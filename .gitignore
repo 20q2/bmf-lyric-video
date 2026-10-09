@@ -1,0 +1,16 @@
+# source audio (copyrighted; keep local)
+audio/
+*.mp3
+# analysis artefacts
+analysis/stems/
+analysis/.cache/
+analysis/.venv/
+analysis/work/
+analysis/qa/
+__pycache__/
+# app
+node_modules/
+.vite-cache/
+dist/
+out/
+.superpowers/
