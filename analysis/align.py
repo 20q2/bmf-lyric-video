@@ -70,6 +70,12 @@ FIX = {
     (28, 3): dict(end=120.17, conf=0.8),
     # L29 bridge "Blowin'": the voice enters at 120.64 (282 Hz) after the silence that ends "fly"; refinement had 120.88.
     (29, 0): dict(start=120.64, conf=0.8),
+    # L33 verse-3 "Ecstasy": 134.15-135.57 is L32's ad-lib "(we'll be, oh-oh)": "we'll be" 410 -> 263 Hz, then two held
+    # "oh"s (237 Hz, then 267-278 Hz from 134.85). A dip at 135.57-135.60, and "Ecstasy" enters at 135.62 (onset 3.2,
+    # 359 Hz; syllable onsets 135.77, 136.00); "is" from 136.10. CTC started it on the ad-lib at 134.12 (the user saw it
+    # underline "way too early").
+    (33, 0): dict(start=135.62, end=136.09, conf=0.75),
+    (33, 1): dict(start=136.10, conf=0.7),
     # L47 outro "Blowin'": 172.15-173.00 is the falling "oh" ad-lib (312 -> 207 Hz); "Blowin'" enters at 173.05 on
     # the 277 Hz note L45 starts on (165.69). Whisper: "Girl" (= Blowin') 173.06.
     (47, 0): dict(start=173.05, conf=0.7),

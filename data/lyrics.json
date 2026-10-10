@@ -1975,20 +1975,20 @@
       "i": 33,
       "text": "Ecstasy is just a pill away",
       "section": "verse3",
-      "start": 134.12,
+      "start": 135.62,
       "end": 137.48,
       "words": [
         {
           "w": "Ecstasy",
-          "start": 134.12,
-          "end": 136.136,
-          "conf": 0.59
+          "start": 135.62,
+          "end": 136.09,
+          "conf": 0.75
         },
         {
           "w": "is",
-          "start": 136.136,
+          "start": 136.1,
           "end": 136.28,
-          "conf": 0.85
+          "conf": 0.7
         },
         {
           "w": "just",
@@ -2835,6 +2835,11 @@
     {
       "start": 129.98,
       "end": 131.17,
+      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
+    },
+    {
+      "start": 133.79,
+      "end": 135.52,
       "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
     },
     {
