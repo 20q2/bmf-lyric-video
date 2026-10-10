@@ -28,5 +28,6 @@ where Whisper's reading is plausible; the rest look like Whisper mishearing and 
 | L42 | 2:34 | Talkin' so fine, I might hold it for ransom | Talk is no fine, I'm right holding for it | | |
 | L45, L47 | 2:45, 2:53 | **Blowin' money** fast | **Girl, we're running** fast (the bridge, 2:00: "Going money fast") | ✓ | |
 
-Settled 2026-10-09 by the user: the bridge and outro are only "Blowin' money fast (oh) / Tryna make it last (oh)"
-twice each; Genius's "it won't last", "we might crash" and "we'll be" are not sung.
+Settled 2026-10-09 by the user, by ear: the bridge and outro sing "Blowin' money fast, (oh) it won't last /
+Tryna make it last / Blowin' money fast, (mmm) we might crash / Tryna make it last (we'll be, oh-oh)" (Genius's
+lines 1 and 3; line 4 is "Tryna make it last" with "we'll be, oh-oh" as the ad-lib, not "I'll make it last").

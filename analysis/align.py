@@ -32,13 +32,14 @@ ALTS = ("mms", "lv60k", "fused_vocL", "fused_vocR")
 
 # Per-line time windows (seconds) where the automatic path is ambiguous.
 LINE_WINDOWS = {
-    # Bridge and outro: four two-bar phrases each, "Blowin' money fast (oh-oh-oh) / Tryna make it last (oh-oh-oh)",
-    # the "oh"s ad-libs between phrases (lyrics.txt keeps them in parentheses). Unconstrained, CTC stretched each line
-    # over the ad-libs around it (e.g. bridge "Blowin'" 118.74-121.57, swallowing the held chorus "fly" to 120.15).
-    # Windows: from the phrase's entry to just before its trailing "oh" (Whisper's phrase timings, and the stem: the
-    # bridge enters at 120.64 after a silence 120.20-120.62; "Tryna" melismas to 124.82, then a silence to 125.27).
-    29: (120.60, 122.85), 30: (123.40, 126.65), 31: (127.05, 130.20), 32: (130.70, 133.62),
-    45: (164.95, 167.45), 46: (169.45, 171.60), 47: (173.00, 175.15), 48: (177.05, 178.70),
+    # Bridge and outro, four two-bar phrases each: "Blowin' money fast, (oh) it won't last (oh) / Tryna make it last
+    # (oh) / Blowin' money fast, (mmm) we might crash (oh) / Tryna make it last (we'll be, oh-oh)". The "oh"s are higher ad-libs
+    # (~420 Hz) between lead phrases (~210-320 Hz). Unconstrained, CTC stretched lines over them (e.g. bridge "Blowin'"
+    # 118.74-121.57, over the held chorus "fly" to 120.15). Windows: from the phrase's entry to just before the next
+    # line's lead; the bridge enters at 120.64 after a silence 120.20-120.62. (The user heard "it won't last" at ~125
+    # s: the lead's 277 -> 155 Hz phrase 123.46-124.18, which an earlier pass had taken for "Tryna".)
+    29: (120.60, 124.20), 30: (125.25, 126.65), 31: (127.05, 131.78), 32: (132.30, 133.62),
+    45: (164.95, 169.10), 46: (170.25, 171.60), 47: (173.00, 176.62), 48: (177.05, 178.70),
 }
 
 # ---------------------------------------------------------------------------
@@ -72,10 +73,29 @@ FIX = {
     # L47 outro "Blowin'": 172.15-173.00 is the falling "oh" ad-lib (312 -> 207 Hz); "Blowin'" enters at 173.05 on
     # the 277 Hz note L45 starts on (165.69). Whisper: "Girl" (= Blowin') 173.06.
     (47, 0): dict(start=173.05, conf=0.7),
-    # L30 bridge "Tryna": the 415 Hz note 123.05-123.42 is the ad-lib "oh" after L29; "Tryna" enters at 123.46
-    # (onset 1.5, down to 277 Hz) and melismas to 124.84; silence to 125.27; "make" from 125.29.
-    (30, 0): dict(start=123.46, end=124.84, conf=0.75),
-    (30, 1): dict(start=125.29, conf=0.75),
+    # L47 outro "...we might crash" (the user confirmed the words), faint: after the high "mmm" (420 Hz, 175.45-176.20)
+    # the lead's short phrase 176.30-176.62 (-50 dB, 174 -> 156 Hz, the bridge's "crash" contour), spaced as L31's.
+    (47, 3): dict(start=176.30, end=176.40, conf=0.4),
+    (47, 4): dict(start=176.40, end=176.50, conf=0.4),
+    (47, 5): dict(start=176.50, end=176.62, conf=0.4),
+    # L29 bridge "...fast, (oh) it won't last": the lead's "it won't last" is 123.46-124.18 (onset 1.5, 277 -> 316 Hz,
+    # "last" falling to 155 Hz); the 415 Hz note 122.9-123.42 before it is the "oh" ad-lib. "fast" ends at 122.85.
+    (29, 2): dict(end=122.85, conf=0.7),
+    (29, 3): dict(start=123.46, conf=0.75),
+    # L30 bridge "Tryna": after the "oh" ad-lib (420 Hz, 124.22-124.84) and a silence, the lead re-enters at 125.29
+    # (onset 2.5, 282 Hz). Whisper: "make" 125.62.
+    (30, 0): dict(start=125.29, conf=0.75),
+    # L31 bridge "...fast, (mmm) we might crash": same shape; "we might crash" 131.27-131.76 (233-261 Hz), then the
+    # "oh" ad-lib (415 Hz) 131.80-132.25; L32 "Tryna" re-enters at 132.34 (onset 1.1, 272 Hz).
+    # Its first half: "Blowin'" 127.17 (onset 5.3, 314 -> 207 Hz) to the dip at 128.10, "money" from 128.15 (onset 1.4,
+    # 277 Hz; CTC: 129.04), "fast" from the unvoiced /f/ at 129.50 to 129.88; the 210 Hz hum 130.0-130.4 is the "mmm".
+    (31, 1): dict(start=128.15, conf=0.7),
+    (31, 2): dict(start=129.50, end=129.88, conf=0.7),
+    # "we" 131.27-131.39 (261 Hz), "might" from the onset at 131.40 (233 Hz), "crash" from 131.55 (rising to 261 Hz).
+    (31, 3): dict(start=131.27, end=131.39, conf=0.65),
+    (31, 4): dict(start=131.40, end=131.54, conf=0.6),
+    (31, 5): dict(start=131.55, end=131.76, conf=0.65),
+    (32, 0): dict(start=132.34, conf=0.7),
     # L47 outro "fast" (CTC: from 174.81): 174.40-174.85 (351 Hz -> 139 Hz, gone by 174.90); the 213-230 Hz note from 175.00 is the "oh".
     (47, 2): dict(start=174.40, end=174.85, conf=0.6),
     # L48, the song's last phrase, fades out at -51..-56 dB: two notes, 177.35-177.85 (310 Hz) and 178.05-178.55

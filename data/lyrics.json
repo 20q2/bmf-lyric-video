@@ -1817,10 +1817,10 @@
     },
     {
       "i": 29,
-      "text": "Blowin' money fast",
+      "text": "Blowin' money fast, it won't last",
       "section": "bridge1",
       "start": 120.64,
-      "end": 122.961,
+      "end": 124.801,
       "words": [
         {
           "w": "Blowin'",
@@ -1832,13 +1832,31 @@
           "w": "money",
           "start": 121.569,
           "end": 122.317,
-          "conf": 0.69
+          "conf": 0.61
         },
         {
-          "w": "fast",
+          "w": "fast,",
           "start": 122.317,
-          "end": 122.961,
-          "conf": 0.69
+          "end": 122.85,
+          "conf": 0.7
+        },
+        {
+          "w": "it",
+          "start": 123.46,
+          "end": 123.7,
+          "conf": 0.75
+        },
+        {
+          "w": "won't",
+          "start": 123.7,
+          "end": 123.913,
+          "conf": 0.44
+        },
+        {
+          "w": "last",
+          "start": 123.913,
+          "end": 124.801,
+          "conf": 0.68
         }
       ]
     },
@@ -1846,24 +1864,24 @@
       "i": 30,
       "text": "Tryna make it last",
       "section": "bridge1",
-      "start": 123.46,
+      "start": 125.29,
       "end": 126.917,
       "words": [
         {
           "w": "Tryna",
-          "start": 123.46,
-          "end": 124.84,
+          "start": 125.29,
+          "end": 125.84,
           "conf": 0.75
         },
         {
           "w": "make",
-          "start": 125.29,
-          "end": 125.889,
-          "conf": 0.75
+          "start": 125.84,
+          "end": 126.063,
+          "conf": 0.52
         },
         {
           "w": "it",
-          "start": 125.889,
+          "start": 126.063,
           "end": 126.26,
           "conf": 0.6
         },
@@ -1877,28 +1895,46 @@
     },
     {
       "i": 31,
-      "text": "Blowin' money fast",
+      "text": "Blowin' money fast, we might crash",
       "section": "bridge1",
       "start": 127.14,
-      "end": 130.439,
+      "end": 131.76,
       "words": [
         {
           "w": "Blowin'",
           "start": 127.14,
-          "end": 129.04,
+          "end": 128.15,
           "conf": 0.7
         },
         {
           "w": "money",
-          "start": 129.04,
-          "end": 129.815,
-          "conf": 0.61
+          "start": 128.15,
+          "end": 129.5,
+          "conf": 0.7
         },
         {
-          "w": "fast",
-          "start": 129.815,
-          "end": 130.439,
-          "conf": 0.69
+          "w": "fast,",
+          "start": 129.5,
+          "end": 129.88,
+          "conf": 0.7
+        },
+        {
+          "w": "we",
+          "start": 131.27,
+          "end": 131.39,
+          "conf": 0.65
+        },
+        {
+          "w": "might",
+          "start": 131.4,
+          "end": 131.54,
+          "conf": 0.6
+        },
+        {
+          "w": "crash",
+          "start": 131.55,
+          "end": 131.76,
+          "conf": 0.65
         }
       ]
     },
@@ -1906,20 +1942,20 @@
       "i": 32,
       "text": "Tryna make it last",
       "section": "bridge1",
-      "start": 131.252,
+      "start": 132.34,
       "end": 133.641,
       "words": [
         {
           "w": "Tryna",
-          "start": 131.252,
+          "start": 132.34,
           "end": 132.74,
-          "conf": 0.59
+          "conf": 0.7
         },
         {
           "w": "make",
           "start": 132.74,
           "end": 133.023,
-          "conf": 0.69
+          "conf": 0.76
         },
         {
           "w": "it",
@@ -2585,28 +2621,46 @@
     },
     {
       "i": 45,
-      "text": "Blowin' money fast",
+      "text": "Blowin' money fast, it won't last",
       "section": "outro1",
       "start": 165.64,
-      "end": 167.33,
+      "end": 170.198,
       "words": [
         {
           "w": "Blowin'",
           "start": 165.64,
           "end": 166.566,
-          "conf": 0.61
+          "conf": 0.54
         },
         {
           "w": "money",
           "start": 166.566,
-          "end": 166.94,
-          "conf": 0.77
+          "end": 167.32,
+          "conf": 0.69
         },
         {
-          "w": "fast",
-          "start": 166.94,
-          "end": 167.33,
-          "conf": 0.66
+          "w": "fast,",
+          "start": 167.32,
+          "end": 168.063,
+          "conf": 0.72
+        },
+        {
+          "w": "it",
+          "start": 168.063,
+          "end": 168.44,
+          "conf": 0.6
+        },
+        {
+          "w": "won't",
+          "start": 168.44,
+          "end": 168.94,
+          "conf": 0.52
+        },
+        {
+          "w": "last",
+          "start": 168.94,
+          "end": 170.198,
+          "conf": 0.75
         }
       ]
     },
@@ -2621,7 +2675,7 @@
           "w": "Tryna",
           "start": 170.28,
           "end": 170.68,
-          "conf": 0.62
+          "conf": 0.69
         },
         {
           "w": "make",
@@ -2645,28 +2699,46 @@
     },
     {
       "i": 47,
-      "text": "Blowin' money fast",
+      "text": "Blowin' money fast, we might crash",
       "section": "outro1",
       "start": 173.05,
-      "end": 174.85,
+      "end": 176.62,
       "words": [
         {
           "w": "Blowin'",
           "start": 173.05,
-          "end": 174.04,
+          "end": 173.66,
           "conf": 0.7
         },
         {
           "w": "money",
-          "start": 174.04,
+          "start": 173.66,
           "end": 174.4,
-          "conf": 0.77
+          "conf": 0.61
         },
         {
-          "w": "fast",
+          "w": "fast,",
           "start": 174.4,
           "end": 174.85,
           "conf": 0.6
+        },
+        {
+          "w": "we",
+          "start": 176.3,
+          "end": 176.4,
+          "conf": 0.4
+        },
+        {
+          "w": "might",
+          "start": 176.4,
+          "end": 176.5,
+          "conf": 0.4
+        },
+        {
+          "w": "crash",
+          "start": 176.5,
+          "end": 176.62,
+          "conf": 0.4
         }
       ]
     },
@@ -2711,6 +2783,10 @@
     },
     {
       "section": "bridge1",
+      "text": "Oh"
+    },
+    {
+      "section": "bridge1",
       "text": "Ooh-oh"
     },
     {
@@ -2719,7 +2795,11 @@
     },
     {
       "section": "bridge1",
-      "text": "Oh-oh"
+      "text": "Oh"
+    },
+    {
+      "section": "bridge1",
+      "text": "We'll be, oh-oh"
     },
     {
       "section": "outro1",
@@ -2727,6 +2807,10 @@
     },
     {
       "section": "outro1",
+      "text": "Oh"
+    },
+    {
+      "section": "outro1",
       "text": "Ooh-oh"
     },
     {
@@ -2735,7 +2819,11 @@
     },
     {
       "section": "outro1",
-      "text": "Oh-oh"
+      "text": "Oh"
+    },
+    {
+      "section": "outro1",
+      "text": "We'll be, oh-oh"
     }
   ],
   "extras": [
@@ -2745,13 +2833,8 @@
       "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
     },
     {
-      "start": 130.54,
-      "end": 131.15,
-      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
-    },
-    {
-      "start": 167.43,
-      "end": 170.18,
+      "start": 129.98,
+      "end": 131.17,
       "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
     },
     {
