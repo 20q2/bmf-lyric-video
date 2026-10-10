@@ -8,7 +8,7 @@ import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, centerAt } from '../drive/carriers';
 import { daylight, skyAt } from '../drive/sky';
-import { buildCar, buildCarrier, buildWorld } from '../drive/world';
+import { buildCar, buildCarrier, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
@@ -59,6 +59,7 @@ export default class DriveScene extends Scene {
       const line = this.ctx.lyrics.lines[c.phrase.line]!;
       o.visible = t > line.words[0]!.start - BANNER_SKY.before && t < line.end + BANNER_SKY.after;
       o.matrix.setPosition(centerAt(c, t));
+      if (o.visible) flutter(o, c, t);
     }
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });

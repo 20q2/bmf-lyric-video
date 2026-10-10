@@ -124,8 +124,8 @@ export const WALL_VIEW = { dist: 20, slide: 7, eye: 2.2 };
 export const SKY = { ahead: 75, up: 19, side: 17, lift: 7 };
 /** Banners fly this far ahead of the car as their line starts, this high, this far to its side (left: clear of the
  *  sky-writing still dissolving on the right), drifting this fast (m, m/s); the plane flies `tow` ahead of its banner,
- *  and a formation's banners stand `gap` apart. */
-export const BANNER = { ahead: 60, up: 42, side: -12, speed: 6, tow: 9, gap: 6.5 };
+ *  and a formation's banners stand `gap` apart; a banner seen from further off than `view` is made bigger to match. */
+export const BANNER = { ahead: 60, up: 42, side: -12, speed: 6, tow: 9, gap: 6.5, view: 58 };
 /** A banner holds one row up to this many characters. */
 export const BANNER_ROW = 22;
 /** The faces on the left stand this far off the road's centre (m). Per kind: how high a lone face's centre stands, and
@@ -177,12 +177,13 @@ export function rowsOf(text: string): string[] {
   return [words.slice(0, best).join(' '), words.slice(best).join(' ')];
 }
 
-function layout(kind: Kind, text: string, solo?: Phrase['solo']) {
+/** Laid out at `scale` x its kind's size (a banner seen from further off is made bigger). */
+function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 1) {
   const L = LAYOUT[kind], set = CAPS.has(kind) ? text.toUpperCase() : text;
   const rows = kind === 'banner' ? (set.length <= BANNER_ROW ? [set] : rowsOf(set)) : rowsFor(set, solo);
   const longest = Math.max(...rows.map((r) => r.length));
-  const em = Math.min(L.rowH * L.emOfRow, (L.w * TEXT_W) / (longest * L.advance));
-  return { rows, em, w: L.w, h: L.rowH * rows.length };
+  const em = scale * Math.min(L.rowH * L.emOfRow, (L.w * TEXT_W) / (longest * L.advance));
+  return { rows, em, w: scale * L.w, h: scale * L.rowH * rows.length };
 }
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -233,15 +234,19 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           const T0 = phs[0]!.start, T1 = phs[phs.length - 1]!.end;
           s = motion.distanceAt(T0) + BANNER.ahead; const f = route.frameAt(s);
           const mid = f.pos.clone().addScaledVector(WORLD_UP, BANNER.up).addScaledVector(f.right, BANNER.side);
-          const car = route.frameAt(motion.distanceAt((T0 + T1) / 2)).pos;
+          const cf = route.frameAt(motion.distanceAt((T0 + T1) / 2)), car = cf.pos;
           normal = car.clone().sub(mid).normalize();
           up = uprightFor(normal, WORLD_UP);
+          // sized for how far off the camera (low behind the car: framing) sees it, so its type reads the same anywhere
+          const eye = car.clone().addScaledVector(flat(cf.fwd), -8).addScaledVector(WORLD_UP, 1.6);
+          const scale = Math.max(1, eye.distanceTo(mid) / BANNER.view);
+          lay = layout(kind_, ph.text, ph.solo, scale);
           // keeping pace with the car (its average speed over the line), drifting left to right across the frame
           const pace = (motion.distanceAt(T1) - motion.distanceAt(T0)) / Math.max(1e-3, T1 - T0);
           vel = up.clone().cross(normal).normalize().multiplyScalar(BANNER.speed).addScaledVector(flat(f.fwd), pace);
           const rank = pi - (phs.length - 1) / 2; // its place in the formation, from the middle (+: lower)
-          center = mid.addScaledVector(vel, ph.start - (T0 + T1) / 2).addScaledVector(up, -rank * BANNER.gap);
-          aim = up.clone().multiplyScalar(rank * BANNER.gap);
+          center = mid.addScaledVector(vel, ph.start - (T0 + T1) / 2).addScaledVector(up, -rank * BANNER.gap * scale);
+          aim = up.clone().multiplyScalar(rank * BANNER.gap * scale);
           solid = null;
         } else if (kind_ === 'sky') {
           const side = pi % 2 === 0 ? -1 : 1; // left first, then right: read left to right

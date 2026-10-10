@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import type { Drive } from './drive';
 import type { Route } from './route';
-import { BANNER, type Carrier, PAIRABLE, basisOf, solidsOf } from './carriers';
+import { BANNER, type Carrier, LAYOUT, PAIRABLE, basisOf, solidsOf } from './carriers';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 
@@ -185,6 +185,19 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   return g;
 }
 
+/** A towed banner ripples: a wave running back from its leading (right) edge, growing toward its trailing edge. Small
+ *  enough to leave the words readable. */
+export const FLUTTER = { segments: 40, amp: 0.025, waves: 2.5, hz: 1.3 };
+/** Ripple a banner carrier's face (its object from buildCarrier) at t. */
+export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
+  const face = o.getObjectByName('face') as THREE.Mesh, p = face.geometry.attributes.position!;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), back = (c.w / 2 - x) / c.w; // 0 at the leading edge, 1 at the trailing
+    p.setZ(i, FLUTTER.amp * c.w * back * Math.sin(2 * Math.PI * (FLUTTER.waves * back - FLUTTER.hz * t)));
+  }
+  p.needsUpdate = true;
+}
+
 /** A carrier with its face's texture: a board on posts (a sign, a billboard), a street blade on its pole, a gantry over
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
@@ -193,7 +206,9 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), mat));
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h, c.kind === 'banner' ? FLUTTER.segments : 1, 1), mat);
+  board.name = 'face';
+  g.add(board);
   const grey = (hex: string) => new THREE.MeshLambertMaterial({ color: hex });
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b);
@@ -210,12 +225,17 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
     case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey('#4a4a52')); break;
     case 'street': legs([-c.w / 2 - 0.15], y0 + c.h / 2 + 0.4); break;
     case 'banner': {
-      // the plane ahead of it (to its right, flying that way) on a tow line from its leading edge
-      const x0 = c.w / 2 + BANNER.tow, plane = grey('#e9e4da');
-      box(BANNER.tow, 0.06, 0.06, c.w / 2 + BANNER.tow / 2, 0, 0, grey('#3a3a40'));
-      box(5.5, 1.1, 1.1, x0 + 2.75, 0, 0, plane); // fuselage, nose to the right
-      box(1.4, 0.15, 9, x0 + 3.2, 0.35, 0, plane); // wings
-      box(1, 1.6, 0.12, x0 + 0.4, 0.9, 0, plane); // tail fin
+      // the plane ahead of it (to its right, nose that way: it flies the way the words run), a high-wing tug on a tow
+      // line from the banner's leading edge; as big as the banner was made (carriers.ts BANNER.view)
+      const k = c.w / LAYOUT.banner.w, tow = BANNER.tow * k, x0 = c.w / 2 + tow, body = grey('#e9e4da'), trim = grey('#b3122e');
+      box(tow, 0.05 * k, 0.05 * k, c.w / 2 + tow / 2, 0, 0, grey('#3a3a40'));
+      const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * k, 0.22 * k, 6 * k, 10), body);
+      fuselage.rotation.z = -Math.PI / 2; fuselage.position.set(x0 + 3 * k, 0, 0); g.add(fuselage); // tail at x0, nose at +6
+      box(1.5 * k, 0.12 * k, 10 * k, x0 + 3.9 * k, 0.6 * k, 0, body); // wing, over the cabin
+      box(0.8 * k, 0.08 * k, 3.4 * k, x0 + 0.35 * k, 0.1 * k, 0, body); // tailplane
+      box(1 * k, 1.5 * k, 0.08 * k, x0 + 0.4 * k, 0.75 * k, 0, trim); // fin
+      const prop = new THREE.Mesh(new THREE.CircleGeometry(1.1 * k, 16), new THREE.MeshBasicMaterial({ color: '#2a2a30', transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+      prop.rotation.y = Math.PI / 2; prop.position.set(x0 + 6.05 * k, 0, 0); g.add(prop); // spinning, a blur
       break;
     }
     case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey('#4a4a52')); break;
