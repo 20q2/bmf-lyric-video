@@ -112,6 +112,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   drive.blocks.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
   g.add(blocks);
   g.add(dressing(drive));
+  g.add(placeSigns(drive));
 
   // palms: a trunk and a crown, behind the roadside signs' line
   const trunks: THREE.Matrix4[] = [], crowns: THREE.Matrix4[] = [];
@@ -256,6 +257,50 @@ function dressing(drive: Drive): THREE.Group {
   }
   const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
   g.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: '#1c0f22' })));
+  return g;
+}
+
+/** The song's places, as city signs by the road just after the line that names them (callbacks, never ahead of the
+ *  words): South Detroit, Compton, Slauson; and "South of somewhere": SOUTH OF, DETROIT crossed out, somewhere sprayed. */
+export const PLACES: readonly [RegExp, string, string, boolean][] = [
+  [/south detroit/i, 'SOUTH DETROIT', 'CITY LIMIT', false],
+  [/compton/i, 'COMPTON', 'WEST SIDE', false],
+  [/slauson/i, 'SLAUSON AV', 'NEXT RIGHT', false],
+  [/south of somewhere/i, 'SOUTH OF', 'DETROIT', true],
+];
+const PLACE_SIGN = { after: 45, lateral: 11.5, w: 7, h: 3.4, y: 4.2 };
+function placeSigns(drive: Drive): THREE.Group {
+  const g = new THREE.Group(), { route, motion } = drive;
+  const lines = new Map<number, { text: string; end: number }>();
+  for (const c of drive.carriers) { const l = lines.get(c.phrase.line); lines.set(c.phrase.line, { text: (l ? l.text + ' ' : '') + c.phrase.text, end: Math.max(l?.end ?? 0, c.phrase.end) }); }
+  for (const [, l] of lines) {
+    const place = PLACES.find(([re]) => re.test(l.text));
+    if (!place) continue;
+    const [, name, sub, sprayed] = place, P = PLACE_SIGN;
+    let s = motion.distanceAt(l.end) + P.after;
+    while (drive.carriers.some((c) => Math.abs(c.s - s) < 16)) s += 6; // clear of the words' own faces
+    const cv = document.createElement('canvas'); cv.width = 768; cv.height = Math.round((768 * P.h) / P.w);
+    const x = cv.getContext('2d')!, W = cv.width, H = cv.height;
+    x.fillStyle = '#1f6b44'; x.fillRect(0, 0, W, H);
+    x.strokeStyle = '#f4f4f0'; x.lineWidth = 10; x.strokeRect(14, 14, W - 28, H - 28);
+    x.fillStyle = '#f4f4f0'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = `${H * 0.3}px "${F.archivo(100, 700)}"`; x.fillText(name, W / 2, H * 0.36, W * 0.88);
+    x.font = `${H * 0.17}px "${F.archivo(100, 700)}"`; x.fillText(sub, W / 2, H * 0.72, W * 0.8);
+    if (sprayed) { // the old name struck out, the new one sprayed over in pink
+      const wSub = x.measureText(sub).width;
+      x.strokeStyle = '#ff4fa3'; x.lineWidth = 9; x.beginPath(); x.moveTo(W / 2 - wSub / 2 - 10, H * 0.74); x.lineTo(W / 2 + wSub / 2 + 10, H * 0.68); x.stroke();
+      x.fillStyle = '#ff4fa3'; x.save(); x.translate(W * 0.62, H * 0.6); x.rotate(-0.12);
+      x.font = `${H * 0.26}px "${F.bodoni(700, { italic: true })}"`; x.fillText('somewhere', 0, 0); x.restore();
+    }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const f = route.frameAt(s), face = f.fwd.clone().negate().addScaledVector(f.right, -0.5).setY(0).normalize(); // toward the oncoming car and the road
+    const sign = new THREE.Group();
+    sign.add(new THREE.Mesh(new THREE.PlaneGeometry(P.w, P.h), new THREE.MeshBasicMaterial({ map: tex })));
+    for (const px of [-P.w / 2 + 0.6, P.w / 2 - 0.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, P.y + P.h / 2, 0.2), toon({ color: WORLD.post })); leg.position.set(px, (P.h / 2 - P.y) / 2, -0.12); sign.add(leg); } // (legs: the ground to the board's top)
+    sign.matrixAutoUpdate = false;
+    sign.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(f.pos.clone().addScaledVector(f.right, P.lateral).add(new THREE.Vector3(0, P.y, 0)));
+    g.add(sign);
+  }
   return g;
 }
 
