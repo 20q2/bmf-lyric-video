@@ -24,7 +24,7 @@
 import * as THREE from 'three';
 import { OBB } from 'three/addons/math/OBB.js';
 import { hash } from '../engine/util';
-import { type Pose, fitSign } from './camera';
+import { LENS, type Pose, eyeOf, fitSign, poseFrom } from './camera';
 import type { Motion } from './motion';
 import type { Phrase } from './phrases';
 import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
@@ -493,6 +493,63 @@ export function pairFraming(c: Carrier, n: Carrier): ((t: number) => Pose) | nul
   const p = lookFrom(eye, mid);
   return () => p;
 }
+const aimOf = (c: Carrier) => c.center.clone().add(c.aim ?? ZERO);
+/** How far back a framing of two neighbouring faces stands (m). */
+const pairDist = (c: Carrier, n: Carrier) => Math.max(WALL_VIEW.dist, (aimOf(c).distanceTo(aimOf(n)) + Math.max(c.w, n.w)) * PAIR.wall);
+/** Whether two neighbouring faces can share a take: standing back to hold both keeps their type at least
+ *  PAIR.takePx tall (px at 1080p, head on). */
+export const takeable = (c: Carrier, n: Carrier) => (Math.min(c.em, n.em) * 1080) / (2 * Math.tan((LENS.fov * Math.PI) / 360) * pairDist(c, n)) >= PAIR.takePx;
+/** A line's faces on the left in one take: the camera drifts along them as they're sung, on the first as it's sung,
+ *  between each and the one before at its cue (both in frame, standing back to hold the two: the one just sung is
+ *  still being read), on the last as the line ends. No cut inside the line. */
+export function lineTake(cs: readonly Carrier[], previews: readonly boolean[]): (t: number) => Pose {
+  const aims = cs.map(aimOf), dists = cs.slice(1).map((n, i) => pairDist(cs[i]!, n));
+  // (how far back at p: each pair's distance between them, eased across the faces)
+  const distAt = (p: number) => { const x = Math.min(dists.length - 1, Math.max(0, p - 0.5)), i = Math.min(dists.length - 2, Math.floor(x)); return i < 0 ? dists[0]! : dists[i]! + (dists[i + 1]! - dists[i]!) * (x - i); };
+  // (held while each is sung: between it and the one before, still being read; or, when it previews the next, between
+  // it and that one, nearer it (PAIR.toNext); sliding on once it's sung, over PAIR.slide, by the next cue if there's
+  // room: else just after, the next already in frame)
+  const keys: [number, number][] = [];
+  cs.forEach((c, i) => {
+    const p = previews[i] && i < cs.length - 1 ? i + PAIR.toNext : Math.max(0, i - 0.5), held = keys[keys.length - 1]?.[0] ?? -Infinity;
+    const from = Math.max(c.phrase.start, held + PAIR.slide);
+    keys.push([from, p], [Math.max(from, c.phrase.end), p]);
+  });
+  keys.push([keys[keys.length - 1]![0] + PAIR.slide, cs.length - 1]);
+  for (let k = 1; k < keys.length; k++) keys[k]![1] = Math.max(keys[k]![1], keys[k - 1]![1]);
+  const along = (t: number) => { // where along the faces the take is at t (0: the first; i + 0.5: between i and i + 1)
+    if (t <= keys[0]![0]) return 0;
+    for (let k = 1; k < keys.length; k++) if (t < keys[k]![0]) { const [t0, p0] = keys[k - 1]!, [t1, p1] = keys[k]!; const u = (t - t0) / Math.max(1e-3, t1 - t0); return p0 + (p1 - p0) * (u * u * (3 - 2 * u)); }
+    return cs.length - 1;
+  };
+  return (t) => {
+    const p = along(t), a = Math.min(cs.length - 2, Math.floor(p)), f = p - a;
+    const aim = aims[a]!.clone().lerp(aims[a + 1]!, f), c = cs[a]!, n = cs[a + 1]!, dist = distAt(p);
+    const eye = aim.clone().addScaledVector(c.normal.clone().lerp(n.normal, f).normalize(), dist);
+    eye.y = groundY(c) + (groundY(n) - groundY(c)) * f + 2.2 + (dist - WALL_VIEW.dist) * PAIR.lift;
+    return lookFrom(eye, aim);
+  };
+}
+/** A line on one kind of sign elsewhere (paint, signs, gantries, the tunnel's lettering) in one take: each phrase's own
+ *  framing held while it's sung, gliding on to the next's once it's sung (over the gap; a whip, PAIR.whip, at least). */
+export function glideTake(cs: readonly Carrier[], frames: readonly ((t: number) => Pose)[]): (t: number) => Pose {
+  const keys: [number, number][] = [];
+  cs.forEach((c, i) => {
+    const from = Math.max(c.phrase.start, (keys[keys.length - 1]?.[0] ?? -Infinity) + PAIR.whip);
+    keys.push([from, i], [Math.max(from, c.phrase.end), i]);
+  });
+  return (t) => {
+    let k = 1;
+    while (k < keys.length && t >= keys[k]![0]) k++;
+    if (k >= keys.length) return frames[cs.length - 1]!(t);
+    const [t0, p0] = keys[k - 1]!, [t1, p1] = keys[k]!;
+    if (t < t0 || p0 === p1) return frames[t < t0 ? 0 : p0]!(t);
+    const u = (t - t0) / Math.max(1e-3, t1 - t0);
+    // (the eye on a straight line between theirs: a pose's orbit would swing it through a wall)
+    const A = frames[p0]!(t), B = frames[p1]!(t), e = u * u * (3 - 2 * u);
+    return poseFrom(eyeOf(A).lerp(eyeOf(B), e), new THREE.Vector3(A.tx, A.ty, A.tz).lerp(new THREE.Vector3(B.tx, B.ty, B.tz), e));
+  };
+}
 /** How far back a pair framing stands, per metre of the pair's extent; and how far it rises (m) per metre further out
  *  than WALL_VIEW.dist. */
-export const PAIR = { wall: 0.95, lift: 0.5, toNext: 0.45 };
+export const PAIR = { wall: 0.95, lift: 0.5, toNext: 0.45, takePx: 54, slide: 0.25, whip: 0.12 };

@@ -4,7 +4,7 @@
 import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
 import { CHASE, type Pose, chase, lerpPose } from './camera';
-import { type Carrier, framing, isFast, lookFrom, pairFraming, placeCarriers } from './carriers';
+import { type Carrier, type Kind, PAIRABLE, framing, glideTake, isFast, lineTake, lookFrom, pairFraming, placeCarriers, takeable } from './carriers';
 import type { Motion } from './motion';
 import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor, emphasisOf } from './phrases';
@@ -36,9 +36,8 @@ export const LANE = 1.9;
 /** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
  *  its first shot stands (m). */
 export const OPENING = { at: [2.47, 6.22, 9.97, 13.72], signDist: 7.5 };
-/** The end: the slam card's hold on "crash" before black (s, look/slam.ts), the cut to the motel (s, a half-beat after the last line has
- *  been read), and the fade out (s). */
-export const FINALE = { slam: 0.4, endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
+/** The end: the cut to the motel (s, a half-beat after the last line has been read), and the fade out (s). */
+export const FINALE = { endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
 /** A move this far (m between the eyes, or radians between the views) is a cut instead; a cut may come this much
  *  before its cue (onto a half-beat) or after. */
@@ -51,6 +50,8 @@ export const far = (a: Pose, b: Pose) => eyeOf(a).distanceTo(eyeOf(b)) > CUT.dis
   || Math.max(a.dist, b.dist) / Math.min(a.dist, b.dist) > CUT.zoom
   || [0.25, 0.5, 0.75].some((u) => eyeOf(lerpPose(a, b, u)).y < Math.min(eyeOf(a).y, eyeOf(b).y) - 0.3); // it would dip
 
+/** The kinds a line glides along in one take (glideTake; the faces on the left have theirs: lineTake). */
+const GLIDES: ReadonlySet<Kind> = new Set(['road', 'sign', 'street', 'gantry', 'tunnel']);
 /** The road through the stretches: each stretch's segment is the distance the car covers in it. */
 export function routeFor(R: readonly Stretch[], motion: Motion): Route {
   return new Route(R.map((s) => ({ s0: motion.distanceAt(s.start), s1: motion.distanceAt(s.end), turn: s.turn * DEG, rise: s.rise })));
@@ -67,8 +68,8 @@ export interface Drive {
   /** The song's beats (s). */
   beats: readonly number[];
   carFrame(t: number): RouteFrame;
-  /** The cut to black after the last "crash" [from, to) (s). */
-  blackout: [number, number] | null;
+  /** The cut to the last line (s): every word sung before it goes, so the end starts clean. */
+  lastCut: number | null;
   stretchAt(t: number): Stretch;
   camera(t: number): Pose;
   shots: Shot[];
@@ -91,25 +92,43 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // pass 1: each phrase's shot. A line's first phrase may be found up to PREROLL early, but not before the phrase before
   // it has been read and sung; every phrase's reading window runs from its shot until it has been up dwellFor.
   const reading: [number, number][] = [], paired: boolean[] = [], phraseShots: Shot[] = [];
+  // in a fast line, the next phrase shares the frame (if it can), so it is read before it's sung (or the next would be
+  // too short to read alone: it's previewed)
+  const fastAt = (i: number) => {
+    const c = carriers[i]!, next = carriers[i + 1];
+    const nextAlone = next ? (carriers[i + 2]?.phrase.start ?? next.phrase.end + 1) - next.phrase.start - SETTLE : Infinity;
+    return isFast(lyrics.lines[c.phrase.line]!) || (!!next && (isFast(lyrics.lines[next.phrase.line]!) || nextAlone < dwellFor(next.phrase.words.length)));
+  };
+  // a line on faces on the left is one take: the camera drifts along its faces as they're sung (lineTake), on into the
+  // next line's first when that one's previewed
+  const takes: (Target | undefined)[] = [];
+  for (let i = 0; i < carriers.length;) {
+    let j = i + 1;
+    while (j < carriers.length && PAIRABLE.has(carriers[j]!.kind) && PAIRABLE.has(carriers[j - 1]!.kind) && takeable(carriers[j - 1]!, carriers[j]!)
+      && (carriers[j]!.phrase.line === carriers[j - 1]!.phrase.line || fastAt(j - 1))) j++;
+    // (elsewhere, a line on one kind of sign: from its framing to the next's)
+    if (j === i + 1 && GLIDES.has(carriers[i]!.kind)) while (j < carriers.length && carriers[j]!.phrase.line === carriers[i]!.phrase.line && carriers[j]!.kind === carriers[i]!.kind) j++;
+    const run = carriers.slice(i, j);
+    const take = run.length < 2 ? undefined : PAIRABLE.has(run[0]!.kind) ? lineTake(run, run.map((_, k) => fastAt(i + k))) : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t))));
+    for (let k = i; k < j; k++) takes[k] = take;
+    i = j;
+  }
   carriers.forEach((c, i) => {
     const w = c.phrase.words[0]!, cue = w.start - LEAD, prev = carriers[i - 1];
     const free = prev ? Math.max(reading[i - 1]![1], prev.phrase.end + 0.1) : 0; // read, and done being sung
     const early = !prev || prev.phrase.line !== c.phrase.line ? Math.min(PREROLL, Math.max(0, cue - free)) : 0;
-    // in a fast line, the next phrase shares the frame (if it can), so it is read before it's sung
-    const next = carriers[i + 1];
-    // (or the next would be too short to read alone: it's previewed here)
-    const nextAlone = next ? (carriers[i + 2]?.phrase.start ?? next.phrase.end + 1) - next.phrase.start - SETTLE : Infinity;
-    const fast = isFast(lyrics.lines[c.phrase.line]!) || (!!next && (isFast(lyrics.lines[next.phrase.line]!) || nextAlone < dwellFor(next.phrase.words.length)));
-    const pair = next && fast ? pairFraming(c, next) : null;
-    paired.push(!!pair);
-    const to = pair ?? framing(c, carFrame, (t) => motion.distanceAt(t));
+    const next = carriers[i + 1], take = takes[i], pair = !take && next && fastAt(i) ? pairFraming(c, next) : null;
+    paired.push(!!pair || (!!take && take === takes[i + 1]));
+    const to = take ?? pair ?? framing(c, carFrame, (t) => motion.distanceAt(t));
     let at: Shot['at'] = early > 0.05 ? cue - early : { start: w.start, w: w.w };
     // one continuous take: when the new framing is far from the last phrase's, the camera swoops there (an arc over the
     // town), leaving early enough to arrive on the cue, once the phrase before has been read and sung; the last line
-    // (out of the black after "crash") is cut to
+    // (after "crash") is cut to
     let move: Shot['move'] = 'snap';
     const before = phraseShots[i - 1];
-    if (!before || far(before.to(resolveAt(at)), to(resolveAt(at)))) {
+    if (take && take === takes[i - 1]) {
+      // (on in the line's take: no move of its own)
+    } else if (!before || far(before.to(resolveAt(at)), to(resolveAt(at)))) {
       // (where the phrase before is still up and there's no room to leave early, a cut: the densest lines)
       const t0 = resolveAt(at), lead = SWOOP_S - SNAP_S, free = Math.max(reading[i - 1]?.[1] ?? -Infinity, prev?.phrase.end ?? -Infinity);
       const room = free <= t0 - lead;
@@ -152,8 +171,8 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   ];
   shots.push(...opening);
   for (const o of opening) own.add(o);
-  // the end: "crash" cuts to black (the scene: drive.blackout); the last line low behind the parked car (its tail
-  // lights, the banner over it; carriers.ts); then the motel again, empty at night, and its NO goes out
+  // the end: after "crash" (a jolt), the last line low behind the parked car (its tail lights, the banner over it;
+  // carriers.ts); then the motel again, empty at night, and its NO goes out
   const endCard: Shot = { at: FINALE.endCard, to: signShot, move: 'cut' };
   shots.push(endCard); own.add(endCard);
   // a stretch's glide gives way to the phrases' own shots: it may not start within 0.3 s of one, nor while a phrase is
@@ -162,9 +181,6 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
   const blocks = blocksOf(route, motion, stretches, carriers, tunnels);
-  // black from just after the last "crash" until the last line's shot
-  const crash = lyrics.lines.flatMap((l) => l.words).filter((w) => /^crash/i.test(w.w)).pop();
-  const lastShot = phraseShots[phraseShots.length - 1];
-  const blackout: [number, number] | null = crash && lastShot ? [crash.start + FINALE.slam, resolveAt(lastShot.at)] : null;
-  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, blackout };
+  const lastShot = phraseShots[phraseShots.length - 1], lastCut = lastShot ? resolveAt(lastShot.at) : null;
+  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut };
 }
