@@ -4,7 +4,7 @@
 import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
 import { CHASE, type Pose, chase, lerpPose } from './camera';
-import { type Carrier, framing, isFast, pairFraming, placeCarriers } from './carriers';
+import { type Carrier, framing, isFast, lookFrom, pairFraming, placeCarriers } from './carriers';
 import type { Motion } from './motion';
 import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor, emphasisOf } from './phrases';
@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
 import { type Block, blocksOf } from './blocks';
+import { motelSign } from './landmarks';
 
 const DEG = Math.PI / 180;
 /** After a line, the camera goes back to the car only if the next line is at least this far off (s). */
@@ -28,6 +29,13 @@ export const SWAY = { amp: 0.35, rate: 0.35 };
 /** The car's bulk (m): world.ts builds it within this box (the two of them sitting up out of it included), its base on
  *  the road at the car's route frame; the guard checks it doesn't hide the lyrics. */
 export const CAR_BOX = { w: 2.05, h: 1.95, l: 5.7 };
+
+/** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
+ *  its first shot stands (m). */
+export const OPENING = { at: [2.47, 6.22, 9.97, 13.72], signDist: 7.5 };
+/** The end: the flash before black after "crash" (s), the cut to the motel (s, a half-beat after the last line has
+ *  been read), and the fade out (s). */
+export const FINALE = { flash: 0.12, endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
 /** A move this far (m between the eyes, or radians between the views) is a cut instead; a cut may come this much
  *  before its cue (onto a half-beat) or after. */
@@ -56,6 +64,8 @@ export interface Drive {
   /** The song's beats (s). */
   beats: readonly number[];
   carFrame(t: number): RouteFrame;
+  /** The cut to black after the last "crash" [from, to) (s). */
+  blackout: [number, number] | null;
   stretchAt(t: number): Stretch;
   camera(t: number): Pose;
   shots: Shot[];
@@ -116,17 +126,38 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // pass 2: back to the car after a line, once its last phrase has been read, if the next line's shot is far enough off
   carriers.forEach((c, i) => {
     const next = carriers[i + 1];
-    if (next && next.phrase.line === c.phrase.line) return;
+    if (!next || next.phrase.line === c.phrase.line) return; // (after the last line, the end card)
     const back = Math.max(c.phrase.end + 0.05, reading[i]![1]), nextAt = next ? resolveAt(phraseShots[i + 1]!.at) : Infinity;
     // a cut back to the car on the beat after (or the 'land' when the car's chase is near enough to move to)
     const beat = beatAtOrAfter(audio, back), to = chaseOf(stretchAt(beat));
     if (nextAt - beat >= BACK_TO_CAR_GAP) { const b: Shot = { at: beat, to, move: far(phraseShots[i]!.to(beat), to(beat)) ? 'cut' : 'land' }; shots.push(b); own.add(b); }
   });
+  // the opening, cut on its downbeats: the motel sign's neon flickering on; the Impala, low, dropping on its
+  // hydraulics; over the two of them, the road ahead; the lot, wide; then the car pulls out into the chase
+  const sign = motelSign(route), park = carFrame(0), at0 = (fwd: number, right: number, up: number) => park.pos.clone().addScaledVector(park.fwd, fwd).addScaledVector(park.right, right).add(new THREE.Vector3(0, up, 0));
+  const signShot: Target = (t) => lookFrom(sign.center.clone().addScaledVector(sign.normal, OPENING.signDist - 0.5 * Math.min(1, t / 3)).add(new THREE.Vector3(0, -0.8, 0)), sign.center);
+  const opening: Shot[] = [
+    { at: 0, to: signShot, move: 'cut' },
+    { at: OPENING.at[0]!, to: () => lookFrom(at0(5.2, 2.4, 0.5), at0(0.6, 0, 0.75)), move: 'cut' },
+    { at: OPENING.at[1]!, to: () => lookFrom(at0(-1.9, 0, 1.85), at0(25, 0, 1.2)), move: 'cut' },
+    { at: OPENING.at[2]!, to: () => lookFrom(at0(12, -16, 3), at0(0, 4, 1.2)), move: 'cut' },
+    { at: OPENING.at[3]!, to: chaseOf(stretches[0]!), move: 'cut' },
+  ];
+  shots.push(...opening);
+  for (const o of opening) own.add(o);
+  // the end: "crash" cuts to black (the scene: drive.blackout); the last line low behind the parked car (its tail
+  // lights, the banner over it; carriers.ts); then the motel again, empty at night, and its NO goes out
+  const endCard: Shot = { at: FINALE.endCard, to: signShot, move: 'cut' };
+  shots.push(endCard); own.add(endCard);
   // a stretch's glide gives way to the phrases' own shots: it may not start within 0.3 s of one, nor while a phrase is
   // still being read (its reading window)
   const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
   const blocks = blocksOf(route, motion, stretches, carriers, tunnels);
-  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept };
+  // black from just after the last "crash" until the last line's shot
+  const crash = lyrics.lines.flatMap((l) => l.words).filter((w) => /^crash/i.test(w.w)).pop();
+  const lastShot = phraseShots[phraseShots.length - 1];
+  const blackout: [number, number] | null = crash && lastShot ? [crash.start + FINALE.flash, resolveAt(lastShot.at)] : null;
+  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, blackout };
 }

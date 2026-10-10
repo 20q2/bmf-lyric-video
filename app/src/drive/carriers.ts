@@ -69,6 +69,8 @@ export interface Carrier {
   aim?: THREE.Vector3;
   /** A carrier that moves (a towed banner): its velocity (m/s); `center` is where it is as its phrase starts. */
   vel?: THREE.Vector3;
+  /** The last line's: shot low behind the parked car, its tail lights, the writing over it (the end). */
+  finale?: boolean;
   /** A billboard: the product its ad sells (ads.ts); its lyric is the headline. */
   ad?: Ad;
 }
@@ -128,7 +130,7 @@ export const SKY = { ahead: 75, up: 27, side: 17, lift: 7 };
 /** Banners fly this far ahead of the car as their line starts, this high, this far to its side (left: clear of the
  *  sky-writing still dissolving on the right), drifting this fast (m, m/s); the plane flies `tow` ahead of its banner,
  *  and a formation's banners stand `gap` apart; a banner seen from further off than `view` is made bigger to match. */
-export const BANNER = { ahead: 60, up: 42, side: -12, speed: 6, tow: 9, gap: 6.5, view: 58 };
+export const BANNER = { ahead: 60, up: 42, side: -12, speed: 6, tow: 9, gap: 6.5, view: 58, finale: { ahead: 42, up: 15 } };
 /** A banner holds one row up to this many characters. */
 export const BANNER_ROW = 22;
 /** The faces on the left stand this far off the road's centre (m). Per kind: how high a lone face's centre stands, and
@@ -207,7 +209,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
   const clear = (s: number) => { const tn = nearTunnel(tunnels, s, TUNNEL_CLEAR); return tn ? tn.s1 + TUNNEL_CLEAR : s; };
   const last: Record<string, number> = {};
   const room = (key: string, s: number, gap: number) => { const v = Math.max(s, (last[key] ?? -Infinity) + gap); last[key] = v; return v; };
-  const lines = R.flatMap((st) => st.lines);
+  const lines = R.flatMap((st) => st.lines), lastLine = lines[lines.length - 1]?.i ?? -1;
   const nextStart = (i: number) => lines.find((l) => l.i > i)?.words[0]!.start ?? Infinity;
   for (const st of R) {
     const pattern = PATTERNS[st.id] ?? ['sign'];
@@ -237,9 +239,10 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         } else if (kind_ === 'banner') {
           // a line's banners fly in formation, one over the next (read top-down), ahead in the sky, facing the car
           // halfway through the line; flying left to right (the way their words run), crossing the middle as it's sung
-          const T0 = phs[0]!.start, T1 = phs[phs.length - 1]!.end;
-          s = motion.distanceAt(T0) + BANNER.ahead; const f = route.frameAt(s);
-          const mid = f.pos.clone().addScaledVector(WORLD_UP, BANNER.up).addScaledVector(f.right, BANNER.side);
+          // (the last line's lower and nearer: seen from low behind the car, over it)
+          const T0 = phs[0]!.start, T1 = phs[phs.length - 1]!.end, fin = line.i === lastLine;
+          s = motion.distanceAt(T0) + (fin ? BANNER.finale.ahead : BANNER.ahead); const f = route.frameAt(s);
+          const mid = f.pos.clone().addScaledVector(WORLD_UP, fin ? BANNER.finale.up : BANNER.up).addScaledVector(f.right, fin ? 0 : BANNER.side);
           const cf = route.frameAt(motion.distanceAt((T0 + T1) / 2)), car = cf.pos;
           normal = car.clone().sub(mid).normalize();
           up = uprightFor(normal, WORLD_UP);
@@ -308,7 +311,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         }
         foot ??= center.y - route.frameAt(s).pos.y;
         if (solid === undefined) solid = solidFor(kind_, lay.w, lay.h, foot);
-        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000) } : {}) });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000) } : {}), ...(line.i === lastLine ? { finale: true } : {}) });
       });
     });
   }
@@ -343,6 +346,8 @@ function overlaps(a: Placed, b: Placed): boolean {
 
 /** The back-seat shot of sky-writing and banners (in these stretches): this far behind the car's centre and this high
  *  (m, over the car's bulk: drive.ts CAR_BOX), aimed this far (radians) under the writing. */
+/** The end's tail-light shot: how far behind the car, off its side and up (m), and how far under the writing it aims. */
+export const TAIL = { back: 7.5, side: 1.4, up: 0.9, under: 5 };
 export const CABIN = { stretches: new Set(['chorus1', 'outro1']), back: 2.3, up: 2.15, under: (8 * Math.PI) / 180 };
 
 /** The pose for a camera at `eye` looking at `at`. */
@@ -380,6 +385,11 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
       return () => p;
     }
     case 'sky': case 'banner': {
+      if (c.finale) return (t) => {
+        // low behind the parked car, its tail lights in the frame's foot, looking up over it at the writing
+        const f = car(t), eye = f.pos.clone().addScaledVector(flat(f.fwd), -TAIL.back).addScaledVector(f.right, TAIL.side).addScaledVector(WORLD_UP, TAIL.up);
+        return lookFrom(eye, centerAt(c, t).add(c.aim ?? ZERO).addScaledVector(WORLD_UP, -TAIL.under));
+      };
       // in some stretches from the back seat: just behind the two of them, over their shoulders, aimed a little under
       // the writing so their silhouettes sit along the frame's foot; otherwise low behind the car, looking up at it
       const cabin = CABIN.stretches.has(c.stretch);

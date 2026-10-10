@@ -12,6 +12,7 @@ import { BANNER, type Carrier, LAYOUT, PAIRABLE, basisOf, solidsOf } from './car
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
+import { MOTEL_SIGN, motelSign } from './landmarks';
 
 export const ROAD_HALF = 4;
 /** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
@@ -140,7 +141,9 @@ export function buildWorld(drive: Drive): THREE.Group {
   const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.motel }));
   motel.matrixAutoUpdate = false;
   motel.matrix.copy(boxAt(route, 4, 22, 34, 9, 14));
-  g.add(motel, motelSign(route));
+  const sign = buildMotelSign(route);
+  g.add(motel, sign);
+  g.userData.sign = sign.userData;
   return g;
 }
 
@@ -232,11 +235,10 @@ function buildStreetlights(drive: Drive): THREE.Group {
   return g;
 }
 
-/** The motel's roadside sign, the video's title in the world: SZA over BMF in pink neon, NO VACANCY lit below; a
- *  panel on a pole across the road from the lot. */
-export const MOTEL_SIGN = { s: -18, lateral: -8, w: 4.4, h: 5.4, y: 5.4 }; // across the road, behind the car in the intro's shot
-function motelSign(route: Route): THREE.Group {
-  const c = document.createElement('canvas'); c.width = 512; c.height = Math.round((512 * MOTEL_SIGN.h) / MOTEL_SIGN.w);
+/** The motel's roadside sign (landmarks.ts), the video's title in the world: SZA over BMF in pink neon, NO VACANCY
+ *  lit below. Two faces — with the NO, and without (VACANCY, the end) — the scene picks one and lights it (userData). */
+function signFace(no: boolean): THREE.CanvasTexture {
+  const M = MOTEL_SIGN, c = document.createElement('canvas'); c.width = 512; c.height = Math.round((512 * M.h) / M.w);
   const x = c.getContext('2d')!, W = c.width, H = c.height;
   x.fillStyle = '#163a40'; x.fillRect(0, 0, W, H);
   x.strokeStyle = '#f3e6c4'; x.lineWidth = 14; x.strokeRect(14, 14, W - 28, H - 28);
@@ -244,20 +246,25 @@ function motelSign(route: Route): THREE.Group {
   x.fillStyle = '#f3e6c4'; x.font = `${H * 0.11}px "${F.archivo(100, 900)}"`; x.fillText('SZA', W / 2, H * 0.17);
   x.shadowColor = 'rgba(255,79,163,1)'; x.shadowBlur = 28; x.fillStyle = '#ffd0e8';
   x.font = `${H * 0.27}px "${F.bodoni(700, { italic: true })}"`; x.fillText('BMF', W / 2, H * 0.48, W * 0.8);
-  x.shadowColor = 'rgba(255,60,40,1)'; x.fillStyle = '#ff8a70'; x.font = `${H * 0.075}px "${F.archivo(100, 700)}"`;
-  x.fillText('NO VACANCY', W / 2, H * 0.82);
+  x.font = `${H * 0.075}px "${F.archivo(100, 700)}"`;
+  const vac = 'VACANCY', gap = x.measureText(' ').width, wNo = x.measureText('NO').width, wVac = x.measureText(vac).width, x0 = W / 2 - (wNo + gap + wVac) / 2;
+  x.textAlign = 'left';
+  x.shadowColor = no ? 'rgba(255,60,40,1)' : 'rgba(0,0,0,0)'; x.fillStyle = no ? '#ff8a70' : '#4a2a2a'; x.fillText('NO', x0, H * 0.82);
+  x.shadowColor = 'rgba(255,60,40,1)'; x.fillStyle = '#ff8a70'; x.fillText(vac, x0 + wNo + gap, H * 0.82);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
-  mat.color.setScalar(1.7); // neon: it blooms
-  const g = new THREE.Group(), M = MOTEL_SIGN;
+  return tex;
+}
+function buildMotelSign(route: Route): THREE.Group {
+  const M = MOTEL_SIGN, at = motelSign(route), faces = { no: signFace(true), vacancy: signFace(false) };
+  const mat = new THREE.MeshBasicMaterial({ map: faces.no, side: THREE.DoubleSide });
+  const g = new THREE.Group();
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(M.w, M.h), mat);
   panel.position.set(0, M.y, 0); g.add(panel);
   const pole = new THREE.Mesh(new THREE.BoxGeometry(0.35, M.y - M.h / 2, 0.35), toon({ color: WORLD.post }));
   pole.position.set(0, (M.y - M.h / 2) / 2, -0.1); g.add(pole);
-  const f = route.frameAt(Math.max(0, M.s)), p = f.pos.clone().addScaledVector(f.fwd, Math.min(0, M.s)).addScaledVector(f.right, M.lateral);
-  const face = f.fwd.clone().addScaledVector(f.right, -0.8 * Math.sign(M.lateral)).setY(0).normalize(); // toward the road and up it, where the intro's shot looks from
   g.matrixAutoUpdate = false;
-  g.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(p);
+  g.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(at.normal).normalize(), new THREE.Vector3(0, 1, 0), at.normal).setPosition(at.foot);
+  g.userData = { neon: mat, faces };
   return g;
 }
 
@@ -342,10 +349,13 @@ function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh
  *  silhouettes: him at the wheel (on its left) in a cap, her riding, her hair down her back. */
 export const CAR = { length: 5.4, width: 1.96, belt: 0.98, wheelZ: 1.55, wheelR: 0.36 };
 export function buildCar(): THREE.Group {
-  const g = new THREE.Group(), { length: L, width: Wd, belt, wheelZ, wheelR } = CAR, hl = L / 2;
+  // the body (and the two of them) on its hydraulics (hydraulics.ts moves it, by name); the wheels on the road
+  const g = new THREE.Group(), body = new THREE.Group(), { length: L, width: Wd, belt, wheelZ, wheelR } = CAR, hl = L / 2;
+  body.name = 'body';
+  g.add(body);
   const paint = toon({ color: WORLD.car }), dark = toon({ color: WORLD.carDark }), chrome = toon({ color: WORLD.chrome });
   const white = toon({ color: '#f4efe4' }), seat = toon({ color: '#3a1820' });
-  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, to: THREE.Object3D = body) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); to.add(o); return o; };
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => add(new THREE.BoxGeometry(w, h, d), m, x, y, z);
 
   // the body: its side profile (z along, y up), wheel arches cut from the sill
@@ -358,15 +368,15 @@ export function buildCar(): THREE.Group {
   side.lineTo(-1.25, belt); // the open cockpit's beltline
   side.lineTo(-hl + 0.2, belt - 0.02); side.lineTo(-hl, 0.86); side.lineTo(-hl - 0.05, 0.55); // the deck, the tail
   side.closePath();
-  const body = new THREE.ExtrudeGeometry(side, { depth: Wd - 0.08, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 2, curveSegments: 10 });
-  body.rotateY(-Math.PI / 2); body.translate((Wd - 0.08) / 2, 0, 0);
-  add(body, paint, 0, 0, 0);
+  const shell = new THREE.ExtrudeGeometry(side, { depth: Wd - 0.08, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 2, curveSegments: 10 });
+  shell.rotateY(-Math.PI / 2); shell.translate((Wd - 0.08) / 2, 0, 0);
+  add(shell, paint, 0, 0, 0);
   // the cockpit: seats and the windshield
   box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
   box(Wd - 0.12, 0.05, 0.05, 0, belt + 0.48, 0.92, chrome); // the windshield's top rail
   for (const x of [Wd / 2 - 0.08, -Wd / 2 + 0.08]) box(0.05, 0.5, 0.05, x, belt + 0.24, 0.95, chrome);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#cfe3ff', transparent: true, opacity: 0.18, depthWrite: false }));
-  glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; g.add(glass);
+  glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);
   // chrome: the spear down each side, the bumpers
   for (const x of [Wd / 2, -Wd / 2]) box(0.03, 0.05, L - 0.9, x, 0.74, 0.05, chrome);
   box(Wd + 0.06, 0.13, 0.14, 0, 0.42, hl + 0.06, chrome);
@@ -375,9 +385,9 @@ export function buildCar(): THREE.Group {
   // wheels: tyre, whitewall, chrome cap
   for (const z of [wheelZ, -wheelZ]) for (const x of [Wd / 2 - 0.13, -Wd / 2 + 0.13]) {
     const sgn = Math.sign(x);
-    const tyre = add(new THREE.CylinderGeometry(wheelR, wheelR, 0.24, 20), dark, x, wheelR, z); tyre.rotation.z = Math.PI / 2;
-    const wall = add(new THREE.RingGeometry(wheelR * 0.55, wheelR * 0.8, 24), white, x + sgn * 0.125, wheelR, z); wall.rotation.y = (sgn * Math.PI) / 2;
-    const cap = add(new THREE.CircleGeometry(wheelR * 0.5, 16), chrome, x + sgn * 0.127, wheelR, z); cap.rotation.y = (sgn * Math.PI) / 2;
+    const tyre = add(new THREE.CylinderGeometry(wheelR, wheelR, 0.24, 20), dark, x, wheelR, z, g); tyre.rotation.z = Math.PI / 2;
+    const wall = add(new THREE.RingGeometry(wheelR * 0.55, wheelR * 0.8, 24), white, x + sgn * 0.125, wheelR, z, g); wall.rotation.y = (sgn * Math.PI) / 2;
+    const cap = add(new THREE.CircleGeometry(wheelR * 0.5, 16), chrome, x + sgn * 0.127, wheelR, z, g); cap.rotation.y = (sgn * Math.PI) / 2;
   }
   // lights: quad headlights, triple round tail lights; the beams ahead on the road
   const head = lampMaterial('#fff2d8', GLOW.head, 0.9), tail = lampMaterial('#ff2a24', GLOW.tail, 0.5);
@@ -389,7 +399,7 @@ export function buildCar(): THREE.Group {
   const P = throwGeo.attributes.position!;
   for (let i = 0; i < P.count; i++) { const far = P.getZ(i) < 0 ? 1 : 0; P.setXYZ(i, P.getX(i) * (far ? 7 : 1.6), 0.04, hl + 0.4 + far * 22); }
   const lit = new THREE.Mesh(throwGeo, glowMaterial('#ffe6bd', GLOW.beam, false, true));
-  g.add(lit);
+  g.add(lit); // (on the road, not on the body)
   // the two of them: him at the wheel (+x: the car's left) in a cap; her, her hair down her back
   for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
     add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);

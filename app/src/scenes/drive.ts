@@ -19,12 +19,15 @@ import { PrintPass } from '../look/print';
 import { NIGHT } from '../look/night';
 import { buildCity } from '../look/city';
 import { Money } from '../look/money';
+import { type Stance, hydraulics } from '../drive/hydraulics';
+import { neonAt } from '../drive/landmarks';
+import { FINALE } from '../drive/drive';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
 const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
 const TUNNEL_DARK = new THREE.Color('#120a05');
-/** A banner's plane is in the sky from this long before its line until this long after (s). */
-const BANNER_SKY = { before: 2, after: 4 };
+/** A banner's plane is in the sky from this long before its line is revealed until this long after the line (s). */
+const BANNER_SKY = { before: 0.8, after: 4 };
 /** Carriers further along the road than this from the car (m) are put away. */
 const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
@@ -53,6 +56,9 @@ export default class DriveScene extends Scene {
   private fogColor = new THREE.Color();
   private city!: ReturnType<typeof buildCity>;
   private money!: Money;
+  /** The motel sign's neon (its material and its two faces), and the car's body on its hydraulics. */
+  private sign!: { neon: THREE.MeshBasicMaterial; faces: { no: THREE.Texture; vacancy: THREE.Texture } };
+  private stance!: (t: number) => Stance;
   /** When the word "crash" is sung (s). */
   private crashes: number[] = [];
   /** Where the sun sets (flat, unit). */
@@ -71,7 +77,10 @@ export default class DriveScene extends Scene {
     this.rt.depthTexture = new THREE.DepthTexture(this.rt.width, this.rt.height, THREE.FloatType);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.world.add(buildWorld(this.drive), this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
+    const world = buildWorld(this.drive);
+    this.sign = world.userData.sign;
+    this.stance = hydraulics(audio, lyrics, this.drive.stretches);
+    this.world.add(world, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
     for (const c of this.drive.carriers) {
       const art = new CarrierArt(c);
       this.arts.push(art);
@@ -111,12 +120,20 @@ export default class DriveScene extends Scene {
     const cf = d.carFrame(t);
     this.car.matrixAutoUpdate = false;
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
+    const st = this.stance(t), body = this.car.getObjectByName('body')!;
+    body.position.y = st.lift; body.rotation.set(st.pitch, 0, st.roll);
+    // the motel's neon: flickering on, and at the end its NO going out
+    const neon = neonAt(t, f.beat);
+    this.sign.neon.color.setScalar(0.25 + 1.45 * neon.lit);
+    const face = neon.no ? this.sign.faces.no : this.sign.faces.vacancy;
+    if (this.sign.neon.map !== face) { this.sign.neon.map = face; this.sign.neon.needsUpdate = true; }
     const carS = d.motion.distanceAt(t);
     for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER;
     // banners where they've flown to; each plane in the sky only around its line
     for (const [c, o] of this.flying) {
       const line = this.ctx.lyrics.lines[c.phrase.line]!;
-      o.visible = t > line.words[0]!.start - BANNER_SKY.before && t < line.end + BANNER_SKY.after;
+      const first = d.carriers.find((k) => k.phrase.line === c.phrase.line)!;
+      o.visible = t > first.reveal - BANNER_SKY.before && t < line.end + BANNER_SKY.after;
       o.matrix.setPosition(centerAt(c, t));
       if (o.visible) flutter(o, c, t);
     }
@@ -155,7 +172,7 @@ export default class DriveScene extends Scene {
       this.sodium.forEach((l, k) => {
         const s = tn.lamps[Math.min(tn.lamps.length - 1, Math.max(0, i - 1 + k))]!, fr = d.route.frameAt(s);
         l.position.copy(fr.pos).addScaledVector(fr.up, TUNNEL.h - 0.6);
-        l.intensity = TUNNEL_LIGHT.intensity * inside;
+        l.intensity = TUNNEL_LIGHT.intensity * inside * (this.crashes.some((c) => t >= c && t < c + 0.47) ? 0.05 : 1); // "crash": the lamps die for a beat
       });
     } else this.sodium.forEach((l) => (l.intensity = 0));
     this.sun.intensity *= 1 - inside;
@@ -179,11 +196,16 @@ export default class DriveScene extends Scene {
     // the beat: while the drums play, the frame punches in a touch on each kick; "crash" jolts it, with a flash
     const drums = smooth(0.12, 0.3, f.a.drums), hit = this.crashes.reduce((m, c) => (t >= c && t < c + 0.6 ? Math.max(m, Math.exp(-(t - c) * 7)) : m), 0);
     const jolt = 14 * hit;
+    // the end: "crash" whites out and cuts to black; at the very end the motel fades away
+    const bo = d.blackout, black = bo && t >= bo[0] && t < bo[1] ? 1 : 0;
+    const [f0, f1] = FINALE.fade, gone = Math.min(1, Math.max(0, (t - f0) / (f1 - f0)));
+    const white = bo && t >= bo[0] - FINALE.flash && t < bo[0] ? 1.2 : 0;
     return {
       bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06, grain: 0.055, vignette: 0.22,
       zoom: 1 + 0.007 * f.a.kick * drums + 0.03 * hit,
       shake: [jolt * Math.sin(t * 91), jolt * Math.cos(t * 77)],
-      flash: 0.12 * hit,
+      flash: 0.12 * hit + white,
+      exposure: (1 - black) * (1 - gone * gone),
     };
   }
 
