@@ -48,7 +48,7 @@ to the user. Only the final export renders video (M5).
   and before "and / from / with...", never after "the / my...").
 - `carriers.ts`, `carrierart.ts`: where each phrase is written — road paint, sky-writing; on the road's left walls,
   billboards, shop fascias and neon (two phrases stacked per building, read top-down); on the right short signs and
-  street blades; freeway gantries (per-stretch patterns; "fly" lines in the sky) — and how the camera frames it; faces
+  street blades; banners towed by planes; freeway gantries (per-stretch patterns; "fly" lines in the sky) — and how the camera frames it; faces
   drawn in the browser. Each carrier's solid (building or backing board) is in the model, so the guard checks
   occlusion against what the scene builds.
 - `tunnel.ts`: a stretch marked `tunnel` (the bridge) runs through a headland — its mouths, a lamp over the car on
