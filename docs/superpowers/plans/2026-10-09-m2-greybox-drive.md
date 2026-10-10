@@ -149,3 +149,18 @@ on the signs, needs to be more dynamic." Done on m2:
   phrase being sung and the next (the user's pick: "preview the next phrase").
 - 12 phrases of 121 are still 0.07-0.8 s short (tight joins in the dense verses): listed in tests/sung.test.ts
   KNOWN_SHORT, which may only shrink; M4 designs those shots by hand.
+
+## Revision 3: more kinds of signage, nothing read ahead (2026-10-10)
+
+- The user: "use different kinds of signs to swap it up" and "don't show too much of the song out in the distance —
+  it encourages us to try and read it if we have a beat".
+- New carriers: billboards, shop fascias and neon (the Strip at night) join walls on the left; green street blades join
+  signs on the right; gantries are green freeway signs. Fast lines cycle through the left kinds per stretch.
+- Reveal: every face is blank (its board or wall standing) until the shot that first frames it; a line's next phrase
+  may show from the shot before (or the fast-verse preview), never more than 2 s ahead; the guard checks it.
+- Two phrases stack on one building, top then bottom: the left-hand run used to drift up to 124 m ahead of the car
+  in the slow verses (onto the freeway and the hill); now at most ~30 m. Faces step along a bend until their
+  buildings clear; the across-road camera aims at the whole stack, rises over the right-hand signs when a pair needs
+  it further out; gantries stand clear of the left-hand run; no palms in front of faces.
+- The guard learnt occlusion (carrier solids); that measured three second-signs-of-a-line as short (they stand behind
+  the first). KNOWN_SHORT: 10 (was 12).

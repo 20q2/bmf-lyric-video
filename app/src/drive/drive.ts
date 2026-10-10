@@ -16,6 +16,8 @@ const DEG = Math.PI / 180;
 export const BACK_TO_CAR_GAP = 1.2;
 /** A line's first phrase may be found this long before its first word (s), when the line before has ended. */
 export const PREROLL = 0.5;
+/** A phrase's text never shows more than this long before it's sung (s), whatever frame it's in. */
+export const REVEAL_AHEAD = 2;
 /** The chase framings sway this far either side of their preset (radians) at this rate (radians per second), so the
  *  camera never sits still on the car — but never swings round far enough to turn its direction on screen around. */
 export const SWAY = { amp: 0.35, rate: 0.35 };
@@ -50,7 +52,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   for (const st of stretches) if (st.k > 0) shots.push({ at: st.start, to: chaseOf(st), move: 'glide' });
   // pass 1: each phrase's shot. A line's first phrase may be found up to PREROLL early, but not before the phrase before
   // it has been read and sung; every phrase's reading window runs from its shot until it has been up dwellFor.
-  const reading: [number, number][] = [];
+  const reading: [number, number][] = [], paired: boolean[] = [];
   const phraseShots = carriers.map((c, i) => {
     const w = c.phrase.words[0]!, cue = w.start - LEAD, prev = carriers[i - 1];
     const free = prev ? Math.max(reading[i - 1]![1], prev.phrase.end + 0.1) : 0; // read, and done being sung
@@ -60,12 +62,19 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     // (or the next would be too short to read alone: it's previewed here)
     const nextAlone = next ? (carriers[i + 2]?.phrase.start ?? next.phrase.end + 1) - next.phrase.start - SETTLE : Infinity;
     const fast = isFast(lyrics.lines[c.phrase.line]!) || (!!next && (isFast(lyrics.lines[next.phrase.line]!) || nextAlone < dwellFor(next.phrase.words.length)));
-    const pair = next && fast ? pairFraming(c, next, carFrame) : null;
+    const pair = next && fast ? pairFraming(c, next) : null;
+    paired.push(!!pair);
     const shot: Shot = { at: early > 0.05 ? cue - early : { start: w.start, w: w.w }, to: pair ?? framing(c, carFrame, (t) => motion.distanceAt(t)) };
     reading.push([resolveAt(shot.at), cue + SNAP_S + dwellFor(c.phrase.words.length)]);
     return shot;
   });
   shots.push(...phraseShots);
+  // each phrase's text shows from its own shot, or from the shot before when that's the same line's (the next phrase
+  // may be seen coming) or previews it (paired): never more than one phrase ahead, never across a pause
+  carriers.forEach((c, i) => {
+    c.reveal = resolveAt(phraseShots[i]!.at);
+    if (paired[i - 1] || carriers[i - 1]?.phrase.line === c.phrase.line) c.reveal = Math.min(c.reveal, Math.max(resolveAt(phraseShots[i - 1]!.at), c.phrase.start - REVEAL_AHEAD));
+  });
   const own = new Set<Shot>(phraseShots);
   // pass 2: back to the car after a line, once its last phrase has been read, if the next line's shot is far enough off
   carriers.forEach((c, i) => {

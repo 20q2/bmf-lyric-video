@@ -46,10 +46,16 @@ to the user. Only the final export renders video (M5).
   eases from the previous move's pose at the same t, so a hand-off from the moving car to a fixed sign is continuous).
 - `phrases.ts`: lines into phrases of 1-4 words (the cheapest split under a phrase-reading cost: breaks at commas, gaps
   and before "and / from / with...", never after "the / my...").
-- `carriers.ts`, `carrierart.ts`: where each phrase is written — road paint, sky-writing, walls, short signs, freeway
-  gantries (per-stretch patterns; "fly" lines in the sky) — and how the camera frames it; faces drawn in the browser.
-- `drive.ts`: the model the scene renders and `tests/sung.test.ts` checks (every phrase's carrier in frame, facing the
-  camera, type >= 36 px while sung; the car never over road paint while it's sung).
+- `carriers.ts`, `carrierart.ts`: where each phrase is written — road paint, sky-writing; on the road's left walls,
+  billboards, shop fascias and neon (two phrases stacked per building, read top-down); on the right short signs and
+  street blades; freeway gantries (per-stretch patterns; "fly" lines in the sky) — and how the camera frames it; faces
+  drawn in the browser. Each carrier's solid (building or backing board) is in the model, so the guard checks
+  occlusion against what the scene builds.
+- `dissolve.ts`: when text shows — blank until the camera first comes for it (`reveal`: never more than one phrase,
+  or 2 s, ahead), sky-writing dissolving after.
+- `drive.ts`: the model the scene renders and `tests/sung.test.ts` checks (while sung every phrase's carrier is in the
+  title-safe frame, facing the camera, upright left to right, not hidden by another carrier, type >= 48 px; each
+  phrase readable for dwellFor; nothing revealed early; the car never over road paint while it's sung).
 - `world.ts`, `sky.ts`, `scenes/drive.ts`: the greybox world, the sky over time, the scene.
 
 Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous stretch, `l` loop the

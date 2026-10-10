@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import type { Drive } from './drive';
 import type { Route } from './route';
-import type { Carrier } from './carriers';
+import { type Carrier, PAIRABLE, basisOf, solidsOf } from './carriers';
 import type { Stretch } from './stretches';
 
 const ROAD_HALF = 4;
@@ -103,6 +103,8 @@ export function buildWorld(drive: Drive): THREE.Group {
     if (!PALMS.has(stretchAtS(s).id)) continue;
     for (const side of [1, -1]) {
       if (side === -1 && BLOCKS[stretchAtS(s).id]!.seaLeft) continue;
+      // none on the left where a face stands: they'd stand between it and the camera across the road
+      if (side === -1 && drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 4)) continue;
       const h = 9 + 4 * hash(k, side, 8);
       trunks.push(boxAt(route, s, side * 11.5, 0.35, h, 0.35));
       crowns.push(boxAt(route, s, side * 11.5, 3.2, 1.2, 3.2, h));
@@ -122,38 +124,34 @@ export function buildWorld(drive: Drive): THREE.Group {
   return g;
 }
 
-/** A carrier with its face's texture: a board on posts, a gantry over the road, a painted wall on its building, paint
- *  on the road, or writing in the sky. */
+/** A carrier with its face's texture: a board on posts (a sign, a billboard), a street blade on its pole, a gantry over
+ *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
+ *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky';
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   const g = new THREE.Group();
   g.add(new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), mat));
   const grey = (hex: string) => new THREE.MeshLambertMaterial({ color: hex });
-  if (c.kind === 'sign' || c.kind === 'gantry') {
-    const back = new THREE.Mesh(new THREE.BoxGeometry(c.w + 0.2, c.h + 0.2, 0.15), grey('#2a2a30'));
-    back.position.z = -0.1;
-    g.add(back);
-    const drop = c.kind === 'gantry' ? 6 + c.h / 2 : 3 + c.h / 2, legX = c.kind === 'gantry' ? 6.5 : c.w / 2 - 0.5;
-    for (const x of [-legX, legX]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, drop, 0.2), grey('#4a4a52'));
-      leg.position.set(x, c.h / 2 - drop / 2, -0.2);
-      g.add(leg);
-    }
-    if (c.kind === 'gantry') {
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(13.4, 0.4, 0.4), grey('#4a4a52'));
-      beam.position.set(0, c.h / 2 + 0.2, -0.2);
-      g.add(beam);
-    }
-  } else if (c.kind === 'wall') {
-    const building = new THREE.Mesh(new THREE.BoxGeometry(c.w + 6, 14, 10), new THREE.MeshLambertMaterial({ color: wall }));
-    building.position.set(0, 7 - 5, -5.06); // its front face just behind the paint, its foot on the ground (the text is 5 m up)
-    g.add(building);
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b);
+  };
+  // the face's centre stands this high over the ground (the road's height where it stands)
+  const y0 = c.foot;
+  // legs from the board's top down to the ground, at these x
+  const legs = (xs: number[], drop = y0 + c.h / 2) => { for (const x of xs) box(0.2, drop, 0.2, x, c.h / 2 - drop / 2, -0.2, grey('#4a4a52')); };
+  // its backing board or its building (carriers.ts solidsOf: what the guard checks for hiding other faces)
+  const building = PAIRABLE.has(c.kind) && c.kind !== 'billboard';
+  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? new THREE.MeshLambertMaterial({ color: wall }) : grey('#2a2a30'));
+  switch (c.kind) {
+    case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
+    case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey('#4a4a52')); break;
+    case 'street': legs([-c.w / 2 - 0.15], y0 + c.h / 2 + 0.4); break;
+    case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey('#4a4a52')); break;
   }
-  const along = c.up.clone().cross(c.normal).normalize();
   g.matrixAutoUpdate = false;
-  g.matrix.makeBasis(along, c.up, c.normal).setPosition(c.center);
+  g.matrix.copy(basisOf(c));
   return g;
 }
 
