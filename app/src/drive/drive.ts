@@ -13,8 +13,9 @@ import { type Stretch, motionFor, resolveStretches } from './stretches';
 const DEG = Math.PI / 180;
 /** After a line, the camera goes back to the car only if the next line is at least this far off (s). */
 export const BACK_TO_CAR_GAP = 1.2;
-/** The chase framings orbit the car this fast (radians per second), so the camera never sits still on it. */
-export const ORBIT = 0.09;
+/** The chase framings sway this far either side of their preset (radians) at this rate (radians per second), so the
+ *  camera never sits still on the car — but never swings round far enough to turn its direction on screen around. */
+export const SWAY = { amp: 0.35, rate: 0.35 };
 
 /** The road through the stretches: each stretch's segment is the distance the car covers in it. */
 export function routeFor(R: readonly Stretch[], motion: Motion): Route {
@@ -39,7 +40,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const stretchAt = (t: number) => stretches.find((s) => t >= s.start && t < s.end) ?? stretches[stretches.length - 1]!;
   const chaseOf = (st: Stretch): Target => (t) => {
     const p = chase(CHASE[st.chase], carFrame(t));
-    return { ...p, yaw: p.yaw + Math.sin((t - st.start) * ORBIT * 4) * 0.5 + (t - st.start) * ORBIT };
+    return { ...p, yaw: p.yaw + Math.sin((t - st.start) * SWAY.rate) * SWAY.amp };
   };
 
   const shots: Shot[] = [];

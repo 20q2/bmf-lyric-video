@@ -1,4 +1,5 @@
-// The guard: while each phrase is sung, its carrier is in frame, faces the camera and its type is big enough to read —
+// The guard: while each phrase is sung, its carrier is in frame, faces the camera, reads upright left to right, and its
+// type is big enough to read —
 // through the camera the scene renders (drive.ts camera). From the moment the snap onto it has landed until the next
 // phrase's cue (or the phrase's end).
 import { expect, test } from 'bun:test';
@@ -34,6 +35,10 @@ function problems(c: Carrier, t: number): string[] {
   const toCam = cam.position.clone().sub(c.center).normalize();
   const angle = (Math.acos(Math.min(1, toCam.dot(c.normal))) * 180) / Math.PI;
   if (angle > MAX_ANGLE) out.push(`faces ${angle.toFixed(0)}° away`);
+  // upright and left to right on screen: the text's up points up, its run points right
+  const o = toPx(c.center.clone().project(cam)), r = toPx(c.center.clone().addScaledVector(along(c), c.em).project(cam)), u = toPx(c.center.clone().addScaledVector(c.up, c.em).project(cam));
+  if (r.x - o.x <= Math.abs(r.y - o.y)) out.push('reads backwards or sideways');
+  if (o.y - u.y <= Math.abs(u.x - o.x)) out.push('upside down or sideways');
   const a = toPx(c.center.clone().addScaledVector(c.up, c.em / 2).project(cam)), b = toPx(c.center.clone().addScaledVector(c.up, -c.em / 2).project(cam));
   const px = a.distanceTo(b);
   if (px < MIN_EM_PX) out.push(`type ${px.toFixed(0)} px`);

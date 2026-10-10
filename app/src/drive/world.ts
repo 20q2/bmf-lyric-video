@@ -157,12 +157,14 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   return g;
 }
 
-/** Road paint laid on the road itself, row of vertices by row along it, so it follows the road's bends and grade. */
+/** Road paint laid on the road itself, row of vertices by row along it, so it follows the road's bends and grade. The
+ *  face's own axes decide which way its texture runs: its up along the road (forward or back) and its run across it. */
 function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh {
   const geo = new THREE.PlaneGeometry(c.w, c.h, 1, Math.max(2, Math.ceil(c.h / 0.5)));
-  const p = geo.attributes.position!;
+  const p = geo.attributes.position!, f0 = route.frameAt(c.s);
+  const upSign = Math.sign(c.up.dot(f0.fwd)), runSign = Math.sign(c.up.clone().cross(c.normal).dot(f0.right));
   for (let i = 0; i < p.count; i++) {
-    const f = route.frameAt(c.s + p.getY(i)), v = f.pos.clone().addScaledVector(f.right, p.getX(i)).addScaledVector(f.up, 0.03);
+    const f = route.frameAt(c.s + upSign * p.getY(i)), v = f.pos.clone().addScaledVector(f.right, runSign * p.getX(i)).addScaledVector(f.up, 0.03);
     p.setXYZ(i, v.x, v.y, v.z);
   }
   geo.computeVertexNormals();

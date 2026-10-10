@@ -1,10 +1,12 @@
 // Where each phrase is written in the world (its "carrier"), and how the camera finds it. Every lyric line takes one
 // kind of carrier from its stretch's pattern (the "fly" lines always the sky), and each of its phrases gets its own:
-//   road   painted on the asphalt just past where the car is when the phrase ends, read from behind; the camera holds
-//          high over the words and the car drives up to them (never over them while they're sung)
+//   road   painted on the asphalt just past where the car is when the phrase ends, written to be read from ahead: the
+//          camera holds high in front of the words looking back, the car drives toward it, down the screen, up to them
+//          (never over them while they're sung), and each next phrase lies further on: lower on screen, read top-down
 //   sky    written in the sky ahead as it's sung, then dissolving (carrierart.ts); the camera sits low behind the
 //          car and looks up at it
-//   wall   painted on a building's wall beside the road; from across the road, the camera slides along with the car
+//   wall   painted on a building's wall on the left of the road; from across the road the camera looks left, so the car
+//          drives left to right on screen and each next wall comes in on the right
 //   sign   a short roadside board; the camera snaps to it
 //   gantry a board over the freeway; the camera snaps to it
 // Placement and text layout (rows and type size, in metres) are pure, so the guards can check legibility under bun;
@@ -50,8 +52,6 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   chorus4: ['road', 'sky', 'sky'],
   outro1: ['sky', 'sky', 'sky', 'sky'],
 };
-/** Stretches with the sea on the left: no walls there. */
-const SEA_LEFT = new Set(['chorus3', 'bridge1']);
 
 /** Per kind: a row's height and the face's width (m), and the face's type: its average advance per character (a share
  *  of the em) and the share of a row the em may take. */
@@ -113,7 +113,8 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
     const pattern = PATTERNS[st.id] ?? ['sign'];
     st.lines.forEach((line, li) => {
       let kind: Kind = /\bfly\b/i.test(line.text) ? 'sky' : pattern[li % pattern.length]!;
-      const wallSide = SEA_LEFT.has(st.id) ? 1 : li % 2 === 0 ? 1 : -1;
+      // walls stand on the left (seen from the right, the drive runs left to right on screen); none where the sea is
+      const wallSide = -1;
       phrasesOf(line).forEach((ph, pi) => {
         const lay = layout(kind, ph.text), id = `L${line.i}.${pi}`;
         let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3;
@@ -121,9 +122,9 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           s = room('road', motion.distanceAt(ph.end) + ROAD_AHEAD + lay.h / 2, lay.h + 2); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.up, 0.03);
           normal = f.up.clone();
-          up = f.fwd.clone();
+          up = f.fwd.clone().negate();
         } else if (kind === 'sky') {
-          const side = pi % 2 === 0 ? -1 : 1;
+          const side = pi % 2 === 0 ? -1 : 1; // left first, then right: read left to right
           s = motion.distanceAt(ph.start) + SKY.ahead; const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(WORLD_UP, SKY.up + (pi % 2) * SKY.lift).addScaledVector(f.right, side * SKY.side);
           const car = route.frameAt(motion.distanceAt((ph.start + ph.end) / 2)).pos;
@@ -140,7 +141,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           normal = flat(f.fwd.clone().negate());
           up = WORLD_UP.clone();
         } else {
-          const side = pi % 2 === 0 ? 1 : -1;
+          const side = 1; // on the right: the walls have the left
           s = room(`sign${side}`, motion.distanceAt((ph.start + ph.end) / 2), 10); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.right, side * SIGN.lateral).addScaledVector(WORLD_UP, SIGN.y);
           const back = flat(f.fwd.clone().negate()), toRoad = flat(f.right.clone().multiplyScalar(-side));
@@ -165,7 +166,7 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
   const jitter = (k: number) => hash(c.phrase.start * 1000, k) * 2 - 1; // a seeded variation, so runs don't repeat
   switch (c.kind) {
     case 'road': {
-      // high behind the words, held: the car drives into frame and over them
+      // high in front of the words, looking back down the road at them, held: the car drives toward us, up to them
       const p: Pose = { tx: c.center.x, ty: c.center.y, tz: c.center.z, dist: Math.max(ROAD_VIEW.dist, c.h * ROAD_VIEW.perLength), yaw: Math.atan2(c.up.x, c.up.z) + Math.PI + 0.2 * jitter(1), pitch: ROAD_VIEW.pitch + 0.08 * jitter(2), roll: 0 };
       return () => p;
     }

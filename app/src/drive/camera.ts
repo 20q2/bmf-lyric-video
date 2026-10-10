@@ -40,7 +40,7 @@ export const lerpPose = (a: Pose, b: Pose, u: number): Pose => ({
 const DEG = Math.PI / 180;
 /** The car's home framings: yaw from its nose (+ to its left), pitch and distance. */
 export const CHASE = Object.freeze({
-  side: { yaw: -90 * DEG, pitch: 8 * DEG, dist: 9 },
+  side: { yaw: -90 * DEG, pitch: 8 * DEG, dist: 7 }, // from its right: it drives left to right on screen
   behind: { yaw: 180 * DEG, pitch: 12 * DEG, dist: 11 },
   front3q: { yaw: -35 * DEG, pitch: 8 * DEG, dist: 9 },
   high: { yaw: 180 * DEG, pitch: 50 * DEG, dist: 30 },
