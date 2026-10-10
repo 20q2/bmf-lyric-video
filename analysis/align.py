@@ -31,7 +31,15 @@ PRIMARY = "fused6"
 ALTS = ("mms", "lv60k", "fused_vocL", "fused_vocR")
 
 # Per-line time windows (seconds) where the automatic path is ambiguous.
-LINE_WINDOWS = {}
+LINE_WINDOWS = {
+    # Bridge and outro: four two-bar phrases each, "Blowin' money fast (oh-oh-oh) / Tryna make it last (oh-oh-oh)",
+    # the "oh"s ad-libs between phrases (lyrics.txt keeps them in parentheses). Unconstrained, CTC stretched each line
+    # over the ad-libs around it (e.g. bridge "Blowin'" 118.74-121.57, swallowing the held chorus "fly" to 120.15).
+    # Windows: from the phrase's entry to just before its trailing "oh" (Whisper's phrase timings, and the stem: the
+    # bridge enters at 120.64 after a silence 120.20-120.62; "Tryna" melismas to 124.82, then a silence to 125.27).
+    29: (120.60, 122.85), 30: (123.40, 126.65), 31: (127.05, 130.20), 32: (130.70, 133.62),
+    45: (164.95, 167.45), 46: (169.45, 171.60), 47: (173.00, 175.15), 48: (177.05, 178.70),
+}
 
 # ---------------------------------------------------------------------------
 # Manual anchors (seconds) for the CTC path, established by inspecting the QA
@@ -44,7 +52,39 @@ ANCHORS = {}
 # dict(start=..., end=..., conf=...).  A manual end is authoritative: main()
 # pushes the following word later instead of cutting the fixed word short.
 # entries are added only after inspecting the QA plots for this song
-FIX = {}
+FIX = {
+    # L16 "Ooh, he bossy, ooh, he crip walkin'": the second "ooh" (206 Hz) ends at 77.45 (-28 -> -41 dB), the stem
+    # stays near -44 dB to 77.70 and "he" enters at 77.72 (-39 -> -17 dB). CTC ran "ooh" through the silence.
+    (16, 3): dict(end=77.45, conf=0.75),
+    (16, 4): dict(start=77.72, conf=0.75),
+    # L17 "...and he slut me out": "and" (261 Hz) falls away at 81.17; a faint -40 dB tail to 81.40, then the voice
+    # re-enters at 81.43 (onset 2.1). "he" 81.43-81.60 (dip to -32 dB at 81.62), "slut" from 81.67 (onset 2.0).
+    (17, 5): dict(start=81.43, end=81.60, conf=0.7),
+    (17, 6): dict(start=81.67, conf=0.7),
+    # L19 "...call him Mr. Handle It": "call" 88.48-88.69 (onset 5.2 at 88.50), the stem near -40..-48 dB to 88.93,
+    # "him" enters at 88.95 (229 Hz) and "Mr." rises to 260 Hz from 89.20. CTC put "him" on the end of "call".
+    (19, 6): dict(start=88.95, end=89.19, conf=0.7),
+    (19, 7): dict(start=89.20, conf=0.7),
+    # L28 chorus-3 "fly" (the last one) is held to 120.15 (-20 -> -45 dB by 120.20); the bridge enters at 120.64.
+    (28, 3): dict(end=120.17, conf=0.8),
+    # L29 bridge "Blowin'": the voice enters at 120.64 (282 Hz) after the silence that ends "fly"; refinement had 120.88.
+    (29, 0): dict(start=120.64, conf=0.8),
+    # L47 outro "Blowin'": 172.15-173.00 is the falling "oh" ad-lib (312 -> 207 Hz); "Blowin'" enters at 173.05 on
+    # the 277 Hz note L45 starts on (165.69). Whisper: "Girl" (= Blowin') 173.06.
+    (47, 0): dict(start=173.05, conf=0.7),
+    # L30 bridge "Tryna": the 415 Hz note 123.05-123.42 is the ad-lib "oh" after L29; "Tryna" enters at 123.46
+    # (onset 1.5, down to 277 Hz) and melismas to 124.84; silence to 125.27; "make" from 125.29.
+    (30, 0): dict(start=123.46, end=124.84, conf=0.75),
+    (30, 1): dict(start=125.29, conf=0.75),
+    # L47 outro "fast" (CTC: from 174.81): 174.40-174.85 (351 Hz -> 139 Hz, gone by 174.90); the 213-230 Hz note from 175.00 is the "oh".
+    (47, 2): dict(start=174.40, end=174.85, conf=0.6),
+    # L48, the song's last phrase, fades out at -51..-56 dB: two notes, 177.35-177.85 (310 Hz) and 178.05-178.55
+    # (280-309 Hz), the stem at its floor from 178.60. Whisper: Tryna 177.10, make 177.56, it 177.86, last 178.10.
+    (48, 0): dict(start=177.35, end=177.55, conf=0.5),
+    (48, 1): dict(start=177.56, end=177.85, conf=0.5),
+    (48, 2): dict(start=177.86, end=178.04, conf=0.5),
+    (48, 3): dict(start=178.05, end=178.56, conf=0.5),
+}
 
 # ---------------------------------------------------------------------------
 

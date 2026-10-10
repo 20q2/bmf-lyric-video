@@ -1,0 +1,2764 @@
+{
+  "lines": [
+    {
+      "i": 0,
+      "text": "Young and fine and dark and handsome",
+      "section": "chorus1",
+      "start": 15.64,
+      "end": 18.862,
+      "words": [
+        {
+          "w": "Young",
+          "start": 15.64,
+          "end": 16.103,
+          "conf": 0.78
+        },
+        {
+          "w": "and",
+          "start": 16.103,
+          "end": 16.423,
+          "conf": 0.75
+        },
+        {
+          "w": "fine",
+          "start": 16.423,
+          "end": 17.146,
+          "conf": 0.82
+        },
+        {
+          "w": "and",
+          "start": 17.146,
+          "end": 17.5,
+          "conf": 0.67
+        },
+        {
+          "w": "dark",
+          "start": 17.5,
+          "end": 17.899,
+          "conf": 0.84
+        },
+        {
+          "w": "and",
+          "start": 18.034,
+          "end": 18.204,
+          "conf": 0.8
+        },
+        {
+          "w": "handsome",
+          "start": 18.204,
+          "end": 18.862,
+          "conf": 0.85
+        }
+      ]
+    },
+    {
+      "i": 1,
+      "text": "The boy from South Detroit keep bossing",
+      "section": "chorus1",
+      "start": 18.967,
+      "end": 22.693,
+      "words": [
+        {
+          "w": "The",
+          "start": 18.967,
+          "end": 19.381,
+          "conf": 0.76
+        },
+        {
+          "w": "boy",
+          "start": 19.381,
+          "end": 19.75,
+          "conf": 0.85
+        },
+        {
+          "w": "from",
+          "start": 19.75,
+          "end": 20.169,
+          "conf": 0.84
+        },
+        {
+          "w": "South",
+          "start": 20.169,
+          "end": 20.663,
+          "conf": 0.71
+        },
+        {
+          "w": "Detroit",
+          "start": 20.76,
+          "end": 21.351,
+          "conf": 0.71
+        },
+        {
+          "w": "keep",
+          "start": 21.42,
+          "end": 21.716,
+          "conf": 0.77
+        },
+        {
+          "w": "bossing",
+          "start": 21.94,
+          "end": 22.693,
+          "conf": 0.79
+        }
+      ]
+    },
+    {
+      "i": 2,
+      "text": "And I can't keep my panties from dropping",
+      "section": "chorus1",
+      "start": 22.693,
+      "end": 26.415,
+      "words": [
+        {
+          "w": "And",
+          "start": 22.693,
+          "end": 22.878,
+          "conf": 0.72
+        },
+        {
+          "w": "I",
+          "start": 23.098,
+          "end": 23.482,
+          "conf": 0.69
+        },
+        {
+          "w": "can't",
+          "start": 23.54,
+          "end": 23.956,
+          "conf": 0.69
+        },
+        {
+          "w": "keep",
+          "start": 24.02,
+          "end": 24.5,
+          "conf": 0.97
+        },
+        {
+          "w": "my",
+          "start": 24.5,
+          "end": 24.74,
+          "conf": 0.72
+        },
+        {
+          "w": "panties",
+          "start": 24.74,
+          "end": 25.437,
+          "conf": 0.88
+        },
+        {
+          "w": "from",
+          "start": 25.437,
+          "end": 25.7,
+          "conf": 1.0
+        },
+        {
+          "w": "dropping",
+          "start": 25.7,
+          "end": 26.415,
+          "conf": 0.83
+        }
+      ]
+    },
+    {
+      "i": 3,
+      "text": "He's so fly, fly",
+      "section": "chorus1",
+      "start": 26.415,
+      "end": 30.58,
+      "words": [
+        {
+          "w": "He's",
+          "start": 26.415,
+          "end": 26.66,
+          "conf": 0.81
+        },
+        {
+          "w": "so",
+          "start": 26.66,
+          "end": 26.859,
+          "conf": 0.85
+        },
+        {
+          "w": "fly,",
+          "start": 26.994,
+          "end": 28.271,
+          "conf": 0.59
+        },
+        {
+          "w": "fly",
+          "start": 28.39,
+          "end": 30.58,
+          "conf": 0.76
+        }
+      ]
+    },
+    {
+      "i": 4,
+      "text": "Going too fast, don't hurt yourself",
+      "section": "verse1",
+      "start": 30.58,
+      "end": 32.381,
+      "words": [
+        {
+          "w": "Going",
+          "start": 30.58,
+          "end": 30.77,
+          "conf": 0.61
+        },
+        {
+          "w": "too",
+          "start": 30.77,
+          "end": 30.87,
+          "conf": 0.72
+        },
+        {
+          "w": "fast,",
+          "start": 30.87,
+          "end": 31.32,
+          "conf": 0.85
+        },
+        {
+          "w": "don't",
+          "start": 31.32,
+          "end": 31.52,
+          "conf": 0.87
+        },
+        {
+          "w": "hurt",
+          "start": 31.52,
+          "end": 31.82,
+          "conf": 0.89
+        },
+        {
+          "w": "yourself",
+          "start": 31.82,
+          "end": 32.381,
+          "conf": 0.85
+        }
+      ]
+    },
+    {
+      "i": 5,
+      "text": "I can't keep up with all the lies you tell yourself",
+      "section": "verse1",
+      "start": 32.77,
+      "end": 36.188,
+      "words": [
+        {
+          "w": "I",
+          "start": 32.77,
+          "end": 32.94,
+          "conf": 0.76
+        },
+        {
+          "w": "can't",
+          "start": 32.94,
+          "end": 33.18,
+          "conf": 0.71
+        },
+        {
+          "w": "keep",
+          "start": 33.18,
+          "end": 33.444,
+          "conf": 0.91
+        },
+        {
+          "w": "up",
+          "start": 33.444,
+          "end": 33.92,
+          "conf": 0.44
+        },
+        {
+          "w": "with",
+          "start": 33.92,
+          "end": 34.167,
+          "conf": 0.72
+        },
+        {
+          "w": "all",
+          "start": 34.397,
+          "end": 34.62,
+          "conf": 0.78
+        },
+        {
+          "w": "the",
+          "start": 34.62,
+          "end": 34.8,
+          "conf": 0.76
+        },
+        {
+          "w": "lies",
+          "start": 34.8,
+          "end": 35.125,
+          "conf": 0.75
+        },
+        {
+          "w": "you",
+          "start": 35.125,
+          "end": 35.26,
+          "conf": 1.0
+        },
+        {
+          "w": "tell",
+          "start": 35.26,
+          "end": 35.54,
+          "conf": 1.0
+        },
+        {
+          "w": "yourself",
+          "start": 35.54,
+          "end": 36.188,
+          "conf": 0.85
+        }
+      ]
+    },
+    {
+      "i": 6,
+      "text": "You kinda cute, but play too much, don't play yourself",
+      "section": "verse1",
+      "start": 36.44,
+      "end": 39.924,
+      "words": [
+        {
+          "w": "You",
+          "start": 36.44,
+          "end": 36.532,
+          "conf": 0.73
+        },
+        {
+          "w": "kinda",
+          "start": 36.532,
+          "end": 36.996,
+          "conf": 0.89
+        },
+        {
+          "w": "cute,",
+          "start": 36.996,
+          "end": 37.62,
+          "conf": 0.82
+        },
+        {
+          "w": "but",
+          "start": 37.62,
+          "end": 37.954,
+          "conf": 0.77
+        },
+        {
+          "w": "play",
+          "start": 38.08,
+          "end": 38.36,
+          "conf": 0.72
+        },
+        {
+          "w": "too",
+          "start": 38.36,
+          "end": 38.54,
+          "conf": 0.73
+        },
+        {
+          "w": "much,",
+          "start": 38.54,
+          "end": 38.84,
+          "conf": 0.77
+        },
+        {
+          "w": "don't",
+          "start": 38.84,
+          "end": 39.0,
+          "conf": 0.84
+        },
+        {
+          "w": "play",
+          "start": 39.0,
+          "end": 39.3,
+          "conf": 0.97
+        },
+        {
+          "w": "yourself",
+          "start": 39.3,
+          "end": 39.924,
+          "conf": 0.85
+        }
+      ]
+    },
+    {
+      "i": 7,
+      "text": "I'm not the one, but we can still pretend this can be my man",
+      "section": "verse1",
+      "start": 40.249,
+      "end": 45.267,
+      "words": [
+        {
+          "w": "I'm",
+          "start": 40.249,
+          "end": 40.36,
+          "conf": 0.64
+        },
+        {
+          "w": "not",
+          "start": 40.36,
+          "end": 40.68,
+          "conf": 0.72
+        },
+        {
+          "w": "the",
+          "start": 40.68,
+          "end": 40.942,
+          "conf": 0.74
+        },
+        {
+          "w": "one,",
+          "start": 40.942,
+          "end": 41.4,
+          "conf": 0.58
+        },
+        {
+          "w": "but",
+          "start": 41.4,
+          "end": 41.715,
+          "conf": 0.54
+        },
+        {
+          "w": "we",
+          "start": 41.8,
+          "end": 41.915,
+          "conf": 0.52
+        },
+        {
+          "w": "can",
+          "start": 41.915,
+          "end": 42.149,
+          "conf": 0.67
+        },
+        {
+          "w": "still",
+          "start": 42.149,
+          "end": 42.54,
+          "conf": 0.94
+        },
+        {
+          "w": "pretend",
+          "start": 42.54,
+          "end": 43.26,
+          "conf": 0.85
+        },
+        {
+          "w": "this",
+          "start": 43.26,
+          "end": 43.48,
+          "conf": 0.79
+        },
+        {
+          "w": "can",
+          "start": 43.48,
+          "end": 43.72,
+          "conf": 0.79
+        },
+        {
+          "w": "be",
+          "start": 43.72,
+          "end": 43.905,
+          "conf": 0.95
+        },
+        {
+          "w": "my",
+          "start": 43.905,
+          "end": 44.3,
+          "conf": 0.85
+        },
+        {
+          "w": "man",
+          "start": 44.3,
+          "end": 45.267,
+          "conf": 0.78
+        }
+      ]
+    },
+    {
+      "i": 8,
+      "text": "You say you feel different when you with me, tell me anything",
+      "section": "verse1",
+      "start": 45.62,
+      "end": 49.238,
+      "words": [
+        {
+          "w": "You",
+          "start": 45.62,
+          "end": 45.756,
+          "conf": 0.84
+        },
+        {
+          "w": "say",
+          "start": 45.756,
+          "end": 46.105,
+          "conf": 0.96
+        },
+        {
+          "w": "you",
+          "start": 46.105,
+          "end": 46.23,
+          "conf": 0.8
+        },
+        {
+          "w": "feel",
+          "start": 46.23,
+          "end": 46.56,
+          "conf": 0.79
+        },
+        {
+          "w": "different",
+          "start": 46.56,
+          "end": 47.068,
+          "conf": 0.69
+        },
+        {
+          "w": "when",
+          "start": 47.068,
+          "end": 47.307,
+          "conf": 0.72
+        },
+        {
+          "w": "you",
+          "start": 47.307,
+          "end": 47.5,
+          "conf": 0.82
+        },
+        {
+          "w": "with",
+          "start": 47.5,
+          "end": 47.741,
+          "conf": 0.83
+        },
+        {
+          "w": "me,",
+          "start": 47.741,
+          "end": 47.92,
+          "conf": 0.86
+        },
+        {
+          "w": "tell",
+          "start": 47.92,
+          "end": 48.18,
+          "conf": 0.83
+        },
+        {
+          "w": "me",
+          "start": 48.18,
+          "end": 48.52,
+          "conf": 0.78
+        },
+        {
+          "w": "anything",
+          "start": 48.52,
+          "end": 49.238,
+          "conf": 0.72
+        }
+      ]
+    },
+    {
+      "i": 9,
+      "text": "Compliment my energy, it's different laying next to me",
+      "section": "verse1",
+      "start": 49.34,
+      "end": 52.775,
+      "words": [
+        {
+          "w": "Compliment",
+          "start": 49.34,
+          "end": 50.04,
+          "conf": 0.78
+        },
+        {
+          "w": "my",
+          "start": 50.04,
+          "end": 50.316,
+          "conf": 0.8
+        },
+        {
+          "w": "energy,",
+          "start": 50.316,
+          "end": 51.06,
+          "conf": 0.54
+        },
+        {
+          "w": "it's",
+          "start": 51.06,
+          "end": 51.144,
+          "conf": 0.59
+        },
+        {
+          "w": "different",
+          "start": 51.144,
+          "end": 51.72,
+          "conf": 0.86
+        },
+        {
+          "w": "laying",
+          "start": 51.72,
+          "end": 52.14,
+          "conf": 0.62
+        },
+        {
+          "w": "next",
+          "start": 52.14,
+          "end": 52.38,
+          "conf": 0.71
+        },
+        {
+          "w": "to",
+          "start": 52.38,
+          "end": 52.6,
+          "conf": 0.88
+        },
+        {
+          "w": "me",
+          "start": 52.6,
+          "end": 52.775,
+          "conf": 0.75
+        }
+      ]
+    },
+    {
+      "i": 10,
+      "text": "All I ask is don't make me pull up and get to dumping",
+      "section": "verse1",
+      "start": 53.119,
+      "end": 56.36,
+      "words": [
+        {
+          "w": "All",
+          "start": 53.119,
+          "end": 53.48,
+          "conf": 0.77
+        },
+        {
+          "w": "I",
+          "start": 53.48,
+          "end": 53.603,
+          "conf": 0.64
+        },
+        {
+          "w": "ask",
+          "start": 53.603,
+          "end": 53.84,
+          "conf": 0.76
+        },
+        {
+          "w": "is",
+          "start": 53.84,
+          "end": 54.02,
+          "conf": 0.96
+        },
+        {
+          "w": "don't",
+          "start": 54.02,
+          "end": 54.26,
+          "conf": 0.78
+        },
+        {
+          "w": "make",
+          "start": 54.26,
+          "end": 54.48,
+          "conf": 0.87
+        },
+        {
+          "w": "me",
+          "start": 54.48,
+          "end": 54.676,
+          "conf": 0.82
+        },
+        {
+          "w": "pull",
+          "start": 54.72,
+          "end": 55.06,
+          "conf": 0.75
+        },
+        {
+          "w": "up",
+          "start": 55.06,
+          "end": 55.294,
+          "conf": 0.71
+        },
+        {
+          "w": "and",
+          "start": 55.294,
+          "end": 55.48,
+          "conf": 0.77
+        },
+        {
+          "w": "get",
+          "start": 55.48,
+          "end": 55.554,
+          "conf": 0.76
+        },
+        {
+          "w": "to",
+          "start": 55.554,
+          "end": 55.813,
+          "conf": 0.89
+        },
+        {
+          "w": "dumping",
+          "start": 55.88,
+          "end": 56.36,
+          "conf": 0.87
+        }
+      ]
+    },
+    {
+      "i": 11,
+      "text": "You know I can't give no fucks, you know I'm with all the ruckus, can you?",
+      "section": "verse1",
+      "start": 56.36,
+      "end": 60.7,
+      "words": [
+        {
+          "w": "You",
+          "start": 56.36,
+          "end": 56.58,
+          "conf": 0.66
+        },
+        {
+          "w": "know",
+          "start": 56.58,
+          "end": 56.96,
+          "conf": 0.73
+        },
+        {
+          "w": "I",
+          "start": 56.96,
+          "end": 57.08,
+          "conf": 0.69
+        },
+        {
+          "w": "can't",
+          "start": 57.08,
+          "end": 57.3,
+          "conf": 0.75
+        },
+        {
+          "w": "give",
+          "start": 57.3,
+          "end": 57.52,
+          "conf": 0.85
+        },
+        {
+          "w": "no",
+          "start": 57.52,
+          "end": 57.669,
+          "conf": 0.83
+        },
+        {
+          "w": "fucks,",
+          "start": 57.669,
+          "end": 58.08,
+          "conf": 0.89
+        },
+        {
+          "w": "you",
+          "start": 58.08,
+          "end": 58.322,
+          "conf": 0.65
+        },
+        {
+          "w": "know",
+          "start": 58.322,
+          "end": 58.8,
+          "conf": 0.77
+        },
+        {
+          "w": "I'm",
+          "start": 58.8,
+          "end": 58.94,
+          "conf": 0.65
+        },
+        {
+          "w": "with",
+          "start": 58.94,
+          "end": 59.225,
+          "conf": 0.93
+        },
+        {
+          "w": "all",
+          "start": 59.225,
+          "end": 59.49,
+          "conf": 0.79
+        },
+        {
+          "w": "the",
+          "start": 59.49,
+          "end": 59.62,
+          "conf": 0.84
+        },
+        {
+          "w": "ruckus,",
+          "start": 59.62,
+          "end": 60.088,
+          "conf": 0.82
+        },
+        {
+          "w": "can",
+          "start": 60.088,
+          "end": 60.44,
+          "conf": 0.68
+        },
+        {
+          "w": "you?",
+          "start": 60.44,
+          "end": 60.7,
+          "conf": 0.84
+        }
+      ]
+    },
+    {
+      "i": 12,
+      "text": "Young and fine and dark and handsome",
+      "section": "chorus2",
+      "start": 60.7,
+      "end": 64.1,
+      "words": [
+        {
+          "w": "Young",
+          "start": 60.7,
+          "end": 61.16,
+          "conf": 0.73
+        },
+        {
+          "w": "and",
+          "start": 61.16,
+          "end": 61.43,
+          "conf": 0.59
+        },
+        {
+          "w": "fine",
+          "start": 61.43,
+          "end": 62.109,
+          "conf": 0.79
+        },
+        {
+          "w": "and",
+          "start": 62.109,
+          "end": 62.528,
+          "conf": 0.63
+        },
+        {
+          "w": "dark",
+          "start": 62.528,
+          "end": 62.897,
+          "conf": 0.82
+        },
+        {
+          "w": "and",
+          "start": 63.002,
+          "end": 63.201,
+          "conf": 0.71
+        },
+        {
+          "w": "handsome",
+          "start": 63.201,
+          "end": 64.1,
+          "conf": 0.81
+        }
+      ]
+    },
+    {
+      "i": 13,
+      "text": "The boy West side of Compton came walking in",
+      "section": "chorus2",
+      "start": 64.1,
+      "end": 67.846,
+      "words": [
+        {
+          "w": "The",
+          "start": 64.1,
+          "end": 64.38,
+          "conf": 0.72
+        },
+        {
+          "w": "boy",
+          "start": 64.38,
+          "end": 64.84,
+          "conf": 0.85
+        },
+        {
+          "w": "West",
+          "start": 64.84,
+          "end": 65.157,
+          "conf": 0.77
+        },
+        {
+          "w": "side",
+          "start": 65.157,
+          "end": 65.8,
+          "conf": 0.81
+        },
+        {
+          "w": "of",
+          "start": 65.8,
+          "end": 65.955,
+          "conf": 0.67
+        },
+        {
+          "w": "Compton",
+          "start": 66.0,
+          "end": 66.7,
+          "conf": 0.9
+        },
+        {
+          "w": "came",
+          "start": 66.7,
+          "end": 66.96,
+          "conf": 0.62
+        },
+        {
+          "w": "walking",
+          "start": 66.96,
+          "end": 67.7,
+          "conf": 0.82
+        },
+        {
+          "w": "in",
+          "start": 67.7,
+          "end": 67.846,
+          "conf": 0.76
+        }
+      ]
+    },
+    {
+      "i": 14,
+      "text": "I can't keep my panties from dropping",
+      "section": "chorus2",
+      "start": 68.17,
+      "end": 71.42,
+      "words": [
+        {
+          "w": "I",
+          "start": 68.17,
+          "end": 68.5,
+          "conf": 0.76
+        },
+        {
+          "w": "can't",
+          "start": 68.5,
+          "end": 68.983,
+          "conf": 0.61
+        },
+        {
+          "w": "keep",
+          "start": 69.02,
+          "end": 69.5,
+          "conf": 0.91
+        },
+        {
+          "w": "my",
+          "start": 69.5,
+          "end": 69.781,
+          "conf": 0.77
+        },
+        {
+          "w": "panties",
+          "start": 69.781,
+          "end": 70.415,
+          "conf": 0.73
+        },
+        {
+          "w": "from",
+          "start": 70.415,
+          "end": 70.68,
+          "conf": 0.99
+        },
+        {
+          "w": "dropping",
+          "start": 70.68,
+          "end": 71.42,
+          "conf": 0.82
+        }
+      ]
+    },
+    {
+      "i": 15,
+      "text": "He's so fly, fly",
+      "section": "chorus2",
+      "start": 71.42,
+      "end": 75.179,
+      "words": [
+        {
+          "w": "He's",
+          "start": 71.42,
+          "end": 71.62,
+          "conf": 0.7
+        },
+        {
+          "w": "so",
+          "start": 71.62,
+          "end": 71.932,
+          "conf": 0.95
+        },
+        {
+          "w": "fly,",
+          "start": 71.991,
+          "end": 73.333,
+          "conf": 0.82
+        },
+        {
+          "w": "fly",
+          "start": 73.333,
+          "end": 75.179,
+          "conf": 0.8
+        }
+      ]
+    },
+    {
+      "i": 16,
+      "text": "Ooh, he bossy, ooh, he crip walkin'",
+      "section": "verse2",
+      "start": 75.86,
+      "end": 79.1,
+      "words": [
+        {
+          "w": "Ooh,",
+          "start": 75.86,
+          "end": 76.062,
+          "conf": 0.61
+        },
+        {
+          "w": "he",
+          "start": 76.247,
+          "end": 76.481,
+          "conf": 0.8
+        },
+        {
+          "w": "bossy,",
+          "start": 76.52,
+          "end": 77.314,
+          "conf": 0.8
+        },
+        {
+          "w": "ooh,",
+          "start": 77.314,
+          "end": 77.45,
+          "conf": 0.75
+        },
+        {
+          "w": "he",
+          "start": 77.72,
+          "end": 77.908,
+          "conf": 0.75
+        },
+        {
+          "w": "crip",
+          "start": 78.12,
+          "end": 78.44,
+          "conf": 0.76
+        },
+        {
+          "w": "walkin'",
+          "start": 78.44,
+          "end": 79.1,
+          "conf": 0.75
+        }
+      ]
+    },
+    {
+      "i": 17,
+      "text": "Took me to Slauson and he slut me out",
+      "section": "verse2",
+      "start": 79.1,
+      "end": 82.5,
+      "words": [
+        {
+          "w": "Took",
+          "start": 79.1,
+          "end": 79.35,
+          "conf": 0.7
+        },
+        {
+          "w": "me",
+          "start": 79.58,
+          "end": 79.809,
+          "conf": 0.82
+        },
+        {
+          "w": "to",
+          "start": 80.02,
+          "end": 80.138,
+          "conf": 0.77
+        },
+        {
+          "w": "Slauson",
+          "start": 80.138,
+          "end": 81.08,
+          "conf": 0.75
+        },
+        {
+          "w": "and",
+          "start": 81.08,
+          "end": 81.19,
+          "conf": 0.72
+        },
+        {
+          "w": "he",
+          "start": 81.43,
+          "end": 81.6,
+          "conf": 0.7
+        },
+        {
+          "w": "slut",
+          "start": 81.67,
+          "end": 81.96,
+          "conf": 0.7
+        },
+        {
+          "w": "me",
+          "start": 81.96,
+          "end": 82.3,
+          "conf": 0.72
+        },
+        {
+          "w": "out",
+          "start": 82.3,
+          "end": 82.5,
+          "conf": 0.75
+        }
+      ]
+    },
+    {
+      "i": 18,
+      "text": "And when I got a problem, he get to packing",
+      "section": "verse2",
+      "start": 82.5,
+      "end": 86.66,
+      "words": [
+        {
+          "w": "And",
+          "start": 82.5,
+          "end": 82.58,
+          "conf": 0.59
+        },
+        {
+          "w": "when",
+          "start": 82.58,
+          "end": 82.902,
+          "conf": 0.7
+        },
+        {
+          "w": "I",
+          "start": 82.902,
+          "end": 83.04,
+          "conf": 0.75
+        },
+        {
+          "w": "got",
+          "start": 83.04,
+          "end": 83.39,
+          "conf": 0.7
+        },
+        {
+          "w": "a",
+          "start": 83.39,
+          "end": 83.56,
+          "conf": 0.83
+        },
+        {
+          "w": "problem,",
+          "start": 83.76,
+          "end": 84.737,
+          "conf": 0.64
+        },
+        {
+          "w": "he",
+          "start": 84.737,
+          "end": 85.002,
+          "conf": 0.79
+        },
+        {
+          "w": "get",
+          "start": 85.18,
+          "end": 85.426,
+          "conf": 0.76
+        },
+        {
+          "w": "to",
+          "start": 85.64,
+          "end": 85.97,
+          "conf": 0.86
+        },
+        {
+          "w": "packing",
+          "start": 85.97,
+          "end": 86.66,
+          "conf": 0.83
+        }
+      ]
+    },
+    {
+      "i": 19,
+      "text": "He 'bout all that action, call him Mr. Handle It",
+      "section": "verse2",
+      "start": 86.66,
+      "end": 90.6,
+      "words": [
+        {
+          "w": "He",
+          "start": 86.66,
+          "end": 86.868,
+          "conf": 0.83
+        },
+        {
+          "w": "'bout",
+          "start": 87.032,
+          "end": 87.421,
+          "conf": 0.86
+        },
+        {
+          "w": "all",
+          "start": 87.421,
+          "end": 87.6,
+          "conf": 0.68
+        },
+        {
+          "w": "that",
+          "start": 87.6,
+          "end": 88.08,
+          "conf": 0.79
+        },
+        {
+          "w": "action,",
+          "start": 88.08,
+          "end": 88.46,
+          "conf": 0.58
+        },
+        {
+          "w": "call",
+          "start": 88.46,
+          "end": 88.698,
+          "conf": 0.73
+        },
+        {
+          "w": "him",
+          "start": 88.95,
+          "end": 89.19,
+          "conf": 0.7
+        },
+        {
+          "w": "Mr.",
+          "start": 89.2,
+          "end": 89.586,
+          "conf": 0.7
+        },
+        {
+          "w": "Handle",
+          "start": 89.586,
+          "end": 90.16,
+          "conf": 0.79
+        },
+        {
+          "w": "It",
+          "start": 90.16,
+          "end": 90.6,
+          "conf": 0.8
+        }
+      ]
+    },
+    {
+      "i": 20,
+      "text": "You know I'm hella different from them chickens you been trickin' on",
+      "section": "verse2",
+      "start": 90.6,
+      "end": 94.276,
+      "words": [
+        {
+          "w": "You",
+          "start": 90.6,
+          "end": 90.82,
+          "conf": 0.46
+        },
+        {
+          "w": "know",
+          "start": 90.82,
+          "end": 90.92,
+          "conf": 0.36
+        },
+        {
+          "w": "I'm",
+          "start": 90.92,
+          "end": 91.028,
+          "conf": 0.69
+        },
+        {
+          "w": "hella",
+          "start": 91.028,
+          "end": 91.482,
+          "conf": 0.86
+        },
+        {
+          "w": "different",
+          "start": 91.52,
+          "end": 91.951,
+          "conf": 0.7
+        },
+        {
+          "w": "from",
+          "start": 91.951,
+          "end": 92.24,
+          "conf": 0.84
+        },
+        {
+          "w": "them",
+          "start": 92.24,
+          "end": 92.42,
+          "conf": 0.76
+        },
+        {
+          "w": "chickens",
+          "start": 92.42,
+          "end": 92.92,
+          "conf": 0.99
+        },
+        {
+          "w": "you",
+          "start": 92.92,
+          "end": 93.18,
+          "conf": 0.73
+        },
+        {
+          "w": "been",
+          "start": 93.18,
+          "end": 93.36,
+          "conf": 0.94
+        },
+        {
+          "w": "trickin'",
+          "start": 93.36,
+          "end": 93.917,
+          "conf": 0.77
+        },
+        {
+          "w": "on",
+          "start": 93.917,
+          "end": 94.276,
+          "conf": 0.79
+        }
+      ]
+    },
+    {
+      "i": 21,
+      "text": "I can be your ride or die, get down your strongest bone",
+      "section": "verse2",
+      "start": 94.415,
+      "end": 98.14,
+      "words": [
+        {
+          "w": "I",
+          "start": 94.415,
+          "end": 94.54,
+          "conf": 0.5
+        },
+        {
+          "w": "can",
+          "start": 94.54,
+          "end": 94.645,
+          "conf": 0.8
+        },
+        {
+          "w": "be",
+          "start": 94.645,
+          "end": 95.04,
+          "conf": 0.92
+        },
+        {
+          "w": "your",
+          "start": 95.04,
+          "end": 95.32,
+          "conf": 0.73
+        },
+        {
+          "w": "ride",
+          "start": 95.32,
+          "end": 95.62,
+          "conf": 0.72
+        },
+        {
+          "w": "or",
+          "start": 95.62,
+          "end": 95.74,
+          "conf": 0.65
+        },
+        {
+          "w": "die,",
+          "start": 95.74,
+          "end": 96.107,
+          "conf": 0.94
+        },
+        {
+          "w": "get",
+          "start": 96.46,
+          "end": 96.68,
+          "conf": 0.7
+        },
+        {
+          "w": "down",
+          "start": 96.68,
+          "end": 96.96,
+          "conf": 0.77
+        },
+        {
+          "w": "your",
+          "start": 96.96,
+          "end": 97.059,
+          "conf": 0.6
+        },
+        {
+          "w": "strongest",
+          "start": 97.059,
+          "end": 97.64,
+          "conf": 0.77
+        },
+        {
+          "w": "bone",
+          "start": 97.64,
+          "end": 98.14,
+          "conf": 0.8
+        }
+      ]
+    },
+    {
+      "i": 22,
+      "text": "Trust me, boy, I'm good in every hood",
+      "section": "verse2",
+      "start": 98.14,
+      "end": 100.0,
+      "words": [
+        {
+          "w": "Trust",
+          "start": 98.14,
+          "end": 98.327,
+          "conf": 0.61
+        },
+        {
+          "w": "me,",
+          "start": 98.327,
+          "end": 98.44,
+          "conf": 0.92
+        },
+        {
+          "w": "boy,",
+          "start": 98.44,
+          "end": 98.601,
+          "conf": 0.91
+        },
+        {
+          "w": "I'm",
+          "start": 98.601,
+          "end": 98.78,
+          "conf": 0.84
+        },
+        {
+          "w": "good",
+          "start": 98.78,
+          "end": 99.02,
+          "conf": 0.89
+        },
+        {
+          "w": "in",
+          "start": 99.02,
+          "end": 99.175,
+          "conf": 0.73
+        },
+        {
+          "w": "every",
+          "start": 99.175,
+          "end": 99.5,
+          "conf": 0.9
+        },
+        {
+          "w": "hood",
+          "start": 99.5,
+          "end": 100.0,
+          "conf": 0.7
+        }
+      ]
+    },
+    {
+      "i": 23,
+      "text": "Trickin', finna fall in backwards",
+      "section": "verse2",
+      "start": 100.0,
+      "end": 101.9,
+      "words": [
+        {
+          "w": "Trickin',",
+          "start": 100.0,
+          "end": 100.172,
+          "conf": 0.68
+        },
+        {
+          "w": "finna",
+          "start": 100.172,
+          "end": 100.531,
+          "conf": 0.76
+        },
+        {
+          "w": "fall",
+          "start": 100.531,
+          "end": 100.9,
+          "conf": 0.61
+        },
+        {
+          "w": "in",
+          "start": 100.9,
+          "end": 101.02,
+          "conf": 0.78
+        },
+        {
+          "w": "backwards",
+          "start": 101.02,
+          "end": 101.9,
+          "conf": 0.78
+        }
+      ]
+    },
+    {
+      "i": 24,
+      "text": "I'm just tryna show you what it would be like if you my man",
+      "section": "verse2",
+      "start": 101.9,
+      "end": 105.161,
+      "words": [
+        {
+          "w": "I'm",
+          "start": 101.9,
+          "end": 102.028,
+          "conf": 0.5
+        },
+        {
+          "w": "just",
+          "start": 102.028,
+          "end": 102.402,
+          "conf": 0.87
+        },
+        {
+          "w": "tryna",
+          "start": 102.402,
+          "end": 102.52,
+          "conf": 0.52
+        },
+        {
+          "w": "show",
+          "start": 102.52,
+          "end": 102.597,
+          "conf": 0.94
+        },
+        {
+          "w": "you",
+          "start": 102.597,
+          "end": 102.86,
+          "conf": 0.97
+        },
+        {
+          "w": "what",
+          "start": 102.86,
+          "end": 103.1,
+          "conf": 0.87
+        },
+        {
+          "w": "it",
+          "start": 103.1,
+          "end": 103.24,
+          "conf": 0.82
+        },
+        {
+          "w": "would",
+          "start": 103.24,
+          "end": 103.565,
+          "conf": 0.9
+        },
+        {
+          "w": "be",
+          "start": 103.565,
+          "end": 103.72,
+          "conf": 0.74
+        },
+        {
+          "w": "like",
+          "start": 103.72,
+          "end": 103.989,
+          "conf": 0.78
+        },
+        {
+          "w": "if",
+          "start": 103.989,
+          "end": 104.248,
+          "conf": 0.68
+        },
+        {
+          "w": "you",
+          "start": 104.248,
+          "end": 104.42,
+          "conf": 0.81
+        },
+        {
+          "w": "my",
+          "start": 104.42,
+          "end": 104.68,
+          "conf": 0.85
+        },
+        {
+          "w": "man",
+          "start": 104.68,
+          "end": 105.161,
+          "conf": 0.68
+        }
+      ]
+    },
+    {
+      "i": 25,
+      "text": "Young and fine and dark and handsome",
+      "section": "chorus3",
+      "start": 105.62,
+      "end": 109.1,
+      "words": [
+        {
+          "w": "Young",
+          "start": 105.62,
+          "end": 106.139,
+          "conf": 0.75
+        },
+        {
+          "w": "and",
+          "start": 106.139,
+          "end": 106.453,
+          "conf": 0.74
+        },
+        {
+          "w": "fine",
+          "start": 106.453,
+          "end": 107.097,
+          "conf": 0.84
+        },
+        {
+          "w": "and",
+          "start": 107.097,
+          "end": 107.46,
+          "conf": 0.67
+        },
+        {
+          "w": "dark",
+          "start": 107.46,
+          "end": 108.019,
+          "conf": 0.82
+        },
+        {
+          "w": "and",
+          "start": 108.019,
+          "end": 108.22,
+          "conf": 0.78
+        },
+        {
+          "w": "handsome",
+          "start": 108.22,
+          "end": 109.1,
+          "conf": 0.77
+        }
+      ]
+    },
+    {
+      "i": 26,
+      "text": "The boy from South of somewhere came walking in",
+      "section": "chorus3",
+      "start": 109.1,
+      "end": 112.76,
+      "words": [
+        {
+          "w": "The",
+          "start": 109.1,
+          "end": 109.36,
+          "conf": 0.69
+        },
+        {
+          "w": "boy",
+          "start": 109.36,
+          "end": 109.576,
+          "conf": 0.85
+        },
+        {
+          "w": "from",
+          "start": 109.576,
+          "end": 110.16,
+          "conf": 0.97
+        },
+        {
+          "w": "South",
+          "start": 110.16,
+          "end": 110.678,
+          "conf": 0.76
+        },
+        {
+          "w": "of",
+          "start": 110.793,
+          "end": 110.908,
+          "conf": 0.85
+        },
+        {
+          "w": "somewhere",
+          "start": 110.908,
+          "end": 111.641,
+          "conf": 0.94
+        },
+        {
+          "w": "came",
+          "start": 111.68,
+          "end": 111.94,
+          "conf": 0.75
+        },
+        {
+          "w": "walking",
+          "start": 111.94,
+          "end": 112.669,
+          "conf": 0.82
+        },
+        {
+          "w": "in",
+          "start": 112.669,
+          "end": 112.76,
+          "conf": 0.59
+        }
+      ]
+    },
+    {
+      "i": 27,
+      "text": "And I can't keep my panties from dropping",
+      "section": "chorus3",
+      "start": 112.76,
+      "end": 116.38,
+      "words": [
+        {
+          "w": "And",
+          "start": 112.76,
+          "end": 113.178,
+          "conf": 0.71
+        },
+        {
+          "w": "I",
+          "start": 113.178,
+          "end": 113.54,
+          "conf": 0.76
+        },
+        {
+          "w": "can't",
+          "start": 113.54,
+          "end": 113.971,
+          "conf": 0.75
+        },
+        {
+          "w": "keep",
+          "start": 114.04,
+          "end": 114.375,
+          "conf": 1.0
+        },
+        {
+          "w": "my",
+          "start": 114.48,
+          "end": 114.74,
+          "conf": 0.85
+        },
+        {
+          "w": "panties",
+          "start": 114.74,
+          "end": 115.42,
+          "conf": 0.74
+        },
+        {
+          "w": "from",
+          "start": 115.42,
+          "end": 115.66,
+          "conf": 0.85
+        },
+        {
+          "w": "dropping",
+          "start": 115.66,
+          "end": 116.38,
+          "conf": 0.85
+        }
+      ]
+    },
+    {
+      "i": 28,
+      "text": "He's so fly, fly",
+      "section": "chorus3",
+      "start": 116.38,
+      "end": 120.17,
+      "words": [
+        {
+          "w": "He's",
+          "start": 116.38,
+          "end": 116.6,
+          "conf": 0.79
+        },
+        {
+          "w": "so",
+          "start": 116.6,
+          "end": 116.824,
+          "conf": 0.78
+        },
+        {
+          "w": "fly,",
+          "start": 117.0,
+          "end": 118.256,
+          "conf": 0.65
+        },
+        {
+          "w": "fly",
+          "start": 118.346,
+          "end": 120.17,
+          "conf": 0.8
+        }
+      ]
+    },
+    {
+      "i": 29,
+      "text": "Blowin' money fast",
+      "section": "bridge1",
+      "start": 120.64,
+      "end": 122.961,
+      "words": [
+        {
+          "w": "Blowin'",
+          "start": 120.64,
+          "end": 121.569,
+          "conf": 0.8
+        },
+        {
+          "w": "money",
+          "start": 121.569,
+          "end": 122.317,
+          "conf": 0.69
+        },
+        {
+          "w": "fast",
+          "start": 122.317,
+          "end": 122.961,
+          "conf": 0.69
+        }
+      ]
+    },
+    {
+      "i": 30,
+      "text": "Tryna make it last",
+      "section": "bridge1",
+      "start": 123.46,
+      "end": 126.917,
+      "words": [
+        {
+          "w": "Tryna",
+          "start": 123.46,
+          "end": 124.84,
+          "conf": 0.75
+        },
+        {
+          "w": "make",
+          "start": 125.29,
+          "end": 125.889,
+          "conf": 0.75
+        },
+        {
+          "w": "it",
+          "start": 125.889,
+          "end": 126.26,
+          "conf": 0.6
+        },
+        {
+          "w": "last",
+          "start": 126.26,
+          "end": 126.917,
+          "conf": 0.69
+        }
+      ]
+    },
+    {
+      "i": 31,
+      "text": "Blowin' money fast",
+      "section": "bridge1",
+      "start": 127.14,
+      "end": 130.439,
+      "words": [
+        {
+          "w": "Blowin'",
+          "start": 127.14,
+          "end": 129.04,
+          "conf": 0.7
+        },
+        {
+          "w": "money",
+          "start": 129.04,
+          "end": 129.815,
+          "conf": 0.61
+        },
+        {
+          "w": "fast",
+          "start": 129.815,
+          "end": 130.439,
+          "conf": 0.69
+        }
+      ]
+    },
+    {
+      "i": 32,
+      "text": "Tryna make it last",
+      "section": "bridge1",
+      "start": 131.252,
+      "end": 133.641,
+      "words": [
+        {
+          "w": "Tryna",
+          "start": 131.252,
+          "end": 132.74,
+          "conf": 0.59
+        },
+        {
+          "w": "make",
+          "start": 132.74,
+          "end": 133.023,
+          "conf": 0.69
+        },
+        {
+          "w": "it",
+          "start": 133.023,
+          "end": 133.28,
+          "conf": 0.69
+        },
+        {
+          "w": "last",
+          "start": 133.28,
+          "end": 133.641,
+          "conf": 0.63
+        }
+      ]
+    },
+    {
+      "i": 33,
+      "text": "Ecstasy is just a pill away",
+      "section": "verse3",
+      "start": 134.12,
+      "end": 137.48,
+      "words": [
+        {
+          "w": "Ecstasy",
+          "start": 134.12,
+          "end": 136.136,
+          "conf": 0.59
+        },
+        {
+          "w": "is",
+          "start": 136.136,
+          "end": 136.28,
+          "conf": 0.85
+        },
+        {
+          "w": "just",
+          "start": 136.28,
+          "end": 136.52,
+          "conf": 0.98
+        },
+        {
+          "w": "a",
+          "start": 136.52,
+          "end": 136.62,
+          "conf": 0.95
+        },
+        {
+          "w": "pill",
+          "start": 136.62,
+          "end": 136.88,
+          "conf": 1.0
+        },
+        {
+          "w": "away",
+          "start": 136.88,
+          "end": 137.48,
+          "conf": 0.97
+        }
+      ]
+    },
+    {
+      "i": 34,
+      "text": "Pop it up or you could screw today",
+      "section": "verse3",
+      "start": 137.48,
+      "end": 139.358,
+      "words": [
+        {
+          "w": "Pop",
+          "start": 137.48,
+          "end": 137.76,
+          "conf": 0.8
+        },
+        {
+          "w": "it",
+          "start": 137.76,
+          "end": 137.862,
+          "conf": 0.71
+        },
+        {
+          "w": "up",
+          "start": 137.862,
+          "end": 138.06,
+          "conf": 0.93
+        },
+        {
+          "w": "or",
+          "start": 138.06,
+          "end": 138.16,
+          "conf": 0.92
+        },
+        {
+          "w": "you",
+          "start": 138.16,
+          "end": 138.32,
+          "conf": 0.99
+        },
+        {
+          "w": "could",
+          "start": 138.32,
+          "end": 138.44,
+          "conf": 0.87
+        },
+        {
+          "w": "screw",
+          "start": 138.44,
+          "end": 138.745,
+          "conf": 0.89
+        },
+        {
+          "w": "today",
+          "start": 138.745,
+          "end": 139.358,
+          "conf": 0.87
+        }
+      ]
+    },
+    {
+      "i": 35,
+      "text": "I'm just tryna hear you say my name",
+      "section": "verse3",
+      "start": 139.358,
+      "end": 141.26,
+      "words": [
+        {
+          "w": "I'm",
+          "start": 139.358,
+          "end": 139.5,
+          "conf": 0.62
+        },
+        {
+          "w": "just",
+          "start": 139.5,
+          "end": 139.7,
+          "conf": 0.86
+        },
+        {
+          "w": "tryna",
+          "start": 139.7,
+          "end": 139.932,
+          "conf": 0.72
+        },
+        {
+          "w": "hear",
+          "start": 139.932,
+          "end": 140.22,
+          "conf": 0.72
+        },
+        {
+          "w": "you",
+          "start": 140.22,
+          "end": 140.38,
+          "conf": 0.82
+        },
+        {
+          "w": "say",
+          "start": 140.38,
+          "end": 140.461,
+          "conf": 0.87
+        },
+        {
+          "w": "my",
+          "start": 140.461,
+          "end": 140.78,
+          "conf": 0.89
+        },
+        {
+          "w": "name",
+          "start": 140.78,
+          "end": 141.26,
+          "conf": 0.63
+        }
+      ]
+    },
+    {
+      "i": 36,
+      "text": "Love to play your ruler, be your Jane",
+      "section": "verse3",
+      "start": 141.26,
+      "end": 143.1,
+      "words": [
+        {
+          "w": "Love",
+          "start": 141.26,
+          "end": 141.44,
+          "conf": 0.7
+        },
+        {
+          "w": "to",
+          "start": 141.44,
+          "end": 141.56,
+          "conf": 0.85
+        },
+        {
+          "w": "play",
+          "start": 141.56,
+          "end": 141.78,
+          "conf": 1.0
+        },
+        {
+          "w": "your",
+          "start": 141.78,
+          "end": 141.98,
+          "conf": 0.86
+        },
+        {
+          "w": "ruler,",
+          "start": 141.98,
+          "end": 142.38,
+          "conf": 0.98
+        },
+        {
+          "w": "be",
+          "start": 142.38,
+          "end": 142.58,
+          "conf": 1.0
+        },
+        {
+          "w": "your",
+          "start": 142.58,
+          "end": 142.7,
+          "conf": 0.52
+        },
+        {
+          "w": "Jane",
+          "start": 142.7,
+          "end": 143.1,
+          "conf": 0.85
+        }
+      ]
+    },
+    {
+      "i": 37,
+      "text": "You could be my Tarzan, toss me up",
+      "section": "verse3",
+      "start": 143.1,
+      "end": 144.796,
+      "words": [
+        {
+          "w": "You",
+          "start": 143.1,
+          "end": 143.26,
+          "conf": 0.85
+        },
+        {
+          "w": "could",
+          "start": 143.26,
+          "end": 143.44,
+          "conf": 1.0
+        },
+        {
+          "w": "be",
+          "start": 143.44,
+          "end": 143.6,
+          "conf": 0.85
+        },
+        {
+          "w": "my",
+          "start": 143.6,
+          "end": 143.78,
+          "conf": 0.92
+        },
+        {
+          "w": "Tarzan,",
+          "start": 143.78,
+          "end": 144.028,
+          "conf": 0.85
+        },
+        {
+          "w": "toss",
+          "start": 144.028,
+          "end": 144.38,
+          "conf": 0.96
+        },
+        {
+          "w": "me",
+          "start": 144.38,
+          "end": 144.551,
+          "conf": 0.85
+        },
+        {
+          "w": "up",
+          "start": 144.551,
+          "end": 144.796,
+          "conf": 0.6
+        }
+      ]
+    },
+    {
+      "i": 38,
+      "text": "Other hoes is lacking, call me up",
+      "section": "verse3",
+      "start": 145.01,
+      "end": 146.68,
+      "words": [
+        {
+          "w": "Other",
+          "start": 145.01,
+          "end": 145.2,
+          "conf": 0.8
+        },
+        {
+          "w": "hoes",
+          "start": 145.2,
+          "end": 145.539,
+          "conf": 0.97
+        },
+        {
+          "w": "is",
+          "start": 145.539,
+          "end": 145.68,
+          "conf": 0.92
+        },
+        {
+          "w": "lacking,",
+          "start": 145.68,
+          "end": 145.923,
+          "conf": 0.98
+        },
+        {
+          "w": "call",
+          "start": 145.923,
+          "end": 146.26,
+          "conf": 1.0
+        },
+        {
+          "w": "me",
+          "start": 146.26,
+          "end": 146.432,
+          "conf": 0.82
+        },
+        {
+          "w": "up",
+          "start": 146.432,
+          "end": 146.68,
+          "conf": 0.59
+        }
+      ]
+    },
+    {
+      "i": 39,
+      "text": "Know my baby packing, why I'm stuck",
+      "section": "verse3",
+      "start": 146.68,
+      "end": 148.438,
+      "words": [
+        {
+          "w": "Know",
+          "start": 146.68,
+          "end": 146.931,
+          "conf": 0.76
+        },
+        {
+          "w": "my",
+          "start": 146.931,
+          "end": 147.061,
+          "conf": 0.89
+        },
+        {
+          "w": "baby",
+          "start": 147.061,
+          "end": 147.4,
+          "conf": 0.92
+        },
+        {
+          "w": "packing,",
+          "start": 147.4,
+          "end": 147.754,
+          "conf": 0.95
+        },
+        {
+          "w": "why",
+          "start": 147.754,
+          "end": 147.98,
+          "conf": 0.9
+        },
+        {
+          "w": "I'm",
+          "start": 147.98,
+          "end": 148.123,
+          "conf": 0.91
+        },
+        {
+          "w": "stuck",
+          "start": 148.123,
+          "end": 148.438,
+          "conf": 1.0
+        }
+      ]
+    },
+    {
+      "i": 40,
+      "text": "That's why he my man",
+      "section": "verse3",
+      "start": 148.572,
+      "end": 150.174,
+      "words": [
+        {
+          "w": "That's",
+          "start": 148.572,
+          "end": 148.96,
+          "conf": 0.84
+        },
+        {
+          "w": "why",
+          "start": 148.96,
+          "end": 149.171,
+          "conf": 1.0
+        },
+        {
+          "w": "he",
+          "start": 149.171,
+          "end": 149.4,
+          "conf": 0.78
+        },
+        {
+          "w": "my",
+          "start": 149.4,
+          "end": 149.66,
+          "conf": 0.93
+        },
+        {
+          "w": "man",
+          "start": 149.66,
+          "end": 150.174,
+          "conf": 0.77
+        }
+      ]
+    },
+    {
+      "i": 41,
+      "text": "Young and he fine and he tall and he handsome",
+      "section": "chorus4",
+      "start": 150.6,
+      "end": 154.36,
+      "words": [
+        {
+          "w": "Young",
+          "start": 150.6,
+          "end": 150.937,
+          "conf": 0.71
+        },
+        {
+          "w": "and",
+          "start": 150.937,
+          "end": 151.14,
+          "conf": 0.7
+        },
+        {
+          "w": "he",
+          "start": 151.14,
+          "end": 151.286,
+          "conf": 0.71
+        },
+        {
+          "w": "fine",
+          "start": 151.286,
+          "end": 151.86,
+          "conf": 0.9
+        },
+        {
+          "w": "and",
+          "start": 151.86,
+          "end": 152.08,
+          "conf": 0.66
+        },
+        {
+          "w": "he",
+          "start": 152.08,
+          "end": 152.28,
+          "conf": 0.77
+        },
+        {
+          "w": "tall",
+          "start": 152.28,
+          "end": 152.813,
+          "conf": 0.7
+        },
+        {
+          "w": "and",
+          "start": 152.813,
+          "end": 152.977,
+          "conf": 0.64
+        },
+        {
+          "w": "he",
+          "start": 152.977,
+          "end": 153.22,
+          "conf": 0.76
+        },
+        {
+          "w": "handsome",
+          "start": 153.22,
+          "end": 154.36,
+          "conf": 0.69
+        }
+      ]
+    },
+    {
+      "i": 42,
+      "text": "Talkin' so fine, I might hold it for ransom",
+      "section": "chorus4",
+      "start": 154.36,
+      "end": 158.1,
+      "words": [
+        {
+          "w": "Talkin'",
+          "start": 154.36,
+          "end": 154.8,
+          "conf": 0.75
+        },
+        {
+          "w": "so",
+          "start": 154.8,
+          "end": 155.08,
+          "conf": 0.82
+        },
+        {
+          "w": "fine,",
+          "start": 155.08,
+          "end": 155.6,
+          "conf": 0.78
+        },
+        {
+          "w": "I",
+          "start": 155.6,
+          "end": 155.74,
+          "conf": 0.74
+        },
+        {
+          "w": "might",
+          "start": 155.74,
+          "end": 156.04,
+          "conf": 0.8
+        },
+        {
+          "w": "hold",
+          "start": 156.04,
+          "end": 156.48,
+          "conf": 0.83
+        },
+        {
+          "w": "it",
+          "start": 156.48,
+          "end": 156.634,
+          "conf": 0.68
+        },
+        {
+          "w": "for",
+          "start": 156.634,
+          "end": 156.94,
+          "conf": 0.84
+        },
+        {
+          "w": "ransom",
+          "start": 156.94,
+          "end": 158.1,
+          "conf": 0.74
+        }
+      ]
+    },
+    {
+      "i": 43,
+      "text": "Put it in drive, I'm not shy, I might let ya",
+      "section": "chorus4",
+      "start": 158.1,
+      "end": 161.84,
+      "words": [
+        {
+          "w": "Put",
+          "start": 158.1,
+          "end": 158.4,
+          "conf": 0.74
+        },
+        {
+          "w": "it",
+          "start": 158.4,
+          "end": 158.7,
+          "conf": 0.54
+        },
+        {
+          "w": "in",
+          "start": 158.7,
+          "end": 158.82,
+          "conf": 0.73
+        },
+        {
+          "w": "drive,",
+          "start": 158.82,
+          "end": 159.36,
+          "conf": 0.75
+        },
+        {
+          "w": "I'm",
+          "start": 159.36,
+          "end": 159.5,
+          "conf": 0.7
+        },
+        {
+          "w": "not",
+          "start": 159.5,
+          "end": 159.657,
+          "conf": 0.85
+        },
+        {
+          "w": "shy,",
+          "start": 159.657,
+          "end": 160.081,
+          "conf": 0.91
+        },
+        {
+          "w": "I",
+          "start": 160.081,
+          "end": 160.276,
+          "conf": 0.58
+        },
+        {
+          "w": "might",
+          "start": 160.276,
+          "end": 160.7,
+          "conf": 0.6
+        },
+        {
+          "w": "let",
+          "start": 160.7,
+          "end": 160.999,
+          "conf": 0.81
+        },
+        {
+          "w": "ya",
+          "start": 161.14,
+          "end": 161.84,
+          "conf": 0.68
+        }
+      ]
+    },
+    {
+      "i": 44,
+      "text": "Cruise all night",
+      "section": "chorus4",
+      "start": 161.84,
+      "end": 165.414,
+      "words": [
+        {
+          "w": "Cruise",
+          "start": 161.84,
+          "end": 162.59,
+          "conf": 0.75
+        },
+        {
+          "w": "all",
+          "start": 162.59,
+          "end": 163.289,
+          "conf": 0.61
+        },
+        {
+          "w": "night",
+          "start": 163.289,
+          "end": 165.414,
+          "conf": 0.52
+        }
+      ]
+    },
+    {
+      "i": 45,
+      "text": "Blowin' money fast",
+      "section": "outro1",
+      "start": 165.64,
+      "end": 167.33,
+      "words": [
+        {
+          "w": "Blowin'",
+          "start": 165.64,
+          "end": 166.566,
+          "conf": 0.61
+        },
+        {
+          "w": "money",
+          "start": 166.566,
+          "end": 166.94,
+          "conf": 0.77
+        },
+        {
+          "w": "fast",
+          "start": 166.94,
+          "end": 167.33,
+          "conf": 0.66
+        }
+      ]
+    },
+    {
+      "i": 46,
+      "text": "Tryna make it last",
+      "section": "outro1",
+      "start": 170.28,
+      "end": 171.904,
+      "words": [
+        {
+          "w": "Tryna",
+          "start": 170.28,
+          "end": 170.68,
+          "conf": 0.62
+        },
+        {
+          "w": "make",
+          "start": 170.68,
+          "end": 171.12,
+          "conf": 0.51
+        },
+        {
+          "w": "it",
+          "start": 171.12,
+          "end": 171.22,
+          "conf": 0.6
+        },
+        {
+          "w": "last",
+          "start": 171.22,
+          "end": 171.904,
+          "conf": 0.81
+        }
+      ]
+    },
+    {
+      "i": 47,
+      "text": "Blowin' money fast",
+      "section": "outro1",
+      "start": 173.05,
+      "end": 174.85,
+      "words": [
+        {
+          "w": "Blowin'",
+          "start": 173.05,
+          "end": 174.04,
+          "conf": 0.7
+        },
+        {
+          "w": "money",
+          "start": 174.04,
+          "end": 174.4,
+          "conf": 0.77
+        },
+        {
+          "w": "fast",
+          "start": 174.4,
+          "end": 174.85,
+          "conf": 0.6
+        }
+      ]
+    },
+    {
+      "i": 48,
+      "text": "Tryna make it last",
+      "section": "outro1",
+      "start": 177.35,
+      "end": 178.56,
+      "words": [
+        {
+          "w": "Tryna",
+          "start": 177.35,
+          "end": 177.55,
+          "conf": 0.5
+        },
+        {
+          "w": "make",
+          "start": 177.56,
+          "end": 177.85,
+          "conf": 0.5
+        },
+        {
+          "w": "it",
+          "start": 177.86,
+          "end": 178.04,
+          "conf": 0.5
+        },
+        {
+          "w": "last",
+          "start": 178.05,
+          "end": 178.56,
+          "conf": 0.5
+        }
+      ]
+    }
+  ],
+  "adlibs": [
+    {
+      "section": "bridge1",
+      "text": "Oh-woah"
+    },
+    {
+      "section": "bridge1",
+      "text": "Ooh-oh"
+    },
+    {
+      "section": "bridge1",
+      "text": "Mmm"
+    },
+    {
+      "section": "bridge1",
+      "text": "Oh-oh"
+    },
+    {
+      "section": "outro1",
+      "text": "Oh-woah"
+    },
+    {
+      "section": "outro1",
+      "text": "Ooh-oh"
+    },
+    {
+      "section": "outro1",
+      "text": "Mmm"
+    },
+    {
+      "section": "outro1",
+      "text": "Oh-oh"
+    }
+  ],
+  "extras": [
+    {
+      "start": 11.18,
+      "end": 12.04,
+      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
+    },
+    {
+      "start": 130.54,
+      "end": 131.15,
+      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
+    },
+    {
+      "start": 167.43,
+      "end": 170.18,
+      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
+    },
+    {
+      "start": 172.2,
+      "end": 172.94,
+      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
+    }
+  ],
+  "notes": "Timeline = audio/song.wav (ffmpeg decode of the mp3); stems separated from the same file, zero offset. Method: CTC emissions (20 ms) of the Demucs vocal stem from torchaudio MMS_FA and wav2vec2-large-lv60k-960h on the mono sum and L/R channels, fused as a probability mixture; one global constrained Viterbi alignment of all lead lines with a garbage token between lines to absorb ad-libs (parenthesised lyrics, listed under 'adlibs'); signal refinement of word starts/ends on the vocal stem; cross-check against faster-whisper large-v3 word timestamps. conf: 0.35 + agreement of independent alignments + CTC posterior + Whisper agreement. 'syl' = per-part timings of hyphenated tokens (ooh-oh)."
+}

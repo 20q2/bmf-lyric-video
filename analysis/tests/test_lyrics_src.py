@@ -50,7 +50,7 @@ def test_real_lyrics_file():
     lines, adlibs = lyrics_src.load()
     assert len(lines) == 49
     assert lines[0] == {"section": "chorus1", "text": "Young and fine and dark and handsome"}
-    assert lines[-1] == {"section": "outro1", "text": "I'll make it last, we'll be, oh-oh"}
+    assert lines[-1] == {"section": "outro1", "text": "Tryna make it last"}
     assert all(l["text"].isascii() for l in lines)  # catches pasted homoglyphs (Cyrillic е etc.)
     sections = []
     for l in lines:

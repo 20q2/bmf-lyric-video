@@ -5,9 +5,10 @@ lights early or late. Two rules on the vocal stem's RMS (work/vocal_feats.npz, 5
 over 25 ms):
   gap  : inside a word, a run of >= GAP_S where the voice is DROP_DB below the word's own level (or under
          FLOOR_DB). A hard flag: the word spans a silence; the report says where the silence is.
-  held : a word starts while the sound before it is still sustained: the voice stays within HELD_DB of its
-         level for the PRE_S before the start and never dips DIP_DB below it in the DIP_WIN around it.
-         A soft flag: legato singing does this legitimately; check these by ear on the test card.
+  held : a word starts inside a held note: the voice stays within HELD_DB of its level for the PRE_S before
+         the start, never dips DIP_DB below it in the DIP_WIN around it, and (given the pitch track) stays
+         voiced on the same note (within NOTE_ST semitones) across PITCH_S either side. A soft flag: check
+         these by ear on the test card. (Without the pitch condition every legato word flags: BMF gave 164.)
 Run: uv run python stretch_check.py   (exit 1 while any gap flag is not in ALLOW)
 """
 import json
@@ -24,10 +25,16 @@ PRE_S = 0.25
 HELD_DB = 10.0
 DIP_DB = 6.0
 DIP_WIN = (-0.12, 0.06)
+PITCH_S = 0.08
+NOTE_ST = 0.5
 EDGE_S = 0.04  # ignore the word's own attack and release
 
 # (line, word index) -> why a gap inside that word is what was sung (e.g. a held word broken by a breath).
-ALLOW: dict[tuple[int, int], str] = {}
+ALLOW: dict[tuple[int, int], str] = {
+    # the song's last phrase fades out at -51..-57 dB, under FLOOR_DB: the "silences" are its quiet notes
+    (48, 1): "faint fade-out: 'make' sung at -52 dB",
+    (48, 3): "faint fade-out: 'last' sung at -56 dB",
+}
 
 
 def runs(mask):
@@ -55,8 +62,9 @@ def gap_runs(r, hop, start, end):
             for a, b in runs(low) if (b - a) * hop >= GAP_S]
 
 
-def held_start(r, hop, start):
-    """True when `start` sits inside a sustained sound: no articulation (dip) where the word begins."""
+def held_start(r, hop, start, f0=None):
+    """True when `start` sits inside a held note: no articulation (dip, unvoiced consonant or change of note)
+    where the word begins. f0 (Hz, NaN = unvoiced) on the same hop as r; without it only the level is checked."""
     p0, p1 = int((start - PRE_S) / hop), int(start / hop)
     if p0 < 0 or p1 - p0 < 3:
         return False
@@ -65,10 +73,18 @@ def held_start(r, hop, start):
     if ref < FLOOR_DB + 10:
         return False
     w = r[max(0, int((start + DIP_WIN[0]) / hop)):int((start + DIP_WIN[1]) / hop)]
-    return bool(pre.min() > ref - HELD_DB and w.min() > ref - DIP_DB)
+    if not (pre.min() > ref - HELD_DB and w.min() > ref - DIP_DB):
+        return False
+    if f0 is None:
+        return True
+    n = int(PITCH_S / hop)
+    a, b = f0[p1 - n:p1], f0[p1:p1 + n]
+    if np.isnan(a).any() or np.isnan(b).any():
+        return False
+    return bool(abs(12 * np.log2(np.median(b) / np.median(a))) < NOTE_ST)
 
 
-def check(lines, r, hop):
+def check(lines, r, hop, f0=None):
     """Flags over every lead word: dicts with line, word, text, start, end, rule, detail."""
     out = []
     for ln in lines:
@@ -76,7 +92,7 @@ def check(lines, r, hop):
             base = dict(line=ln["i"], word=k, text=w["w"], start=w["start"], end=w["end"])
             for a, b in gap_runs(r, hop, w["start"], w["end"]):
                 out.append(base | dict(rule="gap", detail=f"silent {a:.2f}-{b:.2f}"))
-            if held_start(r, hop, w["start"]):
+            if held_start(r, hop, w["start"], f0):
                 out.append(base | dict(rule="held", detail="starts inside a sustained sound"))
     return out
 
@@ -85,7 +101,7 @@ def main():
     doc = json.loads((common.DATA / "lyrics.json").read_text(encoding="utf-8"))
     f = np.load(common.WORK / "vocal_feats.npz")
     hop = float(f["hop_s"])
-    flags = check(doc["lines"], smooth(f["rms_db"], hop), hop)
+    flags = check(doc["lines"], smooth(f["rms_db"], hop), hop, f["f0"])
     rows = [f"{x['rule']:4s}  L{x['line']:02d}.{x['word']:<2d} {x['start']:7.2f}-{x['end']:7.2f}  "
             f"{x['text']:<14s} {x['detail']}" for x in flags]
     report = "\n".join(rows) or "no flags"

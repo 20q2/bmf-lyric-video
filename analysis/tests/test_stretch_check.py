@@ -40,3 +40,25 @@ def test_a_start_after_a_dip_is_not_held():
 
 def test_a_start_in_silence_is_not_held():
     assert not held_start(track([]), HOP, 1.2)
+
+
+def pitch(spans, dur=3.0):
+    """An f0 track (Hz, 5 ms hop): NaN (unvoiced) except each (t0, t1, hz) span."""
+    f = np.full(int(dur / HOP), np.nan)
+    for a, b, hz in spans:
+        f[int(a / HOP):int(b / HOP)] = hz
+    return f
+
+
+def test_a_start_on_the_same_held_note_is_held():
+    assert held_start(track([(0.5, 2.0)]), HOP, 1.2, pitch([(0.5, 2.0, 440.0)]))
+
+
+def test_a_legato_change_of_note_is_not_held():
+    f0 = pitch([(0.5, 1.2, 440.0), (1.2, 2.0, 494.0)])  # a whole tone up at the start
+    assert not held_start(track([(0.5, 2.0)]), HOP, 1.2, f0)
+
+
+def test_an_unvoiced_start_is_not_held():
+    f0 = pitch([(0.5, 1.15, 440.0), (1.25, 2.0, 440.0)])  # a consonant: no pitch around the start
+    assert not held_start(track([(0.5, 2.0)]), HOP, 1.2, f0)
