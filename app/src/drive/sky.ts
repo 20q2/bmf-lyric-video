@@ -6,10 +6,10 @@ import * as THREE from 'three';
 
 /** [song s, zenith sRGB, horizon sRGB, sun elevation (degrees)]. */
 export const SKY_KEYS: readonly [number, string, string, number][] = Object.freeze([
-  [0, '#F2A65A', '#FFE0A6', 16],
-  [30, '#EE8A55', '#FFD08E', 11],
-  [60, '#DA6A5E', '#FFB97C', 6],
-  [90, '#B04E78', '#FF9A6A', 2],
+  [0, '#F2A65A', '#FFE0A6', 22],
+  [30, '#EE8A55', '#FFD08E', 17],
+  [60, '#DA6A5E', '#FFB97C', 12],
+  [90, '#B04E78', '#FF9A6A', 4],
   [112, '#7C3A7E', '#F7745F', -1],
   [125, '#4B2A6E', '#D9567A', -5],
   [140, '#261A4C', '#8E3D7C', -10],

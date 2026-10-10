@@ -23,12 +23,15 @@ import { F, font } from '../engine/type';
 import type { Carrier } from './carriers';
 import { dissolveAt, revealAt } from './dissolve';
 import { daylight } from './sky';
-import { TEXT_SHARE } from './ads';
+import { BRAND, TEXT_SHARE } from './ads';
 import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 
 const CANVAS_W = 1024;
-/** Boards whose waiting headline shows as greeked lines. */
-const GREEKED: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'sign', 'wall', 'storefront', 'street', 'gantry']);
+/** Boards that show their ad's copy until their lyric flips in (tri-vision: FLIP.slats slats, turning in a wave). */
+const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'sign', 'wall', 'storefront', 'street', 'gantry']);
+export const FLIP = { slats: 10, stagger: 0.6, steps: 12 };
+/** The word of emphasis's row takes this many shares of its face's height (the others one each). */
+const SOLO_ROW = 1.45;
 /** The word of emphasis is never more than this many times its companions' size (they stay readable beside it). */
 const SOLO_MAX = 1.6;
 /** Faces that carry poster art until their lyric is revealed. */
@@ -65,26 +68,30 @@ export const wallColor = (c: Carrier) => c.kind === 'neon'
 const hexOf = (c: THREE.Color) => `#${c.getHexString(THREE.SRGBColorSpace)}`;
 const GREEN = '#1f6b44';
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
     // by day a soft plum shade under the white (it reads on a pale sky and on the buildings), by night a white glow
     case 'sky': {
-      const day = daylight(c.phrase.start) > 0.6; // by day heavier, its shade laid twice
-      return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
+      // (a heavy italic sans: smoke letters, sturdy at a distance where a Didone's hairlines drop out); by day its shade
+      // laid twice, by night a glow
+      const day = daylight(c.phrase.start) > 0.6;
+      return { family: F.archivoItalic(100, 800), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
     }
     case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.72, 1] };
     case 'billboard': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
-      const a = AD_STYLE[c.ad ?? 'lipstick'];
-      return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, a.now], alpha: [0.72, 1] };
+      // (the word being sung: warm yellow on a dark ad, red on a light one — one rule across the film)
+      const a = AD_STYLE[c.ad ?? 'lipstick'], dark = new THREE.Color(a.bg).getHSL({ h: 0, s: 0, l: 0 }).l < 0.4;
+      return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, dark ? '#ffd65a' : '#d81e2c'], alpha: [0.72, 1] };
     }
     case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.72, 1] };
-    case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#7ff6ff'], alpha: [0.6, 1], glow: 'rgba(255,79,163,0.95)' };
+    case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#fff1a0'], alpha: [0.6, 1], glow: 'rgba(255,79,163,0.95)', tubes: true };
     case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
+    case 'hill': return { family: F.archivo(100, 900), caps: true, colors: ['#fbf7ee', '#fbf7ee', '#ffd65a'], alpha: [0.62, 1] };
     case 'tunnel': return c.phrase.line % 2 // (the lines in turn: sodium orange, then cold cyan)
-      ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)' }
-      : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)' };
+      ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)', tubes: true }
+      : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)', tubes: true };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
@@ -110,7 +117,7 @@ export class CarrierArt {
 
   update(t: number) {
     const falling = this.carrier.phrase.words.some((w) => /^dropping/i.test(w.w) && t >= w.start && t < w.start + 0.8);
-    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * 10)}:${Math.round(punchAt(this.carrier, t) * 10)}:${falling ? Math.round(t * 30) : 0}`;
+    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * FLIP.steps)}:${Math.round(punchAt(this.carrier, t) * 10)}:${falling ? Math.round(t * 30) : 0}`;
     if (key === this.key) return;
     this.key = key;
     this.draw(t);
@@ -118,7 +125,7 @@ export class CarrierArt {
   }
 
   private draw(t: number) {
-    const { c, canvas, carrier, style } = this, W = canvas.width, H = canvas.height, pxPerM = W / carrier.w;
+    const { c, canvas, carrier, style } = this, W = canvas.width, H = canvas.height;
     c.clearRect(0, 0, W, H);
     if (style.bg) { c.fillStyle = style.bg; c.fillRect(0, 0, W, H); }
     if (style.border) { c.strokeStyle = style.border; c.lineWidth = 6; c.strokeRect(10, 10, W - 20, H - 20); }
@@ -128,18 +135,46 @@ export class CarrierArt {
     if (carrier.ad) drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' ? undefined : style.colors[1]);
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
     const TW = W * share; // the lyric's width
-    const shown = Math.round(revealAt(carrier, t) * 10) / 10;
-    // before its words are revealed a board shows where they'll go, as a layout's greeked lines (grey bars): it reads as
-    // a designed ad waiting for its headline, never as an empty board, and gives nothing away
-    if (shown < 1 && GREEKED.has(carrier.kind)) {
-      c.save(); c.globalAlpha = 0.22 * (1 - shown); c.fillStyle = style.colors[1];
-      carrier.rows.forEach((row, r) => {
-        const rh = H / carrier.rows.length, bw = Math.min(TW * 0.8, TW * (0.3 + 0.05 * row.length));
-        c.beginPath(); c.roundRect((TW - bw) / 2, rh * (r + 0.5) - rh * 0.12, bw, rh * 0.24, rh * 0.12); c.fill();
-      });
-      c.restore();
+    const shown = Math.round(revealAt(carrier, t) * FLIP.steps) / FLIP.steps;
+    if (!COPY.has(carrier.kind)) { if (shown > 0) this.drawWords(c, t, TW, shown); return; }
+    // a board shows its ad's own copy (its maker, its line) until its lyric comes; then it flips like a tri-vision
+    // board, slat by slat, from the copy to the words
+    if (shown >= 1) { this.drawWords(c, t, TW, 1); return; }
+    const before = this.layer('before'), after = this.layer('after');
+    this.drawCopy(before.getContext('2d')!, TW);
+    const ac = after.getContext('2d')!;
+    ac.clearRect(0, 0, W, H);
+    if (shown > 0) this.drawWords(ac, t, TW, 1);
+    for (let i = 0; i < FLIP.slats; i++) {
+      const p = Math.min(1, Math.max(0, shown * (1 + FLIP.stagger) - (i / FLIP.slats) * FLIP.stagger));
+      const src = p < 0.5 ? before : after, squash = Math.abs(Math.cos(Math.PI * p)), sw = TW / FLIP.slats, sx = i * sw;
+      if (squash < 0.02) continue;
+      c.drawImage(src, sx, 0, sw, H, sx + (sw * (1 - squash)) / 2, 0, sw * squash, H);
     }
-    if (shown <= 0) return;
+  }
+
+  private layers: Record<string, HTMLCanvasElement> = {};
+  private layer(name: string) {
+    const l = (this.layers[name] ??= document.createElement('canvas'));
+    if (l.width !== this.canvas.width || l.height !== this.canvas.height) { l.width = this.canvas.width; l.height = this.canvas.height; }
+    return l;
+  }
+
+  /** The ad's own copy where its headline will go: its maker in capitals, its line under it (route signs: NEXT EXIT). */
+  private drawCopy(c: CanvasRenderingContext2D, TW: number) {
+    const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height;
+    c.clearRect(0, 0, W, H);
+    const [brand, line] = carrier.ad ? BRAND[carrier.ad] : ['NEXT EXIT', '1 MILE'];
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = style.colors[1];
+    const big = Math.min(H * 0.34, (TW * 0.8) / Math.max(4, brand.length * 0.58));
+    c.font = font(F.archivo(62, 900), big); c.fillText(brand, TW / 2, H * 0.44, TW * 0.86);
+    c.globalAlpha = 0.8; c.font = font(F.bodoni(700, { italic: true }), big * 0.42); c.fillText(line, TW / 2, H * 0.44 + big * 0.72, TW * 0.86);
+    c.globalAlpha = 1; c.textAlign = 'left';
+  }
+
+  /** The phrase, karaoke word by word, at `alpha` (its reveal for faces without copy). */
+  private drawWords(c: CanvasRenderingContext2D, t: number, TW: number, alpha: number) {
+    const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height, pxPerM = W / carrier.w;
     let em = carrier.em * pxPerM;
     c.font = font(style.family, em);
     const label = (w: Word) => (style.caps ? w.w.toUpperCase() : w.w);
@@ -150,28 +185,46 @@ export class CarrierArt {
     if (gone >= 1) return;
     if (style.glow) { c.shadowColor = style.glow; c.shadowBlur = em * (0.22 + 0.6 * gone); }
     const words = carrier.phrase.words, space = c.measureText(' ').width;
-    let wi = 0;
+    // rows share the face's height, the word of emphasis's row a bigger share
+    const soloRow = carrier.phrase.solo === 'first' ? 0 : carrier.phrase.solo === 'last' ? carrier.rows.length - 1 : -1;
+    const weights = carrier.rows.map((_, r) => (r === soloRow ? SOLO_ROW : 1)), sum = weights.reduce((a, b) => a + b, 0);
+    if (style.tubes) { // neon on its backplates: a dark rounded plate behind each row, its mounting
+      c.save(); c.shadowBlur = 0; c.globalAlpha = 0.55 * alpha; c.fillStyle = '#120a14';
+      let y0 = 0;
+      carrier.rows.forEach((row, r) => {
+        const rh = (H * weights[r]!) / sum, wd = Math.min(TW * 0.96, c.measureText(row).width + em * 0.8);
+        c.beginPath(); c.roundRect((TW - wd) / 2, y0 + rh * 0.12, wd, rh * 0.76, rh * 0.18); c.fill();
+        y0 += rh;
+      });
+      c.restore();
+    }
+    let wi = 0, top = 0;
     carrier.rows.forEach((row, r) => {
-      const n = row.split(' ').length, rowWords = words.slice(wi, wi + n);
+      const n = row.split(' ').length, rowWords = words.slice(wi, wi + n), rowH = (H * weights[r]!) / sum;
       wi += n;
-      // the word of emphasis, alone on its row: as big as the row allows, punching up as it's sung
-      const solo = (carrier.phrase.solo === 'first' && r === 0) || (carrier.phrase.solo === 'last' && r === carrier.rows.length - 1);
+      const y = top + rowH / 2;
+      top += rowH;
+      // the word of emphasis, alone on its row: bigger (up to SOLO_MAX x its companions), in the accent colour,
+      // punching up as it's sung
+      const solo = r === soloRow;
       if (solo) {
         const base = c.measureText(label(rowWords[0]!)).width;
-        const big = Math.min((PUNCH.fill * H) / carrier.rows.length, (em * TW * 0.92) / base, em * SOLO_MAX) * (1 + PUNCH.scale * punchAt(carrier, t));
+        const big = Math.min(PUNCH.fill * rowH, (em * TW * 0.92) / base, em * SOLO_MAX) * (1 + PUNCH.scale * punchAt(carrier, t));
         c.font = font(style.family, Math.max(em, Math.min(big, (em * TW * 0.98) / base))); // never past the face's edge
       }
       const total = rowWords.reduce((s, w) => s + c.measureText(label(w)).width, 0) + space * (rowWords.length - 1);
       let x = (TW - total) / 2;
-      const y = (H * (r + 0.5)) / carrier.rows.length;
       for (const w of rowWords) {
         const sung = t >= w.start, now = sung && t < w.end;
-        c.fillStyle = style.colors[now ? 2 : sung ? 1 : 0];
-        c.globalAlpha = style.alpha[sung ? 1 : 0] * (1 - gone) * shown;
+        c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];
+        c.globalAlpha = (solo ? 1 : style.alpha[sung ? 1 : 0]) * (1 - gone) * alpha;
         // dissolving: the letters drift apart and up, a little more each word along
-        const fall = fallAt(w, t, H / carrier.rows.length);
+        const fall = fallAt(w, t, rowH);
         if (fall) { c.save(); c.translate(x, y + fall.dy); c.rotate(fall.tilt); }
         const [fx, fy] = fall ? [0, 0] : [x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6];
+        if (style.tubes) { // neon: the tube's brighter core line over its glow
+          c.save(); c.lineWidth = Math.max(2, em * 0.035); c.strokeStyle = 'rgba(255,255,255,0.75)'; c.strokeText(label(w), fx, fy); c.restore();
+        }
         for (let k = 0; k < (style.glowPasses ?? 1); k++) c.fillText(label(w), fx, fy);
         if (fall) c.restore();
         x += c.measureText(label(w)).width + space;

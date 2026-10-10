@@ -26,6 +26,8 @@ export const SLOPE = 1;
 const OVERLOOK_LIP = 9;
 const STEP = 2;
 
+/** Each section's ground (sRGB; others the golden fields). */
+const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
 const PALMS = new Set(['intro', 'chorus1', 'verse2', 'verse3']); // (none on the coast road: they'd stand in the hook's sky)
 
 /** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
@@ -84,8 +86,10 @@ export function buildWorld(drive: Drive): THREE.Group {
   // the road ends at the overlook, a few metres past where the car parks: a cliff, the city below
   const end = Math.min(route.length, motion.distanceAt(drive.stretches[drive.stretches.length - 1]!.end) + OVERLOOK_LIP);
   const named = <T extends THREE.Object3D>(o: T, name: string) => { o.name = name; return o; };
-  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass), end), lambert()), 'verges'));
-  g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass), end), lambert()), 'verges'));
+  // each section its own ground: the city's paving, the freeway's concrete, the neighbourhood's lawns, the coast's sand
+  const groundOf = (s: number) => { const g0 = GROUND[stretchAtS(s).id]; return g0 ? new THREE.Color(g0) : grass; };
+  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : groundOf(s)), end), lambert()), 'verges'));
+  g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), lambert()), 'verges'));
   const fe = route.frameAt(end), cliff = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.rock }));
   cliff.matrixAutoUpdate = false;
   cliff.matrix.copy(boxAt(route, end + 1, 0, 2 * SHOULDER, fe.pos.y + 0.4, 2, -(fe.pos.y + 0.4))); // (the verges' width: any wider and its edge cuts across the town seen from the Strip)
@@ -400,9 +404,10 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel'; // the face is only its letters
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
+  if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   const g = new THREE.Group();
   const board = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h, c.kind === 'banner' ? FLUTTER.segments : 1, 1), mat);
@@ -410,7 +415,7 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   g.add(board);
   const grey = (hex: string) => toon({ color: hex });
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b;
   };
   // the face's centre stands this high over the ground (the road's height where it stands)
   const y0 = c.foot;
@@ -418,7 +423,9 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   const legs = (xs: number[], drop = y0 + c.h / 2) => { for (const x of xs) box(0.2, drop, 0.2, x, c.h / 2 - drop / 2, -0.2, grey(WORLD.post)); };
   // its backing board or its building (carriers.ts solidsOf: what the guard checks for hiding other faces)
   const building = PAIRABLE.has(c.kind) && c.kind !== 'billboard';
-  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? toon({ color: wall }) : grey(WORLD.backing));
+  // (a face's building a shade darker than the face, with windows: against a sunset sky it reads as a building; neon's
+  // wall plain dark brick, nothing lit behind its tubes)
+  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? (c.kind === 'neon' ? toon({ color: wall }) : withWindows(toon({ color: wall.clone().multiplyScalar(0.78) }))) : grey(WORLD.backing)).name = building ? 'facade' : 'backing';
   switch (c.kind) {
     case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
     case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey(WORLD.post)); break;
@@ -429,6 +436,13 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
       const k = c.w / LAYOUT.banner.w, tow = BANNER.tow * k, x0 = c.w / 2 + tow;
       box(tow, 0.05 * k, 0.05 * k, c.w / 2 + tow / 2, 0, 0, grey('#3a3a40'));
       const plane = buildPlane(k); plane.position.x = x0; g.add(plane);
+      break;
+    }
+    case 'hill': {
+      // the mound it stands on (from the plain up to the letters' feet), and the scaffold behind each letter
+      const mh = c.foot - c.h / 2 + 2, mound = new THREE.Mesh(new THREE.ConeGeometry(c.w * 0.75, mh, 24, 1), toon({ color: '#5a4a52' }));
+      mound.position.set(0, -c.h / 2 + 2 - mh / 2, -6); mound.scale.z = 0.5; g.add(mound);
+      for (let i = 0; i < 16; i++) box(0.4, c.h * 0.9, 0.4, -c.w * 0.45 + (i * c.w * 0.9) / 15, -c.h * 0.05, -1.2, grey(WORLD.post));
       break;
     }
     case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey(WORLD.post)); break;
@@ -484,7 +498,7 @@ export function buildCar(): THREE.Group {
   box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
   box(Wd - 0.12, 0.05, 0.05, 0, belt + 0.48, 0.92, chrome); // the windshield's top rail
   for (const x of [Wd / 2 - 0.08, -Wd / 2 + 0.08]) box(0.05, 0.5, 0.05, x, belt + 0.24, 0.95, chrome);
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#cfe3ff', transparent: true, opacity: 0.18, depthWrite: false }));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.06, depthWrite: false }));
   glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);
   // chrome: the spear down each side, the bumpers
   for (const x of [Wd / 2, -Wd / 2]) box(0.03, 0.05, L - 0.9, x, 0.74, 0.05, chrome);
@@ -504,7 +518,7 @@ export function buildCar(): THREE.Group {
     const cap = add(new THREE.CircleGeometry(wheelR * 0.5, 16), chrome, x + sgn * 0.127, wheelR, z, g); cap.rotation.y = (sgn * Math.PI) / 2;
   }
   // lights: quad headlights, triple round tail lights; the beams ahead on the road
-  const head = lampMaterial('#fff2d8', GLOW.head, 0.9), tail = lampMaterial('#ff2a24', GLOW.tail, 0.5);
+  const head = lampMaterial('#fff2d8', GLOW.head, 0.9), tail = lampMaterial('#ff2a24', GLOW.tail, 1.1);
   for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.CircleGeometry(0.09, 14), head, x, 0.68, hl + 0.07);
   for (const x of [0.78, 0.55, 0.32, -0.32, -0.55, -0.78]) { const t = add(new THREE.CircleGeometry(0.075, 14), tail, x, 0.68, -hl - 0.07); t.rotation.y = Math.PI; }
   // the headlights' throw: light on the road ahead, widening and fading

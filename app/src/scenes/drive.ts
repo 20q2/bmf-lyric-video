@@ -19,6 +19,7 @@ import { PrintPass } from '../look/print';
 import { NIGHT } from '../look/night';
 import { buildCity } from '../look/city';
 import { Money } from '../look/money';
+import { SLAM, SlamCard } from '../look/slam';
 import { type Stance, hydraulics } from '../drive/hydraulics';
 import { neonAt } from '../drive/landmarks';
 import { type Cast, castOf } from '../drive/cast';
@@ -61,6 +62,9 @@ export default class DriveScene extends Scene {
   private fogColor = new THREE.Color();
   private city!: ReturnType<typeof buildCity>;
   private money!: Money;
+  /** (debugging: the named parts hidden, ?hide=) */
+  private hidden: string[] = [];
+  private slam = new SlamCard();
   /** The motel sign's neon (its material and its two faces), and the car's body on its hydraulics. */
   private sign!: { neon: THREE.MeshBasicMaterial; faces: { no: THREE.Texture; vacancy: THREE.Texture } };
   private stance!: (t: number) => Stance;
@@ -101,6 +105,7 @@ export default class DriveScene extends Scene {
       this.placed.push([c, o]);
       this.world.add(o);
     }
+    if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
@@ -119,7 +124,7 @@ export default class DriveScene extends Scene {
     this.world.fog = new THREE.Fog(0xffffff, 140, 1100);
     // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
     const hide = typeof location === 'undefined' ? [] : (new URLSearchParams(location.search).get('hide') ?? '').split(',').filter(Boolean);
-    if (hide.length) world.traverse((o) => { if (hide.includes(o.name)) o.visible = false; });
+    this.hidden = hide;
     // the city below the overlook, ahead of where the car parks
     const end = this.drive.carFrame(this.ctx.audio.duration);
     this.city = buildCity(end.pos, end.fwd, end.right, -0.4);
@@ -223,6 +228,9 @@ export default class DriveScene extends Scene {
     fog.near = 140 - 130 * inside;
     fog.far = 1100 - 960 * inside;
 
+    // "crash": the slam card, held a beat (the last one into black)
+    const last = this.crashes[this.crashes.length - 1];
+    const slamOn = this.crashes.map((c) => [c, c === last ? SLAM.last : SLAM.other] as const).find(([c, hold]) => t >= c && t < c + hold);
     this.city.update(t, this.cam.position, this.rt.width / W);
     // the lyrics showing now, for the bills to keep out of
     const showing = d.carriers.filter((c) => t > c.reveal && t < c.phrase.end + 1).map((c) => ({ at: centerAt(c, t), r: Math.hypot(c.w, c.h) / 2 }));
@@ -232,18 +240,19 @@ export default class DriveScene extends Scene {
     renderer.render(this.world, this.cam);
     // screen-printed: halftone fades out at night (neon noir is clean), its tones following the light
     this.print.render(renderer, this.rt, this.cam, out, { halftone: 0.55 * day * (1 - inside), lo: 0.004 + 0.02 * day, hi: 0.04 + 0.18 * day });
+    if (slamOn) this.ctx.comp.draw(renderer, this.slam.texture, out, { mode: 'replace', ...this.slam.placement((t - slamOn[0]) / slamOn[1], t) });
     // the beat: while the drums play, the frame punches in a touch on each kick; "crash" jolts it, with a flash
     const drums = smooth(0.12, 0.3, f.a.drums), hit = this.crashes.reduce((m, c) => (t >= c && t < c + 0.6 ? Math.max(m, Math.exp(-(t - c) * 7)) : m), 0);
     const jolt = 14 * hit;
     // the end: "crash" whites out and cuts to black; at the very end the motel fades away
     const bo = d.blackout, black = bo && t >= bo[0] && t < bo[1] ? 1 : 0;
     const [f0, f1] = FINALE.fade, gone = Math.min(1, Math.max(0, (t - f0) / (f1 - f0)));
-    const white = bo && t >= bo[0] - FINALE.flash && t < bo[0] ? 1.2 : 0;
+    // (no flash in the black: added after exposure, it would print a grey frame)
     return {
       bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06, grain: 0.072, vignette: 0.22,
       zoom: 1 + 0.007 * f.a.kick * drums + 0.03 * hit,
       shake: [jolt * Math.sin(t * 91), jolt * Math.cos(t * 77)],
-      flash: 0.12 * hit + white,
+      flash: black ? 0 : 0.08 * hit,
       exposure: (1 - black) * (1 - gone * gone),
     };
   }

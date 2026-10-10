@@ -5,8 +5,8 @@
 import type { Carrier } from './carriers';
 import { SETTLE, dwellFor } from './phrases';
 
-/** A carrier's text fades in over this long from its reveal (s): inside the camera's snap onto it (SNAP_S). */
-export const REVEAL_S = 0.15;
+/** A carrier's text comes in over this long from its reveal (s; a board's tri-vision flip), finished as its shot lands. */
+export const REVEAL_S = 0.3;
 /** How far a carrier's text has appeared at t (0: blank, 1: shown). */
 export const revealAt = (c: Carrier, t: number) => Math.min(1, Math.max(0, (t - c.reveal) / REVEAL_S));
 

@@ -45,12 +45,14 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
     return stretches[stretches.length - 1]!;
   };
   // where the words stand, per side (−1 left, +1 right): [s from, s to]
-  const taken = carriers.filter((c) => c.solid).flatMap((c) => {
+  // (a hill sign keeps its whole side of the road clear, from well before it: it's seen across the valley)
+  const hills = carriers.filter((c) => c.kind === 'hill').map((c) => ({ side: -1, a: c.s - 260, b: c.s + 60 }));
+  const taken = [...hills, ...carriers.filter((c) => c.solid).flatMap((c) => {
     const side = Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) || 1;
     const here = { side, a: c.s - c.w / 2 - 14, b: c.s + c.w / 2 + 14 };
     // a face on the left is filmed from across the road (a wide pair stands well back): that side stays open too
     return side < 0 ? [here, { side: 1, a: c.s - c.w - 24, b: c.s + c.w + 24 }] : [here];
-  });
+  })];
   const out: Block[] = [];
   for (let k = 0; k * PLOT < route.length; k++) {
     for (const side of [1, -1]) {
@@ -59,7 +61,8 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
       if (nearTunnel(tunnels, s, TUNNEL_CLEAR) || taken.some((t) => t.side === side && s > t.a && s < t.b)) continue;
       const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), h = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
       const lateral = side * ((b.far ?? NEAR) + d / 2 + 6 * hash(k, side, 5));
-      out.push({ s, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, s, lateral, w, h, d) });
+      const lift = route.frameAt(s).pos.y + 0.4; // down to the plain: by a raised road it would float
+      out.push({ s, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, s, lateral, w, h + lift, d, -lift) });
     }
   }
   return out;

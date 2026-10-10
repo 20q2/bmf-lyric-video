@@ -24,7 +24,7 @@ export const VACANCY_AT = 179.9;
 export function neonAt(t: number, beat: number): { lit: number; no: boolean } {
   const no = t < VACANCY_AT || (t < VACANCY_AT + 0.35 && Math.floor((t - VACANCY_AT) * 14) % 2 === 1); // it sputters out
   if (t >= NEON_ON.on) return { lit: 1, no };
-  if (t < NEON_ON.from) return { lit: 0.04, no };
+  if (t < NEON_ON.from) return { lit: 1, no }; // (lit from the first frame: the thumbnail)
   // stuttering on: lit in flashes on the half-beats, longer as it catches
   const u = (t - NEON_ON.from) / (NEON_ON.on - NEON_ON.from), phase = (beat * 2) % 1;
   return { lit: phase < 0.25 + 0.6 * u ? 1 : 0.08, no };

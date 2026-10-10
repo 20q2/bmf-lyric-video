@@ -238,3 +238,8 @@ test('the camera is never inside anything: the ground, a tunnel\'s rock, a build
   }
   expect(bad).toEqual([]);
 });
+
+test("every carrier's solid stands at its face (in the face's own frame, not moved into the world)", () => {
+  const far = drive.carriers.filter((c) => c.solid && c.solid.at.length() > Math.max(c.w, c.h, 30));
+  expect(far.map((c) => `${c.id} ${c.solid!.at.toArray().map((v) => v.toFixed(0)).join(',')}`)).toEqual([]);
+});

@@ -12,6 +12,7 @@ import { LEAD, SNAP_S, type Shot, type Target, beatAtOrAfter, director, resolveA
 import * as THREE from 'three';
 import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
+import { REVEAL_S } from './dissolve';
 import { type Block, blocksOf } from './blocks';
 import { motelSign } from './landmarks';
 
@@ -35,9 +36,9 @@ export const LANE = 1.9;
 /** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
  *  its first shot stands (m). */
 export const OPENING = { at: [2.47, 6.22, 9.97, 13.72], signDist: 7.5 };
-/** The end: the flash before black after "crash" (s), the cut to the motel (s, a half-beat after the last line has
+/** The end: the slam card's hold on "crash" before black (s, look/slam.ts), the cut to the motel (s, a half-beat after the last line has
  *  been read), and the fade out (s). */
-export const FINALE = { flash: 0.12, endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
+export const FINALE = { slam: 0.4, endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
 /** A move this far (m between the eyes, or radians between the views) is a cut instead; a cut may come this much
  *  before its cue (onto a half-beat) or after. */
@@ -122,7 +123,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // each phrase's text shows from its own shot, or from the shot before when that's the same line's (the next phrase
   // may be seen coming) or previews it (paired): never more than one phrase ahead, never across a pause
   carriers.forEach((c, i) => {
-    c.reveal = resolveAt(phraseShots[i]!.at);
+    c.reveal = resolveAt(phraseShots[i]!.at) - REVEAL_S; // (shown by the time its shot lands: a cut finds it finished)
     if (paired[i - 1] || carriers[i - 1]?.phrase.line === c.phrase.line) c.reveal = Math.min(c.reveal, Math.max(resolveAt(phraseShots[i - 1]!.at), c.phrase.start - REVEAL_AHEAD));
   });
   const own = new Set<Shot>(phraseShots);
@@ -141,9 +142,9 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const signShot: Target = (t) => lookFrom(sign.center.clone().addScaledVector(sign.normal, OPENING.signDist - 0.5 * Math.min(1, t / 3)).add(new THREE.Vector3(0, -0.8, 0)), sign.center);
   const opening: Shot[] = [
     { at: 0, to: signShot, move: 'cut' },
-    { at: OPENING.at[0]!, to: () => lookFrom(at0(5.2, 2.4, 0.5), at0(0.6, 0, 0.75)), move: 'cut' },
-    { at: OPENING.at[1]!, to: () => lookFrom(at0(-1.9, 0, 1.85), at0(25, 0, 1.2)), move: 'cut' },
-    { at: OPENING.at[2]!, to: () => lookFrom(at0(12, -16, 3), at0(0, 4, 1.2)), move: 'cut' },
+    { at: OPENING.at[0]!, to: (t) => lookFrom(at0(5.2 - 0.35 * (t - OPENING.at[0]!), 2.4, 0.5), at0(0.6, 0, 0.75)), move: 'cut' },
+    { at: OPENING.at[1]!, to: (t) => lookFrom(at0(-1.9 + 0.12 * (t - OPENING.at[1]!), 0, 1.85), at0(25, 0, 1.2)), move: 'cut' },
+    { at: OPENING.at[2]!, to: (t) => lookFrom(at0(12 - 0.8 * (t - OPENING.at[2]!), -16 + 0.9 * (t - OPENING.at[2]!), 3), at0(0, 4, 1.2)), move: 'cut' },
     { at: OPENING.at[3]!, to: chaseOf(stretches[0]!), move: 'cut' },
   ];
   shots.push(...opening);
@@ -161,6 +162,6 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // black from just after the last "crash" until the last line's shot
   const crash = lyrics.lines.flatMap((l) => l.words).filter((w) => /^crash/i.test(w.w)).pop();
   const lastShot = phraseShots[phraseShots.length - 1];
-  const blackout: [number, number] | null = crash && lastShot ? [crash.start + FINALE.flash, resolveAt(lastShot.at)] : null;
+  const blackout: [number, number] | null = crash && lastShot ? [crash.start + FINALE.slam, resolveAt(lastShot.at)] : null;
   return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, blackout };
 }
