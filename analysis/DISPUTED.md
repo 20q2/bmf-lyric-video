@@ -31,3 +31,6 @@ where Whisper's reading is plausible; the rest look like Whisper mishearing and 
 Settled 2026-10-09 by the user, by ear: the bridge and outro sing "Blowin' money fast, (oh) it won't last /
 Tryna make it last / Blowin' money fast, (mmm) we might crash / Tryna make it last (we'll be, oh-oh)" (Genius's
 lines 1 and 3; line 4 is "Tryna make it last" with "we'll be, oh-oh" as the ad-lib, not "I'll make it last").
+
+All lines above confirmed by the user on 2026-10-09 as printed in `lyrics/lyrics.txt` (the Genius wording) after a
+listening pass on the test card: M1's gate ("every word is on time").
