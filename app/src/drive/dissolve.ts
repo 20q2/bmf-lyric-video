@@ -16,6 +16,6 @@ export const DISSOLVE = { after: 0.15, over: 0.6 };
  *  the phrase is sung and has been up its reading time (dwellFor, from SETTLE after its first word). */
 export function dissolveAt(c: Carrier, t: number) {
   if (c.kind !== 'sky') return 0;
-  const from = Math.max(c.phrase.end + DISSOLVE.after, c.phrase.start + SETTLE + dwellFor(c.phrase.words.length) + 0.1);
+  const from = Math.max(c.phrase.end + DISSOLVE.after, c.phrase.start + SETTLE + dwellFor(c.phrase.words.length) + 0.1, (c.hold ?? 0) + DISSOLVE.after);
   return Math.min(1, Math.max(0, (t - from) / DISSOLVE.over));
 }

@@ -12,7 +12,7 @@ import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, centerAt } from '../drive/carriers';
 import { daylight, skyStateAt } from '../drive/sky';
-import { buildCar, buildCarrier, buildWorld, flutter } from '../drive/world';
+import { buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
@@ -28,6 +28,8 @@ const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
 const TUNNEL_DARK = new THREE.Color('#120a05');
 /** A banner's plane is in the sky from this long before its line is revealed until this long after the line (s). */
 const BANNER_SKY = { before: 0.8, after: 4 };
+/** The skywriter flies on this long after its phrase (s), this fast along it and up (m/s). */
+const SKYWRITER = { after: 1.4, speed: 30, climb: 8 };
 /** Carriers further along the road than this from the car (m) are put away. */
 const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
@@ -66,8 +68,11 @@ export default class DriveScene extends Scene {
   /** Every carrier with its object (far from the car, they're put away: across a loop of the road they'd stand
    *  in another stretch's sky). */
   private placed: [Carrier, THREE.Object3D][] = [];
-  /** Carriers that move (towed banners), with their objects. */
+  /** Carriers that move (towed banners, the hook's sky-writing), with their objects. */
   private flying: [Carrier, THREE.Object3D][] = [];
+  /** The skywriter: a plane at the head of the sky-writing as it's written, flying on and up after. */
+  private writer = buildPlane(2.2);
+  private skies: Carrier[] = [];
   /** In a tunnel: the sodium light of the lamps nearest the camera. */
   private sodium = [0, 1, 2].map(() => new THREE.PointLight('#ffa24a', 0, TUNNEL_LIGHT.reach, 1.5));
 
@@ -80,7 +85,9 @@ export default class DriveScene extends Scene {
     const world = buildWorld(this.drive);
     this.sign = world.userData.sign;
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
-    this.world.add(world, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
+    this.skies = this.drive.carriers.filter((c) => c.kind === 'sky');
+    this.writer.matrixAutoUpdate = false;
+    this.world.add(world, this.writer, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
     for (const c of this.drive.carriers) {
       const art = new CarrierArt(c);
       this.arts.push(art);
@@ -135,7 +142,17 @@ export default class DriveScene extends Scene {
       const first = d.carriers.find((k) => k.phrase.line === c.phrase.line)!;
       o.visible = t > first.reveal - BANNER_SKY.before && t < line.end + BANNER_SKY.after;
       o.matrix.setPosition(centerAt(c, t));
-      if (o.visible) flutter(o, c, t);
+      if (o.visible && c.kind === 'banner') flutter(o, c, t); // (cloth ripples; travelling sky-writing doesn't)
+    }
+    // the skywriter, writing the latest sky phrase: at its head along the words' top as they're sung, then away
+    const writing = this.skies.filter((c) => t > c.phrase.start - 0.3 && t < c.phrase.end + SKYWRITER.after).pop();
+    this.writer.visible = !!writing;
+    if (writing) {
+      const w = writing, along = w.up.clone().cross(w.normal).normalize(), dur = Math.max(0.3, w.phrase.end - w.phrase.start);
+      const u = Math.min(1, Math.max(0, (t - w.phrase.start) / dur)), past = Math.max(0, t - w.phrase.end);
+      const head = centerAt(w, t).addScaledVector(along, -w.w / 2 + u * w.w + past * SKYWRITER.speed)
+        .addScaledVector(w.up, w.h * 0.42 + past * SKYWRITER.climb);
+      this.writer.matrix.makeBasis(along, w.up, w.normal).scale(new THREE.Vector3(w.h / 9, w.h / 9, w.h / 9)).setPosition(head);
     }
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });

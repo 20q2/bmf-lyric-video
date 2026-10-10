@@ -30,6 +30,14 @@ const CANVAS_W = 1024;
 /** Faces that carry poster art until their lyric is revealed. */
 /** A word of emphasis punches up this much as it's sung, settling over `over` s; it fills this share of its row. */
 export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
+/** The word dropping drops as it's sung: falling down its row and landing tilted, with a bounce. */
+export const FALL = { depth: 0.3, fallS: 0.3, tilt: 0.08 };
+function fallAt(w: Word, t: number, rowPx: number): { dy: number; tilt: number } | null {
+  if (!/^dropping/i.test(w.w) || t < w.start) return null;
+  const tau = t - w.start, u = Math.min(1, tau / FALL.fallS);
+  const bounce = tau > FALL.fallS ? 0.12 * Math.exp(-(tau - FALL.fallS) * 9) * Math.sin((tau - FALL.fallS) * 30) : 0;
+  return { dy: rowPx * FALL.depth * (u * u - bounce), tilt: FALL.tilt * u };
+}
 /** How far through its punch the emphasis word is at t (1: just sung, 0: settled or not yet). */
 const punchAt = (c: Carrier, t: number) => {
   const p = c.phrase, w = p.solo === 'first' ? p.words[0] : p.solo === 'last' ? p.words[p.words.length - 1] : undefined;
@@ -70,7 +78,9 @@ function styleOf(c: Carrier): Style {
     case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.72, 1] };
     case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#7ff6ff'], alpha: [0.6, 1], glow: 'rgba(255,79,163,0.95)' };
     case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
-    case 'tunnel': return { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)' };
+    case 'tunnel': return c.phrase.line % 2 // (the lines in turn: sodium orange, then cold cyan)
+      ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)' }
+      : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)' };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(400, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
@@ -95,7 +105,8 @@ export class CarrierArt {
   }
 
   update(t: number) {
-    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * 10)}:${Math.round(punchAt(this.carrier, t) * 10)}`;
+    const falling = this.carrier.phrase.words.some((w) => /^dropping/i.test(w.w) && t >= w.start && t < w.start + 0.8);
+    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * 10)}:${Math.round(punchAt(this.carrier, t) * 10)}:${falling ? Math.round(t * 30) : 0}`;
     if (key === this.key) return;
     this.key = key;
     this.draw(t);
@@ -144,7 +155,11 @@ export class CarrierArt {
         c.fillStyle = style.colors[now ? 2 : sung ? 1 : 0];
         c.globalAlpha = style.alpha[sung ? 1 : 0] * (1 - gone) * shown;
         // dissolving: the letters drift apart and up, a little more each word along
-        for (let k = 0; k < (style.glowPasses ?? 1); k++) c.fillText(label(w), x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6);
+        const fall = fallAt(w, t, H / carrier.rows.length);
+        if (fall) { c.save(); c.translate(x, y + fall.dy); c.rotate(fall.tilt); }
+        const [fx, fy] = fall ? [0, 0] : [x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6];
+        for (let k = 0; k < (style.glowPasses ?? 1); k++) c.fillText(label(w), fx, fy);
+        if (fall) c.restore();
         x += c.measureText(label(w)).width + space;
       }
       if (solo) c.font = font(style.family, em);

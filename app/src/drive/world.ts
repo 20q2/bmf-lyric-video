@@ -268,6 +268,20 @@ function buildMotelSign(route: Route): THREE.Group {
   return g;
 }
 
+/** A small high-wing plane, nose along +x from its tail at 0, `k` times life size (banners' tugs, the skywriter). */
+export function buildPlane(k = 1): THREE.Group {
+  const g = new THREE.Group(), body = toon({ color: '#e9e4da' }), trim = toon({ color: '#b3122e' });
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); };
+  const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * k, 0.22 * k, 6 * k, 10), body);
+  fuselage.rotation.z = -Math.PI / 2; fuselage.position.set(3 * k, 0, 0); g.add(fuselage);
+  box(1.5 * k, 0.12 * k, 10 * k, 3.9 * k, 0.6 * k, 0, body); // the wing, over the cabin
+  box(0.8 * k, 0.08 * k, 3.4 * k, 0.35 * k, 0.1 * k, 0, body); // tailplane
+  box(1 * k, 1.5 * k, 0.08 * k, 0.4 * k, 0.75 * k, 0, trim); // fin
+  const prop = new THREE.Mesh(new THREE.CircleGeometry(1.1 * k, 16), new THREE.MeshBasicMaterial({ color: '#2a2a30', transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+  prop.rotation.y = Math.PI / 2; prop.position.set(6.05 * k, 0, 0); g.add(prop); // spinning, a blur
+  return g;
+}
+
 /** A towed banner ripples: a wave running back from its leading (right) edge, growing toward its trailing edge. Small
  *  enough to leave the words readable. */
 export const FLUTTER = { segments: 40, amp: 0.025, waves: 2.5, hz: 1.3 };
@@ -311,15 +325,9 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
     case 'banner': {
       // the plane ahead of it (to its right, nose that way: it flies the way the words run), a high-wing tug on a tow
       // line from the banner's leading edge; as big as the banner was made (carriers.ts BANNER.view)
-      const k = c.w / LAYOUT.banner.w, tow = BANNER.tow * k, x0 = c.w / 2 + tow, body = grey('#e9e4da'), trim = grey('#b3122e');
+      const k = c.w / LAYOUT.banner.w, tow = BANNER.tow * k, x0 = c.w / 2 + tow;
       box(tow, 0.05 * k, 0.05 * k, c.w / 2 + tow / 2, 0, 0, grey('#3a3a40'));
-      const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * k, 0.22 * k, 6 * k, 10), body);
-      fuselage.rotation.z = -Math.PI / 2; fuselage.position.set(x0 + 3 * k, 0, 0); g.add(fuselage); // tail at x0, nose at +6
-      box(1.5 * k, 0.12 * k, 10 * k, x0 + 3.9 * k, 0.6 * k, 0, body); // wing, over the cabin
-      box(0.8 * k, 0.08 * k, 3.4 * k, x0 + 0.35 * k, 0.1 * k, 0, body); // tailplane
-      box(1 * k, 1.5 * k, 0.08 * k, x0 + 0.4 * k, 0.75 * k, 0, trim); // fin
-      const prop = new THREE.Mesh(new THREE.CircleGeometry(1.1 * k, 16), new THREE.MeshBasicMaterial({ color: '#2a2a30', transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
-      prop.rotation.y = Math.PI / 2; prop.position.set(x0 + 6.05 * k, 0, 0); g.add(prop); // spinning, a blur
+      const plane = buildPlane(k); plane.position.x = x0; g.add(plane);
       break;
     }
     case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey(WORLD.post)); break;

@@ -69,6 +69,8 @@ export interface Carrier {
   aim?: THREE.Vector3;
   /** A carrier that moves (a towed banner): its velocity (m/s); `center` is where it is as its phrase starts. */
   vel?: THREE.Vector3;
+  /** Sky-writing held whole (not dissolving) until then (s): a line written as one. */
+  hold?: number;
   /** The last line's: shot low behind the parked car, its tail lights, the writing over it (the end). */
   finale?: boolean;
   /** A billboard: the product its ad sells (ads.ts); its lyric is the headline. */
@@ -112,6 +114,9 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   gantry: { rowH: 2, w: 9.5, advance: 0.55, emOfRow: 0.62 },
   tunnel: { rowH: 2, w: 10, advance: 0.62, emOfRow: 0.7 },
 };
+/** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
+export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i;
+export const HOOK = { fly: [1.2, 1.45, 1.7], recede: 0.35, rise: 9, cruise: 1.7, gap: 3 };
 /** Kinds set in capitals. */
 export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner']);
 /** A phrase longer than this (characters) takes two rows. */
@@ -153,7 +158,7 @@ export const STREET = { lateral: 6.5, y: 3.6 };
 export const GANTRY_Y = 6;
 /** Tunnel lettering's centre stands this high on the wall (m); the camera frames it from this far out, across the bore,
  *  sliding with the car up to `slide` either way, from `eye` m up: the car passes between, so it looks over it. */
-export const TUNNEL_TEXT = { y: 3.8, dist: 2 * TUNNEL.halfW - 1.5, slide: 5, eye: 3.6 };
+export const TUNNEL_TEXT = { y: 3.8, dist: 2 * TUNNEL.halfW - 1.5, slide: 11, eye: 3.6 };
 /** A gantry stands at least this far past the last face on the left (m). */
 export const GANTRY_CLEAR = 20;
 
@@ -189,9 +194,11 @@ function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 1) {
   const longest = Math.max(...rows.map((r) => r.length));
   // a billboard's lyric is its ad's headline: it has the ad's left part, and the board is at least an ad's height
   // the lyric has the board's text share (its art has the rest); a billboard is at least an ad's height
-  const textW = L.w * (TEXT_SHARE[kind] ?? 1), h = L.rowH * rows.length;
+  // (sky-writing is as wide as its words: the guard frames the face, and a wide empty face won't fit two in a shot)
+  const w = kind === 'sky' ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 2) : L.w;
+  const textW = w * (TEXT_SHARE[kind] ?? 1), h = L.rowH * rows.length;
   const em = scale * Math.min(L.rowH * L.emOfRow, (textW * TEXT_W) / (longest * L.advance));
-  return { rows, em, w: scale * L.w, h: scale * (kind === 'billboard' ? Math.max(h, AD.minH) : h) };
+  return { rows, em, w: scale * w, h: scale * (kind === 'billboard' ? Math.max(h, AD.minH) : h) };
 }
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -210,6 +217,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
   const last: Record<string, number> = {};
   const room = (key: string, s: number, gap: number) => { const v = Math.max(s, (last[key] ?? -Infinity) + gap); last[key] = v; return v; };
   const lines = R.flatMap((st) => st.lines), lastLine = lines[lines.length - 1]?.i ?? -1;
+  let flyCount = 0;
   const nextStart = (i: number) => lines.find((l) => l.i > i)?.words[0]!.start ?? Infinity;
   for (const st of R) {
     const pattern = PATTERNS[st.id] ?? ['sign'];
@@ -229,7 +237,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         if (kind_ === 'street' && rowsFor(ph.text, ph.solo).length > 1) kind_ = 'sign';
         let lay = layout(kind_, ph.text, ph.solo);
         const id = `L${line.i}.${pi}`;
-        let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3, foot: number | undefined, stack: Carrier['stack'], aim: THREE.Vector3 | undefined, vel: THREE.Vector3 | undefined;
+        let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3, foot: number | undefined, stack: Carrier['stack'], aim: THREE.Vector3 | undefined, vel: THREE.Vector3 | undefined, hold: number | undefined;
         let solid: Carrier['solid'] | undefined;
         if (kind_ === 'road') {
           s = room('road', motion.distanceAt(ph.end) + ROAD_AHEAD + lay.h / 2, lay.h + 2); const f = route.frameAt(s);
@@ -248,7 +256,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           up = uprightFor(normal, WORLD_UP);
           // sized for how far off the camera (low behind the car: framing) sees it, so its type reads the same anywhere
           const eye = car.clone().addScaledVector(flat(cf.fwd), -8).addScaledVector(WORLD_UP, 1.6);
-          const scale = Math.max(1, eye.distanceTo(mid) / BANNER.view);
+          const scale = Math.max(1, eye.distanceTo(mid) / BANNER.view) * (CRUISE.test(line.text) ? HOOK.cruise : 1);
           lay = layout(kind_, ph.text, ph.solo, scale);
           // keeping pace with the car (its average speed over the line), drifting left to right across the frame
           const pace = (motion.distanceAt(T1) - motion.distanceAt(T0)) / Math.max(1e-3, T1 - T0);
@@ -257,6 +265,30 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           center = mid.addScaledVector(vel, ph.start - (T0 + T1) / 2).addScaledVector(up, -rank * BANNER.gap * scale);
           aim = up.clone().multiplyScalar(rank * BANNER.gap * scale);
           solid = null;
+        } else if (kind_ === 'sky' && FLY.test(line.text)) {
+          // the hook, "He's so fly, fly": bigger each chorus, its two phrases side by side on one line across the sky,
+          // the shot holding both (aimed at the line's middle)
+          const k = flyCount, scale = HOOK.fly[Math.min(k, HOOK.fly.length - 1)]!;
+          lay = layout(kind_, ph.text, ph.solo, scale);
+          const T0 = phs[0]!.start, T1 = phs[phs.length - 1]!.end;
+          // (further off and higher, but less than it grows: it reads bigger each time)
+          const far = 1 + (scale - 1) * HOOK.recede;
+          s = motion.distanceAt(T0) + SKY.ahead * far; const f = route.frameAt(s);
+          const mid = f.pos.clone().addScaledVector(WORLD_UP, SKY.up * far + HOOK.rise * (scale - 1)); // (over the headland by the third)
+          const car = route.frameAt(motion.distanceAt((T0 + T1) / 2)).pos;
+          normal = car.clone().sub(mid).normalize();
+          up = uprightFor(normal, WORLD_UP);
+          // the phrases side by side, as one line written across the sky, `gap` apart
+          const along = up.clone().cross(normal).normalize(), ws = phs.map((p) => layout(kind_, p.text, p.solo, scale).w), gap = HOOK.gap * scale;
+          const total = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1), x = -total / 2 + ws.slice(0, pi).reduce((a, b) => a + b, 0) + gap * pi + ws[pi]! / 2;
+          center = mid.clone().addScaledVector(along, x);
+          aim = mid.clone().sub(center); // (the line's middle, from this phrase: both travel together)
+          // keeping pace with the car over the line, so the shot holds as it's written
+          const pace = (motion.distanceAt(T1) - motion.distanceAt(T0)) / Math.max(1e-3, T1 - T0);
+          vel = flat(f.fwd).multiplyScalar(pace);
+          center.addScaledVector(vel, ph.start - T0);
+          if (pi === phs.length - 1) flyCount++;
+          hold = T1; // the line stays written whole until it's sung
         } else if (kind_ === 'sky') {
           const side = pi % 2 === 0 ? -1 : 1; // left first, then right: read left to right
           s = motion.distanceAt(ph.start) + SKY.ahead; const f = route.frameAt(s);
@@ -311,7 +343,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         }
         foot ??= center.y - route.frameAt(s).pos.y;
         if (solid === undefined) solid = solidFor(kind_, lay.w, lay.h, foot);
-        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000) } : {}), ...(line.i === lastLine ? { finale: true } : {}) });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(hold ? { hold } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000) } : {}), ...(line.i === lastLine ? { finale: true } : {}) });
       });
     });
   }
