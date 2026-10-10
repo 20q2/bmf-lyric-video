@@ -8,7 +8,7 @@ import type { Lyrics } from '../engine/lyrics';
 import type { RouteFrame } from '../drive/route';
 
 /** Bills per line, how long each flies (s), its size (m), and the wind (m/s along the car's forward when parked). */
-export const MONEY = { perLine: 70, life: 7, w: 0.62, h: 0.27, wind: 3.2, fall: 0.55, drag: 1.4 };
+export const MONEY = { perLine: 70, life: 7, w: 0.62, h: 0.27, wind: 3.2, fall: 0.55, drag: 1.4, nearest: 3 };
 
 function billTexture(): THREE.Texture {
   const c = document.createElement('canvas'); c.width = 256; c.height = 112;
@@ -41,7 +41,8 @@ export class Money {
     this.mesh.frustumCulled = false;
   }
 
-  update(t: number) {
+  /** `eye`: the camera; `clear`: the lyrics showing now (centre, radius m) — no bill passes in front of one. */
+  update(t: number, eye?: THREE.Vector3, clear: { at: THREE.Vector3; r: number }[] = []) {
     let n = 0;
     for (const b of this.bills) {
       const tau = t - b.t0;
@@ -59,6 +60,11 @@ export class Money {
         .addScaledVector(f.fwd, v < 1 ? MONEY.wind * tau : 0)
         .addScaledVector(f.up, -MONEY.fall * tau)
         .addScaledVector(f.right, 0.35 * Math.sin(tau * (2 + 2 * hash(b.seed, 4)) + 6 * hash(b.seed, 5)));
+      if (eye && p.distanceTo(eye) < MONEY.nearest) continue; // edge-on at the lens a bill is a green shard
+      if (eye && clear.some(({ at, r: rad }) => {
+        const toText = at.clone().sub(eye), d = toText.length(), toBill = p.clone().sub(eye), db = toBill.length();
+        return db < d && toBill.angleTo(toText) < Math.atan((rad + MONEY.w) / d) + 0.04;
+      })) continue; // it would cross the words
       this.q.setFromEuler(new THREE.Euler(tau * 5 * r(6), tau * 4 * r(7) + 3 * r(8), tau * 6 * r(9)));
       this.m.compose(p, this.q, new THREE.Vector3(1, 1, 1));
       this.mesh.setMatrixAt(n++, this.m);

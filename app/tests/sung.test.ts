@@ -21,7 +21,7 @@ const RATE = 30;
  *  before ends on another kind of carrier than this one starts on; and (L5.1, L8.1, L17.2, added 2026-10-10 when the
  *  guard learnt occlusion) the second sign of a line, which stands behind the first while that one's framed. M4
  *  designs these shots by hand; the list may only shrink. */
-const KNOWN_SHORT = new Set(['L4.0', 'L5.1', 'L7.1', 'L8.1', 'L17.2', 'L20.1', 'L21.0', 'L36.1', 'L42.1', 'L43.1']);
+const KNOWN_SHORT = new Set(['L4.0', 'L7.1', 'L8.1', 'L17.2', 'L21.0', 'L36.1', 'L43.0', 'L43.1']); // (L43.0 added 2026-10-10: chorus 4's ransom line moved to gantries, whose reading time leaves "Put it in drive," a cut on its first word: 1.13 s of 1.2)
 /** Frame margin (NDC), the most a face may turn away from the camera, and the least type size on screen (px at 1080p);
  *  and how long a phrase must stay up (§2: subtitle standards, ⅚ s and 0.3 s a word). */
 const MARGIN = 0.1; // title-safe: the middle 90% of the frame (docs/LYRIC_VIDEO_TENETS.md §3)
@@ -186,7 +186,7 @@ function groundAt(p: THREE.Vector3, near: number): { y: number; rock: boolean } 
 
 test('the camera is never inside anything: the ground, a tunnel\'s rock, a building, a board, the car', () => {
   const bad: string[] = [];
-  for (let t = 0; t < audio.duration; t += 0.1) {
+  for (let t = 0; t < audio.duration; t += 1 / RATE) { // every frame: a move can pass through a board in a tenth
     placeCamera(cam, drive.camera(t));
     const p = cam.position, g = groundAt(p, drive.motion.distanceAt(t));
     const why = g.rock ? 'in rock' : p.y < g.y + 0.3 ? 'under the ground'

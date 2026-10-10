@@ -1,7 +1,7 @@
 // The camera language, from I Like Ur Look's director (spreads/shots.ts there), lifted off the page into the world. A
 // stretch lists shots — a target to frame, starting on a beat, a hit or a sung word's cue — and the director eases
-// between them, landing on the beat grid: 'snap' jumps in a fixed SNAP_S, 'land' overshoots and settles on a beat,
-// 'glide' eases across a bar to a downbeat. A target is a function of time (a chase framing follows the car), and each
+// between them, landing on the beat grid: 'cut' is there at once (an edit), 'snap' jumps in a fixed SNAP_S, 'land'
+// overshoots and settles on a beat, 'glide' eases across a bar to a downbeat. A target is a function of time (a chase framing follows the car), and each
 // move eases from the previous move's pose *at the same t*, so handing the camera from a moving car to a fixed sign
 // (or back) never jumps. Pure functions of t.
 import type { AudioData } from '../engine/audio';
@@ -9,7 +9,7 @@ import { ease } from '../engine/util';
 import { type Pose, lerpPose } from './camera';
 
 export type Target = (t: number) => Pose;
-export type ShotMove = 'land' | 'snap' | 'glide';
+export type ShotMove = 'cut' | 'land' | 'snap' | 'glide';
 /** A sung word's cue: resolves to `start - LEAD`, so a snap's motion lands on the word. `w` names it in errors. */
 export type WordCue = { start: number; w?: string };
 export interface Shot {
@@ -49,6 +49,7 @@ function onGrid(a: AudioData, t: number) {
 }
 
 const EASE: Record<ShotMove, (u: number) => number> = {
+  cut: () => 1,
   land: (u) => ease.outBack(u, OVERSHOOT),
   snap: (u) => (1 - 2 ** (-10 * u)) / (1 - 2 ** -10), // outExpo, normalised to land exactly
   glide: (u) => -(Math.cos(Math.PI * u) - 1) / 2,
@@ -60,6 +61,7 @@ function landing(a: AudioData, s: Shot, at: number) {
     if (m !== 'snap' && !onGrid(a, s.until)) throw new Error(`shot ${describeAt(s, at)}: until ${s.until} is not on the beat grid`);
     return s.until;
   }
+  if (m === 'cut') return at + 1e-4;
   if (m === 'snap') return at + SNAP_S;
   if (m === 'glide') return downbeatAtOrAfter(a, at + barOf(a));
   return beatAtOrAfter(a, at + LAND_MIN);

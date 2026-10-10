@@ -3,12 +3,13 @@
 // what shows.
 import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
-import { CHASE, type Pose, chase } from './camera';
+import { CHASE, type Pose, chase, lerpPose } from './camera';
 import { type Carrier, framing, isFast, pairFraming, placeCarriers } from './carriers';
 import type { Motion } from './motion';
 import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor, emphasisOf } from './phrases';
-import { LEAD, SNAP_S, type Shot, type Target, director, resolveAt } from './shots';
+import { LEAD, SNAP_S, type Shot, type Target, beatAtOrAfter, director, resolveAt } from './shots';
+import * as THREE from 'three';
 import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
 import { type Block, blocksOf } from './blocks';
@@ -27,6 +28,17 @@ export const SWAY = { amp: 0.35, rate: 0.35 };
 /** The car's bulk (m): world.ts builds it within this box (the two of them sitting up out of it included), its base on
  *  the road at the car's route frame; the guard checks it doesn't hide the lyrics. */
 export const CAR_BOX = { w: 2.05, h: 1.95, l: 5.7 };
+
+/** A move this far (m between the eyes, or radians between the views) is a cut instead; a cut may come this much
+ *  before its cue (onto a half-beat) or after. */
+export const CUT = { dist: 12, turn: 0.9, zoom: 3, early: 0.15, late: 0.02 };
+const eyeOf = (p: Pose) => new THREE.Vector3(p.tx + Math.sin(p.yaw) * Math.cos(p.pitch) * p.dist, p.ty + Math.sin(p.pitch) * p.dist, p.tz + Math.cos(p.yaw) * Math.cos(p.pitch) * p.dist);
+const viewOf = (p: Pose) => new THREE.Vector3(p.tx, p.ty, p.tz).sub(eyeOf(p)).normalize();
+/** Whether going from pose a to b is better cut than moved (far apart, turned far, or framed at very different
+ *  distances: easing between those swings the eye wide, through the ground). */
+export const far = (a: Pose, b: Pose) => eyeOf(a).distanceTo(eyeOf(b)) > CUT.dist || viewOf(a).angleTo(viewOf(b)) > CUT.turn
+  || Math.max(a.dist, b.dist) / Math.min(a.dist, b.dist) > CUT.zoom
+  || [0.25, 0.5, 0.75].some((u) => eyeOf(lerpPose(a, b, u)).y < Math.min(eyeOf(a).y, eyeOf(b).y) - 0.3); // it would dip
 
 /** The road through the stretches: each stretch's segment is the distance the car covers in it. */
 export function routeFor(R: readonly Stretch[], motion: Motion): Route {
@@ -64,8 +76,8 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   for (const st of stretches) if (st.k > 0) shots.push({ at: st.start, to: chaseOf(st), move: 'glide' });
   // pass 1: each phrase's shot. A line's first phrase may be found up to PREROLL early, but not before the phrase before
   // it has been read and sung; every phrase's reading window runs from its shot until it has been up dwellFor.
-  const reading: [number, number][] = [], paired: boolean[] = [];
-  const phraseShots = carriers.map((c, i) => {
+  const reading: [number, number][] = [], paired: boolean[] = [], phraseShots: Shot[] = [];
+  carriers.forEach((c, i) => {
     const w = c.phrase.words[0]!, cue = w.start - LEAD, prev = carriers[i - 1];
     const free = prev ? Math.max(reading[i - 1]![1], prev.phrase.end + 0.1) : 0; // read, and done being sung
     const early = !prev || prev.phrase.line !== c.phrase.line ? Math.min(PREROLL, Math.max(0, cue - free)) : 0;
@@ -76,7 +88,20 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     const fast = isFast(lyrics.lines[c.phrase.line]!) || (!!next && (isFast(lyrics.lines[next.phrase.line]!) || nextAlone < dwellFor(next.phrase.words.length)));
     const pair = next && fast ? pairFraming(c, next) : null;
     paired.push(!!pair);
-    const shot: Shot = { at: early > 0.05 ? cue - early : { start: w.start, w: w.w }, to: pair ?? framing(c, carFrame, (t) => motion.distanceAt(t)) };
+    const to = pair ?? framing(c, carFrame, (t) => motion.distanceAt(t));
+    let at: Shot['at'] = early > 0.05 ? cue - early : { start: w.start, w: w.w };
+    // an edit, not a move, when the new framing is far from the last phrase's (a move that far sweeps through the town
+    // and smears the words): cut, on the half-beat if one falls just before the cue
+    let move: Shot['move'] = 'snap';
+    const before = phraseShots[i - 1];
+    if (!before || far(before.to(resolveAt(at)), to(resolveAt(at)))) {
+      move = 'cut';
+      const t0 = resolveAt(at), hb = audio.timeOfBeat(Math.round(audio.beatAt(t0) * 2) / 2);
+      // (early only once the phrase before has been read and sung: in a fast line it's still on)
+      if (hb <= t0 + CUT.late && hb >= t0 - CUT.early && hb > Math.max(reading[i - 1]?.[1] ?? -Infinity, prev?.phrase.end ?? -Infinity)) at = hb;
+    }
+    const shot: Shot = { at, to, move };
+    phraseShots.push(shot);
     reading.push([resolveAt(shot.at), cue + SNAP_S + dwellFor(c.phrase.words.length)]);
     return shot;
   });
@@ -93,7 +118,9 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     const next = carriers[i + 1];
     if (next && next.phrase.line === c.phrase.line) return;
     const back = Math.max(c.phrase.end + 0.05, reading[i]![1]), nextAt = next ? resolveAt(phraseShots[i + 1]!.at) : Infinity;
-    if (nextAt - back >= BACK_TO_CAR_GAP) { const b: Shot = { at: back, to: chaseOf(stretchAt(back)), move: 'land' }; shots.push(b); own.add(b); }
+    // a cut back to the car on the beat after (or the 'land' when the car's chase is near enough to move to)
+    const beat = beatAtOrAfter(audio, back), to = chaseOf(stretchAt(beat));
+    if (nextAt - beat >= BACK_TO_CAR_GAP) { const b: Shot = { at: beat, to, move: far(phraseShots[i]!.to(beat), to(beat)) ? 'cut' : 'land' }; shots.push(b); own.add(b); }
   });
   // a stretch's glide gives way to the phrases' own shots: it may not start within 0.3 s of one, nor while a phrase is
   // still being read (its reading window)

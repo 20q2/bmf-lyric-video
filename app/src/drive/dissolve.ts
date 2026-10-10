@@ -3,6 +3,7 @@
 //             song beyond the next phrase: a viewer with a beat to spare would read ahead
 //   dissolve  sky-writing drifts apart after its phrase
 import type { Carrier } from './carriers';
+import { SETTLE, dwellFor } from './phrases';
 
 /** A carrier's text fades in over this long from its reveal (s): inside the camera's snap onto it (SNAP_S). */
 export const REVEAL_S = 0.15;
@@ -10,6 +11,11 @@ export const REVEAL_S = 0.15;
 export const revealAt = (c: Carrier, t: number) => Math.min(1, Math.max(0, (t - c.reveal) / REVEAL_S));
 
 /** Sky-writing starts to dissolve this long after its phrase ends, and is gone this long after that (s). */
-export const DISSOLVE = { after: 0.4, over: 1.5 };
-/** How far through its dissolve a sky phrase is at t (0: whole, 1: gone; 0 for every other kind). */
-export const dissolveAt = (c: Carrier, t: number) => (c.kind !== 'sky' ? 0 : Math.min(1, Math.max(0, (t - c.phrase.end - DISSOLVE.after) / DISSOLVE.over)));
+export const DISSOLVE = { after: 0.15, over: 0.6 };
+/** How far through its dissolve a sky phrase is at t (0: whole, 1: gone; 0 for every other kind): it starts once
+ *  the phrase is sung and has been up its reading time (dwellFor, from SETTLE after its first word). */
+export function dissolveAt(c: Carrier, t: number) {
+  if (c.kind !== 'sky') return 0;
+  const from = Math.max(c.phrase.end + DISSOLVE.after, c.phrase.start + SETTLE + dwellFor(c.phrase.words.length) + 0.1);
+  return Math.min(1, Math.max(0, (t - from) / DISSOLVE.over));
+}

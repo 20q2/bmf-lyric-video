@@ -85,7 +85,7 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   chorus3: ['road', 'banner', 'road', 'sky'],
   bridge1: ['tunnel'],
   verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
-  chorus4: ['road', 'sky', 'banner'],
+  chorus4: ['gantry', 'sky', 'banner'], // (no paint on the switchback: the road above would hide it)
   outro1: ['sky', 'banner', 'sky', 'banner'],
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
@@ -121,7 +121,7 @@ const TEXT_W = 0.9;
  *  gantries as before. */
 export const ROAD_AHEAD = 3.5;
 /** Road paint is framed from this far (m, or perLength x its length if more) and this steeply (radians) behind it. */
-export const ROAD_VIEW = { dist: 11, pitch: 0.95, perLength: 2.3 };
+export const ROAD_VIEW = { dist: 11, pitch: 0.95, perLength: 2.3, withCar: 0.12, perGap: 2.2 };
 /** Walls are watched from this far out along their normal (m), sliding with the car up to this far either way. */
 export const WALL_VIEW = { dist: 20, slide: 7, eye: 2.2 };
 export const SKY = { ahead: 75, up: 27, side: 17, lift: 7 };
@@ -371,8 +371,12 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
     case 'road': {
       // high in front of the words, looking back down the road at them, held: the car drives toward us, up to them; as
       // steeply to the road's own surface wherever it climbs (the paint's up runs back down the road)
+      // aimed between the words and where the car pulls up to them (as the phrase ends), back far enough to hold it
+      // whole: it drives into the frame and finishes in it
       const grade = -Math.asin(Math.max(-1, Math.min(1, c.up.y)));
-      const p: Pose = { tx: c.center.x, ty: c.center.y, tz: c.center.z, dist: Math.max(ROAD_VIEW.dist, c.h * ROAD_VIEW.perLength), yaw: Math.atan2(c.up.x, c.up.z) + Math.PI + 0.2 * jitter(1), pitch: ROAD_VIEW.pitch + grade + 0.08 * jitter(2), roll: 0 };
+      const carAt = car(c.phrase.end).pos, gap = carAt.distanceTo(c.center);
+      const aim = c.center.clone().lerp(carAt, ROAD_VIEW.withCar).addScaledVector(c.normal, 0.5);
+      const p: Pose = { tx: aim.x, ty: aim.y, tz: aim.z, dist: Math.max(ROAD_VIEW.dist, c.h * ROAD_VIEW.perLength, gap * ROAD_VIEW.perGap), yaw: Math.atan2(c.up.x, c.up.z) + Math.PI + 0.2 * jitter(1), pitch: ROAD_VIEW.pitch + grade + 0.08 * jitter(2), roll: 0 };
       return () => p;
     }
     case 'sky': case 'banner': {

@@ -1,6 +1,7 @@
-// A carrier's face: its phrase, karaoke word by word, in the carrier's own medium (greybox looks until M3):
+// A carrier's face: its phrase, karaoke word by word, in the carrier's own medium. Words not yet sung read clearly
+// (the whole phrase is legible as it arrives); sung words go full strength, the one being sung its accent colour:
 //   sign/gantry  a light board with a thin border, the phrase in Bodoni italic (unsung dim, sung ink, current accent)
-//   road         white stencil capitals on nothing (the asphalt shows through), faint until sung
+//   road         white stencil capitals on nothing (the asphalt shows through)
 //   sky          white italic sky-writing on nothing: each word appears as it's sung, and once the phrase is done
 //                it drifts apart and dissolves over DISSOLVE_S (sky-writing does), so the sky never fills up
 //   wall         heavy capitals painted on the wall's colour
@@ -55,23 +56,23 @@ const GREEN = '#1f6b44';
 interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
-    case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.18, 0.95] };
+    case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
     // by day a soft plum shade under the white (it reads on a pale sky and on the buildings), by night a white glow
     case 'sky': {
       const day = daylight(c.phrase.start) > 0.6; // by day heavier, its shade laid twice
       return { family: F.bodoni(day ? 700 : 400, { italic: true }), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
     }
-    case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.22, 1] };
+    case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.72, 1] };
     case 'billboard': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
       const a = AD_STYLE[c.ad ?? 'lipstick'];
-      return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, a.now], alpha: [0.3, 1] };
+      return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, a.now], alpha: [0.72, 1] };
     }
-    case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.3, 1] };
-    case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#7ff6ff'], alpha: [0.3, 1], glow: 'rgba(255,79,163,0.95)' };
+    case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.72, 1] };
+    case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#7ff6ff'], alpha: [0.6, 1], glow: 'rgba(255,79,163,0.95)' };
     case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
-    case 'tunnel': return { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.2, 1], glow: 'rgba(255,160,60,0.9)' };
-    case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.45, 1] };
-    default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(400, { italic: true }), caps: false, colors: [HEX.dim, HEX.ink, HEX.accent], alpha: [0.55, 1] };
+    case 'tunnel': return { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)' };
+    case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
+    default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(400, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
 }
 

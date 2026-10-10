@@ -25,6 +25,8 @@ const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
 const TUNNEL_DARK = new THREE.Color('#120a05');
 /** A banner's plane is in the sky from this long before its line until this long after (s). */
 const BANNER_SKY = { before: 2, after: 4 };
+/** Carriers further along the road than this from the car (m) are put away. */
+const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
 const FACE_WINDOW = 12;
 /** The sun sets over the sea: it stands this far (radians) left of the coast road's heading (at COAST_T). */
@@ -55,6 +57,9 @@ export default class DriveScene extends Scene {
   private crashes: number[] = [];
   /** Where the sun sets (flat, unit). */
   private sunAz = new THREE.Vector3();
+  /** Every carrier with its object (far from the car, they're put away: across a loop of the road they'd stand
+   *  in another stretch's sky). */
+  private placed: [Carrier, THREE.Object3D][] = [];
   /** Carriers that move (towed banners), with their objects. */
   private flying: [Carrier, THREE.Object3D][] = [];
   /** In a tunnel: the sodium light of the lamps nearest the camera. */
@@ -72,6 +77,7 @@ export default class DriveScene extends Scene {
       this.arts.push(art);
       const o = buildCarrier(c, art.texture, wallColor(c), this.drive.route);
       if (c.vel) this.flying.push([c, o]);
+      this.placed.push([c, o]);
       this.world.add(o);
     }
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
@@ -105,6 +111,8 @@ export default class DriveScene extends Scene {
     const cf = d.carFrame(t);
     this.car.matrixAutoUpdate = false;
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
+    const carS = d.motion.distanceAt(t);
+    for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER;
     // banners where they've flown to; each plane in the sky only around its line
     for (const [c, o] of this.flying) {
       const line = this.ctx.lyrics.lines[c.phrase.line]!;
@@ -160,7 +168,9 @@ export default class DriveScene extends Scene {
     fog.far = 1100 - 960 * inside;
 
     this.city.update(t, this.cam.position, this.rt.width / W);
-    this.money.update(t);
+    // the lyrics showing now, for the bills to keep out of
+    const showing = d.carriers.filter((c) => t > c.reveal && t < c.phrase.end + 1).map((c) => ({ at: centerAt(c, t), r: Math.hypot(c.w, c.h) / 2 }));
+    this.money.update(t, this.cam.position, showing);
     renderer.setRenderTarget(this.rt);
     renderer.clear(true, true, true); // the engine leaves autoClear off; the dome draws the sky, so nothing else clears
     renderer.render(this.world, this.cam);

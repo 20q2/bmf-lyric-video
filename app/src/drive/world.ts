@@ -97,8 +97,13 @@ export function buildWorld(drive: Drive): THREE.Group {
   base.position.set((box3.min.x + box3.max.x) / 2, -0.4, (box3.min.z + box3.max.z) / 2);
   g.add(base);
   g.add(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt, end), lambert()));
-  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil(end / 8));
-  for (let i = 0; i < dashes.count; i++) dashes.setMatrixAt(i, boxAt(route, i * 8, 0, 0.15, 0.02, 3, 0.01));
+  // the centre line's dashes, but none under road paint (they'd cut through its letters; left out, not squashed
+  // flat: a flat box's normals are NaN, and the bloom spreads a NaN into a white dot)
+  const paint = drive.carriers.filter((c) => c.kind === 'road');
+  const dashAt: number[] = [];
+  for (let s = 0; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2)) dashAt.push(s);
+  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
+  dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
   g.add(dashes);
 
   // the town's buildings (blocks.ts: the guard checks them too)
@@ -160,13 +165,13 @@ function sweep(route: Route, s0: number, s1: number, profile: readonly [number, 
   return g;
 }
 
-/** Glazed wall tiles, 8 to a texture repeat. */
+/** Glazed wall tiles, 4 to a texture repeat. */
 function tiles(): THREE.Texture {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const x = c.getContext('2d')!;
   x.fillStyle = '#ddd3bc'; x.fillRect(0, 0, 256, 256);
   x.fillStyle = '#9a907c';
-  for (let k = 0; k < 8; k++) { x.fillRect(k * 32, 0, 2, 256); x.fillRect(0, k * 32, 256, 2); }
+  for (let k = 0; k < 4; k++) { x.fillRect(k * 64, 0, 5, 256); x.fillRect(0, k * 64, 256, 5); } // big tiles, heavy grout: no shimmer
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
@@ -238,7 +243,7 @@ function motelSign(route: Route): THREE.Group {
   x.textAlign = 'center'; x.textBaseline = 'middle';
   x.fillStyle = '#f3e6c4'; x.font = `${H * 0.11}px "${F.archivo(100, 900)}"`; x.fillText('SZA', W / 2, H * 0.17);
   x.shadowColor = 'rgba(255,79,163,1)'; x.shadowBlur = 28; x.fillStyle = '#ffd0e8';
-  x.font = `${H * 0.34}px "${F.bodoni(700, { italic: true })}"`; x.fillText('BMF', W / 2, H * 0.48);
+  x.font = `${H * 0.27}px "${F.bodoni(700, { italic: true })}"`; x.fillText('BMF', W / 2, H * 0.48, W * 0.8);
   x.shadowColor = 'rgba(255,60,40,1)'; x.fillStyle = '#ff8a70'; x.font = `${H * 0.075}px "${F.archivo(100, 700)}"`;
   x.fillText('NO VACANCY', W / 2, H * 0.82);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;

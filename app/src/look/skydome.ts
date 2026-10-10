@@ -26,6 +26,7 @@ void main() {
   // the gradient, printed in bands (their edges anti-aliased)
   float g = pow(h, 0.42), b = g * bands, aa = fwidth(b);
   float q = (floor(b) + smoothstep(1.0 - aa, 1.0, fract(b))) / bands;
+  q = mix(q, g, stars); // by night the bands melt into one gradient (seen looking up they'd ring the frame)
   vec3 c = mix(horizon, zenith, q);
   // the glow round the sun, warmest on the horizon, also banded
   float toSun = max(dot(d, sunDir), 0.0), glow = pow(toSun, 6.0) * (1.0 - g) ;
