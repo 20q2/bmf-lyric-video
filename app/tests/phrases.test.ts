@@ -52,6 +52,7 @@ test("a billboard's ad sells what its lyric says", () => {
   expect(adFor('call him Mr. Handle It', 1)).toBe('phone');
   expect(adFor('Trickin’, finna fall', 1)).toBe('cash');
   expect(adFor('Cruise all night', 1)).toBe('car');
-  expect(adFor('like if you my man', 1)).toBe('diamond');
+  expect(adFor('like if you my man', 1)).toBe('him');
+  expect(adFor('be your Jane', 1)).toBe('diamond');
   expect(ADS).toContain(adFor('from dropping', 7));
 });

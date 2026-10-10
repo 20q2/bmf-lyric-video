@@ -42,9 +42,12 @@ export const SETTLE = 0.21;
 export const GAP_S = 0.22;
 
 /** Words a phrase reads well starting with. */
-const STARTERS = new Set(['and', 'but', 'with', 'from', 'when', 'if', 'or', 'so', 'that', 'like', 'for', 'of', 'in', 'to', 'on', 'call', 'tell', 'cruise', 'put']);
+const STARTERS = new Set(['came', 'and', 'but', 'with', 'from', 'when', 'if', 'or', 'so', 'that', 'like', 'for', 'of', 'in', 'to', 'on', 'call', 'tell', 'cruise', 'put']);
 /** Words a phrase shouldn't end on. */
-const LEANERS = new Set(['the', 'a', 'an', 'my', 'your', 'to', 'of', 'and', 'but', 'from', 'i', 'i\'m', 'you', 'he', 'he\'s', 'it', 'is', 'can', 'can\'t', 'in', 'with', 'all', 'just', 'tryna', 'this', 'we', 'so']);
+const LEANERS = new Set(['the', 'a', 'an', 'my', 'your', 'to', 'of', 'and', 'but', 'i', 'i\'m', 'you', 'he', 'he\'s', 'it', 'is', 'can', 'can\'t', 'in', 'with', 'all', 'just', 'tryna', 'this', 'we', 'so']);
+/** Word pairs a phrase never breaks between: the song's names (South Detroit, West side of Compton, Mr. Handle It,
+ *  South of somewhere). */
+const UNBROKEN: readonly [string, string][] = [['south', 'detroit'], ['west', 'side'], ['mr', 'handle'], ['handle', 'it'], ['south', 'of'], ['of', 'somewhere']];
 const SIZE_COST = [Infinity, 2, 0.3, 0, 0.6, 1.5, 3];
 
 const bare = (w: Word) => w.w.toLowerCase().replace(/[’]/g, "'").replace(/[^a-z']/g, '');
@@ -67,6 +70,7 @@ function cost(words: readonly Word[], i: number, j: number, after: number, solo:
     const gap = next.start - last.end;
     if (gap >= 2 * GAP_S) c -= 2.5; else if (gap >= GAP_S) c -= 1.5;
     if (LEANERS.has(bare(last))) c += 2.5;
+    if (UNBROKEN.some(([a, b]) => bare(last) === a && bare(next) === b)) c += 9; // a name, kept whole
     if (STARTERS.has(bare(next))) c -= 1;
   }
   return c;

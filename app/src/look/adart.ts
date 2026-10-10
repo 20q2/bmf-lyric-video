@@ -5,6 +5,11 @@ import type { Ad } from '../drive/ads';
 
 /** Per ad: its colour field, its headline's colours (sung, the word being sung), and the spotlight behind the product. */
 export const AD_STYLE: Record<Ad, { bg: string; ink: string; now: string; spot: string }> = {
+  him: { bg: '#f6b34a', ink: '#16131a', now: '#c8102e', spot: '#ffd27a' },
+  bandage: { bg: '#9cc3e0', ink: '#16131a', now: '#c8102e', spot: '#bcd8ec' },
+  tape: { bg: '#f6dd8f', ink: '#16131a', now: '#c8102e', spot: '#fbeab6' },
+  keys: { bg: '#16131a', ink: '#f3ead2', now: '#ffd65a', spot: '#2c2433' },
+  heart: { bg: '#ff7aa8', ink: '#36143c', now: '#ffffff', spot: '#ffa0c2' },
   phone: { bg: '#ff5a36', ink: '#fff3e0', now: '#ffd65a', spot: '#ff8a5c' },
   cash: { bg: '#1f5c3c', ink: '#f3ead2', now: '#f6c445', spot: '#2e7a52' },
   car: { bg: '#f6dd8f', ink: '#36143c', now: '#c8102e', spot: '#fbeab6' },
@@ -63,6 +68,41 @@ function star(c: CanvasRenderingContext2D, x: number, y: number, r: number, r2: 
 const rr = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); };
 
 const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D) => void> = {
+  him: (c) => { // him: a profile in silhouette, cap and chain, the sun behind
+    c.fillStyle = '#16131a';
+    c.beginPath(); c.moveTo(-20, 95); c.lineTo(-30, 40); c.quadraticCurveTo(-48, 10, -38, -22); // the back of the neck, the head
+    c.quadraticCurveTo(-30, -62, 8, -60); c.lineTo(40, -58); c.lineTo(62, -50); c.lineTo(30, -46); // the cap, its brim forward
+    c.quadraticCurveTo(36, -30, 34, -16); c.lineTo(44, -6); c.lineTo(36, 0); c.quadraticCurveTo(38, 10, 32, 14); // brow, nose, lips
+    c.quadraticCurveTo(30, 26, 18, 32); c.lineTo(8, 50); c.quadraticCurveTo(30, 60, 70, 95); c.closePath(); c.fill(); // the jaw, the shoulder
+    c.strokeStyle = '#f6c445'; c.lineWidth = 6; c.beginPath(); c.arc(4, 58, 26, 0.2, 2.6); c.stroke(); // the chain
+  },
+  bandage: (c) => { // two crossed bandages
+    for (const a of [0.7, -0.7]) {
+      c.save(); c.rotate(a); c.fillStyle = '#f3d2b0'; rr(c, -85, -24, 170, 48, 24);
+      c.fillStyle = '#e8bc94'; rr(c, -26, -18, 52, 36, 6); c.fillStyle = '#c99a72';
+      for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(-14 + (i % 3) * 14, -8 + Math.floor(i / 3) * 16, 3, 0, Math.PI * 2); c.fill(); }
+      c.restore();
+    }
+  },
+  tape: (c) => { // a measuring tape, pulled out
+    c.fillStyle = '#f6c445'; c.fillRect(-10, 22, 110, 26);
+    c.fillStyle = '#16131a'; for (let i = 0; i < 11; i++) c.fillRect(-6 + i * 10, 22, 2, i % 2 ? 9 : 15);
+    c.fillStyle = '#c8102e'; rr(c, -95, -45, 100, 100, 22);
+    c.fillStyle = '#16131a'; c.beginPath(); c.arc(-45, 5, 20, 0, Math.PI * 2); c.fill();
+  },
+  keys: (c) => { // car keys on a ring, a tag
+    c.strokeStyle = '#f6c445'; c.lineWidth = 7; c.beginPath(); c.arc(-30, -40, 24, 0, Math.PI * 2); c.stroke();
+    for (const [a, l] of [[0.5, 85], [0.95, 70]] as const) {
+      c.save(); c.translate(-30, -40); c.rotate(a); c.fillStyle = '#d8d2c4'; rr(c, 18, -12, 34, 24, 6); c.fillRect(48, -6, l - 30, 12);
+      for (let i = 0; i < 4; i++) c.fillRect(56 + i * 10, 6, 6, 8); c.restore();
+    }
+    c.fillStyle = '#c8102e'; rr(c, -95, -10, 50, 60, 6);
+  },
+  heart: (c) => { // a heart, glossy
+    c.fillStyle = '#c8102e';
+    c.beginPath(); c.moveTo(0, 75); c.bezierCurveTo(-110, 0, -60, -90, 0, -35); c.bezierCurveTo(60, -90, 110, 0, 0, 75); c.fill();
+    c.fillStyle = '#ffffff'; c.globalAlpha = 0.5; c.beginPath(); c.ellipse(-38, -30, 14, 8, -0.7, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+  },
   phone: (c) => { // a rotary telephone
     c.fillStyle = '#fff3e0';
     c.beginPath(); c.moveTo(-70, 70); c.lineTo(70, 70); c.lineTo(50, -5); c.lineTo(-50, -5); c.closePath(); c.fill();
@@ -127,12 +167,14 @@ const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D) => void> = {
     c.fillRect(56, -42, 9, 100); // the heel
     c.fillStyle = '#16131a'; c.globalAlpha = 0.35; c.beginPath(); c.ellipse(-30, 20, 30, 8, -0.2, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
   },
-  roses: (c) => { // three roses, long stems
+  roses: (c) => { // three roses: cupped petals, leaves on the stems
     c.strokeStyle = '#3d6b48'; c.lineWidth = 7;
-    for (const [x, a] of [[-30, -0.3], [0, 0], [30, 0.3]] as const) { c.beginPath(); c.moveTo(x * 0.3, 80); c.lineTo(x + Math.sin(a) * 40, -30); c.stroke(); }
-    for (const [x, y] of [[-42, -40], [0, -55], [42, -40]] as const) {
-      c.fillStyle = '#c8102e'; c.beginPath(); c.arc(x, y, 24, 0, Math.PI * 2); c.fill();
-      c.strokeStyle = '#7a0a1c'; c.lineWidth = 4; c.beginPath(); c.arc(x, y, 12, 0.5, 5.5); c.stroke(); c.beginPath(); c.arc(x + 3, y - 2, 5, 0, 5); c.stroke();
+    for (const [x, a] of [[-30, -0.3], [0, 0], [30, 0.3]] as const) { c.beginPath(); c.moveTo(x * 0.3, 85); c.lineTo(x + Math.sin(a) * 40, -30); c.stroke(); }
+    c.fillStyle = '#3d6b48'; for (const [x, y, a] of [[-14, 30, -0.8], [12, 45, 0.8]] as const) { c.beginPath(); c.ellipse(x, y, 16, 7, a, 0, Math.PI * 2); c.fill(); }
+    for (const [x, y] of [[-42, -40], [0, -58], [42, -40]] as const) {
+      c.fillStyle = '#9e0c24'; c.beginPath(); c.moveTo(x - 26, y - 8); c.quadraticCurveTo(x, y + 40, x + 26, y - 8); c.quadraticCurveTo(x, y + 4, x - 26, y - 8); c.fill(); // the cup
+      c.fillStyle = '#c8102e'; c.beginPath(); c.ellipse(x, y - 8, 22, 15, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#7a0a1c'; c.lineWidth = 3.5; c.beginPath(); c.arc(x, y - 8, 11, 3.6, 8.2); c.stroke(); c.beginPath(); c.arc(x + 2, y - 9, 5, 0, 5); c.stroke();
     }
   },
   chain: (c) => { // a gold rope chain, a pendant
