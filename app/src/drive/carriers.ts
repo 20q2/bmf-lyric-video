@@ -69,8 +69,8 @@ export interface Carrier {
   /** A carrier that moves (a towed banner): its velocity (m/s); `center` is where it is as its phrase starts. */
   vel?: THREE.Vector3;
 }
-/** Where a carrier's centre is at t. */
-export const centerAt = (c: Pick<Carrier, 'center' | 'vel' | 'phrase'>, t: number) => (c.vel ? c.center.clone().addScaledVector(c.vel, t - c.phrase.start) : c.center);
+/** Where a carrier's centre is at t (a new vector: callers may change it). */
+export const centerAt = (c: Pick<Carrier, 'center' | 'vel' | 'phrase'>, t: number) => (c.vel ? c.center.clone().addScaledVector(c.vel, t - c.phrase.start) : c.center.clone());
 
 /** Each stretch's carriers, line by line (cycled); a line with "fly" in it is always written in the sky. */
 export const PATTERNS: Record<string, readonly Kind[]> = {
@@ -333,6 +333,10 @@ function overlaps(a: Placed, b: Placed): boolean {
   return obbs(a).some((x) => bs.some((y) => x.intersectsOBB(y)));
 }
 
+/** The back-seat shot of sky-writing and banners (in these stretches): this far behind the car's centre and this high
+ *  (m, over the car's bulk: drive.ts CAR_BOX), aimed this far (radians) under the writing. */
+export const CABIN = { stretches: new Set(['chorus1', 'outro1']), back: 2.3, up: 2.15, under: (8 * Math.PI) / 180 };
+
 /** The pose for a camera at `eye` looking at `at`. */
 export function lookFrom(eye: THREE.Vector3, at: THREE.Vector3): Pose {
   const d = eye.clone().sub(at), dist = d.length();
@@ -363,11 +367,17 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
       const p: Pose = { tx: c.center.x, ty: c.center.y, tz: c.center.z, dist: Math.max(ROAD_VIEW.dist, c.h * ROAD_VIEW.perLength), yaw: Math.atan2(c.up.x, c.up.z) + Math.PI + 0.2 * jitter(1), pitch: ROAD_VIEW.pitch + grade + 0.08 * jitter(2), roll: 0 };
       return () => p;
     }
-    case 'sky': case 'banner': return (t) => {
-      // low behind the car, looking up at the writing (following a banner as it flies)
-      const f = car(t), eye = f.pos.clone().addScaledVector(flat(f.fwd), -8).addScaledVector(f.right, 2.5 * jitter(3)).add(new THREE.Vector3(0, 1.6, 0));
-      return lookFrom(eye, centerAt(c, t).add(c.aim ?? ZERO));
-    };
+    case 'sky': case 'banner': {
+      // in some stretches from the back seat: just behind the two of them, over their shoulders, aimed a little under
+      // the writing so their silhouettes sit along the frame's foot; otherwise low behind the car, looking up at it
+      const cabin = CABIN.stretches.has(c.stretch);
+      return (t) => {
+        const f = car(t), at = centerAt(c, t).add(c.aim ?? ZERO);
+        if (!cabin) return lookFrom(f.pos.clone().addScaledVector(flat(f.fwd), -8).addScaledVector(f.right, 2.5 * jitter(3)).add(new THREE.Vector3(0, 1.6, 0)), at);
+        const eye = f.pos.clone().addScaledVector(f.fwd, -CABIN.back).addScaledVector(f.up, CABIN.up).addScaledVector(f.right, 0.25 * jitter(3));
+        return lookFrom(eye, at.addScaledVector(WORLD_UP, -eye.distanceTo(at) * Math.tan(CABIN.under)));
+      };
+    }
     default: {
       const p = fitSign({ center: c.center, normal: c.normal, w: c.w, h: c.h });
       return () => ({ ...p, yaw: p.yaw + 0.2 * jitter(5) });

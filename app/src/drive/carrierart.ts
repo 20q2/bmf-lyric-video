@@ -21,8 +21,11 @@ import { WORLD } from '../look/toon';
 import { F, font } from '../engine/type';
 import type { Carrier } from './carriers';
 import { dissolveAt, revealAt } from './dissolve';
+import { daylight } from './sky';
 
 const CANVAS_W = 1024;
+/** Faces that carry poster art until their lyric is revealed. */
+const DECOR: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'sign', 'wall', 'storefront', 'street', 'gantry']);
 /** A word of emphasis punches up this much as it's sung, settling over `over` s; it fills this share of its row. */
 export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
 /** How far through its punch the emphasis word is at t (1: just sung, 0: settled or not yet). */
@@ -48,11 +51,15 @@ export const wallColor = (c: Carrier) => c.kind === 'neon'
 const hexOf = (c: THREE.Color) => `#${c.getHexString(THREE.SRGBColorSpace)}`;
 const GREEN = '#1f6b44';
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.18, 0.95] };
-    case 'sky': return { family: F.bodoni(400, { italic: true }), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.95], glow: 'rgba(255,255,255,0.9)' };
+    // by day a soft plum shade under the white (it reads on a pale sky and on the buildings), by night a white glow
+    case 'sky': {
+      const day = daylight(c.phrase.start) > 0.6; // by day heavier, its shade laid twice
+      return { family: F.bodoni(day ? 700 : 400, { italic: true }), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
+    }
     case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.22, 1] };
     case 'billboard': return { bg: '#fbf8f0', band: HEX.accent, family: F.archivo(62, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.25, 1] };
     case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.3, 1] };
@@ -97,6 +104,7 @@ export class CarrierArt {
     if (style.border) { c.strokeStyle = style.border; c.lineWidth = 6; c.strokeRect(10, 10, W - 20, H - 20); }
     if (style.band) { c.fillStyle = style.band; c.fillRect(0, H * 0.9, W, H * 0.1); }
     const shown = Math.round(revealAt(carrier, t) * 10) / 10;
+    if (shown < 1) this.decor(1 - shown);
     if (shown <= 0) return;
     let em = carrier.em * pxPerM;
     c.font = font(style.family, em);
@@ -106,7 +114,7 @@ export class CarrierArt {
     c.textBaseline = 'middle';
     const gone = Math.round(dissolveAt(carrier, t) * 20) / 20;
     if (gone >= 1) return;
-    if (style.glow) { c.shadowColor = style.glow; c.shadowBlur = em * (0.15 + 0.6 * gone); }
+    if (style.glow) { c.shadowColor = style.glow; c.shadowBlur = em * (0.22 + 0.6 * gone); }
     const words = carrier.phrase.words, space = c.measureText(' ').width;
     let wi = 0;
     carrier.rows.forEach((row, r) => {
@@ -127,13 +135,65 @@ export class CarrierArt {
         c.fillStyle = style.colors[now ? 2 : sung ? 1 : 0];
         c.globalAlpha = style.alpha[sung ? 1 : 0] * (1 - gone) * shown;
         // dissolving: the letters drift apart and up, a little more each word along
-        c.fillText(label(w), x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6);
+        for (let k = 0; k < (style.glowPasses ?? 1); k++) c.fillText(label(w), x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6);
         x += c.measureText(label(w)).width + space;
       }
       if (solo) c.font = font(style.family, em);
     });
     c.globalAlpha = 1;
     c.shadowBlur = 0;
+  }
+
+  /** Before its lyric is revealed a board isn't blank: it carries poster art (no words, so nothing to read ahead) — a
+   *  banded sunset, a palm, a star, stripes, a sun over waves; route signs a shield and an arrow. Seeded per carrier. */
+  private decor(a: number) {
+    const { c, canvas, carrier } = this, W = canvas.width, H = canvas.height, k = carrier.kind;
+    if (!DECOR.has(k)) return;
+    const r = (n: number) => hash(carrier.phrase.start * 1000, n);
+    const ink = '#36143c', P = ['#ff5a36', '#f6b34a', '#e3907a', '#cdb8e6', '#f6dd8f', '#2b78a6'];
+    c.save();
+    c.globalAlpha = a;
+    const cx = W * (0.3 + 0.4 * r(1)), cy = H / 2, R = H * 0.36;
+    if (k === 'street' || k === 'gantry') {
+      // a route shield and an arrow, in the sign's white
+      c.fillStyle = '#f4f4f0';
+      c.beginPath(); c.moveTo(W * 0.3 - R * 0.8, cy - R * 0.8); c.lineTo(W * 0.3 + R * 0.8, cy - R * 0.8); c.lineTo(W * 0.3 + R * 0.8, cy + R * 0.2);
+      c.quadraticCurveTo(W * 0.3 + R * 0.8, cy + R, W * 0.3, cy + R); c.quadraticCurveTo(W * 0.3 - R * 0.8, cy + R, W * 0.3 - R * 0.8, cy + R * 0.2); c.fill();
+      c.beginPath(); c.moveTo(W * 0.7, cy - R); c.lineTo(W * 0.7 + R * 0.7, cy - R * 0.2); c.lineTo(W * 0.7 + R * 0.25, cy - R * 0.2);
+      c.lineTo(W * 0.7 + R * 0.25, cy + R); c.lineTo(W * 0.7 - R * 0.25, cy + R); c.lineTo(W * 0.7 - R * 0.25, cy - R * 0.2); c.lineTo(W * 0.7 - R * 0.7, cy - R * 0.2); c.fill();
+    } else {
+      switch (Math.floor(r(2) * 5)) {
+        case 0: { // a sunset, banded, sinking into the face's foot
+          c.beginPath(); c.rect(0, 0, W, H * 0.78); c.clip();
+          for (let i = 0; i < 5; i++) { c.fillStyle = P[i % 3]!; c.beginPath(); c.arc(cx, H * 0.78, R * 1.5 - i * R * 0.22, Math.PI, 0); c.fill(); }
+          break;
+        }
+        case 1: { // a palm against a sun
+          c.fillStyle = P[1]!; c.beginPath(); c.arc(cx + R * 0.3, cy, R, 0, Math.PI * 2); c.fill();
+          c.strokeStyle = ink; c.lineWidth = H * 0.05; c.beginPath(); c.moveTo(cx - R * 0.2, H); c.quadraticCurveTo(cx - R * 0.1, cy, cx + R * 0.1, cy - R * 0.5); c.stroke();
+          c.fillStyle = ink;
+          for (let i = 0; i < 6; i++) { c.save(); c.translate(cx + R * 0.1, cy - R * 0.5); c.rotate(-Math.PI * 0.9 + (i * Math.PI) / 5.5); c.beginPath(); c.ellipse(R * 0.45, 0, R * 0.5, R * 0.1, 0.25, 0, Math.PI * 2); c.fill(); c.restore(); }
+          break;
+        }
+        case 2: { // a star
+          c.fillStyle = P[0]!; c.beginPath();
+          for (let i = 0; i < 16; i++) { const ang = (i * Math.PI) / 8 - Math.PI / 2, rr = i % 2 ? R * 0.35 : R; c.lineTo(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr); }
+          c.fill();
+          break;
+        }
+        case 3: { // stripes, slanting
+          c.translate(W / 2, H / 2); c.rotate(-0.5);
+          for (let i = -6; i <= 6; i++) { c.fillStyle = P[(i + 6) % 4]!; c.fillRect(i * H * 0.32, -W, H * 0.16, W * 2); }
+          break;
+        }
+        default: { // a sun over waves
+          c.fillStyle = P[0]!; c.beginPath(); c.arc(cx, cy - R * 0.2, R * 0.6, 0, Math.PI * 2); c.fill();
+          c.strokeStyle = P[5]!; c.lineWidth = H * 0.06;
+          for (let j = 0; j < 2; j++) { c.beginPath(); for (let x = 0; x <= W; x += 8) c.lineTo(x, cy + R * (0.45 + 0.3 * j) + Math.sin(x / (H * 0.12)) * H * 0.05); c.stroke(); }
+        }
+      }
+    }
+    c.restore();
   }
 
   dispose() { this.texture.dispose(); }

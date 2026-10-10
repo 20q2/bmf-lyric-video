@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { LENS, placeCamera } from '../src/drive/camera';
 import { type Carrier, KINDS, basisOf, centerAt, solidsOf } from '../src/drive/carriers';
 import { dwellFor } from '../src/drive/phrases';
-import { REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
+import { CAR_BOX, REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
 import { LEAD, SNAP_S } from '../src/drive/shots';
 import { dissolveAt, revealAt } from '../src/drive/dissolve';
 import { TUNNEL_CLEAR, nearTunnel } from '../src/drive/tunnel';
@@ -35,8 +35,15 @@ function corners(c: Carrier) {
 /** Every carrier's solids as boxes in its own frame, with the frame's inverse (to take rays into it). */
 const solids = drive.carriers.map((c) => ({ c, inv: basisOf(c).invert(), boxes: solidsOf(c).map(({ at, size }) => new THREE.Box3().setFromCenterAndSize(at, size)) }));
 /** The other carrier whose solids hide the middle of c's face, or most of its corners, from the camera (if any). */
-function hiddenBy(c: Carrier): string | null {
+const CAR = new THREE.Box3(new THREE.Vector3(-CAR_BOX.w / 2, 0, -CAR_BOX.l / 2), new THREE.Vector3(CAR_BOX.w / 2, CAR_BOX.h, CAR_BOX.l / 2));
+function hiddenBy(c: Carrier, t: number): string | null {
   const pts = [c.center, ...corners(c).map((k) => k.clone().lerp(c.center, 0.2))];
+  // the car, where it is at t
+  const f = drive.carFrame(t), car = new THREE.Matrix4().makeBasis(f.right.clone().negate(), f.up, f.fwd).setPosition(f.pos), inv = car.clone().invert();
+  if (pts.some((p) => {
+    const d = p.distanceTo(cam.position), ray = new THREE.Ray(cam.position.clone(), p.clone().sub(cam.position).normalize()).applyMatrix4(inv), hit = new THREE.Vector3();
+    return ray.intersectBox(CAR, hit) && hit.applyMatrix4(car).distanceTo(cam.position) < d - 0.05;
+  })) return 'the car';
   for (const o of solids) {
     if (o.c === c || !o.boxes.length || o.c.center.distanceTo(c.center) > 120) continue;
     let hid = 0;
@@ -69,7 +76,7 @@ function problems(c: Carrier, t: number): string[] {
   const a = toPx(c.center.clone().addScaledVector(c.up, c.em / 2).project(cam)), b = toPx(c.center.clone().addScaledVector(c.up, -c.em / 2).project(cam));
   const px = a.distanceTo(b);
   if (px < MIN_EM_PX) out.push(`type ${px.toFixed(0)} px`);
-  const by = hiddenBy(c);
+  const by = hiddenBy(c, t);
   if (by) out.push(`hidden by ${by}`);
   return out;
 }

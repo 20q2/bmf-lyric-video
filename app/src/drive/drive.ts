@@ -23,6 +23,10 @@ export const REVEAL_AHEAD = 2;
  *  camera never sits still on the car — but never swings round far enough to turn its direction on screen around. */
 export const SWAY = { amp: 0.35, rate: 0.35 };
 
+/** The car's bulk (m): world.ts builds it within this box (the two of them sitting up out of it included), its base on
+ *  the road at the car's route frame; the guard checks it doesn't hide the lyrics. */
+export const CAR_BOX = { w: 2.05, h: 1.95, l: 5.7 };
+
 /** The road through the stretches: each stretch's segment is the distance the car covers in it. */
 export function routeFor(R: readonly Stretch[], motion: Motion): Route {
   return new Route(R.map((s) => ({ s0: motion.distanceAt(s.start), s1: motion.distanceAt(s.end), turn: s.turn * DEG, rise: s.rise })));
