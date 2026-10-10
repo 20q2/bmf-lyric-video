@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { makeDrive } from '../src/drive/drive';
-import { MAX_WORDS, phrasesOf, punctuationOf } from '../src/drive/phrases';
+import { EMPHASIS, MAX_WORDS, emphasisOf, phrasesOf } from '../src/drive/phrases';
 import { audio, lyrics } from './data';
 
 const all = lyrics.lines.flatMap((l) => phrasesOf(l));
@@ -33,10 +33,11 @@ test('the chorus opening splits into short phrases', () => {
   expect(phrasesOf(lyrics.lines[0]!).map((p) => p.text)).toEqual(['Young and fine', 'and dark', 'and handsome']);
 });
 
-test('the punctuating "you"s and "but"s: thrown in off the beat at a clause edge, each alone on its own row', () => {
-  const solo = punctuationOf(audio.beats);
+test('the words of punctuation and emphasis: every pick names a word, each alone on its own row', () => {
+  const solo = emphasisOf(lyrics.lines);
   const picked = lyrics.lines.flatMap((l) => l.words.flatMap((w, k) => (solo(l, k) ? [`L${l.i}.${k} ${w.w}`] : [])));
-  expect(picked).toEqual(['L6.0 You', 'L6.3 but', 'L7.4 but', 'L11.0 You', 'L11.7 you', 'L11.15 you?']);
+  expect(picked).toEqual(['L2.0 And', 'L5.4 with', 'L6.3 but', 'L7.4 but', 'L11.0 You', 'L17.0 Took', 'L17.4 and', 'L19.5 call']);
+  expect(picked.length).toBe(EMPHASIS.length);
   for (const c of makeDrive(audio, lyrics).carriers) {
     const ks = c.phrase.words.map((w) => lyrics.lines[c.phrase.line]!.words.indexOf(w)).filter((k) => solo(lyrics.lines[c.phrase.line]!, k));
     for (const k of ks) {

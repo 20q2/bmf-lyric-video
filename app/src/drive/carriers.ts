@@ -11,6 +11,9 @@
 //          building, on the right): a slow verse's run keeps up with the car. Any two share a frame (pairFraming)
 //   sign   a short roadside board on the right; `street` a green street-name blade; the camera snaps to it
 //   gantry a green freeway sign over the road; the camera snaps to it
+//   banner towed across the sky by a plane flying left to right, the plane leading, so the words read the way it
+//          flies; a line's banners in formation, one over the next, keeping pace ahead of the car; framed like
+//          sky-writing, the camera following them as they move (Carrier.vel)
 //   tunnel lit up along a tunnel's left wall (the bridge, tunnel.ts), framed from across the bore like the left faces
 // Each phrase's text is blank until the camera first comes for it (`reveal`, set by makeDrive): the world ahead
 // shows its signs and walls, never the song beyond the next phrase.
@@ -28,8 +31,8 @@ import type { Stretch } from './stretches';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
-export type Kind = 'road' | 'sky' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel';
-export const KINDS: readonly Kind[] = ['road', 'sky', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel'];
+export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel';
+export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel'];
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -60,9 +63,14 @@ export interface Carrier {
   solid: { at: THREE.Vector3; size: THREE.Vector3 } | null;
   /** On the left, two phrases share a building, one over the other: which this is (none: alone). */
   stack?: 'top' | 'bottom';
-  /** For a stacked face: how far up (m) from its centre the middle of the stack is, where its shots aim. */
-  stackDy?: number;
+  /** Where its shots aim, from its centre (m): the middle of its stack (two faces on a building) or its formation (a
+   *  line's banners), so the shot holds them all, read top-down. */
+  aim?: THREE.Vector3;
+  /** A carrier that moves (a towed banner): its velocity (m/s); `center` is where it is as its phrase starts. */
+  vel?: THREE.Vector3;
 }
+/** Where a carrier's centre is at t. */
+export const centerAt = (c: Pick<Carrier, 'center' | 'vel' | 'phrase'>, t: number) => (c.vel ? c.center.clone().addScaledVector(c.vel, t - c.phrase.start) : c.center);
 
 /** Each stretch's carriers, line by line (cycled); a line with "fly" in it is always written in the sky. */
 export const PATTERNS: Record<string, readonly Kind[]> = {
@@ -71,11 +79,11 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   verse1: ['street', 'wall', 'road', 'sign', 'billboard', 'road', 'storefront'],
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
   verse2: ['storefront', 'street', 'road', 'wall', 'sign', 'road', 'billboard', 'street', 'road'],
-  chorus3: ['road', 'sky', 'road', 'sky'],
+  chorus3: ['road', 'banner', 'road', 'sky'],
   bridge1: ['tunnel'],
   verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
-  chorus4: ['road', 'sky', 'sky'],
-  outro1: ['sky', 'sky', 'sky', 'sky'],
+  chorus4: ['road', 'sky', 'banner'],
+  outro1: ['sky', 'banner', 'sky', 'banner'],
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
 export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
@@ -89,6 +97,7 @@ export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
 export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; emOfRow: number }> = {
   road: { rowH: 3.4, w: 7, advance: 0.62, emOfRow: 0.7 },
   sky: { rowH: 9, w: 40, advance: 0.42, emOfRow: 0.72 },
+  banner: { rowH: 5, w: 34, advance: 0.6, emOfRow: 0.72 },
   wall: { rowH: 2.6, w: 12, advance: 0.62, emOfRow: 0.7 },
   billboard: { rowH: 2.8, w: 14, advance: 0.52, emOfRow: 0.72 },
   storefront: { rowH: 2.3, w: 13, advance: 0.62, emOfRow: 0.68 },
@@ -99,7 +108,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   tunnel: { rowH: 2, w: 10, advance: 0.62, emOfRow: 0.7 },
 };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner']);
 /** A phrase longer than this (characters) takes two rows. */
 export const WRAP_AT = 13;
 const TEXT_W = 0.9;
@@ -113,6 +122,12 @@ export const ROAD_VIEW = { dist: 11, pitch: 0.95, perLength: 2.3 };
 /** Walls are watched from this far out along their normal (m), sliding with the car up to this far either way. */
 export const WALL_VIEW = { dist: 20, slide: 7, eye: 2.2 };
 export const SKY = { ahead: 75, up: 19, side: 17, lift: 7 };
+/** Banners fly this far ahead of the car as their line starts, this high, this far to its side (left: clear of the
+ *  sky-writing still dissolving on the right), drifting this fast (m, m/s); the plane flies `tow` ahead of its banner,
+ *  and a formation's banners stand `gap` apart. */
+export const BANNER = { ahead: 60, up: 42, side: -12, speed: 6, tow: 9, gap: 6.5 };
+/** A banner holds one row up to this many characters. */
+export const BANNER_ROW = 22;
 /** The faces on the left stand this far off the road's centre (m). Per kind: how high a lone face's centre stands, and
  *  where the lower of two stacked faces starts (its bottom edge); the two stand STACK_GAP apart. */
 export const LEFT_LATERAL = 15;
@@ -163,13 +178,15 @@ export function rowsOf(text: string): string[] {
 }
 
 function layout(kind: Kind, text: string, solo?: Phrase['solo']) {
-  const L = LAYOUT[kind], rows = rowsFor(CAPS.has(kind) ? text.toUpperCase() : text, solo);
+  const L = LAYOUT[kind], set = CAPS.has(kind) ? text.toUpperCase() : text;
+  const rows = kind === 'banner' ? (set.length <= BANNER_ROW ? [set] : rowsOf(set)) : rowsFor(set, solo);
   const longest = Math.max(...rows.map((r) => r.length));
   const em = Math.min(L.rowH * L.emOfRow, (L.w * TEXT_W) / (longest * L.advance));
   return { rows, em, w: L.w, h: L.rowH * rows.length };
 }
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const ZERO = new THREE.Vector3();
 /** The text's up for a face with this normal: world up, made orthogonal to it (paint on the road: the road's forward). */
 const uprightFor = (normal: THREE.Vector3, fallback: THREE.Vector3) => {
   const u = WORLD_UP.clone().addScaledVector(normal, -normal.dot(WORLD_UP));
@@ -203,13 +220,29 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         if (kind_ === 'street' && rowsFor(ph.text, ph.solo).length > 1) kind_ = 'sign';
         let lay = layout(kind_, ph.text, ph.solo);
         const id = `L${line.i}.${pi}`;
-        let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3, foot: number | undefined, stack: Carrier['stack'], stackDy: number | undefined;
+        let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3, foot: number | undefined, stack: Carrier['stack'], aim: THREE.Vector3 | undefined, vel: THREE.Vector3 | undefined;
         let solid: Carrier['solid'] | undefined;
         if (kind_ === 'road') {
           s = room('road', motion.distanceAt(ph.end) + ROAD_AHEAD + lay.h / 2, lay.h + 2); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.up, 0.03);
           normal = f.up.clone();
           up = f.fwd.clone().negate();
+        } else if (kind_ === 'banner') {
+          // a line's banners fly in formation, one over the next (read top-down), ahead in the sky, facing the car
+          // halfway through the line; flying left to right (the way their words run), crossing the middle as it's sung
+          const T0 = phs[0]!.start, T1 = phs[phs.length - 1]!.end;
+          s = motion.distanceAt(T0) + BANNER.ahead; const f = route.frameAt(s);
+          const mid = f.pos.clone().addScaledVector(WORLD_UP, BANNER.up).addScaledVector(f.right, BANNER.side);
+          const car = route.frameAt(motion.distanceAt((T0 + T1) / 2)).pos;
+          normal = car.clone().sub(mid).normalize();
+          up = uprightFor(normal, WORLD_UP);
+          // keeping pace with the car (its average speed over the line), drifting left to right across the frame
+          const pace = (motion.distanceAt(T1) - motion.distanceAt(T0)) / Math.max(1e-3, T1 - T0);
+          vel = up.clone().cross(normal).normalize().multiplyScalar(BANNER.speed).addScaledVector(flat(f.fwd), pace);
+          const rank = pi - (phs.length - 1) / 2; // its place in the formation, from the middle (+: lower)
+          center = mid.addScaledVector(vel, ph.start - (T0 + T1) / 2).addScaledVector(up, -rank * BANNER.gap);
+          aim = up.clone().multiplyScalar(rank * BANNER.gap);
+          solid = null;
         } else if (kind_ === 'sky') {
           const side = pi % 2 === 0 ? -1 : 1; // left first, then right: read left to right
           s = motion.distanceAt(ph.start) + SKY.ahead; const f = route.frameAt(s);
@@ -222,11 +255,11 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           kind_ = prev.kind; lay = layout(kind_, ph.text, ph.solo);
           const L = LEFT[kind_ as LeftKind], fB = L.base + lay.h / 2, fT = L.base + lay.h + STACK_GAP + prev.h / 2;
           prev.center.addScaledVector(WORLD_UP, fT - prev.foot);
-          prev.foot = fT; prev.stack = 'top'; prev.stackDy = (fB - fT) / 2;
+          prev.foot = fT; prev.stack = 'top'; prev.aim = WORLD_UP.clone().multiplyScalar((fB - fT) / 2);
           prev.solid = solidFor(kind_, Math.max(prev.w, lay.w), prev.h, fT, { h: lay.h, dy: fB - fT });
           s = prev.s; normal = prev.normal.clone(); up = prev.up.clone();
           center = prev.center.clone().addScaledVector(WORLD_UP, fB - fT);
-          foot = fB; solid = null; stack = 'bottom'; stackDy = (fT - fB) / 2;
+          foot = fB; solid = null; stack = 'bottom'; aim = WORLD_UP.clone().multiplyScalar((fT - fB) / 2);
         } else if (PAIRABLE.has(kind_)) {
           // on the left (seen from the right, the drive runs left to right on screen); on a bend, on along the road
           // until it stands clear of the one before (their buildings swing into each other on the inside of a turn)
@@ -262,7 +295,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         }
         foot ??= center.y - route.frameAt(s).pos.y;
         if (solid === undefined) solid = solidFor(kind_, lay.w, lay.h, foot);
-        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack, stackDy } : {}) });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}) });
       });
     });
   }
@@ -276,7 +309,7 @@ export const basisOf = (c: Carrier) => new THREE.Matrix4().makeBasis(c.up.clone(
 /** A face's solid part, in its own frame (m): the building it's on (its foot on the ground, at least 1.5 m above the
  *  text), or its backing board, taking in a face stacked `under` it (its height, and its centre's offset). */
 function solidFor(kind: Kind, w: number, h: number, foot: number, under?: { h: number; dy: number }): Carrier['solid'] {
-  if (kind === 'road' || kind === 'sky') return null;
+  if (kind === 'road' || kind === 'sky' || kind === 'banner') return null;
   const H = BUILDING_H[kind as LeftKind];
   if (H) { const top = Math.max(H, foot + h / 2 + 1.5); return { at: new THREE.Vector3(0, top / 2 - foot, -5.06), size: new THREE.Vector3(w + LEFT_GAP, top, 10) }; }
   const lo = under ? under.dy - under.h / 2 : -h / 2;
@@ -309,7 +342,7 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
     // stacked face's shot holds its whole stack, read top-down
     const V = c.kind === 'tunnel' ? TUNNEL_TEXT : WALL_VIEW;
     const along = c.up.clone().cross(c.normal).normalize(), dir = Math.sign(along.dot(car(c.phrase.start).fwd)) || 1;
-    const aim = c.center.clone().addScaledVector(WORLD_UP, c.stackDy ?? 0);
+    const aim = c.center.clone().add(c.aim ?? ZERO);
     return (t) => {
       const slide = Math.max(-V.slide, Math.min(V.slide, carS(t) - c.s)) + 2 * jitter(4);
       const eye = aim.clone().addScaledVector(c.normal, V.dist).addScaledVector(along, dir * slide);
@@ -323,10 +356,10 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
       const p: Pose = { tx: c.center.x, ty: c.center.y, tz: c.center.z, dist: Math.max(ROAD_VIEW.dist, c.h * ROAD_VIEW.perLength), yaw: Math.atan2(c.up.x, c.up.z) + Math.PI + 0.2 * jitter(1), pitch: ROAD_VIEW.pitch + 0.08 * jitter(2), roll: 0 };
       return () => p;
     }
-    case 'sky': return (t) => {
-      // low behind the car, looking up at the writing
+    case 'sky': case 'banner': return (t) => {
+      // low behind the car, looking up at the writing (following a banner as it flies)
       const f = car(t), eye = f.pos.clone().addScaledVector(flat(f.fwd), -8).addScaledVector(f.right, 2.5 * jitter(3)).add(new THREE.Vector3(0, 1.6, 0));
-      return lookFrom(eye, c.center);
+      return lookFrom(eye, centerAt(c, t).add(c.aim ?? ZERO));
     };
     default: {
       const p = fitSign({ center: c.center, normal: c.normal, w: c.w, h: c.h });

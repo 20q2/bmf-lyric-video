@@ -5,7 +5,7 @@
 import { expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { LENS, placeCamera } from '../src/drive/camera';
-import { type Carrier, KINDS, basisOf, solidsOf } from '../src/drive/carriers';
+import { type Carrier, KINDS, basisOf, centerAt, solidsOf } from '../src/drive/carriers';
 import { dwellFor } from '../src/drive/phrases';
 import { REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
 import { LEAD, SNAP_S } from '../src/drive/shots';
@@ -53,6 +53,7 @@ const toPx = (v: THREE.Vector3) => new THREE.Vector2(((v.x + 1) / 2) * 1920, ((1
 
 function problems(c: Carrier, t: number): string[] {
   placeCamera(cam, drive.camera(t));
+  if (c.vel) c = { ...c, center: centerAt(c, t) }; // a banner, where it has flown to
   const out: string[] = [];
   for (const k of corners(c)) {
     const p = k.clone().project(cam);
@@ -98,7 +99,7 @@ test('every carrier reads while its phrase is sung', () => {
 });
 
 test('only tunnel lettering stands in a tunnel or by its mouths, and it stands inside one', () => {
-  const wrong = drive.carriers.filter((c) => c.kind !== 'sky' && (c.kind === 'tunnel') !== !!nearTunnel(drive.tunnels, c.s, c.kind === 'tunnel' ? -c.w / 2 : TUNNEL_CLEAR));
+ const wrong = drive.carriers.filter((c) => c.kind !== 'sky' && c.kind !== 'banner' && (c.kind === 'tunnel') !== !!nearTunnel(drive.tunnels, c.s, c.kind === 'tunnel' ? -c.w / 2 : TUNNEL_CLEAR));
   expect(wrong.map((c) => `${c.id} ${c.kind} s=${c.s.toFixed(0)}`)).toEqual([]);
 });
 

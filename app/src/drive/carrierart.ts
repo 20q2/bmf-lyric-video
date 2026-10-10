@@ -8,8 +8,10 @@
 //   storefront   cream capitals on a dark green fascia
 //   neon         pink italic tubing on a dark wall, glowing; the word being sung lights cyan
 //   street       a green street-name blade, white type; gantry the same green, bigger, over the freeway
+//   banner       a towed banner: dark capitals printed on white cloth, a red hem
 //   tunnel       lit capitals on the tunnel's tiles, glowing sodium orange, the word being sung flaring white
-// Every face is blank until its reveal (dissolve.ts), its board or wall already standing.
+// Every face is blank until its reveal (dissolve.ts), its board or wall already standing. A word of emphasis
+// (Phrase.solo) on its own row is set as big as its row allows, and punches up as it's sung (PUNCH).
 // Laid out as carriers.ts says (rows, em). Redrawn only when its karaoke key changes. Browser only (canvas).
 import * as THREE from 'three';
 import type { Word } from '../engine/lyrics';
@@ -20,6 +22,15 @@ import type { Carrier } from './carriers';
 import { dissolveAt, revealAt } from './dissolve';
 
 const CANVAS_W = 1024;
+/** A word of emphasis punches up this much as it's sung, settling over `over` s; it fills this share of its row. */
+export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
+/** How far through its punch the emphasis word is at t (1: just sung, 0: settled or not yet). */
+const punchAt = (c: Carrier, t: number) => {
+  const p = c.phrase, w = p.solo === 'first' ? p.words[0] : p.solo === 'last' ? p.words[p.words.length - 1] : undefined;
+  if (!w || t < w.start) return 0;
+  const u = (t - w.start) / PUNCH.over;
+  return u >= 1 ? 0 : (1 - u) * (1 - u);
+};
 
 
 /** The karaoke state of a phrase at t: how many words have started, and which is being sung (-1: none). */
@@ -45,6 +56,7 @@ function styleOf(c: Carrier): Style {
     case 'billboard': return { bg: '#fbf8f0', band: HEX.accent, family: F.archivo(62, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.25, 1] };
     case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.3, 1] };
     case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#7ff6ff'], alpha: [0.3, 1], glow: 'rgba(255,79,163,0.95)' };
+    case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
     case 'tunnel': return { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.2, 1], glow: 'rgba(255,160,60,0.9)' };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.45, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(400, { italic: true }), caps: false, colors: [HEX.dim, HEX.ink, HEX.accent], alpha: [0.55, 1] };
@@ -70,7 +82,7 @@ export class CarrierArt {
   }
 
   update(t: number) {
-    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * 10)}`;
+    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * 10)}:${Math.round(punchAt(this.carrier, t) * 10)}`;
     if (key === this.key) return;
     this.key = key;
     this.draw(t);
@@ -99,6 +111,13 @@ export class CarrierArt {
     carrier.rows.forEach((row, r) => {
       const n = row.split(' ').length, rowWords = words.slice(wi, wi + n);
       wi += n;
+      // the word of emphasis, alone on its row: as big as the row allows, punching up as it's sung
+      const solo = (carrier.phrase.solo === 'first' && r === 0) || (carrier.phrase.solo === 'last' && r === carrier.rows.length - 1);
+      if (solo) {
+        const base = c.measureText(label(rowWords[0]!)).width;
+        const big = Math.min((PUNCH.fill * H) / carrier.rows.length, (em * W * 0.92) / base) * (1 + PUNCH.scale * punchAt(carrier, t));
+        c.font = font(style.family, Math.max(em, Math.min(big, (em * W * 0.98) / base))); // never past the face's edge
+      }
       const total = rowWords.reduce((s, w) => s + c.measureText(label(w)).width, 0) + space * (rowWords.length - 1);
       let x = (W - total) / 2;
       const y = (H * (r + 0.5)) / carrier.rows.length;
@@ -110,6 +129,7 @@ export class CarrierArt {
         c.fillText(label(w), x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6);
         x += c.measureText(label(w)).width + space;
       }
+      if (solo) c.font = font(style.family, em);
     });
     c.globalAlpha = 1;
     c.shadowBlur = 0;

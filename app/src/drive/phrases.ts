@@ -4,8 +4,8 @@
 // after a function word ("the |", "my |") or leaving a short word alone — and above all a phrase the viewer can't
 // read before the next one takes over (dwellFor: subtitle standards, docs/LYRIC_VIDEO_TENETS.md §2), so fast lines
 // split into fewer, longer phrases. A comma is a strong place to break, but a phrase may run over one when that's the
-// only way to make it readable. A punctuating word (punctuationOf: "you" and "but" thrown in off the beat at a clause's
-// edge) stands at its phrase's start or end, on a row of its own (carriers.ts). Pure.
+// only way to make it readable. A word of punctuation and emphasis (EMPHASIS, picked by the user's ear) stands at its
+// phrase's start or end, on a row of its own, set bigger (carriers.ts, carrierart.ts). Pure.
 import type { Line, Word } from '../engine/lyrics';
 
 export interface Phrase {
@@ -16,24 +16,21 @@ export interface Phrase {
 /** Whether line's word k is a punctuating word. */
 export type Solo = (line: Line, k: number) => boolean;
 
-/** Words the song throws in as punctuation: "but" after a comma ("cute, but — play too much"), and "you" at a clause's
- *  edge (a line's start or end, or after a comma) sung off the beat ("You kinda cute", "fucks, you know", "can you?"),
- *  not "you" the subject landing on the beat ("You say you feel"). */
-export const SOLO_WORDS = new Set(['you', 'but']);
-/** A word sung within this share of a beat after it is on the beat. */
-export const ON_BEAT = 0.15;
-export function punctuationOf(beats: readonly number[]): Solo {
-  return (line, k) => {
-    const ws = line.words, w = ws[k]!, b = bare(w);
-    if (!SOLO_WORDS.has(b)) return false;
-    const afterComma = k > 0 && punct(ws[k - 1]!);
-    if (b === 'but') return afterComma;
-    if (!(k === 0 || k === ws.length - 1 || afterComma)) return false;
-    let i = 0;
-    while (i + 1 < beats.length && beats[i + 1]! <= w.start) i++;
-    const period = (beats[i + 1] ?? beats[i]! + 0.5) - beats[i]!, phase = (w.start - beats[i]!) / period;
-    return phase >= ON_BEAT;
-  };
+/** Single words that get their own beat of punctuation and emphasis: the user's picks by ear (2026-10-10), as
+ *  [song s, word]. Each names the nearest word of that spelling (tests/phrases.test.ts: within EMPHASIS_NEAR). */
+export const EMPHASIS: readonly [number, string][] = [
+  [22.9, 'and'], [34, 'with'], [37.7, 'but'], [41, 'but'], [56, 'you'], [79, 'took'], [81.2, 'and'], [88, 'call'],
+];
+export const EMPHASIS_NEAR = 0.6;
+/** The EMPHASIS words, as a Solo over the lyrics. */
+export function emphasisOf(lines: readonly Line[]): Solo {
+  const picked = new Set<Word>();
+  for (const [t, name] of EMPHASIS) {
+    let best: Word | undefined;
+    for (const l of lines) for (const w of l.words) if (bare(w) === name && (!best || Math.abs(w.start - t) < Math.abs(best.start - t))) best = w;
+    if (best && Math.abs(best.start - t) <= EMPHASIS_NEAR) picked.add(best);
+  }
+  return (line, k) => picked.has(line.words[k]!);
 }
 
 export const MAX_WORDS = 6;

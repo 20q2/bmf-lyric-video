@@ -6,6 +6,7 @@ import { H, W, makeRT } from '../engine/gl';
 import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
+import { type Carrier, centerAt } from '../drive/carriers';
 import { daylight, skyAt } from '../drive/sky';
 import { buildCar, buildCarrier, buildWorld } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
@@ -13,6 +14,8 @@ import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
 const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
 const TUNNEL_DARK = new THREE.Color('#120a05');
+/** A banner's plane is in the sky from this long before its line until this long after (s). */
+const BANNER_SKY = { before: 2, after: 4 };
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
 const FACE_WINDOW = 12;
 
@@ -26,6 +29,8 @@ export default class DriveScene extends Scene {
   private sun = new THREE.DirectionalLight('#fff3df', 2.2);
   private hemi = new THREE.HemisphereLight('#ffffff', '#3a3326', 1.2);
   private sky = new THREE.Color();
+  /** Carriers that move (towed banners), with their objects. */
+  private flying: [Carrier, THREE.Object3D][] = [];
   /** In a tunnel: the sodium light of the lamps nearest the camera. */
   private sodium = [0, 1, 2].map(() => new THREE.PointLight('#ffa24a', 0, TUNNEL_LIGHT.reach, 1.5));
 
@@ -36,7 +41,9 @@ export default class DriveScene extends Scene {
     for (const c of this.drive.carriers) {
       const art = new CarrierArt(c);
       this.arts.push(art);
-      this.world.add(buildCarrier(c, art.texture, wallColor(c), this.drive.route));
+      const o = buildCarrier(c, art.texture, wallColor(c), this.drive.route);
+      if (c.vel) this.flying.push([c, o]);
+      this.world.add(o);
     }
     this.world.fog = new THREE.Fog(0xffffff, 150, 900);
   }
@@ -47,6 +54,12 @@ export default class DriveScene extends Scene {
     const cf = d.carFrame(t);
     this.car.matrixAutoUpdate = false;
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
+    // banners where they've flown to; each plane in the sky only around its line
+    for (const [c, o] of this.flying) {
+      const line = this.ctx.lyrics.lines[c.phrase.line]!;
+      o.visible = t > line.words[0]!.start - BANNER_SKY.before && t < line.end + BANNER_SKY.after;
+      o.matrix.setPosition(centerAt(c, t));
+    }
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
     // the sky, its light and the fog

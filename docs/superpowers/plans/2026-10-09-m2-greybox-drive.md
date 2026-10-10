@@ -173,3 +173,14 @@ on the signs, needs to be more dynamic." Done on m2:
   starts. Tiled bore, sodium lamps hung where the car is on each beat (they strobe in time); the lyrics lit up along
   the left wall (carrier kind 'tunnel'), framed across the bore from above the car. Nothing else stands within 15 m of
   the mouths (guarded).
+
+## Revision 5: words of emphasis, towed banners (2026-10-10)
+
+- The user named, by ear, single words that deserve their own beat of punctuation and emphasis: 22.9 And, 34 With,
+  37.7 But, 41 But, 56 you, 79 Took, 81.2 and, 88 call (phrases.ts EMPHASIS; a first rule-based guess at "you"/"but"
+  was replaced by this list). Each starts or ends its phrase on a row of its own, set as big as the row allows, and
+  punches up as it's sung.
+- "Some of the sky-writing dragged as a banner on a plane… why settle for the same thing over and over": new carrier
+  'banner': the sky lines that aren't "fly" lines alternate with banners (chorus 3, chorus 4, outro). A line's banners
+  fly in formation, one over the next (read top-down), planes leading to the right (the words run the way they fly),
+  keeping pace ahead of the car; the guard checks them where they've flown to (Carrier.vel, centerAt).

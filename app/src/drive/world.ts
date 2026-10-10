@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import type { Drive } from './drive';
 import type { Route } from './route';
-import { type Carrier, PAIRABLE, basisOf, solidsOf } from './carriers';
+import { BANNER, type Carrier, PAIRABLE, basisOf, solidsOf } from './carriers';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 
@@ -209,6 +209,15 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
     case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
     case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey('#4a4a52')); break;
     case 'street': legs([-c.w / 2 - 0.15], y0 + c.h / 2 + 0.4); break;
+    case 'banner': {
+      // the plane ahead of it (to its right, flying that way) on a tow line from its leading edge
+      const x0 = c.w / 2 + BANNER.tow, plane = grey('#e9e4da');
+      box(BANNER.tow, 0.06, 0.06, c.w / 2 + BANNER.tow / 2, 0, 0, grey('#3a3a40'));
+      box(5.5, 1.1, 1.1, x0 + 2.75, 0, 0, plane); // fuselage, nose to the right
+      box(1.4, 0.15, 9, x0 + 3.2, 0.35, 0, plane); // wings
+      box(1, 1.6, 0.12, x0 + 0.4, 0.9, 0, plane); // tail fin
+      break;
+    }
     case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey('#4a4a52')); break;
   }
   g.matrixAutoUpdate = false;
