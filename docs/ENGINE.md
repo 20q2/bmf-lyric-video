@@ -51,6 +51,8 @@ to the user. Only the final export renders video (M5).
   street blades; freeway gantries (per-stretch patterns; "fly" lines in the sky) — and how the camera frames it; faces
   drawn in the browser. Each carrier's solid (building or backing board) is in the model, so the guard checks
   occlusion against what the scene builds.
+- `tunnel.ts`: a stretch marked `tunnel` (the bridge) runs through a headland — its mouths, a lamp over the car on
+  every beat; world.ts builds the bore, headland and lamps, the scene darkens and lights it by where the camera is.
 - `dissolve.ts`: when text shows — blank until the camera first comes for it (`reveal`: never more than one phrase,
   or 2 s, ahead), sky-writing dissolving after.
 - `drive.ts`: the model the scene renders and `tests/sung.test.ts` checks (while sung every phrase's carrier is in the

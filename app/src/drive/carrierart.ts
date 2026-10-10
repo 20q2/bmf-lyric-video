@@ -8,6 +8,7 @@
 //   storefront   cream capitals on a dark green fascia
 //   neon         pink italic tubing on a dark wall, glowing; the word being sung lights cyan
 //   street       a green street-name blade, white type; gantry the same green, bigger, over the freeway
+//   tunnel       lit capitals on the tunnel's tiles, glowing sodium orange, the word being sung flaring white
 // Every face is blank until its reveal (dissolve.ts), its board or wall already standing.
 // Laid out as carriers.ts says (rows, em). Redrawn only when its karaoke key changes. Browser only (canvas).
 import * as THREE from 'three';
@@ -44,6 +45,7 @@ function styleOf(c: Carrier): Style {
     case 'billboard': return { bg: '#fbf8f0', band: HEX.accent, family: F.archivo(62, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.25, 1] };
     case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.3, 1] };
     case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#7ff6ff'], alpha: [0.3, 1], glow: 'rgba(255,79,163,0.95)' };
+    case 'tunnel': return { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.2, 1], glow: 'rgba(255,160,60,0.9)' };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.45, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(400, { italic: true }), caps: false, colors: [HEX.dim, HEX.ink, HEX.accent], alpha: [0.55, 1] };
   }

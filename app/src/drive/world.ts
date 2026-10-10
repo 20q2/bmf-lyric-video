@@ -6,6 +6,7 @@ import { hash } from '../engine/util';
 import type { Drive } from './drive';
 import type { Route } from './route';
 import { type Carrier, PAIRABLE, basisOf, solidsOf } from './carriers';
+import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 
 const ROAD_HALF = 4;
@@ -24,12 +25,12 @@ const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boo
   chorus2: { h: [6, 14], empty: 0.6, far: 40 },
   verse2: { h: [4, 8], empty: 0.3 },
   chorus3: { h: [5, 10], empty: 0.6, seaLeft: true },
-  bridge1: { h: [5, 9], empty: 0.7, seaLeft: true },
+  bridge1: { h: [5, 9], empty: 1, seaLeft: true }, // in the tunnel
   verse3: { h: [8, 18], empty: 0.05 },
   chorus4: { h: [3, 6], empty: 0.8 },
   outro1: { h: [0, 0], empty: 1 },
 };
-const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'bridge1', 'verse3']);
+const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'verse3']);
 
 /** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
  *  coloured per sample. */
@@ -103,6 +104,7 @@ export function buildWorld(drive: Drive): THREE.Group {
     if (!PALMS.has(stretchAtS(s).id)) continue;
     for (const side of [1, -1]) {
       if (side === -1 && BLOCKS[stretchAtS(s).id]!.seaLeft) continue;
+      if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR)) continue; // nor in the rock
       // none on the left where a face stands: they'd stand between it and the camera across the road
       if (side === -1 && drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 4)) continue;
       const h = 9 + 4 * hash(k, side, 8);
@@ -116,6 +118,8 @@ export function buildWorld(drive: Drive): THREE.Group {
   crowns.forEach((m, i) => crown.setMatrixAt(i, m));
   g.add(trunk, crown);
 
+  for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
+
   // the motel the car waits outside at the start
   const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#e58fa8' }));
   motel.matrixAutoUpdate = false;
@@ -124,11 +128,68 @@ export function buildWorld(drive: Drive): THREE.Group {
   return g;
 }
 
+/** A profile (lateral, height; m) swept along the road from s0 to s1: its uv in metres over `tile`. */
+function sweep(route: Route, s0: number, s1: number, profile: readonly [number, number][], tile: number): THREE.BufferGeometry {
+  const n = Math.ceil((s1 - s0) / 1) + 1, m = profile.length, pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  const len = [0];
+  for (let j = 1; j < m; j++) len.push(len[j - 1]! + Math.hypot(profile[j]![0] - profile[j - 1]![0], profile[j]![1] - profile[j - 1]![1]));
+  for (let i = 0; i < n; i++) {
+    const s = Math.min(s1, s0 + i), f = route.frameAt(s);
+    profile.forEach(([x, y], j) => {
+      const v = f.pos.clone().addScaledVector(f.right, x).addScaledVector(f.up, y);
+      pos.push(v.x, v.y, v.z); uv.push((s - s0) / tile, len[j]! / tile);
+    });
+    if (i > 0) for (let j = 0; j < m - 1; j++) { const a = (i - 1) * m + j, b = i * m + j; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Glazed wall tiles, 8 to a texture repeat. */
+function tiles(): THREE.Texture {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#ddd3bc'; x.fillRect(0, 0, 256, 256);
+  x.fillStyle = '#9a907c';
+  for (let k = 0; k < 8; k++) { x.fillRect(k * 32, 0, 2, 256); x.fillRect(0, k * 32, 256, 2); }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+/** A tunnel (tunnel.ts): the tiled bore, the headland over it with a mouth at each end, and its lamps. */
+function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
+  const g = new THREE.Group(), { halfW: W, h: H, hill, hillHalfW } = TUNNEL;
+  const bore: [number, number][] = [[-W, 0], [-W, H], [W, H], [W, 0]];
+  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, bore, 2), new THREE.MeshLambertMaterial({ map: tiles(), side: THREE.DoubleSide })));
+  const rock = new THREE.MeshLambertMaterial({ color: '#5d5446', side: THREE.DoubleSide });
+  const outside: [number, number][] = [[-hillHalfW, -0.3], [-W - 1, H + hill], [W + 1, H + hill], [hillHalfW, -0.3]];
+  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, outside, 4), rock));
+  // the mouths: the headland's face with the bore cut out
+  const face = new THREE.Shape(outside.map(([x, y]) => new THREE.Vector2(x, y)));
+  face.holes.push(new THREE.Path(bore.map(([x, y]) => new THREE.Vector2(x, y))));
+  for (const s of [tn.s0, tn.s1]) {
+    const f = route.frameAt(s), mouth = new THREE.Mesh(new THREE.ShapeGeometry(face), rock);
+    mouth.matrixAutoUpdate = false;
+    mouth.matrix.makeBasis(f.right, f.up, f.fwd).setPosition(f.pos);
+    g.add(mouth);
+  }
+  // a sodium lamp over the car on every beat
+  const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffb347' }), tn.lamps.length);
+  tn.lamps.forEach((s, i) => lamps.setMatrixAt(i, boxAt(route, s, 0, 1.6, 0.15, 0.6, H - 0.15)));
+  g.add(lamps);
+  return g;
+}
+
 /** A carrier with its face's texture: a board on posts (a sign, a billboard), a street blade on its pole, a gantry over
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon'; // the face is only its letters
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   const g = new THREE.Group();

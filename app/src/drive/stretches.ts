@@ -25,6 +25,8 @@ export interface StretchSpec {
   rise: number;
   /** The camera's home framing of the car through the stretch. */
   chase: ChaseName;
+  /** The stretch runs through a tunnel (tunnel.ts). */
+  tunnel?: boolean;
 }
 
 export const STRETCHES: readonly StretchSpec[] = Object.freeze([
@@ -34,7 +36,7 @@ export const STRETCHES: readonly StretchSpec[] = Object.freeze([
   { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'cruise', v: 26 }, turn: -20, rise: 6, chase: 'high' },
   { id: 'verse2', section: 'verse2', place: 'Slauson, the neighbourhood', pace: { kind: 'cruise', v: 10 }, turn: -90, rise: -6, chase: 'side' },
   { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'side' },
-  { id: 'bridge1', section: 'bridge1', place: 'the coast road, faster', pace: { kind: 'cruise', v: 24 }, turn: 10, rise: 0, chase: 'behind' },
+  { id: 'bridge1', section: 'bridge1', place: 'the tunnel through the headland', pace: { kind: 'cruise', v: 24 }, turn: 10, rise: 0, chase: 'behind', tunnel: true },
   { id: 'verse3', section: 'verse3', place: 'the Strip at night', pace: { kind: 'cruise', v: 8 }, turn: 0, rise: 0, chase: 'side' },
   { id: 'chorus4', section: 'chorus4', place: 'up into the hills', pace: { kind: 'cruise', v: 12 }, turn: 120, rise: 15, chase: 'front3q' },
   { id: 'outro1', section: 'outro1', place: 'the overlook, parked', pace: { kind: 'stop', v: 12, byBar: 3 }, turn: 0, rise: 0, chase: 'high' },

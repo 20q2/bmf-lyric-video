@@ -164,3 +164,12 @@ on the signs, needs to be more dynamic." Done on m2:
   it further out; gantries stand clear of the left-hand run; no palms in front of faces.
 - The guard learnt occlusion (carrier solids); that measured three second-signs-of-a-line as short (they stand behind
   the first). KNOWN_SHORT: 10 (was 12).
+
+## Revision 4: the bridge in a tunnel (2026-10-10)
+
+- The user: "Bridge 1 has a totally different vibe from the rest of the song, let's switch its scene up"; of four
+  options (pier at last light, money storm, tunnel, inside the car) they chose the tunnel.
+- The bridge stretch runs through a headland (tunnel.ts): in on its first sung word, out into full night as verse 3
+  starts. Tiled bore, sodium lamps hung where the car is on each beat (they strobe in time); the lyrics lit up along
+  the left wall (carrier kind 'tunnel'), framed across the bore from above the car. Nothing else stands within 15 m of
+  the mouths (guarded).

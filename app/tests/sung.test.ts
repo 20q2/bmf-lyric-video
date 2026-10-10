@@ -10,6 +10,7 @@ import { dwellFor } from '../src/drive/phrases';
 import { REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
 import { LEAD, SNAP_S } from '../src/drive/shots';
 import { dissolveAt, revealAt } from '../src/drive/dissolve';
+import { TUNNEL_CLEAR, nearTunnel } from '../src/drive/tunnel';
 import { audio, lyrics } from './data';
 
 const drive = makeDrive(audio, lyrics);
@@ -94,6 +95,11 @@ test('every carrier reads while its phrase is sung', () => {
     if (bad.length) fails.push(`${c.id} ${c.kind} "${c.phrase.text}" [${c.stretch}] ${bad.length} samples, first ${bad[0]}`);
   });
   expect(fails).toEqual([]);
+});
+
+test('only tunnel lettering stands in a tunnel or by its mouths, and it stands inside one', () => {
+  const wrong = drive.carriers.filter((c) => c.kind !== 'sky' && (c.kind === 'tunnel') !== !!nearTunnel(drive.tunnels, c.s, c.kind === 'tunnel' ? -c.w / 2 : TUNNEL_CLEAR));
+  expect(wrong.map((c) => `${c.id} ${c.kind} s=${c.s.toFixed(0)}`)).toEqual([]);
 });
 
 test("the car never drives over road paint while it's sung", () => {

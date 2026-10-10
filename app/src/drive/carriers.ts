@@ -11,6 +11,7 @@
 //          building, on the right): a slow verse's run keeps up with the car. Any two share a frame (pairFraming)
 //   sign   a short roadside board on the right; `street` a green street-name blade; the camera snaps to it
 //   gantry a green freeway sign over the road; the camera snaps to it
+//   tunnel lit up along a tunnel's left wall (the bridge, tunnel.ts), framed from across the bore like the left faces
 // Each phrase's text is blank until the camera first comes for it (`reveal`, set by makeDrive): the world ahead
 // shows its signs and walls, never the song beyond the next phrase.
 // Placement and text layout (rows and type size, in metres) are pure, so the guards can check legibility under bun;
@@ -24,10 +25,11 @@ import type { Phrase } from './phrases';
 import { SETTLE, dwellFor, phrasesOf } from './phrases';
 import type { Route, RouteFrame } from './route';
 import type { Stretch } from './stretches';
+import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
-export type Kind = 'road' | 'sky' | LeftKind | 'sign' | 'street' | 'gantry';
-export const KINDS: readonly Kind[] = ['road', 'sky', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry'];
+export type Kind = 'road' | 'sky' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel';
+export const KINDS: readonly Kind[] = ['road', 'sky', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel'];
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -70,7 +72,7 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
   verse2: ['storefront', 'street', 'road', 'wall', 'sign', 'road', 'billboard', 'street', 'road'],
   chorus3: ['road', 'sky', 'road', 'sky'],
-  bridge1: ['road', 'sky', 'road', 'sky'],
+  bridge1: ['tunnel'],
   verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
   chorus4: ['road', 'sky', 'sky'],
   outro1: ['sky', 'sky', 'sky', 'sky'],
@@ -94,9 +96,10 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   sign: { rowH: 1.3, w: 4.6, advance: 0.42, emOfRow: 0.62 },
   street: { rowH: 1, w: 4.4, advance: 0.55, emOfRow: 0.66 },
   gantry: { rowH: 2, w: 8, advance: 0.55, emOfRow: 0.62 },
+  tunnel: { rowH: 2, w: 10, advance: 0.62, emOfRow: 0.7 },
 };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel']);
 /** A phrase longer than this (characters) takes two rows. */
 export const WRAP_AT = 13;
 const TEXT_W = 0.9;
@@ -108,7 +111,7 @@ export const ROAD_AHEAD = 3.5;
 /** Road paint is framed from this far (m, or perLength x its length if more) and this steeply (radians) behind it. */
 export const ROAD_VIEW = { dist: 11, pitch: 0.95, perLength: 2.3 };
 /** Walls are watched from this far out along their normal (m), sliding with the car up to this far either way. */
-export const WALL_VIEW = { dist: 20, slide: 7 };
+export const WALL_VIEW = { dist: 20, slide: 7, eye: 2.2 };
 export const SKY = { ahead: 75, up: 19, side: 17, lift: 7 };
 /** The faces on the left stand this far off the road's centre (m). Per kind: how high a lone face's centre stands, and
  *  where the lower of two stacked faces starts (its bottom edge); the two stand STACK_GAP apart. */
@@ -128,6 +131,9 @@ const groundY = (c: Carrier) => c.center.y - c.foot;
 export const SIGN = { lateral: 7.5, y: 3, toe: (25 * Math.PI) / 180, gap: 14 };
 export const STREET = { lateral: 6.5, y: 3.6 };
 export const GANTRY_Y = 6;
+/** Tunnel lettering's centre stands this high on the wall (m); the camera frames it from this far out, across the bore,
+ *  sliding with the car up to `slide` either way, from `eye` m up: the car passes between, so it looks over it. */
+export const TUNNEL_TEXT = { y: 3.8, dist: 2 * TUNNEL.halfW - 1.5, slide: 5, eye: 3.6 };
 /** A gantry stands at least this far past the last face on the left (m). */
 export const GANTRY_CLEAR = 20;
 
@@ -161,8 +167,10 @@ const uprightFor = (normal: THREE.Vector3, fallback: THREE.Vector3) => {
 };
 const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
 
-export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route): Carrier[] {
+export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route, tunnels: readonly Tunnel[] = []): Carrier[] {
   const out: Carrier[] = [];
+  // anything standing by the road stands clear of a tunnel and its mouths
+  const clear = (s: number) => { const tn = nearTunnel(tunnels, s, TUNNEL_CLEAR); return tn ? tn.s1 + TUNNEL_CLEAR : s; };
   const last: Record<string, number> = {};
   const room = (key: string, s: number, gap: number) => { const v = Math.max(s, (last[key] ?? -Infinity) + gap); last[key] = v; return v; };
   const lines = R.flatMap((st) => st.lines);
@@ -214,22 +222,29 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           // until it stands clear of the one before (their buildings swing into each other on the inside of a turn)
           const L = LEFT[kind_ as LeftKind], before = out.findLast((c) => PAIRABLE.has(c.kind) && c.solid);
           const at = (s: number) => { const f = route.frameAt(s); return { center: f.pos.clone().addScaledVector(f.right, -LEFT_LATERAL).addScaledVector(WORLD_UP, L.y), normal: flat(f.right.clone()), up: WORLD_UP.clone() }; };
-          s = room('left', motion.distanceAt((ph.start + ph.end) / 2), lay.w + LEFT_GAP);
+          s = room('left', clear(motion.distanceAt((ph.start + ph.end) / 2)), lay.w + LEFT_GAP);
           solid = solidFor(kind_, lay.w, lay.h, L.y);
           while (before && overlaps(before, { ...at(s), solid })) s += 1;
           last.left = s;
           ({ center, normal, up } = at(s));
           foot = L.y;
+        } else if (kind_ === 'tunnel') {
+          // on the bore's left wall
+          s = room('tunnel', motion.distanceAt((ph.start + ph.end) / 2), lay.w + 4); const f = route.frameAt(s);
+          center = f.pos.clone().addScaledVector(f.right, -(TUNNEL.halfW - 0.05)).addScaledVector(WORLD_UP, TUNNEL_TEXT.y);
+          normal = flat(f.right.clone());
+          up = WORLD_UP.clone();
+          foot = TUNNEL_TEXT.y; solid = null;
         } else if (kind_ === 'gantry') {
           // past the faces on the left (a verse's run of them may still be going when the freeway starts)
-          s = room('gantry', Math.max(motion.distanceAt((ph.start + ph.end) / 2), (last.left ?? -Infinity) + GANTRY_CLEAR), 14); const f = route.frameAt(s);
+          s = room('gantry', clear(Math.max(motion.distanceAt((ph.start + ph.end) / 2), (last.left ?? -Infinity) + GANTRY_CLEAR)), 14); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.up, GANTRY_Y);
           normal = flat(f.fwd.clone().negate());
           up = WORLD_UP.clone();
         } else {
           // signs and street blades on the right: the left is taken
           const P = kind_ === 'street' ? STREET : SIGN;
-          s = room('right', motion.distanceAt((ph.start + ph.end) / 2), SIGN.gap); const f = route.frameAt(s);
+          s = room('right', clear(motion.distanceAt((ph.start + ph.end) / 2)), SIGN.gap); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.right, P.lateral).addScaledVector(WORLD_UP, P.y);
           const back = flat(f.fwd.clone().negate()), toRoad = flat(f.right.clone().negate());
           normal = back.multiplyScalar(Math.cos(SIGN.toe)).addScaledVector(toRoad, Math.sin(SIGN.toe)).normalize();
@@ -279,15 +294,16 @@ export function lookFrom(eye: THREE.Vector3, at: THREE.Vector3): Pose {
 /** How the camera frames a carrier while its phrase is sung: a function of t (most follow the car). */
 export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: number) => number): (t: number) => Pose {
   const jitter = (k: number) => hash(c.phrase.start * 1000, k) * 2 - 1; // a seeded variation, so runs don't repeat
-  if (PAIRABLE.has(c.kind)) {
-    // out from the face across the road, sliding along with the car's progress past it (clamped); a stacked face's
-    // shot holds its whole stack, read top-down
+  if (PAIRABLE.has(c.kind) || c.kind === 'tunnel') {
+    // out from the face across the road (or the bore), sliding along with the car's progress past it (clamped); a
+    // stacked face's shot holds its whole stack, read top-down
+    const V = c.kind === 'tunnel' ? TUNNEL_TEXT : WALL_VIEW;
     const along = c.up.clone().cross(c.normal).normalize(), dir = Math.sign(along.dot(car(c.phrase.start).fwd)) || 1;
     const aim = c.center.clone().addScaledVector(WORLD_UP, c.stackDy ?? 0);
     return (t) => {
-      const slide = Math.max(-WALL_VIEW.slide, Math.min(WALL_VIEW.slide, carS(t) - c.s)) + 2 * jitter(4);
-      const eye = aim.clone().addScaledVector(c.normal, WALL_VIEW.dist).addScaledVector(along, dir * slide);
-      eye.y = groundY(c) + 2.2; // eye height on the ground across from it (not the car's: it may be on a grade)
+      const slide = Math.max(-V.slide, Math.min(V.slide, carS(t) - c.s)) + 2 * jitter(4);
+      const eye = aim.clone().addScaledVector(c.normal, V.dist).addScaledVector(along, dir * slide);
+      eye.y = groundY(c) + V.eye; // eye height over the ground across from it (not the car's: it may be on a grade)
       return lookFrom(eye, aim);
     };
   }

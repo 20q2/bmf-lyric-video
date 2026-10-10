@@ -10,6 +10,7 @@ import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor } from './phrases';
 import { LEAD, SNAP_S, type Shot, type Target, director, resolveAt } from './shots';
 import { type Stretch, motionFor, resolveStretches } from './stretches';
+import { type Tunnel, tunnelsOf } from './tunnel';
 
 const DEG = Math.PI / 180;
 /** After a line, the camera goes back to the car only if the next line is at least this far off (s). */
@@ -32,6 +33,7 @@ export interface Drive {
   motion: Motion;
   route: Route;
   carriers: Carrier[];
+  tunnels: Tunnel[];
   carFrame(t: number): RouteFrame;
   stretchAt(t: number): Stretch;
   camera(t: number): Pose;
@@ -40,7 +42,8 @@ export interface Drive {
 
 export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const stretches = resolveStretches(audio, lyrics), motion = motionFor(stretches, audio), route = routeFor(stretches, motion);
-  const carriers = placeCarriers(stretches, motion, route);
+  const tunnels = tunnelsOf(stretches, motion, audio.beats);
+  const carriers = placeCarriers(stretches, motion, route, tunnels);
   const carFrame = (t: number) => route.frameAt(motion.distanceAt(t));
   const stretchAt = (t: number) => stretches.find((s) => t >= s.start && t < s.end) ?? stretches[stretches.length - 1]!;
   const chaseOf = (st: Stretch): Target => (t) => {
@@ -88,5 +91,5 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
-  return { stretches, motion, route, carriers, carFrame, stretchAt, camera, shots: kept };
+  return { stretches, motion, route, carriers, tunnels, carFrame, stretchAt, camera, shots: kept };
 }
