@@ -24,11 +24,11 @@ test('a land lands on a beat at least 0.25 s on; a glide on the downbeat a bar o
 });
 
 test('two shots starting at the same time are an error', () => {
-  expect(() => plan(audio, [{ at: 5, to: fixed(P({})) }, { at: 5, to: fixed(P({ tx: 1 })) }], moving)).toThrow();
+  expect(() => plan(audio, [{ at: 5, to: fixed(P({})) }, { at: 5, to: fixed(P({ tx: 1 })) }])).toThrow();
 });
 
 test('handing the camera from a moving car to a fixed sign is continuous', () => {
-  const cam = director(audio, [{ at: 30, to: fixed(P({ tx: 40, tz: 600 })), move: 'glide' }]);
+  const cam = director(audio, [{ at: 30, to: fixed(P({ tx: 40, tz: 600 })), move: 'glide' }], moving);
   const dt = 1 / 600;
   for (let t = 29; t < 33; t += dt) expect(gap(cam(t), cam(t + dt))).toBeLessThan(2.5); // smooth at 20 m/s and the glide
   expect(gap(cam(30 - 1e-6), cam(30 + 1e-6))).toBeLessThan(1e-3);
