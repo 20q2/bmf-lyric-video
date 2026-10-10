@@ -34,6 +34,8 @@ export interface Drive {
   route: Route;
   carriers: Carrier[];
   tunnels: Tunnel[];
+  /** The song's beats (s). */
+  beats: readonly number[];
   carFrame(t: number): RouteFrame;
   stretchAt(t: number): Stretch;
   camera(t: number): Pose;
@@ -91,5 +93,5 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
-  return { stretches, motion, route, carriers, tunnels, carFrame, stretchAt, camera, shots: kept };
+  return { stretches, motion, route, carriers, tunnels, beats: audio.beats, carFrame, stretchAt, camera, shots: kept };
 }

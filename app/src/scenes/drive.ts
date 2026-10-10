@@ -16,6 +16,7 @@ import { buildCar, buildCarrier, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
+import { NIGHT } from '../look/night';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
 const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
@@ -122,6 +123,7 @@ export default class DriveScene extends Scene {
     this.hemi.groundColor.copy(sky.horizon).multiplyScalar(0.35);
     this.hemi.intensity = 0.55 + 0.75 * day;
     this.fogColor.copy(sky.horizon);
+    NIGHT.value = smooth(2 * DEG, -8 * DEG, e); // the lights come on as the sun goes
 
     // in a tunnel (by where the camera is): the daylight shut out, the lamps' light on the tiles and the car
     const camS = this.roadS(this.cam.position, d.motion.distanceAt(t)), inside = insideAt(d.tunnels, camS);

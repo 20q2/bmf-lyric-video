@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { hash } from '../engine/util';
 import { WORLD, toon } from '../look/toon';
+import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import type { Drive } from './drive';
 import type { Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, basisOf, solidsOf } from './carriers';
@@ -94,7 +95,7 @@ export function buildWorld(drive: Drive): THREE.Group {
       cols.push(new THREE.Color(WORLD.stucco[Math.floor(hash(k, side, 6) * WORLD.stucco.length)]!));
     }
   }
-  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon(), mats.length);
+  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), mats.length);
   mats.forEach((m, i) => { blocks.setMatrixAt(i, m); blocks.setColorAt(i, cols[i]!); });
   g.add(blocks);
 
@@ -120,6 +121,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   g.add(trunk, crown);
 
   for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
+  g.add(buildStreetlights(drive));
 
   // the motel the car waits outside at the start
   const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.motel }));
@@ -186,6 +188,35 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   return g;
 }
 
+/** Streetlights on the road's right from dusk: one passes the car every STREETLIGHTS.beats beats (at least `gap` m
+ *  apart), a pole with an arm over the road, a bulb and its pool of light; none in a tunnel or by its mouths, nor
+ *  close to a sign (it would stand in front of it). */
+export const STREETLIGHTS = { from: 92, beats: 2, gap: 18, lateral: 6.2, h: 7.2, reach: 3.6 };
+function buildStreetlights(drive: Drive): THREE.Group {
+  const { route, motion } = drive, g = new THREE.Group(), at: number[] = [];
+  const signs = drive.carriers.filter((c) => c.kind === 'sign' || c.kind === 'street' || c.kind === 'gantry');
+  for (const b of drive.beats.filter((b, i) => b >= STREETLIGHTS.from && i % STREETLIGHTS.beats === 0)) {
+    const s = motion.distanceAt(b);
+    if (at.length && s - at[at.length - 1]! < STREETLIGHTS.gap) continue;
+    if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR) || signs.some((c) => Math.abs(c.s - s) < 12)) continue;
+    at.push(s);
+  }
+  const L = STREETLIGHTS, n = at.length;
+  const poles = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.post }), n * 2);
+  const bulbs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), lampMaterial('#ffcf8a'), n);
+  const pools = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 24), glowMaterial('#ffb560', GLOW.pool, true), n);
+  at.forEach((s, i) => {
+    poles.setMatrixAt(2 * i, boxAt(route, s, L.lateral, 0.22, L.h, 0.22));
+    poles.setMatrixAt(2 * i + 1, boxAt(route, s, (L.lateral + L.reach) / 2, L.lateral - L.reach, 0.16, 0.16, L.h - 0.1));
+    bulbs.setMatrixAt(i, boxAt(route, s, L.reach + 0.3, 0.9, 0.18, 0.45, L.h - 0.3));
+    const f = route.frameAt(s), m = new THREE.Matrix4().makeBasis(f.right, f.fwd, f.up).scale(new THREE.Vector3(6.5, 6.5, 1));
+    pools.setMatrixAt(i, m.setPosition(f.pos.clone().addScaledVector(f.right, L.reach - 0.5).addScaledVector(f.up, 0.04)));
+  });
+  pools.frustumCulled = false;
+  g.add(poles, bulbs, pools);
+  return g;
+}
+
 /** A towed banner ripples: a wave running back from its leading (right) edge, growing toward its trailing edge. Small
  *  enough to leave the words readable. */
 export const FLUTTER = { segments: 40, amp: 0.025, waves: 2.5, hz: 1.3 };
@@ -205,6 +236,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
   const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   const g = new THREE.Group();
   const board = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h, c.kind === 'banner' ? FLUTTER.segments : 1, 1), mat);
@@ -260,25 +292,69 @@ function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh
   return new THREE.Mesh(geo, mat);
 }
 
-/** The car (a '64-ish convertible, nose +z) with its two silhouettes: him driving (left), her riding. */
+/** The car: a '64 Impala convertible, the LA lowrider (nose +z): a long low body (its side profile extruded across its
+ *  width, wheel arches cut), a chrome spear down the side, chrome bumpers, whitewalls with chrome caps, quad headlights
+ *  and the triple round tail lights (they glow at night, the headlights throw beams); the two of them as flat
+ *  silhouettes: him at the wheel (on its left) in a cap, her riding, her hair down her back. */
+export const CAR = { length: 5.4, width: 1.96, belt: 0.98, wheelZ: 1.55, wheelR: 0.36 };
 export function buildCar(): THREE.Group {
-  const g = new THREE.Group();
-  const paint = toon({ color: WORLD.car }), dark = toon({ color: WORLD.carDark });
-  const chrome = toon({ color: WORLD.chrome });
-  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b;
-  };
-  box(1.9, 0.55, 4.8, 0, 0.6, 0, paint); // body
-  box(1.86, 0.18, 1.5, 0, 0.95, 1.55, paint); // hood
-  box(1.86, 0.18, 1.2, 0, 0.95, -1.7, paint); // trunk deck
-  box(1.7, 0.45, 0.06, 0, 1.25, 0.75, chrome); // windshield frame
-  for (const z of [1.4, -1.45]) for (const x of [0.92, -0.92]) {
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.25, 14), dark);
-    w.rotation.z = Math.PI / 2; w.position.set(x, 0.36, z); g.add(w);
+  const g = new THREE.Group(), { length: L, width: Wd, belt, wheelZ, wheelR } = CAR, hl = L / 2;
+  const paint = toon({ color: WORLD.car }), dark = toon({ color: WORLD.carDark }), chrome = toon({ color: WORLD.chrome });
+  const white = toon({ color: '#f4efe4' }), seat = toon({ color: '#3a1820' });
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => add(new THREE.BoxGeometry(w, h, d), m, x, y, z);
+
+  // the body: its side profile (z along, y up), wheel arches cut from the sill
+  const side = new THREE.Shape();
+  side.moveTo(-hl, 0.3);
+  side.lineTo(-wheelZ - 0.5, 0.3); side.absarc(-wheelZ, 0.3, 0.5, Math.PI, 0, true);
+  side.lineTo(wheelZ - 0.5, 0.3); side.absarc(wheelZ, 0.3, 0.5, Math.PI, 0, true);
+  side.lineTo(hl, 0.3); side.lineTo(hl + 0.06, 0.55); side.lineTo(hl - 0.05, 0.84);
+  side.lineTo(hl - 0.35, 0.9); side.lineTo(0.95, belt); // the long hood
+  side.lineTo(-1.25, belt); // the open cockpit's beltline
+  side.lineTo(-hl + 0.2, belt - 0.02); side.lineTo(-hl, 0.86); side.lineTo(-hl - 0.05, 0.55); // the deck, the tail
+  side.closePath();
+  const body = new THREE.ExtrudeGeometry(side, { depth: Wd - 0.08, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 2, curveSegments: 10 });
+  body.rotateY(-Math.PI / 2); body.translate((Wd - 0.08) / 2, 0, 0);
+  add(body, paint, 0, 0, 0);
+  // the cockpit: seats and the windshield
+  box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
+  box(Wd - 0.12, 0.05, 0.05, 0, belt + 0.48, 0.92, chrome); // the windshield's top rail
+  for (const x of [Wd / 2 - 0.08, -Wd / 2 + 0.08]) box(0.05, 0.5, 0.05, x, belt + 0.24, 0.95, chrome);
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#cfe3ff', transparent: true, opacity: 0.18, depthWrite: false }));
+  glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; g.add(glass);
+  // chrome: the spear down each side, the bumpers
+  for (const x of [Wd / 2, -Wd / 2]) box(0.03, 0.05, L - 0.9, x, 0.74, 0.05, chrome);
+  box(Wd + 0.06, 0.13, 0.14, 0, 0.42, hl + 0.06, chrome);
+  box(Wd + 0.06, 0.13, 0.14, 0, 0.42, -hl - 0.06, chrome);
+  box(Wd - 0.5, 0.2, 0.04, 0, 0.66, hl + 0.06, dark); // the grille
+  // wheels: tyre, whitewall, chrome cap
+  for (const z of [wheelZ, -wheelZ]) for (const x of [Wd / 2 - 0.13, -Wd / 2 + 0.13]) {
+    const sgn = Math.sign(x);
+    const tyre = add(new THREE.CylinderGeometry(wheelR, wheelR, 0.24, 20), dark, x, wheelR, z); tyre.rotation.z = Math.PI / 2;
+    const wall = add(new THREE.RingGeometry(wheelR * 0.55, wheelR * 0.8, 24), white, x + sgn * 0.125, wheelR, z); wall.rotation.y = (sgn * Math.PI) / 2;
+    const cap = add(new THREE.CircleGeometry(wheelR * 0.5, 16), chrome, x + sgn * 0.127, wheelR, z); cap.rotation.y = (sgn * Math.PI) / 2;
   }
-  for (const x of [0.42, -0.42]) { // driver (+x: the car's left) and passenger
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.42, 4, 8), dark); torso.position.set(x, 1.2, -0.05); g.add(torso);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8), dark); head.position.set(x, 1.68, -0.02); g.add(head);
+  // lights: quad headlights, triple round tail lights; the beams ahead on the road
+  const head = lampMaterial('#fff2d8', GLOW.head, 0.9), tail = lampMaterial('#ff2a24', GLOW.tail, 0.5);
+  for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.CircleGeometry(0.09, 14), head, x, 0.68, hl + 0.07);
+  for (const x of [0.78, 0.55, 0.32, -0.32, -0.55, -0.78]) { const t = add(new THREE.CircleGeometry(0.075, 14), tail, x, 0.68, -hl - 0.07); t.rotation.y = Math.PI; }
+  const beamMat = glowMaterial('#ffe6bd', GLOW.beam);
+  for (const x of [0.6, -0.6]) {
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 3.6, 24, 18, 1, true), beamMat);
+    beam.rotation.x = -Math.PI / 2 + 0.05; // narrow end at the lamp, dipping toward the road
+    beam.position.set(x, 0.55, hl + 12); g.add(beam);
+  }
+  // the two of them: him at the wheel (+x: the car's left) in a cap; her, her hair down her back
+  for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
+    add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);
+    add(new THREE.SphereGeometry(0.14, 14, 10), dark, x, belt + 0.78, -0.22);
+    if (him) {
+      add(new THREE.SphereGeometry(0.15, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, x, belt + 0.84, -0.22); // the cap's crown
+      box(0.2, 0.025, 0.16, x, belt + 0.84, -0.06, dark); // its brim, forward
+    } else {
+      const hair = add(new THREE.SphereGeometry(0.17, 14, 10), dark, x, belt + 0.62, -0.34); hair.scale.set(1, 1.9, 0.75);
+    }
   }
   return g;
 }
