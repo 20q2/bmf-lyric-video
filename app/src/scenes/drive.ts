@@ -218,7 +218,7 @@ export default class DriveScene extends Scene {
     const [f0, f1] = FINALE.fade, gone = Math.min(1, Math.max(0, (t - f0) / (f1 - f0)));
     const white = bo && t >= bo[0] - FINALE.flash && t < bo[0] ? 1.2 : 0;
     return {
-      bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06, grain: 0.055, vignette: 0.22,
+      bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06, grain: 0.072, vignette: 0.22,
       zoom: 1 + 0.007 * f.a.kick * drums + 0.03 * hit,
       shake: [jolt * Math.sin(t * 91), jolt * Math.cos(t * 77)],
       flash: 0.12 * hit + white,

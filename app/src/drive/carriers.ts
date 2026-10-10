@@ -343,7 +343,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         }
         foot ??= center.y - route.frameAt(s).pos.y;
         if (solid === undefined) solid = solidFor(kind_, lay.w, lay.h, foot);
-        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(hold ? { hold } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000) } : {}), ...(line.i === lastLine ? { finale: true } : {}) });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(hold ? { hold } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000, out.findLast((o) => o.ad)?.ad) } : {}), ...(line.i === lastLine ? { finale: true } : {}) });
       });
     });
   }

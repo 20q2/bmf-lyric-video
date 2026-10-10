@@ -13,6 +13,12 @@ export const AD_STYLE: Record<Ad, { bg: string; ink: string; now: string; spot: 
   shades: { bg: '#9cc3e0', ink: '#16131a', now: '#ff5a36', spot: '#ffd27a' },
   diamond: { bg: '#22284a', ink: '#f3ead2', now: '#ff7aa8', spot: '#343c6a' },
   cocktail: { bg: '#2b8a87', ink: '#fbf7ee', now: '#f6dd8f', spot: '#3aa6a2' },
+  heels: { bg: '#16131a', ink: '#f3ead2', now: '#ff3e6c', spot: '#2c2433' },
+  roses: { bg: '#f3e4c4', ink: '#36143c', now: '#c8102e', spot: '#fbf1dc' },
+  chain: { bg: '#3d2a5c', ink: '#f6dd8f', now: '#ffffff', spot: '#523a78' },
+  record: { bg: '#e3907a', ink: '#16131a', now: '#ffffff', spot: '#eeaa96' },
+  suitcase: { bg: '#a9d8c6', ink: '#16131a', now: '#c8102e', spot: '#c4e6d8' },
+  crown: { bg: '#7a1432', ink: '#f6dd8f', now: '#ffffff', spot: '#9a2246' },
 };
 
 /** Draw the ad's product and its mark (not its headline) on a canvas W x H, the headline taking the left `text` share
@@ -112,6 +118,46 @@ const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D) => void> = {
     c.beginPath(); c.moveTo(-70, -25); c.lineTo(70, -25); c.moveTo(-40, -60); c.lineTo(-20, -25); c.lineTo(0, -60); c.lineTo(20, -25); c.lineTo(40, -60);
     c.moveTo(-20, -25); c.lineTo(0, 75); c.lineTo(20, -25); c.stroke();
     c.fillStyle = '#ffffff'; star(c, 52, -62, 20, 4, 4); star(c, -60, 30, 12, 3, 4);
+  },
+  heels: (c) => { // a red stiletto
+    c.fillStyle = '#ff3e6c';
+    c.beginPath(); c.moveTo(-80, 40); c.quadraticCurveTo(-60, -10, -10, 0); c.quadraticCurveTo(40, 10, 70, -50); c.lineTo(80, -40);
+    c.quadraticCurveTo(60, 30, 30, 45); c.lineTo(-80, 50); c.closePath(); c.fill();
+    c.fillRect(56, -42, 9, 100); // the heel
+    c.fillStyle = '#16131a'; c.globalAlpha = 0.35; c.beginPath(); c.ellipse(-30, 20, 30, 8, -0.2, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+  },
+  roses: (c) => { // three roses, long stems
+    c.strokeStyle = '#3d6b48'; c.lineWidth = 7;
+    for (const [x, a] of [[-30, -0.3], [0, 0], [30, 0.3]] as const) { c.beginPath(); c.moveTo(x * 0.3, 80); c.lineTo(x + Math.sin(a) * 40, -30); c.stroke(); }
+    for (const [x, y] of [[-42, -40], [0, -55], [42, -40]] as const) {
+      c.fillStyle = '#c8102e'; c.beginPath(); c.arc(x, y, 24, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#7a0a1c'; c.lineWidth = 4; c.beginPath(); c.arc(x, y, 12, 0.5, 5.5); c.stroke(); c.beginPath(); c.arc(x + 3, y - 2, 5, 0, 5); c.stroke();
+    }
+  },
+  chain: (c) => { // a gold rope chain, a pendant
+    c.strokeStyle = '#f6c445'; c.lineWidth = 10;
+    for (let i = 0; i < 14; i++) { const a = Math.PI * (0.1 + 0.8 * (i / 13)), x = Math.cos(a) * 80, y = -Math.sin(a) * -60 - 40; c.beginPath(); c.ellipse(x, y, 10, 6, a, 0, Math.PI * 2); c.stroke(); }
+    c.fillStyle = '#f6c445'; star(c, 0, 50, 34, 14, 5);
+  },
+  record: (c) => { // a vinyl record and its label
+    c.fillStyle = '#16131a'; c.beginPath(); c.arc(0, 0, 88, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#3a3240'; c.lineWidth = 2; for (let r = 40; r < 86; r += 7) { c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke(); }
+    c.fillStyle = '#ff5a36'; c.beginPath(); c.arc(0, 0, 30, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#16131a'; c.beginPath(); c.arc(0, 0, 4, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffffff'; c.globalAlpha = 0.18; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 86, -1.2, -0.7); c.fill(); c.globalAlpha = 1;
+  },
+  suitcase: (c) => { // a hard-shell suitcase, stickered
+    c.fillStyle = '#c8102e'; rr(c, -80, -45, 160, 115, 14);
+    c.strokeStyle = '#16131a'; c.lineWidth = 8; c.beginPath(); c.roundRect(-28, -75, 56, 34, 10); c.stroke();
+    c.fillStyle = '#7a0a1c'; c.fillRect(-80, 5, 160, 8);
+    c.fillStyle = '#f6dd8f'; c.beginPath(); c.arc(-40, 35, 16, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#9cc3e0'; rr(c, 20, 22, 40, 26, 4);
+  },
+  crown: (c) => { // a crown
+    c.fillStyle = '#f6c445';
+    c.beginPath(); c.moveTo(-80, 50); c.lineTo(-90, -40); c.lineTo(-45, 0); c.lineTo(0, -60); c.lineTo(45, 0); c.lineTo(90, -40); c.lineTo(80, 50); c.closePath(); c.fill();
+    c.fillRect(-82, 50, 164, 22);
+    for (const [x, col] of [[-45, '#c8102e'], [0, '#2b78a6'], [45, '#c8102e']] as const) { c.fillStyle = col; c.beginPath(); c.arc(x, 60, 8, 0, Math.PI * 2); c.fill(); }
   },
   cocktail: (c) => { // a martini, a cherry
     c.fillStyle = '#fbf7ee'; c.globalAlpha = 0.9;

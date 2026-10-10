@@ -6,8 +6,8 @@
 import { hash } from '../engine/util';
 import type { Kind } from './carriers';
 
-export type Ad = 'phone' | 'cash' | 'car' | 'lipstick' | 'perfume' | 'shades' | 'diamond' | 'cocktail';
-export const ADS: readonly Ad[] = ['phone', 'cash', 'car', 'lipstick', 'perfume', 'shades', 'diamond', 'cocktail'];
+export type Ad = 'phone' | 'cash' | 'car' | 'lipstick' | 'perfume' | 'shades' | 'diamond' | 'cocktail' | 'heels' | 'roses' | 'chain' | 'record' | 'suitcase' | 'crown';
+export const ADS: readonly Ad[] = ['phone', 'cash', 'car', 'lipstick', 'perfume', 'shades', 'diamond', 'cocktail', 'heels', 'roses', 'chain', 'record', 'suitcase', 'crown'];
 
 /** A billboard's least height (m). */
 export const AD = { minH: 4.4 };
@@ -20,17 +20,25 @@ export const ADVERTISED: ReadonlySet<Kind> = new Set<Kind>(['billboard', 'sign',
 /** Words that pick a product, checked in this order. */
 const BY_WORD: readonly [RegExp, Ad][] = [
   [/\bcall|\bhear\b/i, 'phone'],
+  [/packing|stuck|took me/i, 'suitcase'],
+  [/ruler|bossy|bossing|keep up/i, 'crown'],
   [/money|ransom|cash|rich|trickin|pay|fast\b/i, 'cash'],
   [/drive|ride|cruise|roll|slauson|pull|pop it|hood/i, 'car'],
-  [/handsome|my man|be your|ruler|tarzan|jane/i, 'diamond'],
+  [/handsome|my man|be your|tarzan|jane/i, 'diamond'],
+  [/lies|pretend|screw/i, 'roses'],
+  [/different|tell me|feel/i, 'record'],
+  [/cute|play too|action/i, 'heels'],
+  [/hood|chickens|strong/i, 'chain'],
   [/\bhe\b|\bhim\b|boy|baby|laying|next to me/i, 'perfume'],
   [/fly|sun|west|south|show|look/i, 'shades'],
   [/energy|cute|fine|name|kiss|lips|panties/i, 'lipstick'],
 ];
-const ANY: readonly Ad[] = ['lipstick', 'perfume', 'shades', 'diamond', 'cocktail'];
+const ANY: readonly Ad[] = ['lipstick', 'perfume', 'shades', 'diamond', 'cocktail', 'heels', 'roses', 'record', 'chain'];
 
-/** The product a billboard's lyric sells. */
-export function adFor(text: string, seed: number): Ad {
-  for (const [re, ad] of BY_WORD) if (re.test(text)) return ad;
-  return ANY[Math.floor(hash(seed, 31) * ANY.length)]!;
+/** The product a billboard's lyric sells: what its words say, else one seeded per board; never the same as the board
+ *  just before (`after`), so neighbours differ. */
+export function adFor(text: string, seed: number, after?: Ad): Ad {
+  for (const [re, ad] of BY_WORD) if (re.test(text) && ad !== after) return ad;
+  const pool = ANY.filter((a) => a !== after);
+  return pool[Math.floor(hash(seed, 31) * pool.length)]!;
 }

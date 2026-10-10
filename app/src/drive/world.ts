@@ -111,6 +111,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), drive.blocks.length);
   drive.blocks.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
   g.add(blocks);
+  g.add(dressing(drive));
 
   // palms: a trunk and a crown, behind the roadside signs' line
   const trunks: THREE.Matrix4[] = [], crowns: THREE.Matrix4[] = [];
@@ -138,7 +139,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   g.add(buildStreetlights(drive));
 
   // the motel the car waits outside at the start
-  const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.motel }));
+  const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon({ color: WORLD.motel })));
   motel.matrixAutoUpdate = false;
   motel.matrix.copy(boxAt(route, 4, 22, 34, 9, 14));
   const sign = buildMotelSign(route);
@@ -201,6 +202,60 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffb347' }), tn.lamps.length);
   tn.lamps.forEach((s, i) => lamps.setMatrixAt(i, boxAt(route, s, 0, 1.6, 0.15, 0.6, H - 0.15)));
   g.add(lamps);
+  return g;
+}
+
+/** The town's dressing: awnings over the buildings' ground floors on the road side, rooftop clutter (AC units, water
+ *  tanks), and power lines on poles along the right where the town is low (the neighbourhood, the coast). */
+const POWER = { stretches: new Set(['verse2', 'chorus3']), lateral: 13, every: 34, h: 9 };
+function dressing(drive: Drive): THREE.Group {
+  const g = new THREE.Group(), { route } = drive, awn: THREE.Matrix4[] = [], awnCol: THREE.Color[] = [], roof: THREE.Matrix4[] = [];
+  const palette = ['#ff5a36', '#2b78a6', '#1f6b44', '#f6dd8f', '#c8102e', '#ffffff'];
+  drive.blocks.forEach((b, i) => {
+    const side = Math.sign(b.lateral), front = Math.abs(b.lateral) - b.d / 2;
+    if (b.h > 4 && hash(i, 41) < 0.6) {
+      // an awning, 1.6 m out from the face toward the road, over the door
+      awn.push(boxAt(route, b.s, side * (front - 0.8), b.w * 0.7, 0.25, 1.6, 3.1));
+      awnCol.push(new THREE.Color(palette[Math.floor(hash(i, 42) * palette.length)]!));
+    }
+    for (let k = 0; k < 1 + Math.floor(hash(i, 43) * 3); k++) {
+      const u = hash(i, 44 + k) - 0.5, v = hash(i, 50 + k) - 0.5, tank = hash(i, 56 + k) < 0.25;
+      roof.push(boxAt(route, b.s + u * b.w * 0.6, b.lateral + v * b.d * 0.6, tank ? 2.2 : 1.6, tank ? 2.6 : 1.1, tank ? 2.2 : 1.2, b.h));
+    }
+  });
+  const awnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon(), awn.length);
+  awn.forEach((m, i) => { awnings.setMatrixAt(i, m); awnings.setColorAt(i, awnCol[i]!); });
+  const roofs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#b9ada0' }), roof.length);
+  roof.forEach((m, i) => roofs.setMatrixAt(i, m));
+  g.add(awnings, roofs);
+  // power lines: poles, and three wires sagging between each pair
+  const at: number[] = [];
+  for (let s = 0; s < route.length; s += POWER.every) {
+    const st = drive.stretchAt(drive.stretches.find((x) => s < drive.motion.distanceAt(x.end))?.start ?? 0);
+    if (!POWER.stretches.has(st.id) || nearTunnel(drive.tunnels, s, TUNNEL_CLEAR) || drive.carriers.some((c) => Math.abs(c.s - s) < 14 && c.solid)) { at.push(NaN); continue; }
+    at.push(s);
+  }
+  const poles = at.filter((s) => !Number.isNaN(s));
+  const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.trunk }), poles.length * 2);
+  poles.forEach((s, i) => { pm.setMatrixAt(2 * i, boxAt(route, s, POWER.lateral, 0.3, POWER.h, 0.3)); pm.setMatrixAt(2 * i + 1, boxAt(route, s, POWER.lateral, 2.4, 0.14, 0.14, POWER.h - 0.6)); });
+  g.add(pm);
+  const wire: number[] = [];
+  for (let i = 1; i < at.length; i++) {
+    const a = at[i - 1]!, b = at[i]!;
+    if (Number.isNaN(a) || Number.isNaN(b)) continue;
+    for (const off of [-1, 0, 1]) {
+      for (let k = 0; k < 8; k++) {
+        const u0 = k / 8, u1 = (k + 1) / 8, p = (u: number) => {
+          const f = route.frameAt(a + (b - a) * u);
+          return f.pos.clone().addScaledVector(f.right, POWER.lateral + off).add(new THREE.Vector3(0, POWER.h - 0.6 - 1.4 * Math.sin(Math.PI * u), 0));
+        };
+        const q0 = p(u0), q1 = p(u1);
+        wire.push(q0.x, q0.y, q0.z, q1.x, q1.y, q1.z);
+      }
+    }
+  }
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
+  g.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: '#1c0f22' })));
   return g;
 }
 

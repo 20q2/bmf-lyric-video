@@ -10,8 +10,8 @@ export const NIGHT: THREE.IUniform<number> = { value: 0 };
 /** How bright the lights shine (HDR multiples). */
 export const GLOW = { window: 1.6, lamp: 6, beam: 0.55, pool: 0.5, neon: 2.6, tail: 4, head: 8 };
 
-/** Light windows into a toon material's buildings (instanced boxes): a grid of windows on their walls (3 m wide, 3.2 m
- *  floors), some lit, by the cell's hash, from NIGHT. */
+/** Windows in a toon material's buildings (instanced boxes): a grid on their walls (3 m wide, 3.2 m floors), dark glass
+ *  by day; by night some lit, by the cell's hash, from NIGHT. */
 export function withWindows(m: THREE.MeshToonMaterial): THREE.MeshToonMaterial {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.night = NIGHT;
@@ -31,16 +31,19 @@ export function withWindows(m: THREE.MeshToonMaterial): THREE.MeshToonMaterial {
       .replace('#include <common>', `#include <common>
 uniform float night; varying vec3 vWinPos; varying vec3 vWinN;
 float winHash(vec3 p) { p = fract(p * .1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-  if (night > 0.0 && abs(vWinN.y) < 0.5) {
-    // along the wall, and up it
+      // the window grid on the walls (3 m wide, 3.2 m floors): dark glass by day, some lit by night
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  float winMask = 0.0, winLit = 0.0; vec3 winWarm = vec3(1.0);
+  if (abs(vWinN.y) < 0.5) {
     float u = abs(vWinN.x) > abs(vWinN.z) ? vWinPos.z : vWinPos.x;
     vec2 g = vec2(u / 3.0, (vWinPos.y - 0.6) / 3.2), cell = floor(g), f = fract(g);
-    float lit = step(0.55, winHash(vec3(cell, floor(vWinPos.x * 0.05) + floor(vWinPos.z * 0.05))));
-    float win = step(0.22, f.x) * step(f.x, 0.78) * step(0.25, f.y) * step(f.y, 0.75) * step(0.0, cell.y);
-    vec3 warm = mix(vec3(1.0, 0.62, 0.28), vec3(0.55, 0.75, 1.0), step(0.85, winHash(vec3(cell.yx, 7.0))));
-    totalEmissiveRadiance += warm * win * lit * night * ${GLOW.window.toFixed(2)};
-  }`);
+    winMask = step(0.22, f.x) * step(f.x, 0.78) * step(0.25, f.y) * step(f.y, 0.75) * step(0.0, cell.y);
+    winLit = step(0.55, winHash(vec3(cell, floor(vWinPos.x * 0.05) + floor(vWinPos.z * 0.05))));
+    winWarm = mix(vec3(1.0, 0.62, 0.28), vec3(0.55, 0.75, 1.0), step(0.85, winHash(vec3(cell.yx, 7.0))));
+    diffuseColor.rgb *= 1.0 - 0.42 * winMask * (1.0 - winLit * night); // the glass, darker than the stucco
+  }`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  totalEmissiveRadiance += winWarm * winMask * winLit * night * ${GLOW.window.toFixed(2)};`);
   };
   return m;
 }
