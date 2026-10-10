@@ -29,7 +29,7 @@ ear wins. Close GPU-heavy games first if you can: the GPU has 8 GB and the model
     bun install
     bun test
     bun x tsc --noEmit -p tsconfig.json
-    bun x vite --port 5890 --strictPort   # http://localhost:5890/?t=60
+    bun x vite --port 5990 --strictPort   # http://localhost:5990/?t=60
     bun scripts/still.ts 16               # one still from the running preview -> out/still_16.00.png
 
 Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous section, `l` loop the

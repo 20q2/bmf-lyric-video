@@ -1,9 +1,9 @@
 // One still from the running preview server (M1 only; M2's render.ts replaces this).
-// Usage (from app/): bun scripts/still.ts [t=16] [url=http://localhost:5890/]  -> ../out/still_<t>.png
+// Usage (from app/): bun scripts/still.ts [t=16] [url=http://localhost:5990/]  -> ../out/still_<t>.png
 import { chromium } from 'playwright-core';
 
 const t = +(process.argv[2] ?? 16);
-const url = process.argv[3] ?? 'http://localhost:5890/';
+const url = process.argv[3] ?? 'http://localhost:5990/';
 const b = await chromium.launch({ channel: process.env.LV_BROWSER ?? 'msedge' });
 try {
   const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });

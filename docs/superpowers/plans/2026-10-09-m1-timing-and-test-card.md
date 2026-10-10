@@ -878,15 +878,15 @@ Expected: no type errors; all tests pass.
 Run in the background (Bash `run_in_background: true`):
 
 ```bash
-source scripts/env.sh && cd app && bun x vite --port 5890 --strictPort
+source scripts/env.sh && cd app && bun x vite --port 5990 --strictPort
 ```
 
 Then check the page and the data are served:
 
 ```bash
-curl -s http://localhost:5890/ | grep -o "<title>BMF</title>"
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5890/data/lyrics.json
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5890/audio/song.wav
+curl -s http://localhost:5990/ | grep -o "<title>BMF</title>"
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5990/data/lyrics.json
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5990/audio/song.wav
 ```
 
 Expected: `<title>BMF</title>`, `200`, `200`.
@@ -902,7 +902,7 @@ mkdir -p out app/scripts && cat > app/scripts/still.ts <<'EOF'
 import { chromium } from 'playwright-core';
 const b = await chromium.launch({ channel: 'msedge' });
 const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });
-await p.goto('http://localhost:5890/?export=1');
+await p.goto('http://localhost:5990/?export=1');
 await p.waitForFunction(() => (window as any).__lv?.ready || (window as any).__lv?.error, null, { timeout: 60000 });
 const err = await p.evaluate(() => (window as any).__lv.error ?? (window as any).__lv.errors.join('\n'));
 if (err) throw new Error(err);
@@ -934,8 +934,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Hand the test card to the user**
 
-Make sure the preview from Task 7 is still running on :5890. Tell the user:
-- the URL `http://localhost:5890/` (space plays, ←/→ ±1 s, shift ±5 s, PageDown/PageUp jump sections, `l` loops a section, the volume slider is bottom right);
+Make sure the preview from Task 7 is still running on :5990. Tell the user:
+- the URL `http://localhost:5990/` (space plays, ←/→ ±1 s, shift ±5 s, PageDown/PageUp jump sections, `l` loops a section, the volume slider is bottom right);
 - what to listen for: each word inks when it is sung, **especially word onsets**;
 - a short list of times to check first: every `held` flag from `analysis/qa/stretch_check.txt`, every low-confidence word (dotted underline), and every line in `analysis/DISPUTED.md` (ask them which words they hear).
 
@@ -1001,7 +1001,7 @@ ear wins.
     cd app
     bun install
     bun test
-    bun x vite --port 5890 --strictPort   # http://localhost:5890/?t=60
+    bun x vite --port 5990 --strictPort   # http://localhost:5990/?t=60
 
 Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous section, `l` loop the
 section, `h` hide the UI. `?card=testcard` forces the karaoke test card (the default scene until M2).
