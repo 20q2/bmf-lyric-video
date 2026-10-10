@@ -1,4 +1,4 @@
-// The edit: which scene plays when. Until M2 adds the drive (scenes/drive.ts) the default is the karaoke test card;
+// The edit: which scene plays when: the drive (scenes/drive.ts), the whole song;
 // ?card=<scene> plays a diagnostic scene instead (?card=1 is shorthand for the karaoke test
 // card that checks the aligned data over the whole song).
 import type { TimelineEntry } from './engine/engine';
@@ -13,8 +13,8 @@ const scene = (name: string) => () => {
   return m ? m() : Promise.reject(new Error(`scene module not found: scenes/${name}.ts`));
 };
 
-/** The video's scene. M2 changes this to 'drive'. */
-const DEFAULT_SCENE = 'testcard';
+/** The video's scene. */
+const DEFAULT_SCENE = 'drive';
 
 export function makeTimeline(_ly: Lyrics, au: AudioData): TimelineEntry[] {
   // ?card=<scene> plays one full-length diagnostic scene instead of the video (?card=1 = the test card).

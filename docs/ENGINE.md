@@ -34,4 +34,4 @@ ear wins. Close GPU-heavy games first if you can: the GPU has 8 GB and the model
     bun scripts/still.ts 16               # one still from the running preview -> out/still_16.00.png
 
 Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous section, `l` loop the
-section, `h` hide the UI. `?card=testcard` forces the karaoke test card (the default scene until M2).
+section, `h` hide the UI. `?card=testcard` forces the karaoke test card (the drive is the default scene).
