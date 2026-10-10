@@ -3,6 +3,7 @@
 // (seeded by position along the road).
 import * as THREE from 'three';
 import { hash } from '../engine/util';
+import { WORLD, toon } from '../look/toon';
 import type { Drive } from './drive';
 import type { Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, basisOf, solidsOf } from './carriers';
@@ -66,19 +67,19 @@ export function buildWorld(drive: Drive): THREE.Group {
     for (const st of drive.stretches) if (s < motion.distanceAt(st.end)) return st;
     return drive.stretches[drive.stretches.length - 1]!;
   };
-  const lambert = (o: THREE.MeshLambertMaterialParameters = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, ...o });
+  const lambert = (o: THREE.MeshToonMaterialParameters = {}) => toon({ vertexColors: true, ...o });
 
   // ground either side (the sea to the left along the coast), the road, its centre dashes
-  const grass = new THREE.Color('#6f7a52'), sand = new THREE.Color('#b9a37a'), sea = new THREE.Color('#2f5f8a'), asphalt = new THREE.Color('#34343c');
+  const grass = new THREE.Color(WORLD.ground), sand = new THREE.Color(WORLD.sand), sea = new THREE.Color(WORLD.sea), asphalt = new THREE.Color(WORLD.asphalt);
   const seaLeft = (s: number) => !!BLOCKS[stretchAtS(s).id]!.seaLeft;
   g.add(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass)), lambert()));
   g.add(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass)), lambert()));
-  const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), new THREE.MeshLambertMaterial({ color: grass.clone().multiplyScalar(0.85) }));
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), toon({ color: grass.clone().multiplyScalar(0.85) }));
   base.rotation.x = -Math.PI / 2;
   base.position.y = -0.4;
   g.add(base);
   g.add(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt), lambert()));
-  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#e8e2cf' }), Math.ceil(route.length / 8));
+  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil(route.length / 8));
   for (let i = 0; i < dashes.count; i++) dashes.setMatrixAt(i, boxAt(route, i * 8, 0, 0.15, 0.02, 3, 0.01));
   g.add(dashes);
 
@@ -90,10 +91,10 @@ export function buildWorld(drive: Drive): THREE.Group {
       if ((side === -1 && b.seaLeft) || hash(k, side, 1) < b.empty) continue;
       const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), h = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
       mats.push(boxAt(route, s, side * ((b.far ?? 18) + d / 2 + 6 * hash(k, side, 5)), w, h, d));
-      cols.push(new THREE.Color().setHSL(0.08 + 0.1 * hash(k, side, 6), 0.15, 0.45 + 0.25 * hash(k, side, 7)));
+      cols.push(new THREE.Color(WORLD.stucco[Math.floor(hash(k, side, 6) * WORLD.stucco.length)]!));
     }
   }
-  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial(), mats.length);
+  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon(), mats.length);
   mats.forEach((m, i) => { blocks.setMatrixAt(i, m); blocks.setColorAt(i, cols[i]!); });
   g.add(blocks);
 
@@ -112,16 +113,16 @@ export function buildWorld(drive: Drive): THREE.Group {
       crowns.push(boxAt(route, s, side * 11.5, 3.2, 1.2, 3.2, h));
     }
   }
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.6, 1, 6), new THREE.MeshLambertMaterial({ color: '#5a4636' }), trunks.length);
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.6, 1, 6), toon({ color: WORLD.trunk }), trunks.length);
   trunks.forEach((m, i) => trunk.setMatrixAt(i, m));
-  const crown = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 7, 4), new THREE.MeshLambertMaterial({ color: '#2f5a3a' }), crowns.length);
+  const crown = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 7, 4), toon({ color: WORLD.crown }), crowns.length);
   crowns.forEach((m, i) => crown.setMatrixAt(i, m));
   g.add(trunk, crown);
 
   for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
 
   // the motel the car waits outside at the start
-  const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#e58fa8' }));
+  const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.motel }));
   motel.matrixAutoUpdate = false;
   motel.matrix.copy(boxAt(route, 4, 22, 34, 9, 14));
   g.add(motel);
@@ -165,8 +166,8 @@ function tiles(): THREE.Texture {
 function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   const g = new THREE.Group(), { halfW: W, h: H, hill, hillHalfW } = TUNNEL;
   const bore: [number, number][] = [[-W, 0], [-W, H], [W, H], [W, 0]];
-  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, bore, 2), new THREE.MeshLambertMaterial({ map: tiles(), side: THREE.DoubleSide })));
-  const rock = new THREE.MeshLambertMaterial({ color: '#5d5446', side: THREE.DoubleSide });
+  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, bore, 2), toon({ map: tiles(), side: THREE.DoubleSide })));
+  const rock = toon({ color: WORLD.rock, side: THREE.DoubleSide });
   const outside: [number, number][] = [[-hillHalfW, -0.3], [-W - 1, H + hill], [W + 1, H + hill], [hillHalfW, -0.3]];
   g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, outside, 4), rock));
   // the mouths: the headland's face with the bore cut out
@@ -209,20 +210,20 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   const board = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h, c.kind === 'banner' ? FLUTTER.segments : 1, 1), mat);
   board.name = 'face';
   g.add(board);
-  const grey = (hex: string) => new THREE.MeshLambertMaterial({ color: hex });
+  const grey = (hex: string) => toon({ color: hex });
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b);
   };
   // the face's centre stands this high over the ground (the road's height where it stands)
   const y0 = c.foot;
   // legs from the board's top down to the ground, at these x
-  const legs = (xs: number[], drop = y0 + c.h / 2) => { for (const x of xs) box(0.2, drop, 0.2, x, c.h / 2 - drop / 2, -0.2, grey('#4a4a52')); };
+  const legs = (xs: number[], drop = y0 + c.h / 2) => { for (const x of xs) box(0.2, drop, 0.2, x, c.h / 2 - drop / 2, -0.2, grey(WORLD.post)); };
   // its backing board or its building (carriers.ts solidsOf: what the guard checks for hiding other faces)
   const building = PAIRABLE.has(c.kind) && c.kind !== 'billboard';
-  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? new THREE.MeshLambertMaterial({ color: wall }) : grey('#2a2a30'));
+  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? toon({ color: wall }) : grey(WORLD.backing));
   switch (c.kind) {
     case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
-    case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey('#4a4a52')); break;
+    case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey(WORLD.post)); break;
     case 'street': legs([-c.w / 2 - 0.15], y0 + c.h / 2 + 0.4); break;
     case 'banner': {
       // the plane ahead of it (to its right, nose that way: it flies the way the words run), a high-wing tug on a tow
@@ -238,7 +239,7 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
       prop.rotation.y = Math.PI / 2; prop.position.set(x0 + 6.05 * k, 0, 0); g.add(prop); // spinning, a blur
       break;
     }
-    case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey('#4a4a52')); break;
+    case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey(WORLD.post)); break;
   }
   g.matrixAutoUpdate = false;
   g.matrix.copy(basisOf(c));
@@ -262,8 +263,8 @@ function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh
 /** The car (a '64-ish convertible, nose +z) with its two silhouettes: him driving (left), her riding. */
 export function buildCar(): THREE.Group {
   const g = new THREE.Group();
-  const paint = new THREE.MeshLambertMaterial({ color: '#b3122e' }), dark = new THREE.MeshLambertMaterial({ color: '#141018' });
-  const chrome = new THREE.MeshLambertMaterial({ color: '#c9c6bf' });
+  const paint = toon({ color: WORLD.car }), dark = toon({ color: WORLD.carDark });
+  const chrome = toon({ color: WORLD.chrome });
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b;
   };

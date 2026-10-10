@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import type { Word } from '../engine/lyrics';
 import { HEX } from '../engine/palette';
 import { hash } from '../engine/util';
+import { WORLD } from '../look/toon';
 import { F, font } from '../engine/type';
 import type { Carrier } from './carriers';
 import { dissolveAt, revealAt } from './dissolve';
@@ -43,7 +44,7 @@ export function karaokeKey(words: readonly Word[], t: number): string {
 /** The colour of the building a face is on (seeded per carrier; neon's wall is dark). */
 export const wallColor = (c: Carrier) => c.kind === 'neon'
   ? new THREE.Color().setHSL(0.75 + 0.1 * hash(c.phrase.start, 9), 0.25, 0.22)
-  : new THREE.Color().setHSL(0.02 + 0.12 * hash(c.phrase.start, 9), 0.35, 0.62);
+  : new THREE.Color(WORLD.stucco[Math.floor(hash(c.phrase.start, 9) * WORLD.stucco.length)]!);
 const hexOf = (c: THREE.Color) => `#${c.getHexString(THREE.SRGBColorSpace)}`;
 const GREEN = '#1f6b44';
 
