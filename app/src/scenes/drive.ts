@@ -1,16 +1,16 @@
 // The drive: the video's one scene (spec §3). The car on the road through the stretches, the sky from golden hour to
-// night, a lyric sign per line, and the camera the shot director gives (drive/drive.ts). M2: greybox.
+// night, the lyrics written into the world phrase by phrase (drive/carriers.ts), and the camera the shot director gives (drive/drive.ts). M2: greybox.
 import * as THREE from 'three';
 import { Scene, type Frame } from '../engine/scene';
 import { H, W, makeRT } from '../engine/gl';
 import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
-import { SignArt } from '../drive/signart';
+import { CarrierArt, wallColor } from '../drive/carrierart';
 import { daylight, skyAt } from '../drive/sky';
-import { buildCar, buildSign, buildWorld } from '../drive/world';
+import { buildCar, buildCarrier, buildWorld } from '../drive/world';
 
-/** Signs whose line is within this many seconds of t keep their faces current. */
-const SIGN_WINDOW = 12;
+/** Carriers whose phrase is within this many seconds of t keep their faces current. */
+const FACE_WINDOW = 12;
 
 export default class DriveScene extends Scene {
   cam = new THREE.PerspectiveCamera(LENS.fov, W / H, LENS.near, LENS.far);
@@ -18,7 +18,7 @@ export default class DriveScene extends Scene {
   private rt = makeRT(W, H, { samples: 4 });
   private drive!: Drive;
   private car = buildCar();
-  private arts: SignArt[] = [];
+  private arts: CarrierArt[] = [];
   private sun = new THREE.DirectionalLight('#fff3df', 2.2);
   private hemi = new THREE.HemisphereLight('#ffffff', '#3a3326', 1.2);
   private sky = new THREE.Color();
@@ -27,10 +27,10 @@ export default class DriveScene extends Scene {
     const { audio, lyrics } = this.ctx;
     this.drive = makeDrive(audio, lyrics);
     this.world.add(buildWorld(this.drive), this.car, this.sun, this.sun.target, this.hemi);
-    for (const s of this.drive.signs) {
-      const art = new SignArt(s);
+    for (const c of this.drive.carriers) {
+      const art = new CarrierArt(c);
       this.arts.push(art);
-      this.world.add(buildSign(s, art.texture));
+      this.world.add(buildCarrier(c, art.texture, wallColor(c), this.drive.route));
     }
     this.world.fog = new THREE.Fog(0xffffff, 150, 900);
   }
@@ -41,8 +41,8 @@ export default class DriveScene extends Scene {
     const cf = d.carFrame(t);
     this.car.matrixAutoUpdate = false;
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
-    // the signs near now
-    this.arts.forEach((a, i) => { const l = d.signs[i]!.line; if (t > l.start - SIGN_WINDOW && t < l.end + SIGN_WINDOW) a.update(t); });
+    // the lyric faces near now
+    this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
     // the sky, its light and the fog
     skyAt(t, this.sky);
     const day = daylight(t);

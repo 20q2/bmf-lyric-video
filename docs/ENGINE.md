@@ -44,9 +44,12 @@ to the user. Only the final export renders video (M5).
 - `motion.ts`, `route.ts`: the car's distance on song time (exact integral of eased speed keys) and the road it drives.
 - `camera.ts`, `shots.ts`: world camera poses and the shot director (snap / land / glide on the beat grid; each move
   eases from the previous move's pose at the same t, so a hand-off from the moving car to a fixed sign is continuous).
-- `signs.ts`, `signart.ts`: a lyric sign per line (placement and text layout pure; faces drawn in the browser).
-- `drive.ts`: the model the scene renders and `tests/sung.test.ts` checks (every sign in frame, facing the camera,
-  type >= 36 px while its line is sung).
+- `phrases.ts`: lines into phrases of 1-4 words (the cheapest split under a phrase-reading cost: breaks at commas, gaps
+  and before "and / from / with...", never after "the / my...").
+- `carriers.ts`, `carrierart.ts`: where each phrase is written — road paint, sky-writing, walls, short signs, freeway
+  gantries (per-stretch patterns; "fly" lines in the sky) — and how the camera frames it; faces drawn in the browser.
+- `drive.ts`: the model the scene renders and `tests/sung.test.ts` checks (every phrase's carrier in frame, facing the
+  camera, type >= 36 px while sung; the car never over road paint while it's sung).
 - `world.ts`, `sky.ts`, `scenes/drive.ts`: the greybox world, the sky over time, the scene.
 
 Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous stretch, `l` loop the

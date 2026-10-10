@@ -1,15 +1,19 @@
 // The greybox world (M2): ground, road, blocks of buildings, palms, a few landmarks, the sign boards and the car with
-// its two silhouettes. Plain lit colours, no textures but the signs' faces: the look comes in M3. Deterministic
+// its two silhouettes. Plain lit colours, no textures but the lyric faces: the look comes in M3. Deterministic
 // (seeded by position along the road).
 import * as THREE from 'three';
 import { hash } from '../engine/util';
 import type { Drive } from './drive';
 import type { Route } from './route';
-import type { Sign } from './signs';
+import type { Carrier } from './carriers';
 import type { Stretch } from './stretches';
 
 const ROAD_HALF = 4;
-const GROUND_HALF = 320;
+/** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
+ *  wider than the road's tightest bend folds over the road there (the hairpin into the hills). */
+const SHOULDER = 40;
+const SEA = 200;
+const BASE = 4000;
 const STEP = 2;
 
 /** Per stretch: building heights (m, min–max; 0 = none), how many plots stay empty, and which sides are sea. */
@@ -27,12 +31,14 @@ const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boo
 };
 const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'bridge1', 'verse3']);
 
-/** A strip along the road from `a` to `b` metres off its centre line (negative: left), coloured per sample. */
-function strip(route: Route, a: number, b: number, dy: number, colorAt: (s: number) => THREE.Color): THREE.BufferGeometry {
+/** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
+ *  coloured per sample. */
+function strip(route: Route, a: number | ((s: number) => number), b: number | ((s: number) => number), dy: number, colorAt: (s: number) => THREE.Color): THREE.BufferGeometry {
+  const at = (x: number | ((s: number) => number), s: number) => (typeof x === 'number' ? x : x(s));
   const n = Math.ceil(route.length / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
   for (let i = 0; i < n; i++) {
     const s = Math.min(route.length, i * STEP), f = route.frameAt(s), c = colorAt(s);
-    const p = f.pos.clone().addScaledVector(f.right, a), q = f.pos.clone().addScaledVector(f.right, b);
+    const p = f.pos.clone().addScaledVector(f.right, at(a, s)), q = f.pos.clone().addScaledVector(f.right, at(b, s));
     pos.set([p.x, p.y + dy, p.z, q.x, q.y + dy, q.z], i * 6);
     col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
     if (i > 0) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
@@ -63,8 +69,13 @@ export function buildWorld(drive: Drive): THREE.Group {
 
   // ground either side (the sea to the left along the coast), the road, its centre dashes
   const grass = new THREE.Color('#6f7a52'), sand = new THREE.Color('#b9a37a'), sea = new THREE.Color('#2f5f8a'), asphalt = new THREE.Color('#34343c');
-  g.add(new THREE.Mesh(strip(route, -GROUND_HALF, -ROAD_HALF, -0.05, (s) => (BLOCKS[stretchAtS(s).id]!.seaLeft ? sea : grass)), lambert()));
-  g.add(new THREE.Mesh(strip(route, ROAD_HALF, GROUND_HALF, -0.05, (s) => (BLOCKS[stretchAtS(s).id]!.seaLeft ? sand : grass)), lambert()));
+  const seaLeft = (s: number) => !!BLOCKS[stretchAtS(s).id]!.seaLeft;
+  g.add(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass)), lambert()));
+  g.add(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass)), lambert()));
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), new THREE.MeshLambertMaterial({ color: grass.clone().multiplyScalar(0.85) }));
+  base.rotation.x = -Math.PI / 2;
+  base.position.y = -0.4;
+  g.add(base);
   g.add(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt), lambert()));
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#e8e2cf' }), Math.ceil(route.length / 8));
   for (let i = 0; i < dashes.count; i++) dashes.setMatrixAt(i, boxAt(route, i * 8, 0, 0.15, 0.02, 3, 0.01));
@@ -85,7 +96,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   mats.forEach((m, i) => { blocks.setMatrixAt(i, m); blocks.setColorAt(i, cols[i]!); });
   g.add(blocks);
 
-  // palms: a trunk and a crown, behind the signs' line
+  // palms: a trunk and a crown, behind the roadside signs' line
   const trunks: THREE.Matrix4[] = [], crowns: THREE.Matrix4[] = [];
   for (let k = 0; k * 30 < route.length; k++) {
     const s = k * 30 + 5;
@@ -111,23 +122,51 @@ export function buildWorld(drive: Drive): THREE.Group {
   return g;
 }
 
-/** A sign's board, back and posts (or gantry), with its face's texture. */
-export function buildSign(sign: Sign, face: THREE.Texture): THREE.Group {
+/** A carrier with its face's texture: a board on posts, a gantry over the road, a painted wall on its building, paint
+ *  on the road, or writing in the sky. */
+export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
+  const clear = c.kind === 'road' || c.kind === 'sky';
+  const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   const g = new THREE.Group();
-  const board = new THREE.Mesh(new THREE.PlaneGeometry(sign.w, sign.h), new THREE.MeshBasicMaterial({ map: face }));
-  const back = new THREE.Mesh(new THREE.BoxGeometry(sign.w + 0.2, sign.h + 0.2, 0.15), new THREE.MeshLambertMaterial({ color: '#2a2a30' }));
-  back.position.z = -0.1;
-  g.add(board, back);
-  const legH = sign.side === 0 ? 6 : 3.2 - sign.h / 2;
-  const legX = sign.side === 0 ? 6.5 : sign.w / 2 - 0.6;
-  for (const x of [-legX, legX]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, legH + sign.h / 2, 0.2), new THREE.MeshLambertMaterial({ color: '#4a4a52' }));
-    leg.position.set(x, -(legH + sign.h / 2) / 2 + sign.h / 2 - (sign.side === 0 ? 0 : sign.h / 2), -0.2);
-    g.add(leg);
+  g.add(new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), mat));
+  const grey = (hex: string) => new THREE.MeshLambertMaterial({ color: hex });
+  if (c.kind === 'sign' || c.kind === 'gantry') {
+    const back = new THREE.Mesh(new THREE.BoxGeometry(c.w + 0.2, c.h + 0.2, 0.15), grey('#2a2a30'));
+    back.position.z = -0.1;
+    g.add(back);
+    const drop = c.kind === 'gantry' ? 6 + c.h / 2 : 3 + c.h / 2, legX = c.kind === 'gantry' ? 6.5 : c.w / 2 - 0.5;
+    for (const x of [-legX, legX]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, drop, 0.2), grey('#4a4a52'));
+      leg.position.set(x, c.h / 2 - drop / 2, -0.2);
+      g.add(leg);
+    }
+    if (c.kind === 'gantry') {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(13.4, 0.4, 0.4), grey('#4a4a52'));
+      beam.position.set(0, c.h / 2 + 0.2, -0.2);
+      g.add(beam);
+    }
+  } else if (c.kind === 'wall') {
+    const building = new THREE.Mesh(new THREE.BoxGeometry(c.w + 6, 14, 10), new THREE.MeshLambertMaterial({ color: wall }));
+    building.position.set(0, 7 - 5, -5.06); // its front face just behind the paint, its foot on the ground (the text is 5 m up)
+    g.add(building);
   }
-  g.position.copy(sign.center);
-  g.lookAt(sign.center.clone().add(sign.normal));
+  const along = c.up.clone().cross(c.normal).normalize();
+  g.matrixAutoUpdate = false;
+  g.matrix.makeBasis(along, c.up, c.normal).setPosition(c.center);
   return g;
+}
+
+/** Road paint laid on the road itself, row of vertices by row along it, so it follows the road's bends and grade. */
+function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh {
+  const geo = new THREE.PlaneGeometry(c.w, c.h, 1, Math.max(2, Math.ceil(c.h / 0.5)));
+  const p = geo.attributes.position!;
+  for (let i = 0; i < p.count; i++) {
+    const f = route.frameAt(c.s + p.getY(i)), v = f.pos.clone().addScaledVector(f.right, p.getX(i)).addScaledVector(f.up, 0.03);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, mat);
 }
 
 /** The car (a '64-ish convertible, nose +z) with its two silhouettes: him driving (left), her riding. */

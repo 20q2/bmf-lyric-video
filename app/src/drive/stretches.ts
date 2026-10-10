@@ -1,5 +1,5 @@
 // The route, stretch by stretch (spec §3): where each part of the drive happens, how fast the car goes, how the road
-// bends and climbs, and where its signs stand. The intro is the time before the first sung word's bar; every other
+// bends and climbs, and how the camera frames the car (its lyrics' carriers: carriers.ts PATTERNS). The intro is the time before the first sung word's bar; every other
 // stretch is one section of data/audio.json. Pure.
 import type { AudioData } from '../engine/audio';
 import type { Line, Lyrics } from '../engine/lyrics';
@@ -25,21 +25,19 @@ export interface StretchSpec {
   rise: number;
   /** The camera's home framing of the car through the stretch. */
   chase: ChaseName;
-  /** Where its lyric signs stand: beside the road, or over it on gantries. */
-  signs: 'roadside' | 'gantry';
 }
 
 export const STRETCHES: readonly StretchSpec[] = Object.freeze([
-  { id: 'intro', section: null, place: 'pink motel, parked', pace: { kind: 'park' }, turn: 0, rise: 0, chase: 'front3q', signs: 'roadside' },
-  { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'side', signs: 'roadside' },
-  { id: 'verse1', section: 'verse1', place: 'city streets, stop-and-go', pace: { kind: 'stopgo', v: 9, go: 2, stop: 1 }, turn: 90, rise: 0, chase: 'front3q', signs: 'roadside' },
-  { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'cruise', v: 26 }, turn: -20, rise: 6, chase: 'high', signs: 'gantry' },
-  { id: 'verse2', section: 'verse2', place: 'Slauson, the neighbourhood', pace: { kind: 'cruise', v: 10 }, turn: -90, rise: -6, chase: 'side', signs: 'roadside' },
-  { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'side', signs: 'roadside' },
-  { id: 'bridge1', section: 'bridge1', place: 'the coast road, faster', pace: { kind: 'cruise', v: 24 }, turn: 10, rise: 0, chase: 'behind', signs: 'roadside' },
-  { id: 'verse3', section: 'verse3', place: 'the Strip at night', pace: { kind: 'cruise', v: 8 }, turn: 0, rise: 0, chase: 'side', signs: 'roadside' },
-  { id: 'chorus4', section: 'chorus4', place: 'up into the hills', pace: { kind: 'cruise', v: 12 }, turn: 120, rise: 40, chase: 'front3q', signs: 'roadside' },
-  { id: 'outro1', section: 'outro1', place: 'the overlook, parked', pace: { kind: 'stop', v: 12, byBar: 3 }, turn: 0, rise: 0, chase: 'high', signs: 'roadside' },
+  { id: 'intro', section: null, place: 'pink motel, parked', pace: { kind: 'park' }, turn: 0, rise: 0, chase: 'front3q' },
+  { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'side' },
+  { id: 'verse1', section: 'verse1', place: 'city streets, stop-and-go', pace: { kind: 'stopgo', v: 9, go: 2, stop: 1 }, turn: 90, rise: 0, chase: 'front3q' },
+  { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'cruise', v: 26 }, turn: -20, rise: 6, chase: 'high' },
+  { id: 'verse2', section: 'verse2', place: 'Slauson, the neighbourhood', pace: { kind: 'cruise', v: 10 }, turn: -90, rise: -6, chase: 'side' },
+  { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'side' },
+  { id: 'bridge1', section: 'bridge1', place: 'the coast road, faster', pace: { kind: 'cruise', v: 24 }, turn: 10, rise: 0, chase: 'behind' },
+  { id: 'verse3', section: 'verse3', place: 'the Strip at night', pace: { kind: 'cruise', v: 8 }, turn: 0, rise: 0, chase: 'side' },
+  { id: 'chorus4', section: 'chorus4', place: 'up into the hills', pace: { kind: 'cruise', v: 12 }, turn: 120, rise: 15, chase: 'front3q' },
+  { id: 'outro1', section: 'outro1', place: 'the overlook, parked', pace: { kind: 'stop', v: 12, byBar: 3 }, turn: 0, rise: 0, chase: 'high' },
 ] satisfies StretchSpec[]);
 
 export interface Stretch extends StretchSpec {

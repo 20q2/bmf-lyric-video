@@ -29,7 +29,7 @@ implementation code (writing all of it twice would double the cost of a mileston
 |---|---|
 | Units | metres, y up; the route starts at the origin heading +z |
 | Stretches | 10: `intro` = [0, the downbeat of L0's bar), then one per `data/audio.json` section (chorus1, verse1, chorus2, verse2, chorus3, bridge1, verse3, chorus4, outro1), each starting on its section's start |
-| Speeds (m/s) | intro 0 → pulls away in its last bar; chorus1 14; verse1 stop-and-go (2 bars at 9, 1 bar stopped, repeat); chorus2 26 (freeway); verse2 10; chorus3 18 (coast); bridge 24; verse3 8 (the Strip); chorus4 12 (hills, climbing 40 m); outro decelerating to a stop by its third bar |
+| Speeds (m/s) | intro 0 → pulls away in its last bar; chorus1 14; verse1 stop-and-go (2 bars at 9, 1 bar stopped, repeat); chorus2 26 (freeway); verse2 10; chorus3 18 (coast); bridge 24; verse3 8 (the Strip); chorus4 12 (hills, climbing 15 m); outro decelerating to a stop by its third bar |
 | Turns | each stretch's road bends by its `turn` (degrees) spread over its length: intro 0, chorus1 0, verse1 90 (two 45° corners), chorus2 −20, verse2 −90, chorus3 30, bridge 10, verse3 0, chorus4 120 (switchbacks), outro 0 |
 | Speed changes | eased over 1 s (smoothstep) so the camera never sees a jolt |
 | Signs (greybox) | one per lyric line, 6 × 1.6 m board, centre 3.2 m up, 6.5 m off the road edge (alternating right / left per line within a stretch; chorus2 gantries: over the road at 6 m, facing the car), placed where the car is at the line's midpoint, its face turned 25° toward the road from facing straight back down it |
@@ -119,3 +119,19 @@ implementation code (writing all of it twice would double the cost of a mileston
   per frame with the game closed; with it open, just note the number).
 - [ ] Commit; hand the user the preview with what to look at (pacing of the drive, where the camera goes, sign
   timing), not polish (M3).
+
+## Revision after the user's first look (2026-10-09)
+
+"The theme is a bit boring… show some phrases as road paint or clouds in the sky instead of just signs… too many words
+on the signs, needs to be more dynamic." Done on m2:
+
+- Lines split into phrases of 1-4 words (`drive/phrases.ts`), 151 in all, each on its own carrier.
+- Carriers (`drive/carriers.ts`): road paint (draped on the road; the camera holds high over it and the car drives up to
+  it), sky-writing (appears as sung, dissolves after; camera low behind the car looking up), painted walls (camera
+  slides along from across the road), short signs, freeway gantries. Each stretch has a pattern of kinds per line;
+  "fly" lines are always in the sky. The user chose all four surfaces.
+- The chase framings between lines orbit the car slowly, so the camera never sits still.
+- Guards: every phrase's carrier in frame, facing the camera, type >= 36 px while sung; the car never covers road paint
+  while it's sung.
+- Fixes found in self-review: the ground was a 640 m strip folding over the hairpin (now shoulders + a base plane); the
+  hill climb was 30° at worst (40 m -> 15 m).
