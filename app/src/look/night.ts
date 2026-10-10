@@ -78,10 +78,13 @@ export function glowMaterial(color: THREE.ColorRepresentation, strength: number,
     vertexShader: VERT,
     fragmentShader: `uniform float night, strength; uniform vec3 color; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
 void main() {
+  // (multisampling can sample just past an edge, where uv runs outside 0..1: pow of a negative is NaN, which the bloom
+  // spreads into a white bar)
+  vec2 uv = clamp(vUv, 0.0, 1.0);
   // a pool: out from its middle; a beam: from just ahead of its lamp, and soft where its cone is seen edge-on
-  float a = ${radial ? 'pow(max(0.0, 1.0 - length(vUv - 0.5) * 2.0), 1.6)'
-    : throwOnRoad ? 'pow(vUv.y, 1.4) * smoothstep(0.0, 0.25, 1.0 - vUv.y) * pow(max(0.0, 1.0 - abs(vUv.x - 0.5) * 2.0), 1.3)'
-    : 'pow(1.0 - vUv.y, 2.2) * smoothstep(0.0, 0.12, vUv.y) * pow(abs(dot(normalize(vN), normalize(vV))), 1.5)'};
+  float a = ${radial ? 'pow(max(0.0, 1.0 - length(uv - 0.5) * 2.0), 1.6)'
+    : throwOnRoad ? 'pow(uv.y, 1.4) * smoothstep(0.0, 0.25, 1.0 - uv.y) * pow(max(0.0, 1.0 - abs(uv.x - 0.5) * 2.0), 1.3)'
+    : 'pow(1.0 - uv.y, 2.2) * smoothstep(0.0, 0.12, uv.y) * pow(abs(dot(normalize(vN), normalize(vV))), 1.5)'};
   gl_FragColor = vec4(color * a * strength * night, 1.0);
 }`,
     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,

@@ -18,6 +18,7 @@ import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
 import { NIGHT } from '../look/night';
 import { buildCity } from '../look/city';
+import { Money } from '../look/money';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
 const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
@@ -49,6 +50,9 @@ export default class DriveScene extends Scene {
   private print = new PrintPass();
   private fogColor = new THREE.Color();
   private city!: ReturnType<typeof buildCity>;
+  private money!: Money;
+  /** When the word "crash" is sung (s). */
+  private crashes: number[] = [];
   /** Where the sun sets (flat, unit). */
   private sunAz = new THREE.Vector3();
   /** Carriers that move (towed banners), with their objects. */
@@ -90,6 +94,9 @@ export default class DriveScene extends Scene {
     const end = this.drive.carFrame(this.ctx.audio.duration);
     this.city = buildCity(end.pos, end.fwd, end.right, -0.4);
     this.world.add(this.city.points);
+    this.money = new Money(lyrics, (t) => this.drive.carFrame(t), (t) => this.drive.motion.speedAt(t));
+    this.world.add(this.money.mesh);
+    this.crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w)).map((w) => w.start));
   }
 
   override render(f: Frame, out: THREE.WebGLRenderTarget): PostOverrides {
@@ -153,12 +160,21 @@ export default class DriveScene extends Scene {
     fog.far = 1100 - 960 * inside;
 
     this.city.update(t, this.cam.position, this.rt.width / W);
+    this.money.update(t);
     renderer.setRenderTarget(this.rt);
     renderer.clear(true, true, true); // the engine leaves autoClear off; the dome draws the sky, so nothing else clears
     renderer.render(this.world, this.cam);
     // screen-printed: halftone fades out at night (neon noir is clean), its tones following the light
     this.print.render(renderer, this.rt, this.cam, out, { halftone: 0.55 * day * (1 - inside), lo: 0.004 + 0.02 * day, hi: 0.04 + 0.18 * day });
-    return { bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06, grain: 0.055, vignette: 0.22 };
+    // the beat: while the drums play, the frame punches in a touch on each kick; "crash" jolts it, with a flash
+    const drums = smooth(0.12, 0.3, f.a.drums), hit = this.crashes.reduce((m, c) => (t >= c && t < c + 0.6 ? Math.max(m, Math.exp(-(t - c) * 7)) : m), 0);
+    const jolt = 14 * hit;
+    return {
+      bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06, grain: 0.055, vignette: 0.22,
+      zoom: 1 + 0.007 * f.a.kick * drums + 0.03 * hit,
+      shake: [jolt * Math.sin(t * 91), jolt * Math.cos(t * 77)],
+      flash: 0.12 * hit,
+    };
   }
 
   /** Where along the road `p` is nearest, searching around `near` (m). */

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { hash } from '../engine/util';
 import { WORLD, toon } from '../look/toon';
+import { F } from '../engine/type';
 import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import type { Drive } from './drive';
 import type { Route } from './route';
@@ -162,7 +163,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.motel }));
   motel.matrixAutoUpdate = false;
   motel.matrix.copy(boxAt(route, 4, 22, 34, 9, 14));
-  g.add(motel);
+  g.add(motel, motelSign(route));
   return g;
 }
 
@@ -249,6 +250,35 @@ function buildStreetlights(drive: Drive): THREE.Group {
   });
   pools.frustumCulled = false;
   g.add(poles, bulbs, pools);
+  return g;
+}
+
+/** The motel's roadside sign, the video's title in the world: SZA over BMF in pink neon, NO VACANCY lit below; a
+ *  panel on a pole across the road from the lot. */
+export const MOTEL_SIGN = { s: -18, lateral: -8, w: 4.4, h: 5.4, y: 5.4 }; // across the road, behind the car in the intro's shot
+function motelSign(route: Route): THREE.Group {
+  const c = document.createElement('canvas'); c.width = 512; c.height = Math.round((512 * MOTEL_SIGN.h) / MOTEL_SIGN.w);
+  const x = c.getContext('2d')!, W = c.width, H = c.height;
+  x.fillStyle = '#163a40'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = '#f3e6c4'; x.lineWidth = 14; x.strokeRect(14, 14, W - 28, H - 28);
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillStyle = '#f3e6c4'; x.font = `${H * 0.11}px "${F.archivo(100, 900)}"`; x.fillText('SZA', W / 2, H * 0.17);
+  x.shadowColor = 'rgba(255,79,163,1)'; x.shadowBlur = 28; x.fillStyle = '#ffd0e8';
+  x.font = `${H * 0.34}px "${F.bodoni(700, { italic: true })}"`; x.fillText('BMF', W / 2, H * 0.48);
+  x.shadowColor = 'rgba(255,60,40,1)'; x.fillStyle = '#ff8a70'; x.font = `${H * 0.075}px "${F.archivo(100, 700)}"`;
+  x.fillText('NO VACANCY', W / 2, H * 0.82);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+  mat.color.setScalar(1.7); // neon: it blooms
+  const g = new THREE.Group(), M = MOTEL_SIGN;
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(M.w, M.h), mat);
+  panel.position.set(0, M.y, 0); g.add(panel);
+  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.35, M.y - M.h / 2, 0.35), toon({ color: WORLD.post }));
+  pole.position.set(0, (M.y - M.h / 2) / 2, -0.1); g.add(pole);
+  const f = route.frameAt(Math.max(0, M.s)), p = f.pos.clone().addScaledVector(f.fwd, Math.min(0, M.s)).addScaledVector(f.right, M.lateral);
+  const face = f.fwd.clone().addScaledVector(f.right, -0.8 * Math.sign(M.lateral)).setY(0).normalize(); // toward the road and up it, where the intro's shot looks from
+  g.matrixAutoUpdate = false;
+  g.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(p);
   return g;
 }
 
