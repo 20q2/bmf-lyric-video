@@ -357,8 +357,10 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
   }
   switch (c.kind) {
     case 'road': {
-      // high in front of the words, looking back down the road at them, held: the car drives toward us, up to them
-      const p: Pose = { tx: c.center.x, ty: c.center.y, tz: c.center.z, dist: Math.max(ROAD_VIEW.dist, c.h * ROAD_VIEW.perLength), yaw: Math.atan2(c.up.x, c.up.z) + Math.PI + 0.2 * jitter(1), pitch: ROAD_VIEW.pitch + 0.08 * jitter(2), roll: 0 };
+      // high in front of the words, looking back down the road at them, held: the car drives toward us, up to them; as
+      // steeply to the road's own surface wherever it climbs (the paint's up runs back down the road)
+      const grade = -Math.asin(Math.max(-1, Math.min(1, c.up.y)));
+      const p: Pose = { tx: c.center.x, ty: c.center.y, tz: c.center.z, dist: Math.max(ROAD_VIEW.dist, c.h * ROAD_VIEW.perLength), yaw: Math.atan2(c.up.x, c.up.z) + Math.PI + 0.2 * jitter(1), pitch: ROAD_VIEW.pitch + grade + 0.08 * jitter(2), roll: 0 };
       return () => p;
     }
     case 'sky': case 'banner': return (t) => {

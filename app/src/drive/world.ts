@@ -16,7 +16,11 @@ const ROAD_HALF = 4;
  *  wider than the road's tightest bend folds over the road there (the hairpin into the hills). */
 const SHOULDER = 40;
 const SEA = 200;
-const BASE = 4000;
+const BASE = 12000;
+/** Where the road climbs above the plain, its verges slope down to it this much out per metre down (an embankment). */
+const SLOPE = 2.4;
+/** The road runs on this far past where the car parks, to the overlook's edge (m). */
+const OVERLOOK_LIP = 9;
 const STEP = 2;
 
 /** Per stretch: building heights (m, min–max; 0 = none), how many plots stay empty, and which sides are sea. */
@@ -36,13 +40,34 @@ const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'verse3']);
 
 /** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
  *  coloured per sample. */
-function strip(route: Route, a: number | ((s: number) => number), b: number | ((s: number) => number), dy: number, colorAt: (s: number) => THREE.Color): THREE.BufferGeometry {
+function strip(route: Route, a: number | ((s: number) => number), b: number | ((s: number) => number), dy: number, colorAt: (s: number) => THREE.Color, end = route.length): THREE.BufferGeometry {
   const at = (x: number | ((s: number) => number), s: number) => (typeof x === 'number' ? x : x(s));
-  const n = Math.ceil(route.length / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
+  const n = Math.ceil(end / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
   for (let i = 0; i < n; i++) {
-    const s = Math.min(route.length, i * STEP), f = route.frameAt(s), c = colorAt(s);
+    const s = Math.min(end, i * STEP), f = route.frameAt(s), c = colorAt(s);
     const p = f.pos.clone().addScaledVector(f.right, at(a, s)), q = f.pos.clone().addScaledVector(f.right, at(b, s));
     pos.set([p.x, p.y + dy, p.z, q.x, q.y + dy, q.z], i * 6);
+    col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
+    if (i > 0) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** An embankment along one side of the road (side: -1 left, +1 right): from the verge's edge (`edge` m out) down to
+ *  the plain at SLOPE, wherever the road stands above it. */
+function skirt(route: Route, side: number, edge: (s: number) => number, end = route.length): THREE.BufferGeometry {
+  const n = Math.ceil(end / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
+  const c = new THREE.Color(WORLD.ground).multiplyScalar(0.8);
+  for (let i = 0; i < n; i++) {
+    const s = Math.min(end, i * STEP), f = route.frameAt(s), h = Math.max(0, f.pos.y + 0.4), e = edge(s);
+    const p = f.pos.clone().addScaledVector(f.right, side * e).addScaledVector(f.up, -0.05);
+    const q = f.pos.clone().addScaledVector(f.right, side * (e + SLOPE * h)); q.y = -0.4;
+    pos.set([p.x, p.y, p.z, q.x, q.y, q.z], i * 6);
     col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
     if (i > 0) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
   }
@@ -73,14 +98,24 @@ export function buildWorld(drive: Drive): THREE.Group {
   // ground either side (the sea to the left along the coast), the road, its centre dashes
   const grass = new THREE.Color(WORLD.ground), sand = new THREE.Color(WORLD.sand), sea = new THREE.Color(WORLD.sea), asphalt = new THREE.Color(WORLD.asphalt);
   const seaLeft = (s: number) => !!BLOCKS[stretchAtS(s).id]!.seaLeft;
-  g.add(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass)), lambert()));
-  g.add(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass)), lambert()));
+  // the road ends at the overlook, a few metres past where the car parks: a cliff, the city below
+  const end = Math.min(route.length, motion.distanceAt(drive.stretches[drive.stretches.length - 1]!.end) + OVERLOOK_LIP);
+  g.add(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass), end), lambert()));
+  g.add(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass), end), lambert()));
+  const fe = route.frameAt(end), cliff = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.rock }));
+  cliff.matrixAutoUpdate = false;
+  cliff.matrix.copy(boxAt(route, end + 1, 0, 2 * SHOULDER + 2 * SLOPE * (fe.pos.y + 0.4), fe.pos.y + 0.4, 2, -(fe.pos.y + 0.4)));
+  g.add(cliff);
+  // embankments where the road has climbed: from each verge's edge down to the plain
+  for (const side of [-1, 1]) g.add(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? SEA : SHOULDER), end), lambert()));
+  const box3 = new THREE.Box3();
+  for (let s = 0; s < route.length; s += 50) box3.expandByPoint(route.frameAt(s).pos);
   const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), toon({ color: grass.clone().multiplyScalar(0.85) }));
   base.rotation.x = -Math.PI / 2;
-  base.position.y = -0.4;
+  base.position.set((box3.min.x + box3.max.x) / 2, -0.4, (box3.min.z + box3.max.z) / 2);
   g.add(base);
-  g.add(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt), lambert()));
-  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil(route.length / 8));
+  g.add(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt, end), lambert()));
+  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil(end / 8));
   for (let i = 0; i < dashes.count; i++) dashes.setMatrixAt(i, boxAt(route, i * 8, 0, 0.15, 0.02, 3, 0.01));
   g.add(dashes);
 
@@ -339,12 +374,13 @@ export function buildCar(): THREE.Group {
   const head = lampMaterial('#fff2d8', GLOW.head, 0.9), tail = lampMaterial('#ff2a24', GLOW.tail, 0.5);
   for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.CircleGeometry(0.09, 14), head, x, 0.68, hl + 0.07);
   for (const x of [0.78, 0.55, 0.32, -0.32, -0.55, -0.78]) { const t = add(new THREE.CircleGeometry(0.075, 14), tail, x, 0.68, -hl - 0.07); t.rotation.y = Math.PI; }
-  const beamMat = glowMaterial('#ffe6bd', GLOW.beam);
-  for (const x of [0.6, -0.6]) {
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 3.6, 24, 18, 1, true), beamMat);
-    beam.rotation.x = -Math.PI / 2 + 0.05; // narrow end at the lamp, dipping toward the road
-    beam.position.set(x, 0.55, hl + 12); g.add(beam);
-  }
+  // the headlights' throw: light on the road ahead, widening and fading
+  const throwGeo = new THREE.PlaneGeometry(1, 1, 1, 1);
+  throwGeo.rotateX(-Math.PI / 2);
+  const P = throwGeo.attributes.position!;
+  for (let i = 0; i < P.count; i++) { const far = P.getZ(i) < 0 ? 1 : 0; P.setXYZ(i, P.getX(i) * (far ? 7 : 1.6), 0.04, hl + 0.4 + far * 22); }
+  const lit = new THREE.Mesh(throwGeo, glowMaterial('#ffe6bd', GLOW.beam, false, true));
+  g.add(lit);
   // the two of them: him at the wheel (+x: the car's left) in a cap; her, her hair down her back
   for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
     add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);

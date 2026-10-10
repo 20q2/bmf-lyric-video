@@ -44,6 +44,7 @@ export const CHASE = Object.freeze({
   behind: { yaw: 180 * DEG, pitch: 12 * DEG, dist: 11 },
   front3q: { yaw: -35 * DEG, pitch: 8 * DEG, dist: 9 },
   high: { yaw: 180 * DEG, pitch: 50 * DEG, dist: 30 },
+  overlook: { yaw: 168 * DEG, pitch: 7 * DEG, dist: 12 }, // low behind, the car against the city below and ahead
 });
 export type ChasePreset = (typeof CHASE)[keyof typeof CHASE];
 

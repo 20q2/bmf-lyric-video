@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 export const NIGHT: THREE.IUniform<number> = { value: 0 };
 /** How bright the lights shine (HDR multiples). */
-export const GLOW = { window: 1.6, lamp: 6, beam: 0.3, pool: 0.5, neon: 2.6, tail: 4, head: 8 };
+export const GLOW = { window: 1.6, lamp: 6, beam: 0.55, pool: 0.5, neon: 2.6, tail: 4, head: 8 };
 
 /** Light windows into a toon material's buildings (instanced boxes): a grid of windows on their walls (3 m wide, 3.2 m
  *  floors), some lit, by the cell's hash, from NIGHT. */
@@ -69,16 +69,19 @@ export function lampMaterial(color: THREE.ColorRepresentation, strength = GLOW.l
   });
 }
 
-/** An additive glow that fades along its geometry's v (from the source at v = 0 to nothing at v = 1), or out from its
- *  middle (`radial`), and with NIGHT. */
-export function glowMaterial(color: THREE.ColorRepresentation, strength: number, radial = false): THREE.ShaderMaterial {
+/** An additive glow that fades along its geometry's v (from the source at v = 0 to nothing at v = 1), out from its
+ *  middle (`radial`), or as headlights' throw on the road (`throwOnRoad`: bright near, fading far and to the sides); and
+ *  with NIGHT. */
+export function glowMaterial(color: THREE.ColorRepresentation, strength: number, radial = false, throwOnRoad = false): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: { night: NIGHT, color: { value: new THREE.Color(color) }, strength: { value: strength } },
     vertexShader: VERT,
     fragmentShader: `uniform float night, strength; uniform vec3 color; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
 void main() {
   // a pool: out from its middle; a beam: from just ahead of its lamp, and soft where its cone is seen edge-on
-  float a = ${radial ? 'pow(max(0.0, 1.0 - length(vUv - 0.5) * 2.0), 1.6)' : 'pow(1.0 - vUv.y, 2.2) * smoothstep(0.0, 0.12, vUv.y) * pow(abs(dot(normalize(vN), normalize(vV))), 1.5)'};
+  float a = ${radial ? 'pow(max(0.0, 1.0 - length(vUv - 0.5) * 2.0), 1.6)'
+    : throwOnRoad ? 'pow(vUv.y, 1.4) * smoothstep(0.0, 0.25, 1.0 - vUv.y) * pow(max(0.0, 1.0 - abs(vUv.x - 0.5) * 2.0), 1.3)'
+    : 'pow(1.0 - vUv.y, 2.2) * smoothstep(0.0, 0.12, vUv.y) * pow(abs(dot(normalize(vN), normalize(vV))), 1.5)'};
   gl_FragColor = vec4(color * a * strength * night, 1.0);
 }`,
     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,

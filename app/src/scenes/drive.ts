@@ -17,6 +17,7 @@ import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
 import { NIGHT } from '../look/night';
+import { buildCity } from '../look/city';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
 const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
@@ -47,6 +48,7 @@ export default class DriveScene extends Scene {
   private dome = new SkyDome();
   private print = new PrintPass();
   private fogColor = new THREE.Color();
+  private city!: ReturnType<typeof buildCity>;
   /** Where the sun sets (flat, unit). */
   private sunAz = new THREE.Vector3();
   /** Carriers that move (towed banners), with their objects. */
@@ -84,6 +86,10 @@ export default class DriveScene extends Scene {
     this.sunAz.set(coast.fwd.x, 0, coast.fwd.z).normalize().multiplyScalar(Math.cos(SUN_AZ))
       .addScaledVector(new THREE.Vector3(coast.right.x, 0, coast.right.z).normalize(), -Math.sin(SUN_AZ)).normalize();
     this.world.fog = new THREE.Fog(0xffffff, 140, 1100);
+    // the city below the overlook, ahead of where the car parks
+    const end = this.drive.carFrame(this.ctx.audio.duration);
+    this.city = buildCity(end.pos, end.fwd, end.right, -0.4);
+    this.world.add(this.city.points);
   }
 
   override render(f: Frame, out: THREE.WebGLRenderTarget): PostOverrides {
@@ -146,6 +152,7 @@ export default class DriveScene extends Scene {
     fog.near = 140 - 130 * inside;
     fog.far = 1100 - 960 * inside;
 
+    this.city.update(t, this.cam.position, this.rt.width / W);
     renderer.setRenderTarget(this.rt);
     renderer.clear(true, true, true); // the engine leaves autoClear off; the dome draws the sky, so nothing else clears
     renderer.render(this.world, this.cam);

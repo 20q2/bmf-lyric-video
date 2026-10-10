@@ -5,7 +5,7 @@ import type { AudioData } from '../engine/audio';
 import type { Line, Lyrics } from '../engine/lyrics';
 import { Motion, type SpeedKey } from './motion';
 
-export type ChaseName = 'side' | 'behind' | 'front3q' | 'high';
+export type ChaseName = 'side' | 'behind' | 'front3q' | 'high' | 'overlook';
 /** How fast the car goes through a stretch (m/s): parked (pulling away in its last bar into the next stretch's speed),
  *  cruising, stop-and-go in bars (`go` bars moving, `stop` bars standing), or slowing to a stop by bar `byBar`. */
 export type Pace =
@@ -38,8 +38,8 @@ export const STRETCHES: readonly StretchSpec[] = Object.freeze([
   { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'side' },
   { id: 'bridge1', section: 'bridge1', place: 'the tunnel through the headland', pace: { kind: 'cruise', v: 24 }, turn: 10, rise: 0, chase: 'behind', tunnel: true },
   { id: 'verse3', section: 'verse3', place: 'the Strip at night', pace: { kind: 'cruise', v: 8 }, turn: 0, rise: 0, chase: 'side' },
-  { id: 'chorus4', section: 'chorus4', place: 'up into the hills', pace: { kind: 'cruise', v: 12 }, turn: 120, rise: 15, chase: 'front3q' },
-  { id: 'outro1', section: 'outro1', place: 'the overlook, parked', pace: { kind: 'stop', v: 12, byBar: 3 }, turn: 0, rise: 0, chase: 'high' },
+  { id: 'chorus4', section: 'chorus4', place: 'up into the hills', pace: { kind: 'cruise', v: 12 }, turn: 120, rise: 40, chase: 'front3q' },
+  { id: 'outro1', section: 'outro1', place: 'the overlook, parked', pace: { kind: 'stop', v: 12, byBar: 3 }, turn: 0, rise: 0, chase: 'overlook' },
 ] satisfies StretchSpec[]);
 
 export interface Stretch extends StretchSpec {
