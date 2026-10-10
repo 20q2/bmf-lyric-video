@@ -11,32 +11,20 @@ import type { Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, basisOf, solidsOf } from './carriers';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
+import { BLOCKS, boxAt } from './blocks';
 
-const ROAD_HALF = 4;
+export const ROAD_HALF = 4;
 /** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
  *  wider than the road's tightest bend folds over the road there (the hairpin into the hills). */
-const SHOULDER = 40;
-const SEA = 200;
+export const SHOULDER = 40;
+export const SEA = 200;
 const BASE = 12000;
 /** Where the road climbs above the plain, its verges slope down to it this much out per metre down (an embankment). */
-const SLOPE = 2.4;
+export const SLOPE = 2.4;
 /** The road runs on this far past where the car parks, to the overlook's edge (m). */
 const OVERLOOK_LIP = 9;
 const STEP = 2;
 
-/** Per stretch: building heights (m, min–max; 0 = none), how many plots stay empty, and which sides are sea. */
-const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number }> = {
-  intro: { h: [6, 10], empty: 0.5 },
-  chorus1: { h: [8, 22], empty: 0.3 },
-  verse1: { h: [14, 40], empty: 0.1 },
-  chorus2: { h: [6, 14], empty: 0.6, far: 40 },
-  verse2: { h: [4, 8], empty: 0.3 },
-  chorus3: { h: [5, 10], empty: 0.6, seaLeft: true },
-  bridge1: { h: [5, 9], empty: 1, seaLeft: true }, // in the tunnel
-  verse3: { h: [8, 18], empty: 0.05 },
-  chorus4: { h: [3, 6], empty: 0.8 },
-  outro1: { h: [0, 0], empty: 1 },
-};
 const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'verse3']);
 
 /** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
@@ -80,13 +68,6 @@ function skirt(route: Route, side: number, edge: (s: number) => number, end = ro
   return g;
 }
 
-function boxAt(route: Route, s: number, lateral: number, w: number, h: number, d: number, y0 = 0): THREE.Matrix4 {
-  const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, lateral);
-  const m = new THREE.Matrix4().makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize());
-  m.scale(new THREE.Vector3(w, h, d));
-  m.setPosition(p.x, p.y + y0 + h / 2, p.z);
-  return m;
-}
 
 export function buildWorld(drive: Drive): THREE.Group {
   const { route, motion } = drive, g = new THREE.Group();
@@ -120,19 +101,9 @@ export function buildWorld(drive: Drive): THREE.Group {
   for (let i = 0; i < dashes.count; i++) dashes.setMatrixAt(i, boxAt(route, i * 8, 0, 0.15, 0.02, 3, 0.01));
   g.add(dashes);
 
-  // blocks either side, seeded by plot
-  const mats: THREE.Matrix4[] = [], cols: THREE.Color[] = [];
-  for (let k = 0; k * 22 < route.length; k++) {
-    for (const side of [1, -1]) {
-      const s = k * 22 + 11, st = stretchAtS(s), b = BLOCKS[st.id]!;
-      if ((side === -1 && b.seaLeft) || hash(k, side, 1) < b.empty) continue;
-      const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), h = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
-      mats.push(boxAt(route, s, side * ((b.far ?? 18) + d / 2 + 6 * hash(k, side, 5)), w, h, d));
-      cols.push(new THREE.Color(WORLD.stucco[Math.floor(hash(k, side, 6) * WORLD.stucco.length)]!));
-    }
-  }
-  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), mats.length);
-  mats.forEach((m, i) => { blocks.setMatrixAt(i, m); blocks.setColorAt(i, cols[i]!); });
+  // the town's buildings (blocks.ts: the guard checks them too)
+  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), drive.blocks.length);
+  drive.blocks.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
   g.add(blocks);
 
   // palms: a trunk and a crown, behind the roadside signs' line

@@ -11,6 +11,7 @@ import { SETTLE, dwellFor, emphasisOf } from './phrases';
 import { LEAD, SNAP_S, type Shot, type Target, director, resolveAt } from './shots';
 import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
+import { type Block, blocksOf } from './blocks';
 
 const DEG = Math.PI / 180;
 /** After a line, the camera goes back to the car only if the next line is at least this far off (s). */
@@ -38,6 +39,8 @@ export interface Drive {
   route: Route;
   carriers: Carrier[];
   tunnels: Tunnel[];
+  /** The town's buildings. */
+  blocks: Block[];
   /** The song's beats (s). */
   beats: readonly number[];
   carFrame(t: number): RouteFrame;
@@ -97,5 +100,6 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
-  return { stretches, motion, route, carriers, tunnels, beats: audio.beats, carFrame, stretchAt, camera, shots: kept };
+  const blocks = blocksOf(route, motion, stretches, carriers, tunnels);
+  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept };
 }

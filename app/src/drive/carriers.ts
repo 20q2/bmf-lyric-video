@@ -124,7 +124,7 @@ export const ROAD_AHEAD = 3.5;
 export const ROAD_VIEW = { dist: 11, pitch: 0.95, perLength: 2.3 };
 /** Walls are watched from this far out along their normal (m), sliding with the car up to this far either way. */
 export const WALL_VIEW = { dist: 20, slide: 7, eye: 2.2 };
-export const SKY = { ahead: 75, up: 19, side: 17, lift: 7 };
+export const SKY = { ahead: 75, up: 27, side: 17, lift: 7 };
 /** Banners fly this far ahead of the car as their line starts, this high, this far to its side (left: clear of the
  *  sky-writing still dissolving on the right), drifting this fast (m, m/s); the plane flies `tow` ahead of its banner,
  *  and a formation's banners stand `gap` apart; a banner seen from further off than `view` is made bigger to match. */
@@ -284,7 +284,9 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           foot = L.y;
         } else if (kind_ === 'tunnel') {
           // on the bore's left wall
-          s = room('tunnel', motion.distanceAt((ph.start + ph.end) / 2), lay.w + 4); const f = route.frameAt(s);
+          // far enough in that its camera, sliding with the car, stays in the bore
+          const tn = nearTunnel(tunnels, motion.distanceAt(ph.start), TUNNEL_CLEAR);
+          s = room('tunnel', Math.max(motion.distanceAt((ph.start + ph.end) / 2), tn ? tn.s0 + TUNNEL_TEXT.slide + lay.w / 2 + 4 : -Infinity), lay.w + 4); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.right, -(TUNNEL.halfW - 0.05)).addScaledVector(WORLD_UP, TUNNEL_TEXT.y);
           normal = flat(f.right.clone());
           up = WORLD_UP.clone();

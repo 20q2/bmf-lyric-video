@@ -10,7 +10,8 @@ import { dwellFor } from '../src/drive/phrases';
 import { CAR_BOX, REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
 import { LEAD, SNAP_S } from '../src/drive/shots';
 import { dissolveAt, revealAt } from '../src/drive/dissolve';
-import { TUNNEL_CLEAR, nearTunnel } from '../src/drive/tunnel';
+import { TUNNEL, TUNNEL_CLEAR, nearTunnel } from '../src/drive/tunnel';
+import { SHOULDER, SLOPE } from '../src/drive/world';
 import { audio, lyrics } from './data';
 
 const drive = makeDrive(audio, lyrics);
@@ -34,6 +35,18 @@ function corners(c: Carrier) {
 }
 /** Every carrier's solids as boxes in its own frame, with the frame's inverse (to take rays into it). */
 const solids = drive.carriers.map((c) => ({ c, inv: basisOf(c).invert(), boxes: solidsOf(c).map(({ at, size }) => new THREE.Box3().setFromCenterAndSize(at, size)) }));
+/** The town's buildings: unit boxes in their own (scaled) frames. */
+const UNIT = new THREE.Box3(new THREE.Vector3(-0.5, -0.5, -0.5), new THREE.Vector3(0.5, 0.5, 0.5));
+const blocks = drive.blocks.map((b) => ({ b, m: b.matrix, inv: b.matrix.clone().invert(), at: new THREE.Vector3().setFromMatrixPosition(b.matrix) }));
+/** Whether a building stands between the camera and p. */
+function blockHides(p: THREE.Vector3): boolean {
+  const d = p.distanceTo(cam.position);
+  return blocks.some(({ m, inv, at }) => {
+    if (at.distanceTo(cam.position) > d + 60) return false;
+    const ray = new THREE.Ray(cam.position.clone(), p.clone().sub(cam.position).normalize()).applyMatrix4(inv), hit = new THREE.Vector3();
+    return !!ray.intersectBox(UNIT, hit) && hit.applyMatrix4(m).distanceTo(cam.position) < d - 0.05;
+  });
+}
 /** The other carrier whose solids hide the middle of c's face, or most of its corners, from the camera (if any). */
 const CAR = new THREE.Box3(new THREE.Vector3(-CAR_BOX.w / 2, 0, -CAR_BOX.l / 2), new THREE.Vector3(CAR_BOX.w / 2, CAR_BOX.h, CAR_BOX.l / 2));
 function hiddenBy(c: Carrier, t: number): string | null {
@@ -44,6 +57,7 @@ function hiddenBy(c: Carrier, t: number): string | null {
     const d = p.distanceTo(cam.position), ray = new THREE.Ray(cam.position.clone(), p.clone().sub(cam.position).normalize()).applyMatrix4(inv), hit = new THREE.Vector3();
     return ray.intersectBox(CAR, hit) && hit.applyMatrix4(car).distanceTo(cam.position) < d - 0.05;
   })) return 'the car';
+  if (pts.some(blockHides)) return 'a building';
   for (const o of solids) {
     if (o.c === c || !o.boxes.length || o.c.center.distanceTo(c.center) > 120) continue;
     let hid = 0;
@@ -150,4 +164,36 @@ test("nothing shows the song ahead: a phrase's text appears only as the camera c
 
 test('the known short phrases are still short (drop them from KNOWN_SHORT as M4 fixes them)', () => {
   expect([...KNOWN_SHORT].filter((id) => { const c = drive.carriers.find((k) => k.id === id); return !c || !isShort(c); })).toEqual([]);
+});
+
+// ---- the camera never inside anything ----
+/** The ground's height under p (m), and whether p is in a tunnel's rock: the road's verges, embankments down to the
+ *  plain, a tunnel's bore and its headland (world.ts, tunnel.ts). */
+function groundAt(p: THREE.Vector3, near: number): { y: number; rock: boolean } {
+  let best = near, bd = Infinity;
+  for (let s = Math.max(0, near - 220); s <= Math.min(drive.route.length, near + 220); s += 2) { const dd = drive.route.frameAt(s).pos.distanceToSquared(p); if (dd < bd) { bd = dd; best = s; } }
+  for (let s = best - 2; s <= best + 2; s += 0.25) { const dd = drive.route.frameAt(Math.max(0, s)).pos.distanceToSquared(p); if (dd < bd) { bd = dd; best = Math.max(0, s); } }
+  const f = drive.route.frameAt(best), rel = p.clone().sub(f.pos), lat = rel.dot(f.right), up = rel.y;
+  const tn = nearTunnel(drive.tunnels, best);
+  if (tn) {
+    const inBore = Math.abs(lat) < TUNNEL.halfW && up < TUNNEL.h;
+    const hillTop = Math.abs(lat) < TUNNEL.halfW + 1 ? TUNNEL.h + TUNNEL.hill : (TUNNEL.h + TUNNEL.hill) * (1 - (Math.abs(lat) - TUNNEL.halfW - 1) / (TUNNEL.hillHalfW - TUNNEL.halfW - 1));
+    return { y: f.pos.y, rock: !inBore && up < hillTop };
+  }
+  const edge = SHOULDER, over = Math.abs(lat) - edge;
+  return { y: over <= 0 ? f.pos.y - 0.05 : Math.max(-0.4, f.pos.y - over / SLOPE), rock: false };
+}
+
+test('the camera is never inside anything: the ground, a tunnel\'s rock, a building, a board, the car', () => {
+  const bad: string[] = [];
+  for (let t = 0; t < audio.duration; t += 0.1) {
+    placeCamera(cam, drive.camera(t));
+    const p = cam.position, g = groundAt(p, drive.motion.distanceAt(t));
+    const why = g.rock ? 'in rock' : p.y < g.y + 0.3 ? 'under the ground'
+      : blocks.some(({ inv }) => UNIT.containsPoint(p.clone().applyMatrix4(inv))) ? 'in a building'
+      : solids.some((o) => o.boxes.some((b) => b.containsPoint(p.clone().applyMatrix4(o.inv)))) ? 'in a board'
+      : null;
+    if (why) bad.push(`${t.toFixed(1)} ${why}`);
+  }
+  expect(bad).toEqual([]);
 });
