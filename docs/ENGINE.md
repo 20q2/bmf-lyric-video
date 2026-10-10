@@ -31,7 +31,23 @@ ear wins. Close GPU-heavy games first if you can: the GPU has 8 GB and the model
     bun test
     bun x tsc --noEmit -p tsconfig.json
     bun x vite --port 5990 --strictPort   # http://localhost:5990/?t=60
-    bun scripts/still.ts 16               # one still from the running preview -> out/still_16.00.png
+    bun scripts/render.ts stills --t 17,45 --url http://localhost:5990          # -> out/stills (no trailing slash on --url)
+    bun scripts/render.ts sheet --from 1 --to 180 --n 40 --cols 8 --url http://localhost:5990 --out ../out/sheet.png
+    bun scripts/render.ts perf --from 60 --to 70                                # ms per frame (close GPU-heavy games first)
 
-Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous section, `l` loop the
-section, `h` hide the UI. `?card=testcard` forces the karaoke test card (the drive is the default scene).
+Without `--url` the renderer starts its own private server. Look at stills and sheets (Read tool) before handing work
+to the user. Only the final export renders video (M5).
+
+## The drive (app/src/drive/)
+
+- `stretches.ts`: the route table (spec §3) — each stretch's section, pace, bend, climb, home chase framing, sign kind.
+- `motion.ts`, `route.ts`: the car's distance on song time (exact integral of eased speed keys) and the road it drives.
+- `camera.ts`, `shots.ts`: world camera poses and the shot director (snap / land / glide on the beat grid; each move
+  eases from the previous move's pose at the same t, so a hand-off from the moving car to a fixed sign is continuous).
+- `signs.ts`, `signart.ts`: a lyric sign per line (placement and text layout pure; faces drawn in the browser).
+- `drive.ts`: the model the scene renders and `tests/sung.test.ts` checks (every sign in frame, facing the camera,
+  type >= 36 px while its line is sung).
+- `world.ts`, `sky.ts`, `scenes/drive.ts`: the greybox world, the sky over time, the scene.
+
+Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous stretch, `l` loop the
+stretch, `h` hide the UI. `?card=testcard` forces the karaoke test card (the drive is the default scene).
