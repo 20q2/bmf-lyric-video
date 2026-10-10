@@ -58,7 +58,10 @@ to the user. Only the final export renders video (M5).
 - `drive.ts`: the model the scene renders and `tests/sung.test.ts` checks (while sung every phrase's carrier is in the
   title-safe frame, facing the camera, upright left to right, not hidden by another carrier, type >= 48 px; each
   phrase readable for dwellFor; nothing revealed early; the car never over road paint while it's sung).
-- `world.ts`, `sky.ts`, `scenes/drive.ts`: the greybox world, the sky over time, the scene.
+- `world.ts`, `sky.ts`, `scenes/drive.ts`: the world, the sky over time, the scene.
+- `look/` (M3, Sunset Print; docs/superpowers/plans/2026-10-10-m3-look.md): `skydome.ts` (banded sky, sun, stars),
+  `toon.ts` (three-tone materials, the palette), `print.ts` (ink, halftone, violet shade), `night.ts` (windows,
+  streetlights, glows; the NIGHT uniform), `city.ts` (the finale's lights), `money.ts` (the bills).
 
 Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous stretch, `l` loop the
 stretch, `h` hide the UI. `?card=testcard` forces the karaoke test card (the drive is the default scene).
