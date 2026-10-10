@@ -22,7 +22,7 @@ import { hash } from '../engine/util';
 import { type Pose, fitSign } from './camera';
 import type { Motion } from './motion';
 import type { Phrase } from './phrases';
-import { SETTLE, dwellFor, phrasesOf } from './phrases';
+import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
 import type { Route, RouteFrame } from './route';
 import type { Stretch } from './stretches';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
@@ -141,6 +141,16 @@ export const GANTRY_CLEAR = 20;
 export const isFast = (line: { words: readonly { start: number }[]; end: number }) =>
   line.end - line.words[0]!.start < 0.3 * line.words.length;
 
+/** A phrase's rows: one, or two balanced; a punctuating word (Phrase.solo) on a row of its own, the rest on one row
+ *  unless it runs past SOLO_WRAP_AT (three rows make too tall a face). */
+export function rowsFor(text: string, solo?: Phrase['solo']): string[] {
+  if (!solo) return rowsOf(text);
+  const words = text.split(' '), rest = (solo === 'first' ? words.slice(1) : words.slice(0, -1)).join(' ');
+  const restRows = rest.length <= SOLO_WRAP_AT ? [rest] : rowsOf(rest);
+  return solo === 'first' ? [words[0]!, ...restRows] : [...restRows, words[words.length - 1]!];
+}
+export const SOLO_WRAP_AT = 18;
+
 export function rowsOf(text: string): string[] {
   if (text.length <= WRAP_AT) return [text];
   const words = text.split(' ');
@@ -152,8 +162,8 @@ export function rowsOf(text: string): string[] {
   return [words.slice(0, best).join(' '), words.slice(best).join(' ')];
 }
 
-function layout(kind: Kind, text: string) {
-  const L = LAYOUT[kind], rows = rowsOf(CAPS.has(kind) ? text.toUpperCase() : text);
+function layout(kind: Kind, text: string, solo?: Phrase['solo']) {
+  const L = LAYOUT[kind], rows = rowsFor(CAPS.has(kind) ? text.toUpperCase() : text, solo);
   const longest = Math.max(...rows.map((r) => r.length));
   const em = Math.min(L.rowH * L.emOfRow, (L.w * TEXT_W) / (longest * L.advance));
   return { rows, em, w: L.w, h: L.rowH * rows.length };
@@ -167,7 +177,7 @@ const uprightFor = (normal: THREE.Vector3, fallback: THREE.Vector3) => {
 };
 const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
 
-export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route, tunnels: readonly Tunnel[] = []): Carrier[] {
+export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route, tunnels: readonly Tunnel[] = [], solo?: Solo): Carrier[] {
   const out: Carrier[] = [];
   // anything standing by the road stands clear of a tunnel and its mouths
   const clear = (s: number) => { const tn = nearTunnel(tunnels, s, TUNNEL_CLEAR); return tn ? tn.s1 + TUNNEL_CLEAR : s; };
@@ -182,7 +192,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
       // a fast line is framed two phrases at a time (pairFraming): on the left, where faces pair side by side (a sign's
       // next stands behind it; paint on a moving road lies too far on to share a readable frame)
       if (isFast(line) && kind !== 'sky' && !PAIRABLE.has(kind)) { const fl = FAST_LEFT[st.id] ?? ['wall']; kind = fl[li % fl.length]!; }
-      const phs = phrasesOf(line, nextStart(line.i));
+      const phs = phrasesOf(line, nextStart(line.i), solo);
       phs.forEach((ph, pi) => {
         // a line's first phrase too short to read alone, straight after the line before, stays on that line's kind of
         // carrier, so the frame before can show it coming (pairFraming)
@@ -190,8 +200,8 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         const alone = (phs[pi + 1]?.start ?? nextStart(line.i)) - ph.start - SETTLE;
         let kind_: Kind = pi === 0 && prev && PAIRABLE.has(prev.kind) && !PAIRABLE.has(kind) && ph.start - prev.phrase.end < 0.4 && alone < dwellFor(ph.words.length) ? prev.kind : kind;
         // a street blade holds one row
-        if (kind_ === 'street' && rowsOf(ph.text).length > 1) kind_ = 'sign';
-        let lay = layout(kind_, ph.text);
+        if (kind_ === 'street' && rowsFor(ph.text, ph.solo).length > 1) kind_ = 'sign';
+        let lay = layout(kind_, ph.text, ph.solo);
         const id = `L${line.i}.${pi}`;
         let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3, foot: number | undefined, stack: Carrier['stack'], stackDy: number | undefined;
         let solid: Carrier['solid'] | undefined;
@@ -209,7 +219,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           up = uprightFor(normal, WORLD_UP);
         } else if (PAIRABLE.has(kind_) && prev && !prev.stack && PAIRABLE.has(prev.kind) && prev.stretch === st.id) {
           // under the face before, on its building: that one moves up to make room
-          kind_ = prev.kind; lay = layout(kind_, ph.text);
+          kind_ = prev.kind; lay = layout(kind_, ph.text, ph.solo);
           const L = LEFT[kind_ as LeftKind], fB = L.base + lay.h / 2, fT = L.base + lay.h + STACK_GAP + prev.h / 2;
           prev.center.addScaledVector(WORLD_UP, fT - prev.foot);
           prev.foot = fT; prev.stack = 'top'; prev.stackDy = (fB - fT) / 2;

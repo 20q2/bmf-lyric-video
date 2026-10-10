@@ -7,7 +7,7 @@ import { CHASE, type Pose, chase } from './camera';
 import { type Carrier, framing, isFast, pairFraming, placeCarriers } from './carriers';
 import type { Motion } from './motion';
 import { Route, type RouteFrame } from './route';
-import { SETTLE, dwellFor } from './phrases';
+import { SETTLE, dwellFor, punctuationOf } from './phrases';
 import { LEAD, SNAP_S, type Shot, type Target, director, resolveAt } from './shots';
 import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
@@ -43,7 +43,7 @@ export interface Drive {
 export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const stretches = resolveStretches(audio, lyrics), motion = motionFor(stretches, audio), route = routeFor(stretches, motion);
   const tunnels = tunnelsOf(stretches, motion, audio.beats);
-  const carriers = placeCarriers(stretches, motion, route, tunnels);
+  const carriers = placeCarriers(stretches, motion, route, tunnels, punctuationOf(audio.beats));
   const carFrame = (t: number) => route.frameAt(motion.distanceAt(t));
   const stretchAt = (t: number) => stretches.find((s) => t >= s.start && t < s.end) ?? stretches[stretches.length - 1]!;
   const chaseOf = (st: Stretch): Target => (t) => {

@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
-import { MAX_WORDS, phrasesOf } from '../src/drive/phrases';
-import { lyrics } from './data';
+import { makeDrive } from '../src/drive/drive';
+import { MAX_WORDS, phrasesOf, punctuationOf } from '../src/drive/phrases';
+import { audio, lyrics } from './data';
 
 const all = lyrics.lines.flatMap((l) => phrasesOf(l));
 
@@ -30,4 +31,17 @@ test('no phrase is a lone short word (I, a, it), unless its line is just that', 
 
 test('the chorus opening splits into short phrases', () => {
   expect(phrasesOf(lyrics.lines[0]!).map((p) => p.text)).toEqual(['Young and fine', 'and dark', 'and handsome']);
+});
+
+test('the punctuating "you"s and "but"s: thrown in off the beat at a clause edge, each alone on its own row', () => {
+  const solo = punctuationOf(audio.beats);
+  const picked = lyrics.lines.flatMap((l) => l.words.flatMap((w, k) => (solo(l, k) ? [`L${l.i}.${k} ${w.w}`] : [])));
+  expect(picked).toEqual(['L6.0 You', 'L6.3 but', 'L7.4 but', 'L11.0 You', 'L11.7 you', 'L11.15 you?']);
+  for (const c of makeDrive(audio, lyrics).carriers) {
+    const ks = c.phrase.words.map((w) => lyrics.lines[c.phrase.line]!.words.indexOf(w)).filter((k) => solo(lyrics.lines[c.phrase.line]!, k));
+    for (const k of ks) {
+      const w = lyrics.lines[c.phrase.line]!.words[k]!;
+      expect(c.rows.some((r) => r.toLowerCase() === w.w.toLowerCase())).toBe(true);
+    }
+  }
 });
