@@ -1,6 +1,7 @@
 // Entry: preview player (default) or export mode (?export=1, driven by scripts/render.ts from M2).
 import { Engine, type AdaptiveSampling } from './engine/engine';
 import { PW, PH, SCALE } from './engine/gl';
+import { resolveStretches } from './drive/stretches';
 import { jump, partAt, partLoop } from './review';
 import { makeTimeline } from './timeline';
 
@@ -119,8 +120,8 @@ function setupPlayer() {
   volume.onchange = () => volume.blur();
   if (engine.errors.length) { errs.textContent = engine.errors.join('\n\n'); errs.style.display = 'block'; }
 
-  // the marks strip and the jump keys follow the song's sections (M2 switches them to the drive's stretches)
-  const parts = engine.audio.sections.map((s) => ({ id: s.name, start: s.start, end: s.end }));
+  // the marks strip and the jump keys follow the drive's stretches (drive/stretches.ts)
+  const parts = resolveStretches(engine.audio, engine.lyrics).map((s) => ({ id: s.id, start: s.start, end: s.end }));
   const starts = parts.map((p) => p.start);
   for (const p of parts) {
     const m = document.createElement('div');

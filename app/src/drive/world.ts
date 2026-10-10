@@ -1,0 +1,283 @@
+// The greybox world (M2): ground, road, blocks of buildings, palms, a few landmarks, the sign boards and the car with
+// its two silhouettes. Plain lit colours, no textures but the lyric faces: the look comes in M3. Deterministic
+// (seeded by position along the road).
+import * as THREE from 'three';
+import { hash } from '../engine/util';
+import type { Drive } from './drive';
+import type { Route } from './route';
+import { BANNER, type Carrier, LAYOUT, PAIRABLE, basisOf, solidsOf } from './carriers';
+import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
+import type { Stretch } from './stretches';
+
+const ROAD_HALF = 4;
+/** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
+ *  wider than the road's tightest bend folds over the road there (the hairpin into the hills). */
+const SHOULDER = 40;
+const SEA = 200;
+const BASE = 4000;
+const STEP = 2;
+
+/** Per stretch: building heights (m, min–max; 0 = none), how many plots stay empty, and which sides are sea. */
+const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number }> = {
+  intro: { h: [6, 10], empty: 0.5 },
+  chorus1: { h: [8, 22], empty: 0.3 },
+  verse1: { h: [14, 40], empty: 0.1 },
+  chorus2: { h: [6, 14], empty: 0.6, far: 40 },
+  verse2: { h: [4, 8], empty: 0.3 },
+  chorus3: { h: [5, 10], empty: 0.6, seaLeft: true },
+  bridge1: { h: [5, 9], empty: 1, seaLeft: true }, // in the tunnel
+  verse3: { h: [8, 18], empty: 0.05 },
+  chorus4: { h: [3, 6], empty: 0.8 },
+  outro1: { h: [0, 0], empty: 1 },
+};
+const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'verse3']);
+
+/** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
+ *  coloured per sample. */
+function strip(route: Route, a: number | ((s: number) => number), b: number | ((s: number) => number), dy: number, colorAt: (s: number) => THREE.Color): THREE.BufferGeometry {
+  const at = (x: number | ((s: number) => number), s: number) => (typeof x === 'number' ? x : x(s));
+  const n = Math.ceil(route.length / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const s = Math.min(route.length, i * STEP), f = route.frameAt(s), c = colorAt(s);
+    const p = f.pos.clone().addScaledVector(f.right, at(a, s)), q = f.pos.clone().addScaledVector(f.right, at(b, s));
+    pos.set([p.x, p.y + dy, p.z, q.x, q.y + dy, q.z], i * 6);
+    col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
+    if (i > 0) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+function boxAt(route: Route, s: number, lateral: number, w: number, h: number, d: number, y0 = 0): THREE.Matrix4 {
+  const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, lateral);
+  const m = new THREE.Matrix4().makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize());
+  m.scale(new THREE.Vector3(w, h, d));
+  m.setPosition(p.x, p.y + y0 + h / 2, p.z);
+  return m;
+}
+
+export function buildWorld(drive: Drive): THREE.Group {
+  const { route, motion } = drive, g = new THREE.Group();
+  const stretchAtS = (s: number): Stretch => {
+    for (const st of drive.stretches) if (s < motion.distanceAt(st.end)) return st;
+    return drive.stretches[drive.stretches.length - 1]!;
+  };
+  const lambert = (o: THREE.MeshLambertMaterialParameters = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, ...o });
+
+  // ground either side (the sea to the left along the coast), the road, its centre dashes
+  const grass = new THREE.Color('#6f7a52'), sand = new THREE.Color('#b9a37a'), sea = new THREE.Color('#2f5f8a'), asphalt = new THREE.Color('#34343c');
+  const seaLeft = (s: number) => !!BLOCKS[stretchAtS(s).id]!.seaLeft;
+  g.add(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass)), lambert()));
+  g.add(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass)), lambert()));
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), new THREE.MeshLambertMaterial({ color: grass.clone().multiplyScalar(0.85) }));
+  base.rotation.x = -Math.PI / 2;
+  base.position.y = -0.4;
+  g.add(base);
+  g.add(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt), lambert()));
+  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#e8e2cf' }), Math.ceil(route.length / 8));
+  for (let i = 0; i < dashes.count; i++) dashes.setMatrixAt(i, boxAt(route, i * 8, 0, 0.15, 0.02, 3, 0.01));
+  g.add(dashes);
+
+  // blocks either side, seeded by plot
+  const mats: THREE.Matrix4[] = [], cols: THREE.Color[] = [];
+  for (let k = 0; k * 22 < route.length; k++) {
+    for (const side of [1, -1]) {
+      const s = k * 22 + 11, st = stretchAtS(s), b = BLOCKS[st.id]!;
+      if ((side === -1 && b.seaLeft) || hash(k, side, 1) < b.empty) continue;
+      const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), h = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
+      mats.push(boxAt(route, s, side * ((b.far ?? 18) + d / 2 + 6 * hash(k, side, 5)), w, h, d));
+      cols.push(new THREE.Color().setHSL(0.08 + 0.1 * hash(k, side, 6), 0.15, 0.45 + 0.25 * hash(k, side, 7)));
+    }
+  }
+  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial(), mats.length);
+  mats.forEach((m, i) => { blocks.setMatrixAt(i, m); blocks.setColorAt(i, cols[i]!); });
+  g.add(blocks);
+
+  // palms: a trunk and a crown, behind the roadside signs' line
+  const trunks: THREE.Matrix4[] = [], crowns: THREE.Matrix4[] = [];
+  for (let k = 0; k * 30 < route.length; k++) {
+    const s = k * 30 + 5;
+    if (!PALMS.has(stretchAtS(s).id)) continue;
+    for (const side of [1, -1]) {
+      if (side === -1 && BLOCKS[stretchAtS(s).id]!.seaLeft) continue;
+      if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR)) continue; // nor in the rock
+      // none on the left where a face stands: they'd stand between it and the camera across the road
+      if (side === -1 && drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 4)) continue;
+      const h = 9 + 4 * hash(k, side, 8);
+      trunks.push(boxAt(route, s, side * 11.5, 0.35, h, 0.35));
+      crowns.push(boxAt(route, s, side * 11.5, 3.2, 1.2, 3.2, h));
+    }
+  }
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.6, 1, 6), new THREE.MeshLambertMaterial({ color: '#5a4636' }), trunks.length);
+  trunks.forEach((m, i) => trunk.setMatrixAt(i, m));
+  const crown = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 7, 4), new THREE.MeshLambertMaterial({ color: '#2f5a3a' }), crowns.length);
+  crowns.forEach((m, i) => crown.setMatrixAt(i, m));
+  g.add(trunk, crown);
+
+  for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
+
+  // the motel the car waits outside at the start
+  const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#e58fa8' }));
+  motel.matrixAutoUpdate = false;
+  motel.matrix.copy(boxAt(route, 4, 22, 34, 9, 14));
+  g.add(motel);
+  return g;
+}
+
+/** A profile (lateral, height; m) swept along the road from s0 to s1: its uv in metres over `tile`. */
+function sweep(route: Route, s0: number, s1: number, profile: readonly [number, number][], tile: number): THREE.BufferGeometry {
+  const n = Math.ceil((s1 - s0) / 1) + 1, m = profile.length, pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  const len = [0];
+  for (let j = 1; j < m; j++) len.push(len[j - 1]! + Math.hypot(profile[j]![0] - profile[j - 1]![0], profile[j]![1] - profile[j - 1]![1]));
+  for (let i = 0; i < n; i++) {
+    const s = Math.min(s1, s0 + i), f = route.frameAt(s);
+    profile.forEach(([x, y], j) => {
+      const v = f.pos.clone().addScaledVector(f.right, x).addScaledVector(f.up, y);
+      pos.push(v.x, v.y, v.z); uv.push((s - s0) / tile, len[j]! / tile);
+    });
+    if (i > 0) for (let j = 0; j < m - 1; j++) { const a = (i - 1) * m + j, b = i * m + j; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Glazed wall tiles, 8 to a texture repeat. */
+function tiles(): THREE.Texture {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#ddd3bc'; x.fillRect(0, 0, 256, 256);
+  x.fillStyle = '#9a907c';
+  for (let k = 0; k < 8; k++) { x.fillRect(k * 32, 0, 2, 256); x.fillRect(0, k * 32, 256, 2); }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+/** A tunnel (tunnel.ts): the tiled bore, the headland over it with a mouth at each end, and its lamps. */
+function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
+  const g = new THREE.Group(), { halfW: W, h: H, hill, hillHalfW } = TUNNEL;
+  const bore: [number, number][] = [[-W, 0], [-W, H], [W, H], [W, 0]];
+  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, bore, 2), new THREE.MeshLambertMaterial({ map: tiles(), side: THREE.DoubleSide })));
+  const rock = new THREE.MeshLambertMaterial({ color: '#5d5446', side: THREE.DoubleSide });
+  const outside: [number, number][] = [[-hillHalfW, -0.3], [-W - 1, H + hill], [W + 1, H + hill], [hillHalfW, -0.3]];
+  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, outside, 4), rock));
+  // the mouths: the headland's face with the bore cut out
+  const face = new THREE.Shape(outside.map(([x, y]) => new THREE.Vector2(x, y)));
+  face.holes.push(new THREE.Path(bore.map(([x, y]) => new THREE.Vector2(x, y))));
+  for (const s of [tn.s0, tn.s1]) {
+    const f = route.frameAt(s), mouth = new THREE.Mesh(new THREE.ShapeGeometry(face), rock);
+    mouth.matrixAutoUpdate = false;
+    mouth.matrix.makeBasis(f.right, f.up, f.fwd).setPosition(f.pos);
+    g.add(mouth);
+  }
+  // a sodium lamp over the car on every beat
+  const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffb347' }), tn.lamps.length);
+  tn.lamps.forEach((s, i) => lamps.setMatrixAt(i, boxAt(route, s, 0, 1.6, 0.15, 0.6, H - 0.15)));
+  g.add(lamps);
+  return g;
+}
+
+/** A towed banner ripples: a wave running back from its leading (right) edge, growing toward its trailing edge. Small
+ *  enough to leave the words readable. */
+export const FLUTTER = { segments: 40, amp: 0.025, waves: 2.5, hz: 1.3 };
+/** Ripple a banner carrier's face (its object from buildCarrier) at t. */
+export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
+  const face = o.getObjectByName('face') as THREE.Mesh, p = face.geometry.attributes.position!;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), back = (c.w / 2 - x) / c.w; // 0 at the leading edge, 1 at the trailing
+    p.setZ(i, FLUTTER.amp * c.w * back * Math.sin(2 * Math.PI * (FLUTTER.waves * back - FLUTTER.hz * t)));
+  }
+  p.needsUpdate = true;
+}
+
+/** A carrier with its face's texture: a board on posts (a sign, a billboard), a street blade on its pole, a gantry over
+ *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
+ *  sky. */
+export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel'; // the face is only its letters
+  const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  if (c.kind === 'road') return drapedOnRoad(c, mat, route);
+  const g = new THREE.Group();
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h, c.kind === 'banner' ? FLUTTER.segments : 1, 1), mat);
+  board.name = 'face';
+  g.add(board);
+  const grey = (hex: string) => new THREE.MeshLambertMaterial({ color: hex });
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b);
+  };
+  // the face's centre stands this high over the ground (the road's height where it stands)
+  const y0 = c.foot;
+  // legs from the board's top down to the ground, at these x
+  const legs = (xs: number[], drop = y0 + c.h / 2) => { for (const x of xs) box(0.2, drop, 0.2, x, c.h / 2 - drop / 2, -0.2, grey('#4a4a52')); };
+  // its backing board or its building (carriers.ts solidsOf: what the guard checks for hiding other faces)
+  const building = PAIRABLE.has(c.kind) && c.kind !== 'billboard';
+  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? new THREE.MeshLambertMaterial({ color: wall }) : grey('#2a2a30'));
+  switch (c.kind) {
+    case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
+    case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey('#4a4a52')); break;
+    case 'street': legs([-c.w / 2 - 0.15], y0 + c.h / 2 + 0.4); break;
+    case 'banner': {
+      // the plane ahead of it (to its right, nose that way: it flies the way the words run), a high-wing tug on a tow
+      // line from the banner's leading edge; as big as the banner was made (carriers.ts BANNER.view)
+      const k = c.w / LAYOUT.banner.w, tow = BANNER.tow * k, x0 = c.w / 2 + tow, body = grey('#e9e4da'), trim = grey('#b3122e');
+      box(tow, 0.05 * k, 0.05 * k, c.w / 2 + tow / 2, 0, 0, grey('#3a3a40'));
+      const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * k, 0.22 * k, 6 * k, 10), body);
+      fuselage.rotation.z = -Math.PI / 2; fuselage.position.set(x0 + 3 * k, 0, 0); g.add(fuselage); // tail at x0, nose at +6
+      box(1.5 * k, 0.12 * k, 10 * k, x0 + 3.9 * k, 0.6 * k, 0, body); // wing, over the cabin
+      box(0.8 * k, 0.08 * k, 3.4 * k, x0 + 0.35 * k, 0.1 * k, 0, body); // tailplane
+      box(1 * k, 1.5 * k, 0.08 * k, x0 + 0.4 * k, 0.75 * k, 0, trim); // fin
+      const prop = new THREE.Mesh(new THREE.CircleGeometry(1.1 * k, 16), new THREE.MeshBasicMaterial({ color: '#2a2a30', transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+      prop.rotation.y = Math.PI / 2; prop.position.set(x0 + 6.05 * k, 0, 0); g.add(prop); // spinning, a blur
+      break;
+    }
+    case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey('#4a4a52')); break;
+  }
+  g.matrixAutoUpdate = false;
+  g.matrix.copy(basisOf(c));
+  return g;
+}
+
+/** Road paint laid on the road itself, row of vertices by row along it, so it follows the road's bends and grade. The
+ *  face's own axes decide which way its texture runs: its up along the road (forward or back) and its run across it. */
+function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh {
+  const geo = new THREE.PlaneGeometry(c.w, c.h, 1, Math.max(2, Math.ceil(c.h / 0.5)));
+  const p = geo.attributes.position!, f0 = route.frameAt(c.s);
+  const upSign = Math.sign(c.up.dot(f0.fwd)), runSign = Math.sign(c.up.clone().cross(c.normal).dot(f0.right));
+  for (let i = 0; i < p.count; i++) {
+    const f = route.frameAt(c.s + upSign * p.getY(i)), v = f.pos.clone().addScaledVector(f.right, runSign * p.getX(i)).addScaledVector(f.up, 0.03);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, mat);
+}
+
+/** The car (a '64-ish convertible, nose +z) with its two silhouettes: him driving (left), her riding. */
+export function buildCar(): THREE.Group {
+  const g = new THREE.Group();
+  const paint = new THREE.MeshLambertMaterial({ color: '#b3122e' }), dark = new THREE.MeshLambertMaterial({ color: '#141018' });
+  const chrome = new THREE.MeshLambertMaterial({ color: '#c9c6bf' });
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b;
+  };
+  box(1.9, 0.55, 4.8, 0, 0.6, 0, paint); // body
+  box(1.86, 0.18, 1.5, 0, 0.95, 1.55, paint); // hood
+  box(1.86, 0.18, 1.2, 0, 0.95, -1.7, paint); // trunk deck
+  box(1.7, 0.45, 0.06, 0, 1.25, 0.75, chrome); // windshield frame
+  for (const z of [1.4, -1.45]) for (const x of [0.92, -0.92]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.25, 14), dark);
+    w.rotation.z = Math.PI / 2; w.position.set(x, 0.36, z); g.add(w);
+  }
+  for (const x of [0.42, -0.42]) { // driver (+x: the car's left) and passenger
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.42, 4, 8), dark); torso.position.set(x, 1.2, -0.05); g.add(torso);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8), dark); head.position.set(x, 1.68, -0.02); g.add(head);
+  }
+  return g;
+}
