@@ -1,15 +1,16 @@
 // The camera language, from I Like Ur Look's director (spreads/shots.ts there), lifted off the page into the world. A
 // stretch lists shots — a target to frame, starting on a beat, a hit or a sung word's cue — and the director eases
-// between them, landing on the beat grid: 'cut' is there at once (an edit), 'snap' jumps in a fixed SNAP_S, 'land'
-// overshoots and settles on a beat, 'glide' eases across a bar to a downbeat. A target is a function of time (a chase framing follows the car), and each
+// between them, landing on the beat grid: 'cut' is there at once (an edit), 'swoop' flies there in SWOOP_S over an arc
+// (the long moves: one continuous take), 'snap' jumps in a fixed SNAP_S, 'land' overshoots and settles on a beat,
+// 'glide' eases across a bar to a downbeat. A target is a function of time (a chase framing follows the car), and each
 // move eases from the previous move's pose *at the same t*, so handing the camera from a moving car to a fixed sign
 // (or back) never jumps. Pure functions of t.
 import type { AudioData } from '../engine/audio';
 import { ease } from '../engine/util';
-import { type Pose, lerpPose } from './camera';
+import { type Pose, lerpPose, swoopPose } from './camera';
 
 export type Target = (t: number) => Pose;
-export type ShotMove = 'cut' | 'land' | 'snap' | 'glide';
+export type ShotMove = 'cut' | 'swoop' | 'land' | 'snap' | 'glide';
 /** A sung word's cue: resolves to `start - LEAD`, so a snap's motion lands on the word. `w` names it in errors. */
 export type WordCue = { start: number; w?: string };
 export interface Shot {
@@ -22,7 +23,7 @@ export interface Shot {
   /** The move's own easing in place of its move's. */
   ease?: (u: number) => number;
 }
-export interface Move { at: number; land: number; to: Target; ease: (u: number) => number }
+export interface Move { at: number; land: number; to: Target; ease: (u: number) => number; swoop: boolean }
 
 /** 'snap's fixed duration (s): the approved animatic's jump. */
 export const SNAP_S = 0.25;
@@ -48,8 +49,11 @@ function onGrid(a: AudioData, t: number) {
   return Math.abs(a.timeOfBeat(Math.round(a.beatAt(t) * 2) / 2) - t) < 1e-3;
 }
 
+/** A swoop's duration (s). */
+export const SWOOP_S = 0.42;
 const EASE: Record<ShotMove, (u: number) => number> = {
   cut: () => 1,
+  swoop: (u) => (u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2), // easeInOutCubic
   land: (u) => ease.outBack(u, OVERSHOOT),
   snap: (u) => (1 - 2 ** (-10 * u)) / (1 - 2 ** -10), // outExpo, normalised to land exactly
   glide: (u) => -(Math.cos(Math.PI * u) - 1) / 2,
@@ -62,6 +66,7 @@ function landing(a: AudioData, s: Shot, at: number) {
     return s.until;
   }
   if (m === 'cut') return at + 1e-4;
+  if (m === 'swoop') return at + SWOOP_S;
   if (m === 'snap') return at + SNAP_S;
   if (m === 'glide') return downbeatAtOrAfter(a, at + barOf(a));
   return beatAtOrAfter(a, at + LAND_MIN);
@@ -78,7 +83,7 @@ export function plan(a: AudioData, shots: readonly Shot[]): Move[] {
   return resolved.map(({ s, at }) => {
     const land = landing(a, s, at);
     if (!(land > at)) throw new Error(`shot ${describeAt(s, at)}: lands at ${land.toFixed(3)}, not after it starts`);
-    return { at, land, to: s.to, ease: s.ease ?? EASE[s.move ?? 'snap'] };
+    return { at, land, to: s.to, ease: s.ease ?? EASE[s.move ?? 'snap'], swoop: s.move === 'swoop' };
   });
 }
 
@@ -89,7 +94,7 @@ export function evaluate(moves: readonly Move[], t: number, start: Target): Pose
   const poseOf = (k: number): Pose => {
     if (k < 0) return start(t);
     const m = moves[k]!, u = (t - m.at) / (m.land - m.at);
-    return u >= 1 ? m.to(t) : lerpPose(poseOf(k - 1), m.to(t), m.ease(Math.max(0, u)));
+    return u >= 1 ? m.to(t) : (m.swoop ? swoopPose : lerpPose)(poseOf(k - 1), m.to(t), m.ease(Math.max(0, u)));
   };
   return poseOf(i);
 }

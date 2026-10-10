@@ -5,7 +5,7 @@ import type { AudioData } from '../engine/audio';
 import type { Line, Lyrics } from '../engine/lyrics';
 import { Motion, type SpeedKey } from './motion';
 
-export type ChaseName = 'side' | 'behind' | 'front3q' | 'high' | 'overlook';
+export type ChaseName = 'side' | 'behind' | 'front3q' | 'high' | 'overlook' | 'hero';
 /** How fast the car goes through a stretch (m/s): parked (pulling away in its last bar into the next stretch's speed),
  *  cruising, stop-and-go in bars (`go` bars moving, `stop` bars standing), or slowing to a stop by bar `byBar`. */
 export type Pace =
@@ -31,11 +31,11 @@ export interface StretchSpec {
 
 export const STRETCHES: readonly StretchSpec[] = Object.freeze([
   { id: 'intro', section: null, place: 'pink motel, parked', pace: { kind: 'park' }, turn: 0, rise: 0, chase: 'front3q' },
-  { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'side' },
+  { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'hero' },
   { id: 'verse1', section: 'verse1', place: 'city streets, stop-and-go', pace: { kind: 'stopgo', v: 9, go: 2, stop: 1 }, turn: 90, rise: 0, chase: 'front3q' },
   { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'cruise', v: 26 }, turn: -20, rise: 6, chase: 'high' },
   { id: 'verse2', section: 'verse2', place: 'Slauson, the neighbourhood', pace: { kind: 'cruise', v: 10 }, turn: -90, rise: -6, chase: 'side' },
-  { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'side' },
+  { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'hero' },
   { id: 'bridge1', section: 'bridge1', place: 'the tunnel through the headland', pace: { kind: 'cruise', v: 24 }, turn: 10, rise: 0, chase: 'behind', tunnel: true },
   { id: 'verse3', section: 'verse3', place: 'the Strip at night', pace: { kind: 'cruise', v: 8 }, turn: 0, rise: 0, chase: 'side' },
   { id: 'chorus4', section: 'chorus4', place: 'up into the hills', pace: { kind: 'cruise', v: 12 }, turn: 120, rise: 40, chase: 'front3q' },

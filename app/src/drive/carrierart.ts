@@ -21,7 +21,7 @@ import { hash } from '../engine/util';
 import { WORLD } from '../look/toon';
 import { F, font } from '../engine/type';
 import type { Carrier } from './carriers';
-import { dissolveAt, revealAt } from './dissolve';
+import { STALE, dissolveAt, revealAt, staleAt } from './dissolve';
 import { daylight } from './sky';
 import { BRAND, TEXT_SHARE } from './ads';
 import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
@@ -117,7 +117,7 @@ export class CarrierArt {
 
   update(t: number) {
     const falling = this.carrier.phrase.words.some((w) => /^dropping/i.test(w.w) && t >= w.start && t < w.start + 0.8);
-    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * FLIP.steps)}:${Math.round(punchAt(this.carrier, t) * 10)}:${falling ? Math.round(t * 30) : 0}`;
+    const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * FLIP.steps)}:${Math.round(punchAt(this.carrier, t) * 10)}:${falling ? Math.round(t * 30) : 0}:${Math.round(staleAt(this.carrier, t) * 8)}`;
     if (key === this.key) return;
     this.key = key;
     this.draw(t);
@@ -174,6 +174,7 @@ export class CarrierArt {
 
   /** The phrase, karaoke word by word, at `alpha` (its reveal for faces without copy). */
   private drawWords(c: CanvasRenderingContext2D, t: number, TW: number, alpha: number) {
+    alpha *= 1 - (1 - STALE.to) * Math.round(staleAt(this.carrier, t) * 8) / 8; // (sung and read: dimmed back)
     const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height, pxPerM = W / carrier.w;
     let em = carrier.em * pxPerM;
     c.font = font(style.family, em);

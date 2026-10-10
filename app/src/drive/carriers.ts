@@ -118,8 +118,8 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   hill: { rowH: 13, w: 120, advance: 0.62, emOfRow: 0.82 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
-export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i;
-export const HOOK = { fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
+export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;
+export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
 export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
@@ -166,7 +166,7 @@ export const STREET = { lateral: 6.5, y: 3.6 };
 export const GANTRY_Y = 6;
 /** Tunnel lettering's centre stands this high on the wall (m); the camera frames it from this far out, across the bore,
  *  sliding with the car up to `slide` either way, from `eye` m up: the car passes between, so it looks over it. */
-export const TUNNEL_TEXT = { y: 3.8, dist: 2 * TUNNEL.halfW - 1.5, slide: 11, eye: 3.6 };
+export const TUNNEL_TEXT = { y: 3.8, dist: 2 * TUNNEL.halfW - 1.5, slide: 11, eye: 2.6, aimDown: 1.2 };
 /** A gantry stands at least this far past the last face on the left (m). */
 export const GANTRY_CLEAR = 20;
 
@@ -225,13 +225,19 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
   const last: Record<string, number> = {};
   const room = (key: string, s: number, gap: number) => { const v = Math.max(s, (last[key] ?? -Infinity) + gap); last[key] = v; return v; };
   const lines = R.flatMap((st) => st.lines), lastLine = lines[lines.length - 1]?.i ?? -1;
-  let flyCount = 0;
+  let flyCount = 0, campaignCount = 0;
   const nextStart = (i: number) => lines.find((l) => l.i > i)?.words[0]!.start ?? Infinity;
   for (const st of R) {
     const pattern = PATTERNS[st.id] ?? ['sign'];
     st.lines.forEach((line, li) => {
       // ("fly" goes in the sky: written there in the first and last choruses, flown on banners in the second)
       let kind: Kind = /\bfly\b/i.test(line.text) ? (st.id === HOOK.bannerIn ? 'banner' : 'sky') : pattern[li % pattern.length]!;
+      // the campaign: "Young and fine and dark and handsome" opens each chorus as his billboards, bigger each time (in
+      // the last verse it keeps the verse's faces, his ad on them: bigger boards there push the gantries after them
+      // out into the sky-writing's way)
+      const his = CAMPAIGN.test(line.text), campaign = his && st.id.startsWith('chorus');
+      if (campaign) kind = 'billboard';
+      const campaignScale = campaign ? HOOK.campaign[Math.min(campaignCount++, HOOK.campaign.length - 1)]! : 1;
       // a fast line is framed two phrases at a time (pairFraming): on the left, where faces pair side by side (a sign's
       // next stands behind it; paint on a moving road lies too far on to share a readable frame)
       if (isFast(line) && kind !== 'sky' && !PAIRABLE.has(kind)) { const fl = FAST_LEFT[st.id] ?? ['wall']; kind = fl[li % fl.length]!; }
@@ -244,7 +250,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         let kind_: Kind = pi === 0 && prev && PAIRABLE.has(prev.kind) && !PAIRABLE.has(kind) && ph.start - prev.phrase.end < 0.4 && alone < dwellFor(ph.words.length) ? prev.kind : kind;
         // a street blade holds one row
         if (kind_ === 'street' && rowsFor(ph.text, ph.solo).length > 1) kind_ = 'sign';
-        let lay = layout(kind_, ph.text, ph.solo);
+        let lay = layout(kind_, ph.text, ph.solo, campaign && kind_ === 'billboard' ? campaignScale : 1);
         const id = `L${line.i}.${pi}`;
         let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3, foot: number | undefined, stack: Carrier['stack'], aim: THREE.Vector3 | undefined, vel: THREE.Vector3 | undefined, hold: number | undefined;
         let solid: Carrier['solid'] | undefined;
@@ -300,7 +306,8 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           center.addScaledVector(vel, ph.start - T0);
           if (fly && pi === phs.length - 1) flyCount++;
           if (fly) hold = T1; // the hook stays written whole until it's sung
-        } else if (PAIRABLE.has(kind_) && prev && !prev.stack && PAIRABLE.has(prev.kind) && prev.stretch === st.id) {
+        } else if (PAIRABLE.has(kind_) && prev && !prev.stack && PAIRABLE.has(prev.kind) && prev.stretch === st.id && !campaign && prev.ad !== 'him') {
+          // (not the campaign's: his boards stand one by one down the road)
           // under the face before, on its building: that one moves up to make room
           kind_ = prev.kind; lay = layout(kind_, ph.text, ph.solo);
           const L = LEFT[kind_ as LeftKind], fB = L.base + lay.h / 2, fT = L.base + lay.h + STACK_GAP + prev.h / 2;
@@ -356,7 +363,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         }
         foot ??= center.y - route.frameAt(s).pos.y;
         if (solid === undefined) solid = solidFor(kind_, lay.w, lay.h, foot);
-        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(hold ? { hold } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000, out.findLast((o) => o.ad)?.ad) } : {}), ...(line.i === lastLine ? { finale: true } : {}) });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(hold ? { hold } : {}), ...(ADVERTISED.has(kind_) ? { ad: his ? 'him' : adFor(ph.text, ph.start * 1000, out.findLast((o) => o.ad)?.ad) } : {}), ...(line.i === lastLine ? { finale: true } : {}) });
       });
     });
   }
@@ -421,10 +428,12 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
     // (faces on the left vary their look phrase by phrase: eye level, low and heroic, or high; the tunnel keeps its own)
     const V = c.kind === 'tunnel' ? TUNNEL_TEXT : WALL_VIEW, look = c.kind === 'tunnel' ? WALL_LOOKS[0]! : WALL_LOOKS[Math.floor(hash(c.phrase.start * 1000, 13) * WALL_LOOKS.length)]!;
     const along = c.up.clone().cross(c.normal).normalize(), dir = Math.sign(along.dot(car(c.phrase.start).fwd)) || 1;
-    const aim = c.center.clone().add(c.aim ?? ZERO);
+    // (in the tunnel aimed under the lettering: the car runs through the bottom of the frame)
+    const aim = c.center.clone().add(c.aim ?? ZERO).addScaledVector(WORLD_UP, c.kind === 'tunnel' ? -TUNNEL_TEXT.aimDown : 0);
     return (t) => {
       const slide = Math.max(-V.slide, Math.min(V.slide, carS(t) - c.s)) + 2 * jitter(4);
-      const eye = aim.clone().addScaledVector(c.normal, V.dist * look.dist).addScaledVector(along, dir * slide);
+      const big = Math.max(1, c.w / LAYOUT[c.kind].w); // (a bigger face, the campaign's: stand back to match)
+      const eye = aim.clone().addScaledVector(c.normal, V.dist * look.dist * big).addScaledVector(along, dir * slide);
       eye.y = groundY(c) + (c.kind === 'tunnel' ? V.eye : look.eye); // over the ground across from it (not the car's: it may be on a grade)
       return lookFrom(eye, aim);
     };
@@ -475,7 +484,8 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
  *  pair can't share a frame (not both on the left). */
 export function pairFraming(c: Carrier, n: Carrier): ((t: number) => Pose) | null {
   if (!PAIRABLE.has(c.kind) || !PAIRABLE.has(n.kind)) return null;
-  const mid = c.center.clone().lerp(n.center, 0.5), span = c.center.distanceTo(n.center);
+  // (centred nearer the one being sung: it leads the frame, the next one comes in at its side)
+  const mid = c.center.clone().lerp(n.center, PAIR.toNext), span = c.center.distanceTo(n.center);
   const dist = Math.max(WALL_VIEW.dist, (span + Math.max(c.w, n.w)) * PAIR.wall);
   const eye = mid.clone().addScaledVector(c.normal, dist);
   // further out than usual, it stands back past the signs on the right: up over them
@@ -485,4 +495,4 @@ export function pairFraming(c: Carrier, n: Carrier): ((t: number) => Pose) | nul
 }
 /** How far back a pair framing stands, per metre of the pair's extent; and how far it rises (m) per metre further out
  *  than WALL_VIEW.dist. */
-export const PAIR = { wall: 0.95, lift: 0.5 };
+export const PAIR = { wall: 0.95, lift: 0.5, toNext: 0.45 };

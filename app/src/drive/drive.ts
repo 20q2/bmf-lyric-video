@@ -8,7 +8,7 @@ import { type Carrier, framing, isFast, lookFrom, pairFraming, placeCarriers } f
 import type { Motion } from './motion';
 import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor, emphasisOf } from './phrases';
-import { LEAD, SNAP_S, type Shot, type Target, beatAtOrAfter, director, resolveAt } from './shots';
+import { LEAD, SNAP_S, SWOOP_S, type Shot, type Target, beatAtOrAfter, director, resolveAt } from './shots';
 import * as THREE from 'three';
 import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
@@ -104,15 +104,18 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     paired.push(!!pair);
     const to = pair ?? framing(c, carFrame, (t) => motion.distanceAt(t));
     let at: Shot['at'] = early > 0.05 ? cue - early : { start: w.start, w: w.w };
-    // an edit, not a move, when the new framing is far from the last phrase's (a move that far sweeps through the town
-    // and smears the words): cut, on the half-beat if one falls just before the cue
+    // one continuous take: when the new framing is far from the last phrase's, the camera swoops there (an arc over the
+    // town), leaving early enough to arrive on the cue, once the phrase before has been read and sung; the last line
+    // (out of the black after "crash") is cut to
     let move: Shot['move'] = 'snap';
     const before = phraseShots[i - 1];
     if (!before || far(before.to(resolveAt(at)), to(resolveAt(at)))) {
-      move = 'cut';
-      const t0 = resolveAt(at), hb = audio.timeOfBeat(Math.round(audio.beatAt(t0) * 2) / 2);
-      // (early only once the phrase before has been read and sung: in a fast line it's still on)
-      if (hb <= t0 + CUT.late && hb >= t0 - CUT.early && hb > Math.max(reading[i - 1]?.[1] ?? -Infinity, prev?.phrase.end ?? -Infinity)) at = hb;
+      // (where the phrase before is still up and there's no room to leave early, a cut: the densest lines)
+      const t0 = resolveAt(at), lead = SWOOP_S - SNAP_S, free = Math.max(reading[i - 1]?.[1] ?? -Infinity, prev?.phrase.end ?? -Infinity);
+      const room = free <= t0 - lead;
+      // (in the tunnel there's no sky to arc through: cut)
+      move = i === carriers.length - 1 || !room || c.kind === 'tunnel' || prev?.kind === 'tunnel' ? 'cut' : 'swoop';
+      if (move === 'swoop') at = t0 - lead;
     }
     const shot: Shot = { at, to, move };
     phraseShots.push(shot);
@@ -134,7 +137,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     const back = Math.max(c.phrase.end + 0.05, reading[i]![1]), nextAt = next ? resolveAt(phraseShots[i + 1]!.at) : Infinity;
     // a cut back to the car on the beat after (or the 'land' when the car's chase is near enough to move to)
     const beat = beatAtOrAfter(audio, back), to = chaseOf(stretchAt(beat));
-    if (nextAt - beat >= BACK_TO_CAR_GAP) { const b: Shot = { at: beat, to, move: far(phraseShots[i]!.to(beat), to(beat)) ? 'cut' : 'land' }; shots.push(b); own.add(b); }
+    if (nextAt - beat >= BACK_TO_CAR_GAP) { const b: Shot = { at: beat, to, move: far(phraseShots[i]!.to(beat), to(beat)) ? (c.kind === 'tunnel' ? 'cut' : 'swoop') : 'land' }; shots.push(b); own.add(b); }
   });
   // the opening, cut on its downbeats: the motel sign's neon flickering on; the Impala, low, dropping on its
   // hydraulics; over the two of them, the road ahead; the lot, wide; then the car pulls out into the chase
