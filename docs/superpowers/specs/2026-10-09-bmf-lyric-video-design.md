@@ -115,7 +115,7 @@ Each ends with the user's sign-off in the live preview.
 
 ## 7. Review and verification
 
-- **The live preview is the review tool.** A Vite dev server on port 5890 (`?t=` to jump, space to play,
+- **The live preview is the review tool.** A Vite dev server on port 5990 (`?t=` to jump, space to play,
   arrows to scrub, next/previous stretch, loop a stretch), plus sliders for motion feel (groove, camera
   kick, drive speed) whose chosen values are committed once.
 - **Still sheets per stretch** at its cue times, self-reviewed before the user sees them ("can you read
