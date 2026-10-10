@@ -16,11 +16,14 @@ import { hash } from '../engine/util';
 import { type Pose, fitSign } from './camera';
 import type { Motion } from './motion';
 import type { Phrase } from './phrases';
-import { phrasesOf } from './phrases';
+import { SETTLE, dwellFor, phrasesOf } from './phrases';
 import type { Route, RouteFrame } from './route';
 import type { Stretch } from './stretches';
 
 export type Kind = 'road' | 'sky' | 'wall' | 'sign' | 'gantry';
+/** Kinds two phrases can share a frame on (pairFraming): walls, side by side. (Paint on a moving road lies too far on,
+ *  and two sky phrases too far apart, for a frame that holds both at a readable size: measured, tests/sung.test.ts.) */
+export const PAIRABLE: ReadonlySet<Kind> = new Set(['wall']);
 
 export interface Carrier {
   id: string;
@@ -79,6 +82,10 @@ export const WALL = { lateral: 15, y: 5 };
 export const SIGN = { lateral: 7.5, y: 3, toe: (25 * Math.PI) / 180 };
 export const GANTRY_Y = 6;
 
+/** A line sung faster than people read (0.3 s a word, subtitle standards: docs/LYRIC_VIDEO_TENETS.md §2). */
+export const isFast = (line: { words: readonly { start: number }[]; end: number }) =>
+  line.end - line.words[0]!.start < 0.3 * line.words.length;
+
 export function rowsOf(text: string): string[] {
   if (text.length <= WRAP_AT) return [text];
   const words = text.split(' ');
@@ -109,33 +116,45 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
   const out: Carrier[] = [];
   const last: Record<string, number> = {};
   const room = (key: string, s: number, gap: number) => { const v = Math.max(s, (last[key] ?? -Infinity) + gap); last[key] = v; return v; };
+  const lines = R.flatMap((st) => st.lines);
+  const nextStart = (i: number) => lines.find((l) => l.i > i)?.words[0]!.start ?? Infinity;
   for (const st of R) {
     const pattern = PATTERNS[st.id] ?? ['sign'];
     st.lines.forEach((line, li) => {
       let kind: Kind = /\bfly\b/i.test(line.text) ? 'sky' : pattern[li % pattern.length]!;
+      // a fast line is framed two phrases at a time (pairFraming): on walls, which pair side by side (a sign's next
+      // stands behind it; paint on a moving road lies too far on to share a readable frame)
+      if (isFast(line) && (kind === 'sign' || kind === 'road')) kind = 'wall';
       // walls stand on the left (seen from the right, the drive runs left to right on screen); none where the sea is
       const wallSide = -1;
-      phrasesOf(line).forEach((ph, pi) => {
-        const lay = layout(kind, ph.text), id = `L${line.i}.${pi}`;
+      const phs = phrasesOf(line, nextStart(line.i));
+      phs.forEach((ph, pi) => {
+        // a line's first phrase too short to read alone, straight after the line before, stays on that line's kind of
+        // carrier, so the frame before can show it coming (pairFraming)
+        const prev = out[out.length - 1];
+        const alone = (phs[pi + 1]?.start ?? nextStart(line.i)) - ph.start - SETTLE;
+        const k: Kind = pi === 0 && prev && PAIRABLE.has(prev.kind) && ph.start - prev.phrase.end < 0.4 && alone < dwellFor(ph.words.length) ? prev.kind : kind;
+        const kind_ = k;
+        const lay = layout(kind_, ph.text), id = `L${line.i}.${pi}`;
         let s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3;
-        if (kind === 'road') {
+        if (kind_ === 'road') {
           s = room('road', motion.distanceAt(ph.end) + ROAD_AHEAD + lay.h / 2, lay.h + 2); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.up, 0.03);
           normal = f.up.clone();
           up = f.fwd.clone().negate();
-        } else if (kind === 'sky') {
+        } else if (kind_ === 'sky') {
           const side = pi % 2 === 0 ? -1 : 1; // left first, then right: read left to right
           s = motion.distanceAt(ph.start) + SKY.ahead; const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(WORLD_UP, SKY.up + (pi % 2) * SKY.lift).addScaledVector(f.right, side * SKY.side);
           const car = route.frameAt(motion.distanceAt((ph.start + ph.end) / 2)).pos;
           normal = car.clone().sub(center).normalize();
           up = uprightFor(normal, WORLD_UP);
-        } else if (kind === 'wall') {
+        } else if (kind_ === 'wall') {
           s = room(`wall${wallSide}`, motion.distanceAt((ph.start + ph.end) / 2), lay.w + 12); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.right, wallSide * WALL.lateral).addScaledVector(WORLD_UP, WALL.y);
           normal = flat(f.right.clone().multiplyScalar(-wallSide));
           up = WORLD_UP.clone();
-        } else if (kind === 'gantry') {
+        } else if (kind_ === 'gantry') {
           s = room('gantry', motion.distanceAt((ph.start + ph.end) / 2), 14); const f = route.frameAt(s);
           center = f.pos.clone().addScaledVector(f.up, GANTRY_Y);
           normal = flat(f.fwd.clone().negate());
@@ -148,7 +167,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           normal = back.multiplyScalar(Math.cos(SIGN.toe)).addScaledVector(toRoad, Math.sin(SIGN.toe)).normalize();
           up = WORLD_UP.clone();
         }
-        out.push({ id, phrase: ph, kind, stretch: st.id, s, center, normal, up, ...lay });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, s, center, normal, up, ...lay });
       });
     });
   }
@@ -191,3 +210,15 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
     }
   }
 }
+
+/** Two phrases framed at once, the one being sung and the next (`n`), so the next can be read before it's sung — for
+ *  fast lines: two walls, from out across the road between them (the next is to the right). Null where the pair can't
+ *  share a frame (not both walls). */
+export function pairFraming(c: Carrier, n: Carrier, car: (t: number) => RouteFrame): ((t: number) => Pose) | null {
+  if (c.kind !== n.kind || !PAIRABLE.has(c.kind)) return null;
+  const mid = c.center.clone().lerp(n.center, 0.5), span = c.center.distanceTo(n.center);
+  const eye = mid.clone().addScaledVector(c.normal, Math.max(WALL_VIEW.dist, (span + c.w) * PAIR.wall));
+  return (t) => { const e = eye.clone(); e.y = car(t).pos.y + 2.2; return lookFrom(e, mid); };
+}
+/** How far back a pair framing stands, per metre of the pair's extent. */
+export const PAIR = { wall: 0.95 };

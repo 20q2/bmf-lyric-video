@@ -135,3 +135,17 @@ on the signs, needs to be more dynamic." Done on m2:
   while it's sung.
 - Fixes found in self-review: the ground was a 640 m strip folding over the hairpin (now shoulders + a base plane); the
   hill climb was 30° at worst (40 m -> 15 m).
+
+## Revision 2: reading direction and reading rules (2026-10-10)
+
+- The user: "reading right to left is terrible… up to down is much more highly preferred". Walls on the left (the car
+  drives left to right on screen), road paint read from ahead (the next phrase lower on screen), sky left then right,
+  signs on the right, the chase sways instead of orbiting. Guard: text upright and running left to right.
+- Research (docs/LYRIC_VIDEO_TENETS.md); the user chose to apply three rules now: title-safe 90% frame, type >= 48 px,
+  and each phrase readable for dwellFor(words) = max(⅚ s, 0.3 s a word), measured as real readable time on screen.
+- To meet it: the phrase splitter penalises phrases too short to read (up to 6 words, a comma may sit inside one);
+  a line's first phrase is found up to 0.5 s early; returns to the car wait for the reading time; stretch glides never
+  interrupt a reading window; in fast lines (sung faster than 0.3 s a word) the camera frames two walls at once — the
+  phrase being sung and the next (the user's pick: "preview the next phrase").
+- 12 phrases of 121 are still 0.07-0.8 s short (tight joins in the dense verses): listed in tests/sung.test.ts
+  KNOWN_SHORT, which may only shrink; M4 designs those shots by hand.
