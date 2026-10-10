@@ -43,7 +43,8 @@ export function drawAd(c: CanvasRenderingContext2D, ad: Ad, W: number, H: number
 
 /** A route sign's art, on the right: a shield and an arrow ahead, in the sign's white. */
 export function drawRoute(c: CanvasRenderingContext2D, W: number, H: number, text: number) {
-  const x0 = W * text, cx = x0 + (W - x0) / 2, cy = H / 2, R = Math.min(W - x0, H) * 0.36;
+  // (sized to fit both, shield and arrow, inside the panel and the sign's border)
+  const x0 = W * text, cx = x0 + (W - x0) / 2, cy = H / 2, R = Math.min((W - x0) * 0.24, H * 0.3);
   c.fillStyle = '#f4f4f0';
   const sx = cx - R * 0.95, ax = cx + R * 0.95;
   c.beginPath(); c.moveTo(sx - R * 0.7, cy - R * 0.8); c.lineTo(sx + R * 0.7, cy - R * 0.8); c.lineTo(sx + R * 0.7, cy + R * 0.2);

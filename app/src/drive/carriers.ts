@@ -86,7 +86,7 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   verse1: ['street', 'wall', 'road', 'sign', 'billboard', 'road', 'storefront'],
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
   verse2: ['storefront', 'street', 'road', 'wall', 'sign', 'road', 'billboard', 'street', 'road'],
-  chorus3: ['road', 'banner', 'road', 'sky'],
+  chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint)
   bridge1: ['tunnel'],
   verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
   chorus4: ['gantry', 'sky', 'banner'], // (no paint on the switchback: the road above would hide it)
@@ -116,7 +116,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i;
-export const HOOK = { fly: [1.2, 1.45, 1.7], recede: 0.35, rise: 9, cruise: 1.7, gap: 3 };
+export const HOOK = { fly: [1.0, 1.4, 1.8], recede: 0.12, rise: 9, cruise: 1.7, gap: 3 };
 /** Kinds set in capitals. */
 export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner']);
 /** A phrase longer than this (characters) takes two rows. */
@@ -126,7 +126,7 @@ const TEXT_W = 0.9;
 /** Placement: paint begins this far past where the car's centre is at the phrase's end (m); sky text this far ahead of the car at
  *  its start, this high (every other one higher by `lift`), this far off to alternate sides; walls this far off the road, their text this high; signs and
  *  gantries as before. */
-export const ROAD_AHEAD = 3.5;
+export const ROAD_AHEAD = 4.5;
 /** Road paint is framed from this far (m, or perLength x its length if more) and this steeply (radians) behind it. */
 export const ROAD_VIEW = { dist: 11, pitch: 0.95, perLength: 2.3, withCar: 0.12, perGap: 2.2 };
 /** Walls are watched from this far out along their normal (m), sliding with the car up to this far either way. */
@@ -265,10 +265,11 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           center = mid.addScaledVector(vel, ph.start - (T0 + T1) / 2).addScaledVector(up, -rank * BANNER.gap * scale);
           aim = up.clone().multiplyScalar(rank * BANNER.gap * scale);
           solid = null;
-        } else if (kind_ === 'sky' && FLY.test(line.text)) {
-          // the hook, "He's so fly, fly": bigger each chorus, its two phrases side by side on one line across the sky,
-          // the shot holding both (aimed at the line's middle)
-          const k = flyCount, scale = HOOK.fly[Math.min(k, HOOK.fly.length - 1)]!;
+        } else if (kind_ === 'sky') {
+          // sky-writing: a line's phrases side by side on one baseline across the sky, left to right as they're sung,
+          // keeping pace with the car; the hook ("He's so fly, fly") bigger each chorus, held whole until it's sung,
+          // the shot holding the whole of it (aimed at the line's middle)
+          const fly = FLY.test(line.text), k = flyCount, scale = fly ? HOOK.fly[Math.min(k, HOOK.fly.length - 1)]! : 1;
           lay = layout(kind_, ph.text, ph.solo, scale);
           const T0 = phs[0]!.start, T1 = phs[phs.length - 1]!.end;
           // (further off and higher, but less than it grows: it reads bigger each time)
@@ -282,20 +283,13 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           const along = up.clone().cross(normal).normalize(), ws = phs.map((p) => layout(kind_, p.text, p.solo, scale).w), gap = HOOK.gap * scale;
           const total = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1), x = -total / 2 + ws.slice(0, pi).reduce((a, b) => a + b, 0) + gap * pi + ws[pi]! / 2;
           center = mid.clone().addScaledVector(along, x);
-          aim = mid.clone().sub(center); // (the line's middle, from this phrase: both travel together)
+          if (fly) aim = mid.clone().sub(center); // (the line's middle, from this phrase: both travel together)
           // keeping pace with the car over the line, so the shot holds as it's written
           const pace = (motion.distanceAt(T1) - motion.distanceAt(T0)) / Math.max(1e-3, T1 - T0);
           vel = flat(f.fwd).multiplyScalar(pace);
           center.addScaledVector(vel, ph.start - T0);
-          if (pi === phs.length - 1) flyCount++;
-          hold = T1; // the line stays written whole until it's sung
-        } else if (kind_ === 'sky') {
-          const side = pi % 2 === 0 ? -1 : 1; // left first, then right: read left to right
-          s = motion.distanceAt(ph.start) + SKY.ahead; const f = route.frameAt(s);
-          center = f.pos.clone().addScaledVector(WORLD_UP, SKY.up + (pi % 2) * SKY.lift).addScaledVector(f.right, side * SKY.side);
-          const car = route.frameAt(motion.distanceAt((ph.start + ph.end) / 2)).pos;
-          normal = car.clone().sub(center).normalize();
-          up = uprightFor(normal, WORLD_UP);
+          if (fly && pi === phs.length - 1) flyCount++;
+          if (fly) hold = T1; // the hook stays written whole until it's sung
         } else if (PAIRABLE.has(kind_) && prev && !prev.stack && PAIRABLE.has(prev.kind) && prev.stretch === st.id) {
           // under the face before, on its building: that one moves up to make room
           kind_ = prev.kind; lay = layout(kind_, ph.text, ph.solo);
@@ -366,6 +360,16 @@ function solidFor(kind: Kind, w: number, h: number, foot: number, under?: { h: n
 /** A carrier's solid parts, which can hide another's face. The scene builds them from this (world.ts), so the guard
  *  checks what shows. */
 export const solidsOf = (c: Pick<Carrier, 'solid'>) => (c.solid ? [c.solid] : []);
+/** Everything of a carrier that can stand in front of another's words, for the guard: its solids, and a gantry's beam
+ *  across the road and its legs (world.ts builds them at these sizes). */
+export function occludersOf(c: Pick<Carrier, 'solid' | 'kind' | 'h' | 'foot'>): { at: THREE.Vector3; size: THREE.Vector3 }[] {
+  const out = solidsOf(c);
+  if (c.kind === 'gantry') {
+    out.push({ at: new THREE.Vector3(0, c.h / 2 + 0.2, -0.2), size: new THREE.Vector3(13.4, 0.4, 0.4) });
+    for (const x of [-6.5, 6.5]) out.push({ at: new THREE.Vector3(x, (c.h / 2 - c.foot) / 2, -0.2), size: new THREE.Vector3(0.2, c.foot + c.h / 2, 0.2) });
+  }
+  return out;
+}
 
 /** Whether two carriers' solids come within CLEAR of each other. */
 type Placed = Pick<Carrier, 'center' | 'normal' | 'up' | 'solid'>;
@@ -380,7 +384,7 @@ function overlaps(a: Placed, b: Placed): boolean {
  *  (m, over the car's bulk: drive.ts CAR_BOX), aimed this far (radians) under the writing. */
 /** The end's tail-light shot: how far behind the car, off its side and up (m), and how far under the writing it aims. */
 export const TAIL = { back: 7.5, side: 1.4, up: 0.9, under: 5 };
-export const CABIN = { stretches: new Set(['chorus1', 'outro1']), back: 2.3, up: 2.15, under: (8 * Math.PI) / 180 };
+export const CABIN = { stretches: new Set(['chorus1', 'outro1']), back: 3.4, up: 2.3, under: (8 * Math.PI) / 180 };
 
 /** The pose for a camera at `eye` looking at `at`. */
 export function lookFrom(eye: THREE.Vector3, at: THREE.Vector3): Pose {

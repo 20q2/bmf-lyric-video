@@ -12,7 +12,7 @@ import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, centerAt } from '../drive/carriers';
 import { daylight, skyStateAt } from '../drive/sky';
-import { buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
+import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
@@ -31,6 +31,8 @@ const TUNNEL_DARK = new THREE.Color('#120a05');
 const BANNER_SKY = { before: 0.8, after: 4 };
 /** The skywriter flies on this long after its phrase (s), this fast along it and up (m/s). */
 const SKYWRITER = { after: 1.4, speed: 30, climb: 8, size: 0.7 };
+/** Road paint stays this long after its phrase (s). */
+const PAINT_LASTS = 3;
 /** Carriers further along the road than this from the car (m) are put away. */
 const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
@@ -115,6 +117,9 @@ export default class DriveScene extends Scene {
     this.sunAz.set(coast.fwd.x, 0, coast.fwd.z).normalize().multiplyScalar(Math.cos(SUN_AZ))
       .addScaledVector(new THREE.Vector3(coast.right.x, 0, coast.right.z).normalize(), -Math.sin(SUN_AZ)).normalize();
     this.world.fog = new THREE.Fog(0xffffff, 140, 1100);
+    // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
+    const hide = typeof location === 'undefined' ? [] : (new URLSearchParams(location.search).get('hide') ?? '').split(',').filter(Boolean);
+    if (hide.length) world.traverse((o) => { if (hide.includes(o.name)) o.visible = false; });
     // the city below the overlook, ahead of where the car parks
     const end = this.drive.carFrame(this.ctx.audio.duration);
     this.city = buildCity(end.pos, end.fwd, end.right, -0.4);
@@ -132,6 +137,10 @@ export default class DriveScene extends Scene {
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
     const st = this.stance(t), body = this.car.getObjectByName('body')!;
     body.position.y = st.lift; body.rotation.set(st.pitch, 0, st.roll);
+    for (const strut of this.car.getObjectByName('struts')!.children) { // from the hub up to the chassis
+      const top = 0.18 + st.lift, bottom = CAR.wheelR;
+      strut.scale.y = Math.max(0.01, top - bottom); strut.position.y = (top + bottom) / 2;
+    }
     // the two of them: her arm up (it swings out and over), her look to him, his nod
     const cast = this.cast(t);
     body.getObjectByName('herArm')!.rotation.set(0, 0, -2.7 * cast.herArm);
@@ -143,12 +152,15 @@ export default class DriveScene extends Scene {
     const face = neon.no ? this.sign.faces.no : this.sign.faces.vacancy;
     if (this.sign.neon.map !== face) { this.sign.neon.map = face; this.sign.neon.needsUpdate = true; }
     const carS = d.motion.distanceAt(t);
-    for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER;
+    // (at the cut to black after the last "crash" every word sung before it goes: the end starts clean)
+    const cleared = d.blackout && t >= d.blackout[0] ? d.blackout[0] : -Infinity;
+    // (road paint is retired a little after it's sung: from the shots after it'd read upside down)
+    for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER && c.phrase.end > cleared && (c.kind !== 'road' || t < c.phrase.end + PAINT_LASTS);
     // banners where they've flown to; each plane in the sky only around its line
     for (const [c, o] of this.flying) {
       const line = this.ctx.lyrics.lines[c.phrase.line]!;
       const first = d.carriers.find((k) => k.phrase.line === c.phrase.line)!;
-      o.visible = t > first.reveal - BANNER_SKY.before && t < line.end + BANNER_SKY.after;
+      o.visible = t > first.reveal - BANNER_SKY.before && t < line.end + BANNER_SKY.after && c.phrase.end > cleared;
       o.matrix.setPosition(centerAt(c, t));
       if (o.visible && c.kind === 'banner') flutter(o, c, t); // (cloth ripples; travelling sky-writing doesn't)
     }

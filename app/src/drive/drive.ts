@@ -30,6 +30,8 @@ export const SWAY = { amp: 0.35, rate: 0.35 };
  *  the road at the car's route frame; the guard checks it doesn't hide the lyrics. */
 export const CAR_BOX = { w: 2.05, h: 1.95, l: 5.7 };
 
+/** How far right of the road's centre the car drives (m): in its lane. */
+export const LANE = 1.9;
 /** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
  *  its first shot stands (m). */
 export const OPENING = { at: [2.47, 6.22, 9.97, 13.72], signDist: 7.5 };
@@ -75,7 +77,8 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const stretches = resolveStretches(audio, lyrics), motion = motionFor(stretches, audio), route = routeFor(stretches, motion);
   const tunnels = tunnelsOf(stretches, motion, audio.beats);
   const carriers = placeCarriers(stretches, motion, route, tunnels, emphasisOf(lyrics.lines));
-  const carFrame = (t: number) => route.frameAt(motion.distanceAt(t));
+  // the car keeps to its lane (the right one), off the centre line
+  const carFrame = (t: number) => { const f = route.frameAt(motion.distanceAt(t)); return { ...f, pos: f.pos.clone().addScaledVector(f.right, LANE) }; };
   const stretchAt = (t: number) => stretches.find((s) => t >= s.start && t < s.end) ?? stretches[stretches.length - 1]!;
   const chaseOf = (st: Stretch): Target => (t) => {
     const p = chase(CHASE[st.chase], carFrame(t));

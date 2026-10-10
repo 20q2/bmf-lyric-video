@@ -5,7 +5,7 @@
 import { expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { LENS, placeCamera } from '../src/drive/camera';
-import { type Carrier, KINDS, basisOf, centerAt, solidsOf } from '../src/drive/carriers';
+import { type Carrier, KINDS, basisOf, centerAt, occludersOf } from '../src/drive/carriers';
 import { dwellFor } from '../src/drive/phrases';
 import { CAR_BOX, REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
 import { LEAD, SNAP_S } from '../src/drive/shots';
@@ -21,7 +21,7 @@ const RATE = 30;
  *  before ends on another kind of carrier than this one starts on; and (L5.1, L8.1, L17.2, added 2026-10-10 when the
  *  guard learnt occlusion) the second sign of a line, which stands behind the first while that one's framed. M4
  *  designs these shots by hand; the list may only shrink. */
-const KNOWN_SHORT = new Set(['L4.0', 'L7.1', 'L8.1', 'L17.2', 'L21.0', 'L36.1', 'L43.0', 'L43.1']); // (L43.0 added 2026-10-10: chorus 4's ransom line moved to gantries, whose reading time leaves "Put it in drive," a cut on its first word: 1.13 s of 1.2)
+const KNOWN_SHORT = new Set(['L4.0', 'L7.1', 'L8.1', 'L17.2', 'L21.0', 'L36.1', 'L43.1']); // (L43.0 added 2026-10-10: chorus 4's ransom line moved to gantries, whose reading time leaves "Put it in drive," a cut on its first word: 1.13 s of 1.2)
 /** Frame margin (NDC), the most a face may turn away from the camera, and the least type size on screen (px at 1080p);
  *  and how long a phrase must stay up (§2: subtitle standards, ⅚ s and 0.3 s a word). */
 const MARGIN = 0.1; // title-safe: the middle 90% of the frame (docs/LYRIC_VIDEO_TENETS.md §3)
@@ -34,7 +34,7 @@ function corners(c: Carrier) {
   return [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([x, y]) => c.center.clone().addScaledVector(a, x!).addScaledVector(u, y!));
 }
 /** Every carrier's solids as boxes in its own frame, with the frame's inverse (to take rays into it). */
-const solids = drive.carriers.map((c) => ({ c, inv: basisOf(c).invert(), boxes: solidsOf(c).map(({ at, size }) => new THREE.Box3().setFromCenterAndSize(at, size)) }));
+const solids = drive.carriers.map((c) => ({ c, inv: basisOf(c).invert(), boxes: occludersOf(c).map(({ at, size }) => new THREE.Box3().setFromCenterAndSize(at, size)) }));
 /** The town's buildings: unit boxes in their own (scaled) frames. */
 const UNIT = new THREE.Box3(new THREE.Vector3(-0.5, -0.5, -0.5), new THREE.Vector3(0.5, 0.5, 0.5));
 const blocks = drive.blocks.map((b) => ({ b, m: b.matrix, inv: b.matrix.clone().invert(), at: new THREE.Vector3().setFromMatrixPosition(b.matrix) }));
@@ -58,6 +58,7 @@ function hiddenBy(c: Carrier, t: number): string | null {
     return ray.intersectBox(CAR, hit) && hit.applyMatrix4(car).distanceTo(cam.position) < d - 0.05;
   })) return 'the car';
   if (pts.some(blockHides)) return 'a building';
+  if (pts.some(terrainHides)) return 'the ground';
   for (const o of solids) {
     if (o.c === c || !o.boxes.length || o.c.center.distanceTo(c.center) > 120) continue;
     let hid = 0;
@@ -69,6 +70,46 @@ function hiddenBy(c: Carrier, t: number): string | null {
     if (hid) return o.c.id;
   }
   return null;
+}
+/** The ground, fast: the road sampled every 2 m into a grid (40 m cells); the ground at a point is the nearest road
+ *  point's height, falling away past the verges down the embankments to the plain (world.ts). The road ends at the
+ *  overlook's cliff. */
+const roadEnd = drive.motion.distanceAt(drive.stretches[drive.stretches.length - 1]!.end) + 9;
+const cells = new Map<string, number[]>(), samples: THREE.Vector3[] = [], fwds: THREE.Vector3[] = [];
+for (let s = 0; s <= roadEnd; s += 2) {
+  const f = drive.route.frameAt(s), p = f.pos;
+  fwds.push(new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize());
+  const k = `${Math.floor(p.x / 40)},${Math.floor(p.z / 40)}`;
+  (cells.get(k) ?? cells.set(k, []).get(k)!).push(samples.length);
+  samples.push(p);
+}
+const roadTop = Math.max(...samples.map((p) => p.y)) + 0.5;
+function terrainY(q: THREE.Vector3): number {
+  if (q.y > roadTop) return -0.4; // (above the highest road: nothing to hit)
+  // the highest of every nearby stretch of road's verges and embankments (where a road climbs past another, its bank
+  // stands over the lower one's ground)
+  const cx = Math.floor(q.x / 40), cz = Math.floor(q.z / 40), reach = Math.ceil((SHOULDER + SLOPE * roadTop) / 40);
+  let y = -0.4;
+  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) for (const n of cells.get(`${cx + i},${cz + j}`) ?? []) {
+    const p = samples[n]!;
+    if (p.y - 0.05 <= y) continue;
+    // this sample's own slice of road (2 m along it), and its verge and bank out to either side
+    const dx = q.x - p.x, dz = q.z - p.z, f = fwds[n]!, along = dx * f.x + dz * f.z, across = Math.abs(dx * f.z - dz * f.x);
+    if (Math.abs(along) > 1.01) continue;
+    y = Math.max(y, p.y - 0.05 - Math.max(0, across - SHOULDER) / SLOPE);
+  }
+  return y;
+}
+/** Whether the ground (the road on a hill, an embankment) stands between the camera and p. In a tunnel's bore the
+ *  ground is its floor; its headland is left to the camera check. */
+function terrainHides(p: THREE.Vector3): boolean {
+  const from = cam.position, d = p.distanceTo(from), n = Math.ceil(d / 3);
+  for (let i = 1; i < n; i++) {
+    const q = from.clone().lerp(p, i / n);
+    if (q.distanceTo(p) < 2) break;
+    if (q.y < terrainY(q) - 0.15) return true;
+  }
+  return false;
 }
 const toPx = (v: THREE.Vector3) => new THREE.Vector2(((v.x + 1) / 2) * 1920, ((1 - v.y) / 2) * 1080);
 
@@ -103,7 +144,7 @@ test('the carriers are a mix: every kind is used', () => {
   expect(new Set(drive.carriers.map((c) => c.kind))).toEqual(new Set(KINDS));
 });
 
-test('every carrier reads while its phrase is sung', () => {
+test('every carrier reads while its phrase is sung', { timeout: 120000 }, () => {
   const fails: string[] = [];
   drive.carriers.forEach((c, i) => {
     const from = c.phrase.start - LEAD + SNAP_S;
@@ -145,7 +186,7 @@ function readable(c: Carrier): number {
 }
 const isShort = (c: Carrier) => readable(c) < dwellFor(c.phrase.words.length) - 1e-6;
 
-test('every phrase is readable on screen long enough: dwellFor(words), counting time before and after it is sung', () => {
+test('every phrase is readable on screen long enough: dwellFor(words), counting time before and after it is sung', { timeout: 120000 }, () => {
   const short = drive.carriers.filter((c) => !KNOWN_SHORT.has(c.id) && isShort(c));
   expect(short.map((c) => `${c.id} ${c.kind} "${c.phrase.text}" readable ${readable(c).toFixed(2)} s of ${dwellFor(c.phrase.words.length).toFixed(2)}`)).toEqual([]);
 });

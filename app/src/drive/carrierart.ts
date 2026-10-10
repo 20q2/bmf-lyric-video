@@ -27,11 +27,15 @@ import { TEXT_SHARE } from './ads';
 import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 
 const CANVAS_W = 1024;
+/** Boards whose waiting headline shows as greeked lines. */
+const GREEKED: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'sign', 'wall', 'storefront', 'street', 'gantry']);
+/** The word of emphasis is never more than this many times its companions' size (they stay readable beside it). */
+const SOLO_MAX = 1.6;
 /** Faces that carry poster art until their lyric is revealed. */
 /** A word of emphasis punches up this much as it's sung, settling over `over` s; it fills this share of its row. */
 export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
 /** The word dropping drops as it's sung: falling down its row and landing tilted, with a bounce. */
-export const FALL = { depth: 0.3, fallS: 0.3, tilt: 0.08 };
+export const FALL = { depth: 0.42, fallS: 0.28, tilt: 0.2 };
 function fallAt(w: Word, t: number, rowPx: number): { dy: number; tilt: number } | null {
   if (!/^dropping/i.test(w.w) || t < w.start) return null;
   const tau = t - w.start, u = Math.min(1, tau / FALL.fallS);
@@ -68,7 +72,7 @@ function styleOf(c: Carrier): Style {
     // by day a soft plum shade under the white (it reads on a pale sky and on the buildings), by night a white glow
     case 'sky': {
       const day = daylight(c.phrase.start) > 0.6; // by day heavier, its shade laid twice
-      return { family: F.bodoni(day ? 700 : 400, { italic: true }), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
+      return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
     }
     case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.72, 1] };
     case 'billboard': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
@@ -82,7 +86,7 @@ function styleOf(c: Carrier): Style {
       ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)' }
       : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)' };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
-    default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(400, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
+    default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
 }
 
@@ -125,6 +129,16 @@ export class CarrierArt {
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
     const TW = W * share; // the lyric's width
     const shown = Math.round(revealAt(carrier, t) * 10) / 10;
+    // before its words are revealed a board shows where they'll go, as a layout's greeked lines (grey bars): it reads as
+    // a designed ad waiting for its headline, never as an empty board, and gives nothing away
+    if (shown < 1 && GREEKED.has(carrier.kind)) {
+      c.save(); c.globalAlpha = 0.22 * (1 - shown); c.fillStyle = style.colors[1];
+      carrier.rows.forEach((row, r) => {
+        const rh = H / carrier.rows.length, bw = Math.min(TW * 0.8, TW * (0.3 + 0.05 * row.length));
+        c.beginPath(); c.roundRect((TW - bw) / 2, rh * (r + 0.5) - rh * 0.12, bw, rh * 0.24, rh * 0.12); c.fill();
+      });
+      c.restore();
+    }
     if (shown <= 0) return;
     let em = carrier.em * pxPerM;
     c.font = font(style.family, em);
@@ -144,7 +158,7 @@ export class CarrierArt {
       const solo = (carrier.phrase.solo === 'first' && r === 0) || (carrier.phrase.solo === 'last' && r === carrier.rows.length - 1);
       if (solo) {
         const base = c.measureText(label(rowWords[0]!)).width;
-        const big = Math.min((PUNCH.fill * H) / carrier.rows.length, (em * TW * 0.92) / base) * (1 + PUNCH.scale * punchAt(carrier, t));
+        const big = Math.min((PUNCH.fill * H) / carrier.rows.length, (em * TW * 0.92) / base, em * SOLO_MAX) * (1 + PUNCH.scale * punchAt(carrier, t));
         c.font = font(style.family, Math.max(em, Math.min(big, (em * TW * 0.98) / base))); // never past the face's edge
       }
       const total = rowWords.reduce((s, w) => s + c.measureText(label(w)).width, 0) + space * (rowWords.length - 1);

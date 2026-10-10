@@ -17,8 +17,8 @@ export function motelSign(route: Route) {
 
 /** The neon's flicker on: dark before `from`, a stutter on the half-beats, fully lit from `on` (a downbeat). */
 export const NEON_ON = { from: 0.59, on: 2.47 };
-/** At the end the NO goes out on this downbeat. */
-export const VACANCY_AT = 180.6;
+/** At the end the NO goes out (s): 0.7 s into the end card, long enough before the fade to register. */
+export const VACANCY_AT = 179.9;
 
 /** How lit the sign's neon is at t (0..1), and whether its NO is lit. */
 export function neonAt(t: number, beat: number): { lit: number; no: boolean } {

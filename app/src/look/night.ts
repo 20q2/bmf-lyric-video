@@ -86,7 +86,7 @@ void main() {
   vec2 uv = clamp(vUv, 0.0, 1.0);
   // a pool: out from its middle; a beam: from just ahead of its lamp, and soft where its cone is seen edge-on
   float a = ${radial ? 'pow(max(0.0, 1.0 - length(uv - 0.5) * 2.0), 1.6)'
-    : throwOnRoad ? 'pow(uv.y, 1.4) * smoothstep(0.0, 0.25, 1.0 - uv.y) * pow(max(0.0, 1.0 - abs(uv.x - 0.5) * 2.0), 1.3)'
+    : throwOnRoad ? 'pow(uv.y, 1.6) * smoothstep(0.0, 0.45, 1.0 - uv.y) * pow(max(0.0, 1.0 - abs(uv.x - 0.5) * 2.0), 2.2) * smoothstep(0.05, 0.5, abs(dot(normalize(vN), normalize(vV))))'
     : 'pow(1.0 - uv.y, 2.2) * smoothstep(0.0, 0.12, uv.y) * pow(abs(dot(normalize(vN), normalize(vV))), 1.5)'};
   gl_FragColor = vec4(color * a * strength * night, 1.0);
 }`,

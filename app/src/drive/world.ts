@@ -21,12 +21,12 @@ export const SHOULDER = 40;
 export const SEA = 200;
 const BASE = 12000;
 /** Where the road climbs above the plain, its verges slope down to it this much out per metre down (an embankment). */
-export const SLOPE = 2.4;
+export const SLOPE = 1;
 /** The road runs on this far past where the car parks, to the overlook's edge (m). */
 const OVERLOOK_LIP = 9;
 const STEP = 2;
 
-const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'verse3']);
+const PALMS = new Set(['intro', 'chorus1', 'verse2', 'verse3']); // (none on the coast road: they'd stand in the hook's sky)
 
 /** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
  *  coloured per sample. */
@@ -83,21 +83,22 @@ export function buildWorld(drive: Drive): THREE.Group {
   const seaLeft = (s: number) => !!BLOCKS[stretchAtS(s).id]!.seaLeft;
   // the road ends at the overlook, a few metres past where the car parks: a cliff, the city below
   const end = Math.min(route.length, motion.distanceAt(drive.stretches[drive.stretches.length - 1]!.end) + OVERLOOK_LIP);
-  g.add(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass), end), lambert()));
-  g.add(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass), end), lambert()));
+  const named = <T extends THREE.Object3D>(o: T, name: string) => { o.name = name; return o; };
+  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : grass), end), lambert()), 'verges'));
+  g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : grass), end), lambert()), 'verges'));
   const fe = route.frameAt(end), cliff = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.rock }));
   cliff.matrixAutoUpdate = false;
-  cliff.matrix.copy(boxAt(route, end + 1, 0, 2 * SHOULDER + 2 * SLOPE * (fe.pos.y + 0.4), fe.pos.y + 0.4, 2, -(fe.pos.y + 0.4)));
-  g.add(cliff);
+  cliff.matrix.copy(boxAt(route, end + 1, 0, 2 * SHOULDER, fe.pos.y + 0.4, 2, -(fe.pos.y + 0.4))); // (the verges' width: any wider and its edge cuts across the town seen from the Strip)
+  g.add(named(cliff, 'cliff'));
   // embankments where the road has climbed: from each verge's edge down to the plain
-  for (const side of [-1, 1]) g.add(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? SEA : SHOULDER), end), lambert()));
+  for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? SEA : SHOULDER), end), lambert()), 'skirts'));
   const box3 = new THREE.Box3();
   for (let s = 0; s < route.length; s += 50) box3.expandByPoint(route.frameAt(s).pos);
   const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), toon({ color: grass.clone().multiplyScalar(0.85) }));
   base.rotation.x = -Math.PI / 2;
   base.position.set((box3.min.x + box3.max.x) / 2, -0.4, (box3.min.z + box3.max.z) / 2);
-  g.add(base);
-  g.add(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt, end), lambert()));
+  g.add(named(base, 'base'));
+  g.add(named(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt, end), lambert()), 'road'));
   // the centre line's dashes, but none under road paint (they'd cut through its letters; left out, not squashed
   // flat: a flat box's normals are NaN, and the bloom spreads a NaN into a white dot)
   const paint = drive.carriers.filter((c) => c.kind === 'road');
@@ -105,14 +106,14 @@ export function buildWorld(drive: Drive): THREE.Group {
   for (let s = 0; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2)) dashAt.push(s);
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
   dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
-  g.add(dashes);
+  g.add(named(dashes, 'dashes'));
 
   // the town's buildings (blocks.ts: the guard checks them too)
   const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), drive.blocks.length);
   drive.blocks.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
-  g.add(blocks);
-  g.add(dressing(drive));
-  g.add(placeSigns(drive));
+  g.add(named(blocks, 'blocks'));
+  g.add(named(dressing(drive), 'dressing'));
+  g.add(named(placeSigns(drive), 'places'));
 
   // palms: a trunk and a crown, behind the roadside signs' line
   const trunks: THREE.Matrix4[] = [], crowns: THREE.Matrix4[] = [];
@@ -124,7 +125,7 @@ export function buildWorld(drive: Drive): THREE.Group {
       if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR)) continue; // nor in the rock
       // none by a face on the left: they'd stand between it and the camera across the road (on the right too: a wide
       // pair shot stands back past them)
-      if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + (side === -1 ? 4 : 12))) continue;
+      if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + (side === -1 ? 8 : 28))) continue;
       const h = 9 + 4 * hash(k, side, 8);
       trunks.push(boxAt(route, s, side * 11.5, 0.35, h, 0.35));
       crowns.push(boxAt(route, s, side * 11.5, 3.2, 1.2, 3.2, h));
@@ -134,10 +135,10 @@ export function buildWorld(drive: Drive): THREE.Group {
   trunks.forEach((m, i) => trunk.setMatrixAt(i, m));
   const crown = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 7, 4), toon({ color: WORLD.crown }), crowns.length);
   crowns.forEach((m, i) => crown.setMatrixAt(i, m));
-  g.add(trunk, crown);
+  g.add(named(trunk, 'palms'), named(crown, 'palms'));
 
   for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
-  g.add(buildStreetlights(drive));
+  g.add(named(buildStreetlights(drive), 'streetlights'));
 
   // the motel the car waits outside at the start
   const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon({ color: WORLD.motel })));
@@ -268,7 +269,7 @@ export const PLACES: readonly [RegExp, string, string, boolean][] = [
   [/slauson/i, 'SLAUSON AV', 'NEXT RIGHT', false],
   [/south of somewhere/i, 'SOUTH OF', 'DETROIT', true],
 ];
-const PLACE_SIGN = { after: 45, lateral: 11.5, w: 7, h: 3.4, y: 4.2 };
+const PLACE_SIGN = { after: 45, lateral: 12, w: 11, h: 5.2, y: 5 };
 function placeSigns(drive: Drive): THREE.Group {
   const g = new THREE.Group(), { route, motion } = drive;
   const lines = new Map<number, { text: string; end: number }>();
@@ -316,7 +317,7 @@ function buildStreetlights(drive: Drive): THREE.Group {
     if (at.length && s - at[at.length - 1]! < STREETLIGHTS.gap) continue;
     if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR) || signs.some((c) => Math.abs(c.s - s) < 12)) continue;
     // nor where the camera stands across the road from a face on the left (it would stand beside the lens)
-    if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 12)) continue;
+    if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 28)) continue;
     at.push(s);
   }
   const L = STREETLIGHTS, n = at.length;
@@ -490,6 +491,11 @@ export function buildCar(): THREE.Group {
   box(Wd + 0.06, 0.13, 0.14, 0, 0.42, hl + 0.06, chrome);
   box(Wd + 0.06, 0.13, 0.14, 0, 0.42, -hl - 0.06, chrome);
   box(Wd - 0.5, 0.2, 0.04, 0, 0.66, hl + 0.06, dark); // the grille
+  // under it: the chassis (it rides with the body), and a strut down to each wheel's hub (the scene stretches them as
+  // the hydraulics lift it: named 'struts')
+  box(Wd - 0.5, 0.16, L - 1.6, 0, 0.22, 0, dark);
+  const struts = new THREE.Group(); struts.name = 'struts'; g.add(struts);
+  for (const z of [wheelZ, -wheelZ]) for (const x of [Wd / 2 - 0.35, -Wd / 2 + 0.35]) add(new THREE.CylinderGeometry(0.05, 0.05, 1, 8), chrome, x, 0.5, z, struts);
   // wheels: tyre, whitewall, chrome cap
   for (const z of [wheelZ, -wheelZ]) for (const x of [Wd / 2 - 0.13, -Wd / 2 + 0.13]) {
     const sgn = Math.sign(x);

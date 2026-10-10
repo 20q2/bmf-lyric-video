@@ -8,7 +8,7 @@ import type { Lyrics } from '../engine/lyrics';
 import type { RouteFrame } from '../drive/route';
 
 /** Bills per line, how long each flies (s), its size (m), and the wind (m/s along the car's forward when parked). */
-export const MONEY = { perLine: 70, life: 7, w: 0.62, h: 0.27, wind: 3.2, fall: 0.55, drag: 1.4, nearest: 3 };
+export const MONEY = { perLine: 90, life: 7, w: 0.95, h: 0.42, wind: 3.2, fall: 0.55, drag: 1.4, nearest: 3 };
 
 function billTexture(): THREE.Texture {
   const c = document.createElement('canvas'); c.width = 256; c.height = 112;

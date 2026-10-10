@@ -26,7 +26,7 @@ usage: bun scripts/render.ts <mode> [options]   (options: see the comment at the
   perf   --from 20 --to 25 [--only ids] [--samples 1] [--shutter 0.5]
   video  [--from 0] [--to <duration>] [--fps 60] [--samples N|auto] [--shutter 0.5] [--preset slow] [--out ../out/lyricvideo.mp4] [--noaudio]
   gpu    (print the WebGL renderer string)
-  all modes: [--scale N] [--url URL]`);
+  all modes: [--scale N] [--url URL] [--hide name,name (the drive's named world parts)]`);
   process.exit(1);
 }
 const opt = (k: string, d?: string) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d; };
@@ -125,7 +125,8 @@ async function bootApp(browser: Browser, url: string) {
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') logs.push(`[${m.type()}] ${m.text()}`); });
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   const only = opt('only');
-  await page.goto(`${url}/?export=1${only ? `&only=${only}` : ''}${SCALE !== 1 ? `&scale=${SCALE}` : ''}${CARD ? `&card=${encodeURIComponent(CARD)}` : ''}`);
+  const hide = opt('hide'); // (debugging: hide the world's named parts, e.g. --hide blocks,palms)
+  await page.goto(`${url}/?export=1${only ? `&only=${only}` : ''}${SCALE !== 1 ? `&scale=${SCALE}` : ''}${CARD ? `&card=${encodeURIComponent(CARD)}` : ''}${hide ? `&hide=${encodeURIComponent(hide)}` : ''}`);
   // (a module that throws while it loads leaves no __lv at all: say what the page said, not just that it timed out)
   try { await page.waitForFunction(() => (window as any).__lv?.ready || (window as any).__lv?.error, null, { timeout: 120000 }); }
   catch (e) { throw new Error(`the app didn't boot within 120 s; ${logs.length ? `the page logged:\n${logs.join('\n')}` : 'the page logged no errors'}`, { cause: e }); }
