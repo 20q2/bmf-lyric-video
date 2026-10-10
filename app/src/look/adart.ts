@@ -15,11 +15,12 @@ export const AD_STYLE: Record<Ad, { bg: string; ink: string; now: string; spot: 
   cocktail: { bg: '#2b8a87', ink: '#fbf7ee', now: '#f6dd8f', spot: '#3aa6a2' },
 };
 
-/** Draw the ad's field, its product and its mark (not its headline) on a canvas W x H, the headline taking the left
- *  `text` share of the width. */
-export function drawAd(c: CanvasRenderingContext2D, ad: Ad, W: number, H: number, text: number) {
-  const st = AD_STYLE[ad];
-  c.fillStyle = st.bg; c.fillRect(0, 0, W, H);
+/** Draw the ad's product and its mark (not its headline) on a canvas W x H, the headline taking the left `text` share
+ *  of the width; on its own colour field (a billboard), or on the face's own ground (`ink`: the face's type colour —
+ *  a roadside sign, a painted wall, a shop's fascia). */
+export function drawAd(c: CanvasRenderingContext2D, ad: Ad, W: number, H: number, text: number, ink?: string) {
+  const st = ink ? { ...AD_STYLE[ad], ink } : AD_STYLE[ad];
+  if (!ink) { c.fillStyle = st.bg; c.fillRect(0, 0, W, H); }
   const x0 = W * text, iw = W - x0, cx = x0 + iw / 2, cy = H * 0.5, R = Math.min(iw, H) * 0.42;
   // the spotlight
   c.fillStyle = st.spot; c.beginPath(); c.arc(cx, cy, R * 1.05, 0, Math.PI * 2); c.fill();
@@ -32,6 +33,19 @@ export function drawAd(c: CanvasRenderingContext2D, ad: Ad, W: number, H: number
   c.fillStyle = st.ink; star(c, mx, my, m * 0.7, m * 0.3, 5);
   // a hairline between headline and product
   c.fillStyle = st.ink; c.globalAlpha = 0.35; c.fillRect(x0 - W * 0.004, H * 0.15, W * 0.004, H * 0.7); c.globalAlpha = 1;
+}
+
+/** A route sign's art, on the right: a shield and an arrow ahead, in the sign's white. */
+export function drawRoute(c: CanvasRenderingContext2D, W: number, H: number, text: number) {
+  const x0 = W * text, cx = x0 + (W - x0) / 2, cy = H / 2, R = Math.min(W - x0, H) * 0.36;
+  c.fillStyle = '#f4f4f0';
+  const sx = cx - R * 0.95, ax = cx + R * 0.95;
+  c.beginPath(); c.moveTo(sx - R * 0.7, cy - R * 0.8); c.lineTo(sx + R * 0.7, cy - R * 0.8); c.lineTo(sx + R * 0.7, cy + R * 0.2);
+  c.quadraticCurveTo(sx + R * 0.7, cy + R, sx, cy + R); c.quadraticCurveTo(sx - R * 0.7, cy + R, sx - R * 0.7, cy + R * 0.2); c.fill();
+  c.fillStyle = '#1f6b44'; star(c, sx, cy, R * 0.38, R * 0.16, 5);
+  c.fillStyle = '#f4f4f0';
+  c.beginPath(); c.moveTo(ax, cy - R); c.lineTo(ax + R * 0.65, cy - R * 0.25); c.lineTo(ax + R * 0.22, cy - R * 0.25);
+  c.lineTo(ax + R * 0.22, cy + R); c.lineTo(ax - R * 0.22, cy + R); c.lineTo(ax - R * 0.22, cy - R * 0.25); c.lineTo(ax - R * 0.65, cy - R * 0.25); c.fill();
 }
 
 function star(c: CanvasRenderingContext2D, x: number, y: number, r: number, r2: number, n: number) {

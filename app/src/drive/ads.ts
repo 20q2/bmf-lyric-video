@@ -1,15 +1,21 @@
-// Billboards are advertisements, and their lyric is the ad's headline: a 70s print ad for a product the words could be
+// Boards are advertisements, and their lyric is the ad's headline: a 70s print ad for a product the words could be
 // selling — "call him Mr. Handle It" sells a telephone, "Blowin' money fast" a bank, "Cruise all night" a car dealer;
 // a line about him, perfume or a diamond; the rest lipstick, sunglasses or a cocktail, seeded per board. The headline
-// takes the ad's left part (AD.text of its width: carriers.ts lays the lyric out in it, so the guard measures the type
-// as drawn); the product is drawn on the right (look/adart.ts). Pure.
+// takes the board's left part (TEXT_SHARE of its width: carriers.ts lays the lyric out in it, so the guard measures
+// the type as drawn); the product is drawn on the right (look/adart.ts). Pure.
 import { hash } from '../engine/util';
+import type { Kind } from './carriers';
 
 export type Ad = 'phone' | 'cash' | 'car' | 'lipstick' | 'perfume' | 'shades' | 'diamond' | 'cocktail';
 export const ADS: readonly Ad[] = ['phone', 'cash', 'car', 'lipstick', 'perfume', 'shades', 'diamond', 'cocktail'];
 
-/** The share of a billboard's width its headline takes (the product has the rest), and its least height (m). */
-export const AD = { text: 0.62, minH: 4.4 };
+/** A billboard's least height (m). */
+export const AD = { minH: 4.4 };
+/** The share of each board's width its lyric takes; the rest, on the right, is its art: a product (ADVERTISED kinds)
+ *  or, on route signs, a shield and an arrow. The art stays: it's built round the words, never fades for them. Faces
+ *  not listed are all lyric. */
+export const TEXT_SHARE: Partial<Record<Kind, number>> = { billboard: 0.62, sign: 0.6, wall: 0.68, storefront: 0.72, street: 0.7, gantry: 0.72 };
+export const ADVERTISED: ReadonlySet<Kind> = new Set<Kind>(['billboard', 'sign', 'wall', 'storefront']);
 
 /** Words that pick a product, checked in this order. */
 const BY_WORD: readonly [RegExp, Ad][] = [

@@ -29,7 +29,7 @@ import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
 import type { Route, RouteFrame } from './route';
 import type { Stretch } from './stretches';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
-import { AD, type Ad, adFor } from './ads';
+import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel';
@@ -101,13 +101,13 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   road: { rowH: 3.4, w: 7, advance: 0.62, emOfRow: 0.7 },
   sky: { rowH: 9, w: 40, advance: 0.42, emOfRow: 0.72 },
   banner: { rowH: 5, w: 34, advance: 0.6, emOfRow: 0.72 },
-  wall: { rowH: 2.6, w: 12, advance: 0.62, emOfRow: 0.7 },
+  wall: { rowH: 2.6, w: 14, advance: 0.62, emOfRow: 0.7 },
   billboard: { rowH: 2.6, w: 17, advance: 0.52, emOfRow: 0.72 },
-  storefront: { rowH: 2.3, w: 13, advance: 0.62, emOfRow: 0.68 },
+  storefront: { rowH: 2.3, w: 14, advance: 0.62, emOfRow: 0.68 },
   neon: { rowH: 2.4, w: 11, advance: 0.42, emOfRow: 0.7 },
-  sign: { rowH: 1.3, w: 4.6, advance: 0.42, emOfRow: 0.62 },
-  street: { rowH: 1, w: 4.4, advance: 0.55, emOfRow: 0.66 },
-  gantry: { rowH: 2, w: 8, advance: 0.55, emOfRow: 0.62 },
+  sign: { rowH: 1.3, w: 5.4, advance: 0.42, emOfRow: 0.62 },
+  street: { rowH: 1, w: 5.2, advance: 0.55, emOfRow: 0.66 },
+  gantry: { rowH: 2, w: 9.5, advance: 0.55, emOfRow: 0.62 },
   tunnel: { rowH: 2, w: 10, advance: 0.62, emOfRow: 0.7 },
 };
 /** Kinds set in capitals. */
@@ -186,7 +186,8 @@ function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 1) {
   const rows = kind === 'banner' ? (set.length <= BANNER_ROW ? [set] : rowsOf(set)) : rowsFor(set, solo);
   const longest = Math.max(...rows.map((r) => r.length));
   // a billboard's lyric is its ad's headline: it has the ad's left part, and the board is at least an ad's height
-  const textW = kind === 'billboard' ? L.w * AD.text : L.w, h = L.rowH * rows.length;
+  // the lyric has the board's text share (its art has the rest); a billboard is at least an ad's height
+  const textW = L.w * (TEXT_SHARE[kind] ?? 1), h = L.rowH * rows.length;
   const em = scale * Math.min(L.rowH * L.emOfRow, (textW * TEXT_W) / (longest * L.advance));
   return { rows, em, w: scale * L.w, h: scale * (kind === 'billboard' ? Math.max(h, AD.minH) : h) };
 }
@@ -305,7 +306,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         }
         foot ??= center.y - route.frameAt(s).pos.y;
         if (solid === undefined) solid = solidFor(kind_, lay.w, lay.h, foot);
-        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(kind_ === 'billboard' ? { ad: adFor(ph.text, ph.start * 1000) } : {}) });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(ADVERTISED.has(kind_) ? { ad: adFor(ph.text, ph.start * 1000) } : {}) });
       });
     });
   }
