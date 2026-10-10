@@ -17,6 +17,7 @@ The time reference is `audio/song.wav`, decoded once from the mp3 (git-ignored).
     uv run python vocal_feats.py     # vocal-stem RMS / pitch / onsets
     uv run python align.py --plots   # -> data/lyrics.json, analysis/qa/line_XX.png
     uv run python analyze.py --plots # -> data/audio.json
+    uv run python rms.py T0 T1       # the vocal stem around a word: the evidence for a FIX entry
     uv run python stretch_check.py   # gap flags (must be fixed or in ALLOW) and held flags (check by ear)
     uv run pytest tests -q
 
