@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { ADS, adFor } from '../src/drive/ads';
 import { makeDrive } from '../src/drive/drive';
 import { EMPHASIS, MAX_WORDS, emphasisOf, phrasesOf } from '../src/drive/phrases';
 import { audio, lyrics } from './data';
@@ -45,4 +46,12 @@ test('the words of punctuation and emphasis: every pick names a word, each alone
       expect(c.rows.some((r) => r.toLowerCase() === w.w.toLowerCase())).toBe(true);
     }
   }
+});
+
+test("a billboard's ad sells what its lyric says", () => {
+  expect(adFor('call him Mr. Handle It', 1)).toBe('phone');
+  expect(adFor('Trickin’, finna fall', 1)).toBe('cash');
+  expect(adFor('Cruise all night', 1)).toBe('car');
+  expect(adFor('like if you my man', 1)).toBe('diamond');
+  expect(ADS).toContain(adFor('from dropping', 7));
 });

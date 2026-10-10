@@ -29,6 +29,7 @@ import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
 import type { Route, RouteFrame } from './route';
 import type { Stretch } from './stretches';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
+import { AD, type Ad, adFor } from './ads';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel';
@@ -68,6 +69,8 @@ export interface Carrier {
   aim?: THREE.Vector3;
   /** A carrier that moves (a towed banner): its velocity (m/s); `center` is where it is as its phrase starts. */
   vel?: THREE.Vector3;
+  /** A billboard: the product its ad sells (ads.ts); its lyric is the headline. */
+  ad?: Ad;
 }
 /** Where a carrier's centre is at t (a new vector: callers may change it). */
 export const centerAt = (c: Pick<Carrier, 'center' | 'vel' | 'phrase'>, t: number) => (c.vel ? c.center.clone().addScaledVector(c.vel, t - c.phrase.start) : c.center.clone());
@@ -87,9 +90,9 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
 export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
-  verse1: ['wall', 'billboard', 'storefront'],
-  verse2: ['billboard', 'wall', 'storefront', 'neon'],
-  verse3: ['neon', 'billboard', 'neon', 'storefront', 'wall'],
+  verse1: ['billboard', 'wall', 'billboard', 'storefront'],
+  verse2: ['billboard', 'storefront', 'billboard', 'neon'],
+  verse3: ['neon', 'billboard', 'neon', 'billboard', 'storefront'],
 };
 
 /** Per kind: a row's height and the face's width (m), and the face's type: its average advance per character (a share
@@ -99,7 +102,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   sky: { rowH: 9, w: 40, advance: 0.42, emOfRow: 0.72 },
   banner: { rowH: 5, w: 34, advance: 0.6, emOfRow: 0.72 },
   wall: { rowH: 2.6, w: 12, advance: 0.62, emOfRow: 0.7 },
-  billboard: { rowH: 2.8, w: 14, advance: 0.52, emOfRow: 0.72 },
+  billboard: { rowH: 2.6, w: 17, advance: 0.52, emOfRow: 0.72 },
   storefront: { rowH: 2.3, w: 13, advance: 0.62, emOfRow: 0.68 },
   neon: { rowH: 2.4, w: 11, advance: 0.42, emOfRow: 0.7 },
   sign: { rowH: 1.3, w: 4.6, advance: 0.42, emOfRow: 0.62 },
@@ -182,8 +185,10 @@ function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 1) {
   const L = LAYOUT[kind], set = CAPS.has(kind) ? text.toUpperCase() : text;
   const rows = kind === 'banner' ? (set.length <= BANNER_ROW ? [set] : rowsOf(set)) : rowsFor(set, solo);
   const longest = Math.max(...rows.map((r) => r.length));
-  const em = scale * Math.min(L.rowH * L.emOfRow, (L.w * TEXT_W) / (longest * L.advance));
-  return { rows, em, w: scale * L.w, h: scale * L.rowH * rows.length };
+  // a billboard's lyric is its ad's headline: it has the ad's left part, and the board is at least an ad's height
+  const textW = kind === 'billboard' ? L.w * AD.text : L.w, h = L.rowH * rows.length;
+  const em = scale * Math.min(L.rowH * L.emOfRow, (textW * TEXT_W) / (longest * L.advance));
+  return { rows, em, w: scale * L.w, h: scale * (kind === 'billboard' ? Math.max(h, AD.minH) : h) };
 }
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -300,7 +305,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
         }
         foot ??= center.y - route.frameAt(s).pos.y;
         if (solid === undefined) solid = solidFor(kind_, lay.w, lay.h, foot);
-        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}) });
+        out.push({ id, phrase: ph, kind: kind_, stretch: st.id, reveal: ph.start, s, center, normal, up, ...lay, foot, solid, ...(stack ? { stack } : {}), ...(aim ? { aim } : {}), ...(vel ? { vel } : {}), ...(kind_ === 'billboard' ? { ad: adFor(ph.text, ph.start * 1000) } : {}) });
       });
     });
   }

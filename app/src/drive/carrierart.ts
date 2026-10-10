@@ -22,10 +22,12 @@ import { F, font } from '../engine/type';
 import type { Carrier } from './carriers';
 import { dissolveAt, revealAt } from './dissolve';
 import { daylight } from './sky';
+import { AD } from './ads';
+import { AD_STYLE, drawAd } from '../look/adart';
 
 const CANVAS_W = 1024;
 /** Faces that carry poster art until their lyric is revealed. */
-const DECOR: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'sign', 'wall', 'storefront', 'street', 'gantry']);
+const DECOR: ReadonlySet<Carrier['kind']> = new Set(['sign', 'wall', 'storefront', 'street', 'gantry']); // (billboards show their ad)
 /** A word of emphasis punches up this much as it's sung, settling over `over` s; it fills this share of its row. */
 export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
 /** How far through its punch the emphasis word is at t (1: just sung, 0: settled or not yet). */
@@ -61,7 +63,10 @@ function styleOf(c: Carrier): Style {
       return { family: F.bodoni(day ? 700 : 400, { italic: true }), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
     }
     case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.22, 1] };
-    case 'billboard': return { bg: '#fbf8f0', band: HEX.accent, family: F.archivo(62, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.25, 1] };
+    case 'billboard': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
+      const a = AD_STYLE[c.ad ?? 'lipstick'];
+      return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, a.now], alpha: [0.3, 1] };
+    }
     case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.3, 1] };
     case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#7ff6ff'], alpha: [0.3, 1], glow: 'rgba(255,79,163,0.95)' };
     case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
@@ -103,6 +108,9 @@ export class CarrierArt {
     if (style.bg) { c.fillStyle = style.bg; c.fillRect(0, 0, W, H); }
     if (style.border) { c.strokeStyle = style.border; c.lineWidth = 6; c.strokeRect(10, 10, W - 20, H - 20); }
     if (style.band) { c.fillStyle = style.band; c.fillRect(0, H * 0.9, W, H * 0.1); }
+    if (carrier.ad) drawAd(c, carrier.ad, W, H, AD.text);
+    // the lyric's width: the whole face, or an ad's headline (its left part)
+    const TW = carrier.ad ? W * AD.text : W;
     const shown = Math.round(revealAt(carrier, t) * 10) / 10;
     if (shown < 1) this.decor(1 - shown);
     if (shown <= 0) return;
@@ -110,7 +118,7 @@ export class CarrierArt {
     c.font = font(style.family, em);
     const label = (w: Word) => (style.caps ? w.w.toUpperCase() : w.w);
     const widest = Math.max(...carrier.rows.map((r) => c.measureText(r).width));
-    if (widest > W * 0.92) { em *= (W * 0.92) / widest; c.font = font(style.family, em); }
+    if (widest > TW * 0.92) { em *= (TW * 0.92) / widest; c.font = font(style.family, em); }
     c.textBaseline = 'middle';
     const gone = Math.round(dissolveAt(carrier, t) * 20) / 20;
     if (gone >= 1) return;
@@ -124,11 +132,11 @@ export class CarrierArt {
       const solo = (carrier.phrase.solo === 'first' && r === 0) || (carrier.phrase.solo === 'last' && r === carrier.rows.length - 1);
       if (solo) {
         const base = c.measureText(label(rowWords[0]!)).width;
-        const big = Math.min((PUNCH.fill * H) / carrier.rows.length, (em * W * 0.92) / base) * (1 + PUNCH.scale * punchAt(carrier, t));
-        c.font = font(style.family, Math.max(em, Math.min(big, (em * W * 0.98) / base))); // never past the face's edge
+        const big = Math.min((PUNCH.fill * H) / carrier.rows.length, (em * TW * 0.92) / base) * (1 + PUNCH.scale * punchAt(carrier, t));
+        c.font = font(style.family, Math.max(em, Math.min(big, (em * TW * 0.98) / base))); // never past the face's edge
       }
       const total = rowWords.reduce((s, w) => s + c.measureText(label(w)).width, 0) + space * (rowWords.length - 1);
-      let x = (W - total) / 2;
+      let x = (TW - total) / 2;
       const y = (H * (r + 0.5)) / carrier.rows.length;
       for (const w of rowWords) {
         const sung = t >= w.start, now = sung && t < w.end;

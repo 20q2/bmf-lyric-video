@@ -143,8 +143,9 @@ export function buildWorld(drive: Drive): THREE.Group {
     for (const side of [1, -1]) {
       if (side === -1 && BLOCKS[stretchAtS(s).id]!.seaLeft) continue;
       if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR)) continue; // nor in the rock
-      // none on the left where a face stands: they'd stand between it and the camera across the road
-      if (side === -1 && drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 4)) continue;
+      // none by a face on the left: they'd stand between it and the camera across the road (on the right too: a wide
+      // pair shot stands back past them)
+      if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + (side === -1 ? 4 : 12))) continue;
       const h = 9 + 4 * hash(k, side, 8);
       trunks.push(boxAt(route, s, side * 11.5, 0.35, h, 0.35));
       crowns.push(boxAt(route, s, side * 11.5, 3.2, 1.2, 3.2, h));
@@ -226,7 +227,7 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
 
 /** Streetlights on the road's right from dusk: one passes the car every STREETLIGHTS.beats beats (at least `gap` m
  *  apart), a pole with an arm over the road, a bulb and its pool of light; none in a tunnel or by its mouths, nor
- *  close to a sign (it would stand in front of it). */
+ *  close to a sign (it would stand in front of it) or across from a face on the left (beside the camera that films it). */
 export const STREETLIGHTS = { from: 92, beats: 2, gap: 18, lateral: 6.2, h: 7.2, reach: 3.6 };
 function buildStreetlights(drive: Drive): THREE.Group {
   const { route, motion } = drive, g = new THREE.Group(), at: number[] = [];
@@ -235,6 +236,8 @@ function buildStreetlights(drive: Drive): THREE.Group {
     const s = motion.distanceAt(b);
     if (at.length && s - at[at.length - 1]! < STREETLIGHTS.gap) continue;
     if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR) || signs.some((c) => Math.abs(c.s - s) < 12)) continue;
+    // nor where the camera stands across the road from a face on the left (it would stand beside the lens)
+    if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 12)) continue;
     at.push(s);
   }
   const L = STREETLIGHTS, n = at.length;
