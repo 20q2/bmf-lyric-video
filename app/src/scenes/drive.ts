@@ -21,6 +21,7 @@ import { buildCity } from '../look/city';
 import { Money } from '../look/money';
 import { type Stance, hydraulics } from '../drive/hydraulics';
 import { neonAt } from '../drive/landmarks';
+import { type Cast, castOf } from '../drive/cast';
 import { FINALE } from '../drive/drive';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
@@ -29,7 +30,7 @@ const TUNNEL_DARK = new THREE.Color('#120a05');
 /** A banner's plane is in the sky from this long before its line is revealed until this long after the line (s). */
 const BANNER_SKY = { before: 0.8, after: 4 };
 /** The skywriter flies on this long after its phrase (s), this fast along it and up (m/s). */
-const SKYWRITER = { after: 1.4, speed: 30, climb: 8 };
+const SKYWRITER = { after: 1.4, speed: 30, climb: 8, size: 0.7 };
 /** Carriers further along the road than this from the car (m) are put away. */
 const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
@@ -61,6 +62,7 @@ export default class DriveScene extends Scene {
   /** The motel sign's neon (its material and its two faces), and the car's body on its hydraulics. */
   private sign!: { neon: THREE.MeshBasicMaterial; faces: { no: THREE.Texture; vacancy: THREE.Texture } };
   private stance!: (t: number) => Stance;
+  private cast!: (t: number) => Cast;
   /** When the word "crash" is sung (s). */
   private crashes: number[] = [];
   /** Where the sun sets (flat, unit). */
@@ -71,7 +73,7 @@ export default class DriveScene extends Scene {
   /** Carriers that move (towed banners, the hook's sky-writing), with their objects. */
   private flying: [Carrier, THREE.Object3D][] = [];
   /** The skywriter: a plane at the head of the sky-writing as it's written, flying on and up after. */
-  private writer = buildPlane(2.2);
+  private writer = buildPlane(1);
   private skies: Carrier[] = [];
   /** In a tunnel: the sodium light of the lamps nearest the camera. */
   private sodium = [0, 1, 2].map(() => new THREE.PointLight('#ffa24a', 0, TUNNEL_LIGHT.reach, 1.5));
@@ -85,6 +87,7 @@ export default class DriveScene extends Scene {
     const world = buildWorld(this.drive);
     this.sign = world.userData.sign;
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
+    this.cast = castOf(audio, lyrics);
     this.skies = this.drive.carriers.filter((c) => c.kind === 'sky');
     this.writer.matrixAutoUpdate = false;
     this.world.add(world, this.writer, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
@@ -129,6 +132,11 @@ export default class DriveScene extends Scene {
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
     const st = this.stance(t), body = this.car.getObjectByName('body')!;
     body.position.y = st.lift; body.rotation.set(st.pitch, 0, st.roll);
+    // the two of them: her arm up (it swings out and over), her look to him, his nod
+    const cast = this.cast(t);
+    body.getObjectByName('herArm')!.rotation.set(0, 0, -2.7 * cast.herArm);
+    body.getObjectByName('herHead')!.rotation.set(0, 0.7 * cast.herLook, 0);
+    body.getObjectByName('hisHead')!.rotation.set(cast.hisNod, 0, 0);
     // the motel's neon: flickering on, and at the end its NO going out
     const neon = neonAt(t, f.beat);
     this.sign.neon.color.setScalar(0.25 + 1.45 * neon.lit);
@@ -150,9 +158,11 @@ export default class DriveScene extends Scene {
     if (writing) {
       const w = writing, along = w.up.clone().cross(w.normal).normalize(), dur = Math.max(0.3, w.phrase.end - w.phrase.start);
       const u = Math.min(1, Math.max(0, (t - w.phrase.start) / dur)), past = Math.max(0, t - w.phrase.end);
+      // sized by a row of its writing, flying just over the top row (never across the words)
+      const k = SKYWRITER.size * (w.h / w.rows.length / 9);
       const head = centerAt(w, t).addScaledVector(along, -w.w / 2 + u * w.w + past * SKYWRITER.speed)
-        .addScaledVector(w.up, w.h * 0.42 + past * SKYWRITER.climb);
-      this.writer.matrix.makeBasis(along, w.up, w.normal).scale(new THREE.Vector3(w.h / 9, w.h / 9, w.h / 9)).setPosition(head);
+        .addScaledVector(w.up, w.h / 2 + 1.2 * k + past * SKYWRITER.climb);
+      this.writer.matrix.makeBasis(along, w.up, w.normal).scale(new THREE.Vector3(k, k, k)).setPosition(head);
     }
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });

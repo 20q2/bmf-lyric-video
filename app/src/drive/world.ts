@@ -463,15 +463,22 @@ export function buildCar(): THREE.Group {
   for (let i = 0; i < P.count; i++) { const far = P.getZ(i) < 0 ? 1 : 0; P.setXYZ(i, P.getX(i) * (far ? 7 : 1.6), 0.04, hl + 0.4 + far * 22); }
   const lit = new THREE.Mesh(throwGeo, glowMaterial('#ffe6bd', GLOW.beam, false, true));
   g.add(lit); // (on the road, not on the body)
-  // the two of them: him at the wheel (+x: the car's left) in a cap; her, her hair down her back
+  // the two of them: him at the wheel (+x: the car's left) in a cap, a hand on it; her, her hair down her back, an arm
+  // that goes up (cast.ts); their heads on pivots at the neck (hers turns to him, his nods): named for the scene
+  const wheel = add(new THREE.TorusGeometry(0.19, 0.025, 8, 24), dark, 0.44, belt + 0.38, 0.42); wheel.rotation.x = -0.9;
   for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
     add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);
-    add(new THREE.SphereGeometry(0.14, 14, 10), dark, x, belt + 0.78, -0.22);
+    const head = new THREE.Group(); head.name = him ? 'hisHead' : 'herHead'; head.position.set(x, belt + 0.66, -0.22); body.add(head);
+    add(new THREE.SphereGeometry(0.14, 14, 10), dark, 0, 0.12, 0, head);
     if (him) {
-      add(new THREE.SphereGeometry(0.15, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, x, belt + 0.84, -0.22); // the cap's crown
-      box(0.2, 0.025, 0.16, x, belt + 0.84, -0.06, dark); // its brim, forward
+      add(new THREE.SphereGeometry(0.15, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0, 0.18, 0, head); // the cap's crown
+      const brim = add(new THREE.BoxGeometry(0.2, 0.025, 0.16), dark, 0, 0.18, 0.16, head); void brim; // its brim, forward
+      const reach = add(new THREE.CapsuleGeometry(0.055, 0.5, 4, 8), dark, x - 0.02, belt + 0.45, 0.1); reach.rotation.x = 1.1; // his arm, to the wheel
     } else {
-      const hair = add(new THREE.SphereGeometry(0.17, 14, 10), dark, x, belt + 0.62, -0.34); hair.scale.set(1, 1.9, 0.75);
+      const hair = add(new THREE.SphereGeometry(0.17, 14, 10), dark, 0, -0.04, -0.12, head); hair.scale.set(1, 1.9, 0.75);
+      const arm = new THREE.Group(); arm.name = 'herArm'; arm.position.set(x - 0.2, belt + 0.55, -0.2); body.add(arm);
+      add(new THREE.CapsuleGeometry(0.055, 0.55, 4, 8), dark, 0, -0.3, 0, arm);
+      add(new THREE.SphereGeometry(0.075, 10, 8), dark, 0, -0.62, 0, arm); // her hand
     }
   }
   return g;
