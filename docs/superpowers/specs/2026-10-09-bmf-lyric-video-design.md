@@ -109,9 +109,10 @@ Each ends with the user's sign-off in the live preview.
 |---|---|---|
 | **M1** | Timing: port the analysis; `lyrics.json` / `audio.json`; the stretched-word check (flags any word spanning a silence or running into a held note in the vocal stem); the karaoke test card; one listening pass with the user focused on word onsets | "Every word is on time" |
 | **M2** | Engine fork and greybox of the whole drive: blocky road, car and signs, the route and shot director working, every lyric on a placeholder sign from start to finish; the test card rendered to a short MP4 once to prove A/V sync | The drive and pacing feel right |
-| **M3** | The look, on stretches 0–2: car, silhouettes, palette, sky, sign families, finishing pass, motion sliders | The quality bar ("good enough") |
-| **M4** | Stretches 3–9 in batches, then review rounds | Watch-through approved |
-| **M5** | Final 1080p60 render, the only long render | — |
+| **M3** | The look ("Sunset Print"), across the whole drive. Revised 2026-10-11: these are **beta graphics**; fidelity comes in M5 | The theme is right (the user, 2026-10-11) |
+| **M4** | Flow: the set-piece per section (docs/superpowers/specs/2026-10-11-bmf-flow-plan.md), section by section, the user's transition notes, then the edit locked | Flow and variety approved |
+| **M5** | The beautifying pass: the car and the two of them modelled, the town, lighting, crisp type, motion blur and depth of field | The fidelity bar |
+| **M6** | Review rounds, then the final 1080p60 render, the only long render | Watch-through approved |
 
 ## 7. Review and verification
 
