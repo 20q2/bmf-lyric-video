@@ -26,6 +26,7 @@ import { FINALE } from '../drive/drive';
 import { carMatrix } from '../drive/carriers';
 import { buildChorus2 } from './sets/chorus2';
 import { buildIntro } from './sets/intro';
+import { buildVerse2 } from './sets/verse2';
 import { buildVerse1 } from './sets/verse1';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
@@ -115,7 +116,7 @@ export default class DriveScene extends Scene {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
       this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
-    for (const set of [buildIntro(this.drive), buildVerse1(this.drive), buildChorus2(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
+    for (const set of [buildIntro(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {
@@ -173,7 +174,9 @@ export default class DriveScene extends Scene {
     // (road paint is retired a little after it's sung: from the shots after it'd read upside down)
     for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER && c.phrase.end > cleared && (c.kind !== 'road' || t < c.phrase.end + PAINT_LASTS) && t < (c.until ?? Infinity) && t >= (c.from ?? -Infinity);
     // the radio, in the car; the set-pieces' props, where they've moved to
-    for (const [o, local, ahead] of this.riding) o.matrix.multiplyMatrices(carMatrix(ahead ? d.carFrame(t, ahead) : cf), local);
+    // (in the car, on its body: lifted, pitched and rolled with it on its hydraulics)
+    const bodyM = new THREE.Matrix4().compose(new THREE.Vector3(0, st.lift, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(st.pitch, 0, st.roll)), new THREE.Vector3(1, 1, 1));
+    for (const [o, local, ahead] of this.riding) o.matrix.multiplyMatrices(ahead ? carMatrix(d.carFrame(t, ahead)) : carMatrix(cf).multiply(bodyM), local);
     for (const set of this.sets) set.update(t);
     // banners where they've flown to; each plane in the sky only around its line
     for (const [c, o] of this.flying) {

@@ -13,7 +13,9 @@
 //   tunnel       lit capitals on the tunnel's tiles, glowing sodium orange, the word being sung flaring white
 // and the set-pieces' surfaces, each in its own medium: a speed trailer's amber LEDs, a bus's tail ad (its ad is the
 // prop's), her lipstick on her visor's mirror, stickers, a California plate, her phone's message bubbles, the radio's cyan display, a menu board with its
-// prices, a burger stand's marquee in changeable letters.
+// prices, a burger stand's marquee in changeable letters; his posters on the freeway's wall, its big sign's panels;
+// murals by a sign painter (a style a line: outlined, shadowed), a hand car wash's sign, their car's windshield banner,
+// its hood's airbrushed lettering and its club plaque, and his giant mural's words (the mural is the prop's).
 // Every face is blank until its reveal (dissolve.ts), its board or wall already standing. A word of emphasis
 // (Phrase.solo) on its own row is set as big as its row allows, and punches up as it's sung (PUNCH).
 // Laid out as carriers.ts says (rows, em). Redrawn only when its karaoke key changes. Browser only (canvas).
@@ -31,7 +33,7 @@ import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 
 const CANVAS_W = 1024;
 /** Boards that show their ad's copy until their lyric flips in (tri-vision: FLIP.slats slats, turning in a wave). */
-const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'wall', 'storefront', 'street', 'gantry']);
+const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'storefront', 'street', 'gantry']);
 export const FLIP = { slats: 10, stagger: 0.6, steps: 12 };
 /** The word of emphasis's row takes this many shares of its face's height (the others one each). */
 const SOLO_ROW = 1.45;
@@ -70,10 +72,18 @@ export const wallColor = (c: Carrier) => c.kind === 'neon'
   : new THREE.Color(WORLD.stucco[Math.floor(hash(c.phrase.start, 9) * WORLD.stucco.length)]!);
 const hexOf = (c: THREE.Color) => `#${c.getHexString(THREE.SRGBColorSpace)}`;
 const GREEN = '#1f6b44';
+/** The murals' styles, one a line: [panel, letters, the word being sung, outline and shadow, face]. */
+const MURALS: readonly [string, string, string, string, string][] = [
+  ['#2b78a6', '#ffd65a', '#ffffff', '#141218', F.archivo(100, 900)],
+  ['#f6dd8f', '#c8102e', '#141218', '#5a0614', F.bodoni(700, { italic: true })],
+  ['#1f6b44', '#ffffff', '#ffd65a', '#0b2a1a', F.archivo(62, 900)],
+  ['#c8102e', '#ffd65a', '#ffffff', '#2a0309', F.archivo(100, 900)],
+  ['#ffd65a', '#c8102e', '#141218', '#7a0a1a', F.archivo(125, 900)],
+];
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
@@ -84,7 +94,6 @@ function styleOf(c: Carrier): Style {
       const day = daylight(c.phrase.start) > 0.6;
       return { family: F.archivoItalic(100, 800), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
     }
-    case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.72, 1] };
     case 'billboard': case 'poster': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
       // (the word being sung: warm yellow on a dark ad, red on a light one — one rule across the film)
       const a = AD_STYLE[c.ad ?? 'lipstick'], dark = new THREE.Color(a.bg).getHSL({ h: 0, s: 0, l: 0 }).l < 0.4;
@@ -109,6 +118,15 @@ function styleOf(c: Carrier): Style {
     case 'mirror': return { bg: '#cdd6db', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#b0102a', '#b0102a', '#e8173a'], alpha: [0.55, 1] };
     case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
+    case 'mural': { // a sign painter's: a style a line (its panel, its letters, outlined and shadowed)
+      const [bg, ink, now, outline, family] = MURALS[c.phrase.line % MURALS.length]!;
+      return { bg, border: outline, family, caps: family !== F.bodoni(700, { italic: true }), colors: [ink, ink, now], alpha: [0.7, 1], outline, shadow: outline };
+    }
+    case 'carwash': return { bg: '#1f8fd6', border: '#ffffff', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.72, 1], outline: '#0b3a66' };
+    case 'visor': return { bg: '#0e0d10', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.7, 1] };
+    case 'hood': return { family: F.archivoItalic(100, 800), caps: true, colors: ['#ffd65a', '#ffd65a', '#ffffff'], alpha: [0.75, 1], outline: '#5a0614', shadow: '#2a0309' };
+    case 'plaque': return { bg: '#c9c4ba', border: '#4a4550', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#1b1820', '#1b1820', '#c8102e'], alpha: [0.7, 1] };
+    case 'giant': return { family: F.archivo(62, 900), caps: true, colors: [AD_STYLE.him.ink, AD_STYLE.him.ink, '#c8102e'], alpha: [0.72, 1] };
     case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
@@ -151,7 +169,7 @@ export class CarrierArt {
     // the board's art, built round its lyric (never fading for it): an ad's product, or a route sign's shield and arrow
     const share = TEXT_SHARE[carrier.kind] ?? 1;
     // (a bus's ad is the bus's: its rows are the headline over it)
-    if (carrier.ad && carrier.kind !== 'bus') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1]);
+    if (carrier.ad && carrier.kind !== 'bus' && carrier.kind !== 'giant') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1]);
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
     else if (carrier.kind === 'menu') this.drawPrices(c, share);
     else if (carrier.kind === 'plate') { c.fillStyle = '#c8102e'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.17); c.fillText('California', W / 2, H * 0.15); c.textAlign = 'left'; }
@@ -269,6 +287,10 @@ export class CarrierArt {
         if (style.tubes) { // neon: the tube's brighter core line over its glow
           c.save(); c.lineWidth = Math.max(2, em * 0.035); c.strokeStyle = 'rgba(255,255,255,0.75)'; c.strokeText(label(w), fx, fy); c.restore();
         }
+        if (style.shadow) { // a sign painter's drop shadow, down and right, and an outline round the letters
+          c.save(); c.shadowBlur = 0; c.fillStyle = style.shadow; c.fillText(label(w), fx + em * 0.07, fy + em * 0.07); c.restore();
+        }
+        if (style.outline) { c.save(); c.lineWidth = em * 0.12; c.lineJoin = 'round'; c.strokeStyle = style.outline; c.strokeText(label(w), fx, fy); c.restore(); }
         for (let k = 0; k < (style.glowPasses ?? 1); k++) c.fillText(label(w), fx, fy);
         if (fall) c.restore();
         x += c.measureText(label(w)).width + space;

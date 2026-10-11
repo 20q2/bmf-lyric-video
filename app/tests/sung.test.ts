@@ -21,7 +21,7 @@ const RATE = 30;
  *  the line before ends on another kind of carrier than this one starts on, or a line's take glides on to them in
  *  0.12 s where a cut was instant. Each section's set-piece (sets/) designs these shots by hand (verse 1's are gone);
  *  the list may only shrink. */
-const KNOWN_SHORT = new Set(['L17.2', 'L21.0', 'L21.1', 'L36.1', 'L42.1', 'L43.1']);
+const KNOWN_SHORT = new Set(['L36.1', 'L42.1', 'L43.1']);
 /** Frame margin (NDC), the most a face may turn away from the camera, and the least type size on screen (px at 1080p);
  *  and how long a phrase must stay up (§2: subtitle standards, ⅚ s and 0.3 s a word). */
 const MARGIN = 0.1; // title-safe: the middle 90% of the frame (docs/LYRIC_VIDEO_TENETS.md §3)
@@ -58,7 +58,9 @@ function hiddenBy(c: Carrier, t: number): string | null {
   // (in the car: over its footprint, up to the height of someone standing in the open top)
   const q = cam.position.clone().applyMatrix4(inv), inside = Math.abs(q.x) < CAR_BOX.w / 2 && Math.abs(q.z) < CAR_BOX.l / 2 && q.y > 0 && q.y < 3.5;
   const boxes = inside ? CABIN_BOXES : [CAR];
+  // (words on the car itself, its banner, hood or plaque: only the cabin can hide them, from inside)
   if (pts.some((p) => {
+    if (!inside && CAR.containsPoint(p.clone().applyMatrix4(inv))) return false;
     const d = p.distanceTo(cam.position), ray = new THREE.Ray(cam.position.clone(), p.clone().sub(cam.position).normalize()).applyMatrix4(inv), hit = new THREE.Vector3();
     return boxes.some((b) => ray.intersectBox(b, hit) && hit.applyMatrix4(car).distanceTo(cam.position) < d - 0.05);
   })) return 'the car';

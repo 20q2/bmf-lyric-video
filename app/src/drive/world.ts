@@ -9,7 +9,7 @@ import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, type SetKind, basisOf, solidsOf } from './carriers';
-const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway']);
+const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'mural', 'carwash', 'visor', 'hood', 'plaque', 'giant']);
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
@@ -29,7 +29,7 @@ const STEP = 2;
 
 /** Each section's ground (sRGB; others the golden fields). */
 const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
-const PALMS = new Set(['intro', 'chorus1', 'verse2', 'verse3']); // (none on the coast road: they'd stand in the hook's sky)
+const PALMS = new Set(['intro', 'chorus1', 'verse3']); // (none in verse 2: its take's camera rides where they'd stand) // (none on the coast road: they'd stand in the hook's sky)
 
 /** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
  *  coloured per sample. */
@@ -225,14 +225,14 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
 
 /** The town's dressing: awnings over the buildings' ground floors on the road side, rooftop clutter (AC units, water
  *  tanks), and power lines on poles along the right where the town is low (the neighbourhood, the coast). */
-const POWER = { stretches: new Set(['verse2', 'chorus3']), lateral: 13, every: 34, h: 9 };
+const POWER = { stretches: new Set(['chorus3']), lateral: 13, every: 34, h: 9 };
 function dressing(drive: Drive): THREE.Group {
   const g = new THREE.Group(), { route } = drive, awn: THREE.Matrix4[] = [], awnCol: THREE.Color[] = [], roof: THREE.Matrix4[] = [];
   const palette = ['#ff5a36', '#2b78a6', '#1f6b44', '#f6dd8f', '#c8102e', '#ffffff'];
   drive.blocks.forEach((b, i) => {
     if (b.concrete) return;
     const side = Math.sign(b.lateral), front = Math.abs(b.lateral) - b.d / 2;
-    if (b.h > 4 && hash(i, 41) < 0.6) {
+    if (b.h > 4 && !b.bare && hash(i, 41) < 0.6) {
       // an awning, 1.6 m out from the face toward the road, over the door
       awn.push(boxAt(route, b.s, side * (front - 0.8), 1.6, 0.25, b.w * 0.7, 3.1));
       awnCol.push(new THREE.Color(palette[Math.floor(hash(i, 42) * palette.length)]!));
@@ -417,7 +417,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus'; // the face is only its letters
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night

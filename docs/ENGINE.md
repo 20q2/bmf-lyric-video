@@ -57,7 +57,7 @@ to the user. Only the final export renders video (M5).
   receipt), frames each (cut / whip / snap), keeps its ground clear and adds its own blocks; `scenes/sets/` builds its
   props from its plan. The guard checks it like the rest; from inside the car only the cabin (drive.ts CABIN) can hide
   a word. `intro.ts`: the red light on the motel's corner, its street signs, green on the first kick (its last shot is
-  the first phrase's). `verse1.ts`: the city at speed (the bus, her mirror and phone, the van, the radio, the burger stand).
+  the first phrase's). `verse1.ts`: the city at speed (the bus, her mirror and phone, the van, the radio, the burger stand). `chorus2.ts`: the freeway (his posters wiped into view by the Metro, the big sign; it owns two lines). `verse2.ts`: Slauson (the mural take, the car wash, their car's banner, hood and plaque, his giant mural).
 - `tunnel.ts`: a stretch marked `tunnel` (the bridge) runs through a headland — its mouths, a lamp over the car on
   every beat; world.ts builds the bore, headland and lamps, the scene darkens and lights it by where the camera is.
 - `dissolve.ts`: when text shows — blank until the camera first comes for it (`reveal`: never more than one phrase,

@@ -37,16 +37,16 @@ import type { Line } from '../engine/lyrics';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
-export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
+export type LeftKind = 'billboard' | 'storefront' | 'neon';
 /** The set-pieces' surfaces (sets/). */
-export type SetKind = 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee' | 'poster' | 'freeway';
+export type SetKind = 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee' | 'poster' | 'freeway' | 'mural' | 'carwash' | 'visor' | 'hood' | 'plaque' | 'giant';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill' | SetKind;
-export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
-  'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway'];
+export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
+  'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'mural', 'carwash', 'visor', 'hood', 'plaque', 'giant'];
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
-export const PAIRABLE: ReadonlySet<Kind> = new Set<LeftKind>(['wall', 'billboard', 'storefront', 'neon']);
+export const PAIRABLE: ReadonlySet<Kind> = new Set<LeftKind>(['billboard', 'storefront', 'neon']);
 
 export interface Carrier {
   id: string;
@@ -109,7 +109,6 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   intro: ['sign'],
   chorus1: ['road', 'road', 'billboard', 'sky', 'street'],
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
-  verse2: ['storefront', 'street', 'road', 'wall', 'sign', 'road', 'billboard', 'street', 'road'],
   chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint)
   bridge1: ['tunnel'],
   verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
@@ -118,17 +117,15 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
 export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
-  verse2: ['billboard', 'storefront', 'billboard', 'neon'],
   verse3: ['neon', 'billboard', 'neon', 'billboard', 'storefront'],
 };
 
 /** Per kind: a row's height and the face's width (m), and the face's type: its average advance per character (a share
  *  of the em) and the share of a row the em may take. */
-export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; emOfRow: number; wrap?: number }> = {
+export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; emOfRow: number; wrap?: number; fit?: boolean }> = {
   road: { rowH: 3.4, w: 7, advance: 0.62, emOfRow: 0.7 },
   sky: { rowH: 9, w: 40, advance: 0.55, emOfRow: 0.72 },
   banner: { rowH: 5, w: 34, advance: 0.6, emOfRow: 0.72 },
-  wall: { rowH: 2.6, w: 14, advance: 0.62, emOfRow: 0.7 },
   billboard: { rowH: 2.6, w: 17, advance: 0.52, emOfRow: 0.72 },
   storefront: { rowH: 2.3, w: 14, advance: 0.62, emOfRow: 0.68 },
   neon: { rowH: 2.4, w: 11, advance: 0.42, emOfRow: 0.7 },
@@ -149,12 +146,19 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   marquee: { rowH: 0.6, w: 3.6, advance: 0.58, emOfRow: 0.7, wrap: 18 },
   poster: { rowH: 1.3, w: 10, advance: 0.52, emOfRow: 0.72 },
   freeway: { rowH: 1.4, w: 6, advance: 0.55, emOfRow: 0.62, wrap: 10 },
+  // (a mural is as wide as its words, up to w)
+  mural: { rowH: 1.1, w: 9.5, advance: 0.6, emOfRow: 0.68, wrap: 16, fit: true },
+  carwash: { rowH: 0.5, w: 3.6, advance: 0.55, emOfRow: 0.7, wrap: 16 },
+  visor: { rowH: 0.26, w: 1.7, advance: 0.6, emOfRow: 0.72, wrap: 16 },
+  hood: { rowH: 0.38, w: 1.6, advance: 0.6, emOfRow: 0.7, wrap: 12 },
+  plaque: { rowH: 0.24, w: 1.3, advance: 0.55, emOfRow: 0.7, wrap: 12 },
+  giant: { rowH: 2.8, w: 13.6, advance: 0.55, emOfRow: 0.72, wrap: 20 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;
 export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster', 'mural', 'carwash', 'hood', 'giant']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
  *  valley), how high its letters' centre stands over the road there. */
 export const HILL = { ahead: 150, side: -55, y: 16 };
@@ -183,7 +187,6 @@ export const BANNER_ROW = 22;
  *  where the lower of two stacked faces starts (its bottom edge); the two stand STACK_GAP apart. */
 export const LEFT_LATERAL = 15;
 export const LEFT: Record<LeftKind, { y: number; base: number }> = {
-  wall: { y: 5, base: 1.6 },
   billboard: { y: 8, base: 5.5 },
   storefront: { y: 3.4, base: 2 },
   neon: { y: 6, base: 2.2 },
@@ -236,7 +239,7 @@ export function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 
   // a billboard's lyric is its ad's headline: it has the ad's left part, and the board is at least an ad's height
   // the lyric has the board's text share (its art has the rest); a billboard is at least an ad's height
   // (sky-writing is as wide as its words: the guard frames the face, and a wide empty face won't fit two in a shot)
-  const w = kind === 'sky' ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 2) : L.w;
+  const w = kind === 'sky' ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 2) : L.fit ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 0.9) : L.w;
   const textW = w * (TEXT_SHARE[kind] ?? 1), h = L.rowH * rows.length;
   const em = scale * Math.min(L.rowH * L.emOfRow, (textW * TEXT_W) / (longest * L.advance));
   return { rows, em, w: scale * w, h: scale * (kind === 'billboard' || kind === 'poster' ? Math.max(h, AD.minH) : h) };
@@ -275,7 +278,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
       const campaignScale = campaign ? HOOK.campaign[Math.min(campaignCount++, HOOK.campaign.length - 1)]! : 1;
       // a fast line is framed two phrases at a time (pairFraming): on the left, where faces pair side by side (a sign's
       // next stands behind it; paint on a moving road lies too far on to share a readable frame)
-      if (isFast(line) && kind !== 'sky' && !PAIRABLE.has(kind)) { const fl = FAST_LEFT[st.id] ?? ['wall']; kind = fl[li % fl.length]!; }
+      if (isFast(line) && kind !== 'sky' && !PAIRABLE.has(kind)) { const fl = FAST_LEFT[st.id] ?? ['storefront']; kind = fl[li % fl.length]!; }
       const phs = phrasesOf(line, nextStart(line.i), solo);
       phs.forEach((ph, pi) => {
         // a line's first phrase too short to read alone, straight after the line before, stays on that line's kind of
@@ -407,7 +410,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
 }
 
 /** How tall the building behind a face on the left stands (m; a billboard stands on posts, none). */
-export const BUILDING_H: Partial<Record<LeftKind, number>> = { wall: 14, storefront: 7, neon: 12 };
+export const BUILDING_H: Partial<Record<LeftKind, number>> = { storefront: 7, neon: 12 };
 /** The carrier's own frame: x along its text, y its text's up, z its face's normal, origin at its centre. */
 export const basisOf = (c: Carrier) => new THREE.Matrix4().makeBasis(c.up.clone().cross(c.normal).normalize(), c.up, c.normal).setPosition(c.center);
 /** A face's solid part, in its own frame (m): the building it's on (its foot on the ground, at least 1.5 m above the

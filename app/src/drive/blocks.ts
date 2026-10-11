@@ -30,7 +30,7 @@ const NEAR = 18;
 
 /** A box standing by the road: a building (the town's), or concrete (a set-piece's structure: a viaduct's deck, its
  *  piers); `lateral` and `w` across the road, `d` along it. */
-export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean }
+export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean; /** No awnings: its front carries murals. */ bare?: boolean }
 
 /** A box `across` x `h` x `along` the road, standing `lateral` off it at s (its foot on the road's level, or `y0` over it). */
 export function boxAt(route: Route, s: number, lateral: number, across: number, h: number, along: number, y0 = 0): THREE.Matrix4 {

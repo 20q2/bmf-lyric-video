@@ -80,13 +80,13 @@ green, one cut.
 - **Edit**: the lights set the rhythm. Hold on red, cut on green.
 - **Out**: the on-ramp. The car accelerates and the camera *cranes* out of the car up to the high chase.
 
-### 3 · Chorus 2 — 1:01–1:16 · the freeway · M
+### 3 · Chorus 2 — 1:01–1:16 · the freeway · M — **built 2026-10-11**
 The ritual at speed: green gantries sweeping overhead (built) with WEST SIDE and COMPTON EXIT, and his
 campaign on freeway boards. "Fly" is flown on banners by planes (built). The camera rides high above the
 car as it merges, the signs come at the lens (*follow*), and speed lines carry the motion.
 - **Out**: the SLAUSON AVE exit gantry. The car takes the off-ramp and drops down into the neighbourhood.
 
-### 4 · Verse 2 — 1:16–1:46 · Slauson, the neighbourhood · L
+### 4 · Verse 2 — 1:16–1:46 · Slauson, the neighbourhood · L — **built 2026-10-11**
 **The grammar: low and slow, lowrider culture.** The camera is at wheel height and swings round the car
 at the corners. The lyrics are painted by hand: murals, store windows, a sign painter's lettering. This
 is a new type voice for the film.
@@ -178,3 +178,34 @@ into chorus 2; whips between the rest.
   own low-rise blocks along its street, and chorus 2's faces start past them.
 - Set-piece panels carry their backings as solids, so the guard sees them. Without that, a shot looked straight into
   the menu board's back.
+
+**Chorus 2 (2026-10-11).** Built as `sets/chorus2.ts`. The set-piece places two of the chorus's lines; "dropping" on
+the road paint and "fly" on the towed banners stay as the drive places them.
+
+- **"Young and fine…"**: his posters are pasted along the freeway's sound wall, with the Metro running at grade in the
+  median in front of them. The camera drifts along the posters while the car and the train blast past, and the
+  train's tail wipes them into view, left to right, on "Young". This is the accidental reveal you loved, made on
+  purpose. (An elevated viaduct would have hidden a band of every board behind its deck.)
+- **"The boy West side…"**: one big three-panel freeway sign, the car rushing under it.
+- **The way out**: the SLAUSON exit sign.
+
+**Verse 2 (2026-10-11).** Built as `sets/verse2.ts`, three cuts in thirty seconds.
+
+- **One take for five lines**: the camera drifts along a block of murals, holding each while it's sung, with a
+  different sign-painter style for each line. The car three-wheels through on "crip walkin'". There's a SLAUSON street
+  sign at the corner, and "Mr. Handle It" in Old English. The chicken shack has its wall and a chicken on its roof.
+- **"Ride or die"**: the hand car wash's sign, the car rolling past.
+- **"Good in every hood"**: their own car, from high in front: the windshield banner, then the hood's airbrushed
+  lettering.
+- **"Finna fall in backwards"**: a whip round behind to the club plaque on the rear deck, as the car lays back on its
+  hydraulics.
+- **"…if you my man"**: the giant mural of him at the end of the street, the car driving up to it.
+
+**Fixes found on the way.**
+
+- Set-pieces can own some of a stretch's lines.
+- The town's blocks had their sizes swapped (each building turned 90 degrees from its plan).
+- The `wall` kind is retired.
+- Verse 2 has no palms or power lines: they stood where the take's camera rides.
+- Signs on the car move with its hydraulics.
+
