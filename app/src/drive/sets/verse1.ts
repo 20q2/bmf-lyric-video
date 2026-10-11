@@ -221,7 +221,7 @@ export const VERSE1: SetPiece = {
       if (e > gap[0] && s < gap[1]) { s = gap[1]; continue; }
       const behind = side > 0 && e > menuS - 14 && s < menuS + AT.marquee.ds + 12, d = 12 + 8 * hash(k, side, 32);
       const h = CITY.h[0] + (CITY.h[1] - CITY.h[0]) * hash(k, side, 33), mid = (s + e) / 2, lateral = side * ((behind ? CITY.behindStand : CITY.back) + d / 2);
-      blocks.push({ s: mid, lateral, w: w - CITY.alley, h, d, color: hash(k, side, 34), matrix: boxAt(route, mid, lateral, w - CITY.alley, h, d) });
+      blocks.push({ s: mid, lateral, w: w - CITY.alley, h, d, color: hash(k, side, 34), matrix: boxAt(route, mid, lateral, d, h, w - CITY.alley) });
       s = e;
     }
 

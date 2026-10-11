@@ -114,9 +114,16 @@ export function buildWorld(drive: Drive): THREE.Group {
   g.add(named(dashes, 'dashes'));
 
   // the town's buildings (blocks.ts: the guard checks them too)
-  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), drive.blocks.length);
-  drive.blocks.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
+  const towns = drive.blocks.filter((b) => !b.concrete), concrete = drive.blocks.filter((b) => b.concrete);
+  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), Math.max(1, towns.length));
+  towns.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
+  blocks.count = towns.length;
   g.add(named(blocks, 'blocks'));
+  // (a set-piece's concrete: a viaduct's deck and piers)
+  const crete = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#b9ada0' }), Math.max(1, concrete.length));
+  concrete.forEach((b, i) => crete.setMatrixAt(i, b.matrix));
+  crete.count = concrete.length;
+  g.add(named(crete, 'concrete'));
   g.add(named(dressing(drive), 'dressing'));
   g.add(named(placeSigns(drive), 'places'));
 
@@ -223,10 +230,11 @@ function dressing(drive: Drive): THREE.Group {
   const g = new THREE.Group(), { route } = drive, awn: THREE.Matrix4[] = [], awnCol: THREE.Color[] = [], roof: THREE.Matrix4[] = [];
   const palette = ['#ff5a36', '#2b78a6', '#1f6b44', '#f6dd8f', '#c8102e', '#ffffff'];
   drive.blocks.forEach((b, i) => {
+    if (b.concrete) return;
     const side = Math.sign(b.lateral), front = Math.abs(b.lateral) - b.d / 2;
     if (b.h > 4 && hash(i, 41) < 0.6) {
       // an awning, 1.6 m out from the face toward the road, over the door
-      awn.push(boxAt(route, b.s, side * (front - 0.8), b.w * 0.7, 0.25, 1.6, 3.1));
+      awn.push(boxAt(route, b.s, side * (front - 0.8), 1.6, 0.25, b.w * 0.7, 3.1));
       awnCol.push(new THREE.Color(palette[Math.floor(hash(i, 42) * palette.length)]!));
     }
     for (let k = 0; k < 1 + Math.floor(hash(i, 43) * 3); k++) {

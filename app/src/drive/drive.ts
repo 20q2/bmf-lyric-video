@@ -15,7 +15,7 @@ import { type Tunnel, tunnelsOf } from './tunnel';
 import { REVEAL_S } from './dissolve';
 import { type Block, blocksOf } from './blocks';
 import { motelSign } from './landmarks';
-import { type Placed, type SetFrame, SETS } from './sets';
+import { type Placed, type SetFrame, SETS, owned } from './sets';
 
 const DEG = Math.PI / 180;
 /** After a line, the camera goes back to the car only if the next line is at least this far off (s). */
@@ -98,7 +98,7 @@ export interface Drive {
 
 export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const stretches = resolveStretches(audio, lyrics);
-  const motion = motionFor(stretches, audio, (s) => SETS[s.id]?.speed(s, audio) ?? []), route = routeFor(stretches, motion);
+  const motion = motionFor(stretches, audio, (s) => SETS[s.id]?.speed?.(s, audio) ?? []), route = routeFor(stretches, motion);
   const tunnels = tunnelsOf(stretches, motion, audio.beats);
   // the car keeps to its lane (the right one), off the centre line
   const carFrame = (t: number, ahead = 0) => { const f = route.frameAt(motion.distanceAt(t) + ahead); return { ...f, pos: f.pos.clone().addScaledVector(f.right, LANE) }; };
@@ -108,7 +108,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // (the faces on the left after a set-piece stand past its ground: its own blocks' far end, and their clear zone)
   const floor: Record<string, number> = {}, setShots: Shot[] = [];
   for (const st of stretches) {
-    const next = stretches[st.k + 1], p = SETS[st.id]?.place({ st, audio, route, motion, carFrame, solo, nextStart, next });
+    const next = stretches[st.k + 1], p = SETS[st.id]?.place({ st, audio, route, motion, carFrame, solo, nextStart, next, floor: floor[st.id] });
     if (!p) continue;
     ofSets.push(...p.carriers);
     if (next && p.blocks.length && p.floor === undefined) floor[next.id] = Math.max(...p.blocks.map((b) => b.s + b.w / 2)) + SET_FLOOR;
@@ -118,7 +118,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     if (next && p.floor !== undefined) floor[next.id] = p.floor;
     plans[st.id] = p.plan;
   }
-  const placed = [...placeCarriers(stretches, motion, route, tunnels, solo, new Set(Object.keys(SETS)), floor), ...ofSets];
+  const placed = [...placeCarriers(stretches, motion, route, tunnels, solo, owned, floor), ...ofSets];
   const carriers = placed.sort((a, b) => a.phrase.words[0]!.gi - b.phrase.words[0]!.gi);
   const stretchAt = (t: number) => stretches.find((s) => t >= s.start && t < s.end) ?? stretches[stretches.length - 1]!;
   const chaseOf = (st: Stretch): Target => (t) => {

@@ -28,13 +28,15 @@ export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLef
 export const PLOT = 22;
 const NEAR = 18;
 
-export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4 }
+/** A box standing by the road: a building (the town's), or concrete (a set-piece's structure: a viaduct's deck, its
+ *  piers); `lateral` and `w` across the road, `d` along it. */
+export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean }
 
-/** The box of a building `w` x `h` x `d` standing `lateral` off the road at s (its foot on the road's level). */
-export function boxAt(route: Route, s: number, lateral: number, w: number, h: number, d: number, y0 = 0): THREE.Matrix4 {
+/** A box `across` x `h` x `along` the road, standing `lateral` off it at s (its foot on the road's level, or `y0` over it). */
+export function boxAt(route: Route, s: number, lateral: number, across: number, h: number, along: number, y0 = 0): THREE.Matrix4 {
   const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, lateral);
   const m = new THREE.Matrix4().makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize());
-  m.scale(new THREE.Vector3(w, h, d));
+  m.scale(new THREE.Vector3(across, h, along));
   m.setPosition(p.x, p.y + y0 + h / 2, p.z);
   return m;
 }
@@ -66,7 +68,7 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
       const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), h = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
       const lateral = side * ((b.far ?? NEAR) + d / 2 + 6 * hash(k, side, 5));
       const lift = route.frameAt(s).pos.y + 0.4; // down to the plain: by a raised road it would float
-      out.push({ s, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, s, lateral, w, h + lift, d, -lift) });
+      out.push({ s, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, s, lateral, d, h + lift, w, -lift) }); // (w along the road, d deep)
     }
   }
   return out;

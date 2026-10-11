@@ -17,9 +17,9 @@
 //   hill   giant white capitals standing on a hillside across the valley, as LA signs its hills (the last chorus's
 //          payoff, "Cruise all night"), framed from behind the climbing car, lit at night
 //   tunnel lit up along a tunnel's left wall (the bridge, tunnel.ts), framed from across the bore like the left faces
-// A set-piece's stretch (sets/) places its own, on its own surfaces (SetKind: a speed trailer, the bus ahead's tail
-// ad, the van ahead's stickers, her phone, the radio, a burger stand's boards…) and frames them itself; placeCarriers
-// skips it.
+// A set-piece (sets/) places the lines it owns (a stretch's, or some of them) on its own surfaces (SetKind: a speed
+// trailer, the bus ahead's tail ad, the van ahead's stickers, her phone, the radio, a burger stand's boards, murals…)
+// and frames them itself; placeCarriers skips them.
 // Each phrase's text is blank until the camera first comes for it (`reveal`, set by makeDrive): the world ahead
 // shows its signs and walls, never the song beyond the next phrase.
 // Placement and text layout (rows and type size, in metres) are pure, so the guards can check legibility under bun;
@@ -33,6 +33,7 @@ import type { Phrase } from './phrases';
 import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
 import type { Route, RouteFrame } from './route';
 import type { Stretch } from './stretches';
+import type { Line } from '../engine/lyrics';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
@@ -248,7 +249,7 @@ const uprightFor = (normal: THREE.Vector3, fallback: THREE.Vector3) => {
 };
 const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
 
-export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route, tunnels: readonly Tunnel[] = [], solo?: Solo, skip: ReadonlySet<string> = new Set(), floor: Readonly<Record<string, number>> = {}): Carrier[] {
+export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route, tunnels: readonly Tunnel[] = [], solo?: Solo, skip: (line: Line, st: Stretch) => boolean = () => false, floor: Readonly<Record<string, number>> = {}): Carrier[] {
   const out: Carrier[] = [];
   // anything standing by the road stands clear of a tunnel and its mouths
   const clear = (s: number) => { const tn = nearTunnel(tunnels, s, TUNNEL_CLEAR); return tn ? tn.s1 + TUNNEL_CLEAR : s; };
@@ -258,9 +259,10 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
   let flyCount = 0, campaignCount = 0;
   const nextStart = (i: number) => lines.find((l) => l.i > i)?.words[0]!.start ?? Infinity;
   for (const st of R) {
-    if (skip.has(st.id)) continue; // (a set-piece places its own)
     const pattern = PATTERNS[st.id] ?? ['sign'];
     st.lines.forEach((line, li) => {
+      // (a set-piece's line: it places its own; a campaign's still counts, so the next chorus's grows on)
+      if (skip(line, st)) { if (CAMPAIGN.test(line.text) && st.id.startsWith('chorus')) campaignCount++; return; }
       // ("fly" goes in the sky: written there in the first and last choruses, flown on banners in the second)
       let kind: Kind = /\bfly\b/i.test(line.text) ? (st.id === HOOK.bannerIn ? 'banner' : 'sky') : pattern[li % pattern.length]!;
       // the campaign: "Young and fine and dark and handsome" opens each chorus as his billboards, bigger each time (the
@@ -408,7 +410,7 @@ export const BUILDING_H: Partial<Record<LeftKind, number>> = { wall: 14, storefr
 export const basisOf = (c: Carrier) => new THREE.Matrix4().makeBasis(c.up.clone().cross(c.normal).normalize(), c.up, c.normal).setPosition(c.center);
 /** A face's solid part, in its own frame (m): the building it's on (its foot on the ground, at least 1.5 m above the
  *  text), or its backing board, taking in a face stacked `under` it (its height, and its centre's offset). */
-function solidFor(kind: Kind, w: number, h: number, foot: number, under?: { h: number; dy: number }): Carrier['solid'] {
+export function solidFor(kind: Kind, w: number, h: number, foot: number, under?: { h: number; dy: number }): Carrier['solid'] {
   if (kind === 'road' || kind === 'sky' || kind === 'banner' || kind === 'hill') return null;
   const H = BUILDING_H[kind as LeftKind];
   if (H) { const top = Math.max(H, foot + h / 2 + 1.5); return { at: new THREE.Vector3(0, top / 2 - foot, -5.06), size: new THREE.Vector3(w + LEFT_GAP, top, 10) }; }

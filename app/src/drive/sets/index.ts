@@ -3,6 +3,7 @@
 // its phrases' carriers and frames each; the town keeps its ground clear; the scene builds its props (scenes/sets/).
 // Pure, like the rest of the drive model: the guard checks what shows.
 import type { AudioData } from '../../engine/audio';
+import type { Line } from '../../engine/lyrics';
 import type { Carrier } from '../carriers';
 import type { Motion, SpeedKey } from '../motion';
 import type { Solo } from '../phrases';
@@ -27,6 +28,8 @@ export interface SetContext {
   nextStart: (i: number) => number;
   /** The stretch after this one. */
   next?: Stretch;
+  /** Its faces on the left stand at least this far along the road (their centres, m: past the set-piece before). */
+  floor?: number;
 }
 export interface Placed {
   carriers: Carrier[];
@@ -45,9 +48,13 @@ export interface Placed {
   floor?: number;
 }
 export interface SetPiece {
-  /** The car's speed keys through the stretch. */
-  speed(st: Stretch, audio: AudioData): SpeedKey[];
+  /** The car's speed keys through the stretch (its pace `set`; else the stretch's own pace). */
+  speed?(st: Stretch, audio: AudioData): SpeedKey[];
+  /** The lines it places (default: all its stretch's); the rest are placed as usual. */
+  owns?(line: Line): boolean;
   place(ctx: SetContext): Placed;
 }
+/** Whether a set-piece places this line of stretch st. */
+export const owned = (line: Line, st: Stretch) => { const set = SETS[st.id]; return !!set && (set.owns?.(line) ?? true); };
 
 export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, verse1: VERSE1 };
