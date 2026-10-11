@@ -44,10 +44,17 @@ Two more causes:
 
 Effort per section: **S** reuse, **M** new props and shots, **L** a new kind of scene.
 
-### 0 · Intro — 0:00–0:16 · the pink motel, parked · S
-- **Lyrics**: none. BMF is on the motel's marquee.
-- **Camera**: keep the downbeat cuts (the neon stutters on, the car drops, the two of them, the lot).
-- **Out**: *follow*. The car pulls out and the camera stays with it into chorus 1, without a cut.
+### 0 · Intro — 0:00–0:16 · a red light on the corner by the pink motel · **built 2026-10-11 (your design)**
+- **The idea**: the car waits at a red light; the corner's street signs introduce the song; the light goes green when
+  the beat kicks in (the first kick, 15.60 s, with the first word).
+- **Shots**, cut on every other downbeat of the guitar intro:
+  - the street signs, BMF BLVD crossing SZA AVE, against the sky, the motel's neon SZA / BMF flickering on beside them;
+  - the Impala at the line, dropping on its hydraulics;
+  - over the two of them, up at the red light (SZA AV lit on its mast);
+  - wide across the intersection, back at the car and the motel;
+  - close on the signal, its walk countdown ticking off the last eight beats.
+- **Out**: on the kick, chorus 1's first phrase from behind the car. The light is green, "YOUNG AND FINE" is on his
+  first billboard across the intersection, and the car pulls away toward it.
 
 ### 1 · Chorus 1 — 0:16–0:31 · the boulevard, golden hour · M
 The ritual, first and smallest:

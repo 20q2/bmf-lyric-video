@@ -7,9 +7,10 @@ import type { Carrier } from '../carriers';
 import type { Motion, SpeedKey } from '../motion';
 import type { Solo } from '../phrases';
 import type { Route, RouteFrame } from '../route';
-import type { ShotMove, Target } from '../shots';
+import type { Shot, ShotMove, Target } from '../shots';
 import type { Stretch } from '../stretches';
 import type { Block } from '../blocks';
+import { INTRO } from './intro';
 import { VERSE1 } from './verse1';
 
 /** How a set frames one of its phrases: the target, the move onto it, and when it starts (default: its cue). */
@@ -24,9 +25,12 @@ export interface SetContext {
   solo?: Solo;
   /** When the line after line i starts (s). */
   nextStart: (i: number) => number;
+  /** The stretch after this one. */
+  next?: Stretch;
 }
 export interface Placed {
   carriers: Carrier[];
+  /** How the camera frames each of its phrases, by carrier id (or the next stretch's first: the intro's hand-off). */
   frames: Map<string, SetFrame>;
   /** Stretches of road the town leaves clear for it: [s from, s to] on a side (−1 left, +1 right). */
   clear: { side: number; a: number; b: number }[];
@@ -34,6 +38,11 @@ export interface Placed {
   blocks: Block[];
   /** Where its props stand and when they move, for the scene (scenes/sets/). */
   plan: unknown;
+  /** Shots of its own that aren't any phrase's (the intro's, before the first word). */
+  shots?: Shot[];
+  /** The next stretch's faces on the left stand at least this far along the road (their centres, m); by default past
+   *  its own blocks. */
+  floor?: number;
 }
 export interface SetPiece {
   /** The car's speed keys through the stretch. */
@@ -41,4 +50,4 @@ export interface SetPiece {
   place(ctx: SetContext): Placed;
 }
 
-export const SETS: Readonly<Record<string, SetPiece>> = { verse1: VERSE1 };
+export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, verse1: VERSE1 };

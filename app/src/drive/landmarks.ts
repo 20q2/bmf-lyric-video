@@ -1,11 +1,12 @@
-// Landmarks that aren't lyrics: the motel's roadside sign (the title, SZA / BMF / NO VACANCY), which opens the video and
-// closes it. Where it stands, and when its neon is lit: it flickers on with the first beats, and at the end, the car
+// Landmarks that aren't lyrics: the motel's roadside sign (SZA / BMF / NO VACANCY) on the corner where the video opens
+// (the car waiting at the light: sets/intro.ts), which closes it. Where it stands, and when its neon is lit: it flickers on with the first beats, and at the end, the car
 // long gone, its NO goes out (VACANCY). Pure: world.ts builds it, drive.ts frames it, the scene lights it.
 import * as THREE from 'three';
 import type { Route } from './route';
 
-/** The sign's spot: along the road (m, before its start), off it (left), its panel's size and its centre's height. */
-export const MOTEL_SIGN = { s: -18, lateral: -8, w: 4.4, h: 5.4, y: 5.4 };
+/** The sign's spot: along the road (m, from where the car waits at the light), off it (right: the motel's side), its
+ *  panel's size and its centre's height. */
+export const MOTEL_SIGN = { s: -4, lateral: 8, w: 4.4, h: 5.4, y: 5.4 };
 
 /** The sign's panel: its centre, the way it faces (toward the road and up it), and its size. */
 export function motelSign(route: Route) {

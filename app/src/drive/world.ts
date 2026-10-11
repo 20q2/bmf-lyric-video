@@ -145,10 +145,14 @@ export function buildWorld(drive: Drive): THREE.Group {
   for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
   g.add(named(buildStreetlights(drive), 'streetlights'));
 
-  // the motel the car waits outside at the start
+  // the motel on the corner, behind the car waiting at the light
   const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon({ color: WORLD.motel })));
   motel.matrixAutoUpdate = false;
-  motel.matrix.copy(boxAt(route, 4, 22, 34, 9, 14));
+  { // (before the road's start: frameAt clamps there, so laid off its first frame by hand)
+    const f = route.frameAt(0), M = { s: -17, lateral: 20, w: 30, h: 9, d: 14 };
+    motel.matrix.makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), f.fwd).scale(new THREE.Vector3(M.w, M.h, M.d))
+      .setPosition(f.pos.clone().addScaledVector(f.fwd, M.s).addScaledVector(f.right, M.lateral).add(new THREE.Vector3(0, M.h / 2, 0)));
+  }
   const sign = buildMotelSign(route);
   g.add(motel, sign);
   g.userData.sign = sign.userData;

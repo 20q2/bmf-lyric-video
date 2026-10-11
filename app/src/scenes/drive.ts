@@ -24,6 +24,7 @@ import { neonAt } from '../drive/landmarks';
 import { type Cast, castOf } from '../drive/cast';
 import { FINALE } from '../drive/drive';
 import { carMatrix } from '../drive/carriers';
+import { buildIntro } from './sets/intro';
 import { buildVerse1 } from './sets/verse1';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
@@ -113,7 +114,7 @@ export default class DriveScene extends Scene {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
       this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
-    for (const set of [buildVerse1(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
+    for (const set of [buildIntro(this.drive), buildVerse1(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {

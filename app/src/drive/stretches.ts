@@ -6,10 +6,9 @@ import type { Line, Lyrics } from '../engine/lyrics';
 import { Motion, type SpeedKey } from './motion';
 
 export type ChaseName = 'side' | 'behind' | 'front3q' | 'high' | 'overlook' | 'hero';
-/** How fast the car goes through a stretch (m/s): parked (pulling away in its last bar into the next stretch's speed),
- *  cruising, slowing to a stop by bar `byBar`, or scripted by its set-piece (sets/: braking for its lights, its stops). */
+/** How fast the car goes through a stretch (m/s): cruising, slowing to a stop by bar `byBar`, or scripted by its
+ *  set-piece (sets/: waiting at the intro's light, rushing past verse 1's speed trailer). */
 export type Pace =
-  | { kind: 'park' }
   | { kind: 'cruise'; v: number }
   | { kind: 'stop'; v: number; byBar: number }
   | { kind: 'set' };
@@ -30,7 +29,7 @@ export interface StretchSpec {
 }
 
 export const STRETCHES: readonly StretchSpec[] = Object.freeze([
-  { id: 'intro', section: null, place: 'pink motel, parked', pace: { kind: 'park' }, turn: 0, rise: 0, chase: 'front3q' },
+  { id: 'intro', section: null, place: 'a red light on the corner by the pink motel', pace: { kind: 'set' }, turn: 0, rise: 0, chase: 'front3q' },
   { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'hero' },
   { id: 'verse1', section: 'verse1', place: 'city streets: a long red light, a drive-thru', pace: { kind: 'set' }, turn: 90, rise: 0, chase: 'front3q' },
   { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'cruise', v: 26 }, turn: -20, rise: 6, chase: 'high' },
@@ -73,12 +72,9 @@ export function resolveStretches(audio: AudioData, lyrics: Lyrics): Stretch[] {
 /** The car's speed profile through the stretches (a set-piece's stretch: its own keys, `scripted`). */
 export function motionFor(R: readonly Stretch[], audio: AudioData, scripted: (s: Stretch) => SpeedKey[] = () => []): Motion {
   const bar = 240 / audio.bpm, keys: SpeedKey[] = [];
-  const cruiseOf = (s: Stretch | undefined) => (s && 'v' in s.pace ? s.pace.v : 0);
   for (const s of R) {
     const p = s.pace;
-    if (p.kind === 'park') {
-      keys.push({ t: s.start, v: 0, ramp: 0 }, { t: s.end - bar, v: cruiseOf(R[s.k + 1]), ramp: bar });
-    } else if (p.kind === 'cruise') {
+    if (p.kind === 'cruise') {
       keys.push({ t: s.start, v: p.v, ramp: bar });
     } else if (p.kind === 'set') {
       keys.push(...scripted(s));

@@ -53,7 +53,7 @@ export const SET_FLOOR = 40;
 export const LANE = 1.9;
 /** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
  *  its first shot stands (m). */
-export const OPENING = { at: [2.47, 6.22, 9.97, 13.72], signDist: 7.5 };
+export const SIGN_SHOT = { dist: 7.5, push: 0.5, over: 3 };
 /** The end: the cut to the motel (s, a half-beat after the last line has been read), and the fade out (s). */
 export const FINALE = { endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
@@ -106,15 +106,16 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const solo = emphasisOf(lyrics.lines), nextStart = (i: number) => lyrics.lines[i + 1]?.words[0]?.start ?? Infinity;
   const setFrames = new Map<string, SetFrame>(), clears: Placed['clear'] = [], setBlocks: Block[] = [], plans: Record<string, unknown> = {}, ofSets: Carrier[] = [];
   // (the faces on the left after a set-piece stand past its ground: its own blocks' far end, and their clear zone)
-  const floor: Record<string, number> = {};
+  const floor: Record<string, number> = {}, setShots: Shot[] = [];
   for (const st of stretches) {
-    const p = SETS[st.id]?.place({ st, audio, route, motion, carFrame, solo, nextStart });
+    const next = stretches[st.k + 1], p = SETS[st.id]?.place({ st, audio, route, motion, carFrame, solo, nextStart, next });
     if (!p) continue;
     ofSets.push(...p.carriers);
-    const next = stretches[st.k + 1];
-    if (next && p.blocks.length) floor[next.id] = Math.max(...p.blocks.map((b) => b.s + b.w / 2)) + SET_FLOOR;
+    if (next && p.blocks.length && p.floor === undefined) floor[next.id] = Math.max(...p.blocks.map((b) => b.s + b.w / 2)) + SET_FLOOR;
     p.frames.forEach((f, id) => setFrames.set(id, f));
     clears.push(...p.clear); setBlocks.push(...p.blocks);
+    if (p.shots) setShots.push(...p.shots);
+    if (next && p.floor !== undefined) floor[next.id] = p.floor;
     plans[st.id] = p.plan;
   }
   const placed = [...placeCarriers(stretches, motion, route, tunnels, solo, new Set(Object.keys(SETS)), floor), ...ofSets];
@@ -205,22 +206,14 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     const beat = beatAtOrAfter(audio, back), to = chaseOf(stretchAt(beat));
     if (nextAt - beat >= BACK_TO_CAR_GAP) { const b: Shot = { at: beat, to, move: far(phraseShots[i]!.to(beat), to(beat)) ? (c.kind === 'tunnel' ? 'cut' : 'swoop') : 'land' }; shots.push(b); own.add(b); }
   });
-  // the opening, cut on its downbeats: the motel sign's neon flickering on; the Impala, low, dropping on its
-  // hydraulics; over the two of them, the road ahead; the lot, wide; then the car pulls out into the chase
-  const sign = motelSign(route), park = carFrame(0), at0 = (fwd: number, right: number, up: number) => park.pos.clone().addScaledVector(park.fwd, fwd).addScaledVector(park.right, right).add(new THREE.Vector3(0, up, 0));
-  const signShot: Target = (t) => lookFrom(sign.center.clone().addScaledVector(sign.normal, OPENING.signDist - 0.5 * Math.min(1, t / 3)).add(new THREE.Vector3(0, -0.8, 0)), sign.center);
-  const opening: Shot[] = [
-    { at: 0, to: signShot, move: 'cut' },
-    { at: OPENING.at[0]!, to: (t) => lookFrom(at0(5.2 - 0.35 * (t - OPENING.at[0]!), 2.4, 0.5), at0(0.6, 0, 0.75)), move: 'cut' },
-    { at: OPENING.at[1]!, to: (t) => lookFrom(at0(-1.9 + 0.12 * (t - OPENING.at[1]!), 0, 1.85), at0(25, 0, 1.2)), move: 'cut' },
-    { at: OPENING.at[2]!, to: (t) => lookFrom(at0(12 - 0.8 * (t - OPENING.at[2]!), -16 + 0.9 * (t - OPENING.at[2]!), 3), at0(0, 4, 1.2)), move: 'cut' },
-    { at: OPENING.at[3]!, to: chaseOf(stretches[0]!), move: 'cut' },
-  ];
-  shots.push(...opening);
-  for (const o of opening) own.add(o);
+  // the opening (the intro's set-piece: its own shots); the motel's sign, which the end comes back to
+  const sign = motelSign(route), endCardAt = FINALE.endCard;
+  const signShot: Target = (t) => lookFrom(sign.center.clone().addScaledVector(sign.normal, SIGN_SHOT.dist - SIGN_SHOT.push * Math.min(1, Math.max(0, t - endCardAt) / SIGN_SHOT.over)).add(new THREE.Vector3(0, -0.8, 0)), sign.center);
+  shots.push(...setShots);
+  for (const o of setShots) own.add(o);
   // the end: after "crash" (a jolt), the last line low behind the parked car (its tail lights, the banner over it;
   // carriers.ts); then the motel again, empty at night, and its NO goes out
-  const endCard: Shot = { at: FINALE.endCard, to: signShot, move: 'cut' };
+  const endCard: Shot = { at: endCardAt, to: signShot, move: 'cut' };
   shots.push(endCard); own.add(endCard);
   // a stretch's glide gives way to the phrases' own shots: it may not start within 0.3 s of one, nor while a phrase is
   // still being read (its reading window)
