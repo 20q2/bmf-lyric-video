@@ -49,6 +49,12 @@ export interface Stretch extends StretchSpec {
   lines: Line[];
 }
 
+/** The song has faded out of hearing by here (s, the user's ear, 2026-10-11): no line ending later is shown; the end
+ *  is the scene's own. */
+export const AUDIBLE = 174;
+/** Whether a line is shown: it ends while the song can still be heard. */
+export const shown = (l: Line) => l.end <= AUDIBLE;
+
 /** The stretches, timed: they tile [0, duration). */
 export function resolveStretches(audio: AudioData, lyrics: Lyrics): Stretch[] {
   const first = lyrics.lines[0]!.start;
@@ -65,7 +71,7 @@ export function resolveStretches(audio: AudioData, lyrics: Lyrics): Stretch[] {
     const start = starts[k]!, end = k + 1 < STRETCHES.length ? starts[k + 1]! : audio.duration;
     if (!(end > start)) throw new Error(`stretch ${s.id}: [${start}, ${end}) is empty`);
     // (a line belongs to its own section, whatever its first word's time: a pickup can start a hair before the bar)
-    return { ...s, k, start, end, lines: lyrics.lines.filter((l) => (s.section === null ? false : l.section === s.section)) };
+    return { ...s, k, start, end, lines: lyrics.lines.filter((l) => (s.section === null ? false : l.section === s.section) && shown(l)) };
   });
 }
 

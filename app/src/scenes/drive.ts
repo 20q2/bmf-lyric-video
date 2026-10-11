@@ -23,6 +23,7 @@ import { type Stance, hydraulics } from '../drive/hydraulics';
 import { neonAt } from '../drive/landmarks';
 import { type Cast, castOf } from '../drive/cast';
 import { FINALE } from '../drive/drive';
+import { AUDIBLE } from '../drive/stretches';
 import { carMatrix } from '../drive/carriers';
 import { buildChorus2 } from './sets/chorus2';
 import { buildIntro } from './sets/intro';
@@ -143,7 +144,8 @@ export default class DriveScene extends Scene {
     this.world.add(this.city.points);
     this.money = new Money(lyrics, (t) => this.drive.carFrame(t), (t) => this.drive.motion.speedAt(t));
     this.world.add(this.money.mesh);
-    this.crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w)).map((w) => w.start));
+    // (the last, under the fade, isn't heard: no jolt)
+    this.crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w) && w.start < AUDIBLE).map((w) => w.start));
   }
 
   override render(f: Frame, out: THREE.WebGLRenderTarget): PostOverrides {
@@ -183,8 +185,9 @@ export default class DriveScene extends Scene {
       const line = this.ctx.lyrics.lines[c.phrase.line]!;
       const first = d.carriers.find((k) => k.phrase.line === c.phrase.line)!;
       // (the last line's banner only from the cut to it: flown in early, it would cross "crash")
-      const lastLine = c.phrase.line === this.ctx.lyrics.lines.length - 1;
-      o.visible = (lastLine ? d.lastCut !== null && t >= d.lastCut : t > first.reveal - BANNER_SKY.before) && t < line.end + BANNER_SKY.after && c.phrase.end > cleared;
+      // (the last line's banner from the cut to it, gone as the song fades out of hearing)
+      const last = !!c.finale;
+      o.visible = (last ? d.lastCut !== null && t >= d.lastCut : t > first.reveal - BANNER_SKY.before) && t < (last ? AUDIBLE : line.end + BANNER_SKY.after) && c.phrase.end > cleared;
       o.matrix.setPosition(centerAt(c, t));
       if (o.visible && c.kind === 'banner') flutter(o, c, t); // (cloth ripples; travelling sky-writing doesn't)
     }

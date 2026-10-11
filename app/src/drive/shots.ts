@@ -86,7 +86,8 @@ export function plan(a: AudioData, shots: readonly Shot[]): Move[] {
   return resolved.map(({ s, at }) => {
     const land = landing(a, s, at);
     if (!(land > at)) throw new Error(`shot ${describeAt(s, at)}: lands at ${land.toFixed(3)}, not after it starts`);
-    return { at, land, to: s.to, ease: s.ease ?? EASE[s.move ?? 'snap'], path: s.move === 'swoop' ? swoopPose : s.move === 'whip' ? linePose : lerpPose };
+    // (a swoop arcs; a whip and a glide fly a straight line: a pose's orbit can swing the eye through the ground)
+    return { at, land, to: s.to, ease: s.ease ?? EASE[s.move ?? 'snap'], path: s.move === 'swoop' ? swoopPose : s.move === 'whip' || s.move === 'glide' ? linePose : lerpPose };
   });
 }
 

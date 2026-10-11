@@ -12,6 +12,7 @@ import { LEAD, SNAP_S } from '../src/drive/shots';
 import { dissolveAt, revealAt } from '../src/drive/dissolve';
 import { TUNNEL, TUNNEL_CLEAR, nearTunnel } from '../src/drive/tunnel';
 import { SHOULDER, SLOPE } from '../src/drive/world';
+import { AUDIBLE, shown } from '../src/drive/stretches';
 import { audio, lyrics } from './data';
 
 const drive = makeDrive(audio, lyrics);
@@ -144,8 +145,9 @@ function problems(c: Carrier, t: number): string[] {
   return out;
 }
 
-test('every word is on exactly one carrier, in order', () => {
-  expect(drive.carriers.flatMap((c) => c.phrase.words.map((w) => w.gi))).toEqual(lyrics.lines.flatMap((l) => l.words.map((w) => w.gi)));
+test('every word sung while the song can be heard is on exactly one carrier, in order; none after', () => {
+  expect(drive.carriers.flatMap((c) => c.phrase.words.map((w) => w.gi))).toEqual(lyrics.lines.filter(shown).flatMap((l) => l.words.map((w) => w.gi)));
+  expect(drive.carriers.filter((c) => c.phrase.end > AUDIBLE).map((c) => c.id)).toEqual([]);
 });
 
 test('the carriers are a mix: every kind is used', () => {

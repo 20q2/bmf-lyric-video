@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { STRETCHES, resolveStretches } from '../src/drive/stretches';
+import { AUDIBLE, STRETCHES, resolveStretches, shown } from '../src/drive/stretches';
 import { audio, lyrics } from './data';
 
 const R = resolveStretches(audio, lyrics);
@@ -19,8 +19,9 @@ test('the intro ends on the downbeat at or before the first sung word', () => {
   expect(first - intro.end).toBeLessThan(240 / audio.bpm); // within a bar
 });
 
-test('every lyric line belongs to exactly one stretch, by its start', () => {
-  const owners = lyrics.lines.map((l) => R.filter((s) => l.start >= s.start && l.start < s.end).length);
-  expect(owners.every((n) => n === 1)).toBe(true);
-  expect(R.flatMap((s) => s.lines.map((l) => l.i))).toEqual(lyrics.lines.map((l) => l.i));
+test('every lyric line shown belongs to exactly one stretch (its section); none after the song fades out of hearing', () => {
+  const owners = lyrics.lines.map((l) => R.filter((s) => l.start >= s.start - 0.25 && l.start < s.end).length);
+  expect(owners.every((n) => n >= 1)).toBe(true);
+  expect(R.flatMap((s) => s.lines.map((l) => l.i))).toEqual(lyrics.lines.filter(shown).map((l) => l.i));
+  expect(R.flatMap((s) => s.lines).every((l) => l.end <= AUDIBLE)).toBe(true);
 });

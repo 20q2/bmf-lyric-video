@@ -10,7 +10,7 @@ import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor, emphasisOf } from './phrases';
 import { LEAD, SNAP_S, SWOOP_S, type Shot, type Target, beatAtOrAfter, director, resolveAt } from './shots';
 import * as THREE from 'three';
-import { type Stretch, motionFor, resolveStretches } from './stretches';
+import { AUDIBLE, type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
 import { REVEAL_S } from './dissolve';
 import { type Block, blocksOf } from './blocks';
@@ -18,6 +18,7 @@ import { motelSign } from './landmarks';
 import { type Placed, type SetFrame, SETS, owned } from './sets';
 
 const DEG = Math.PI / 180;
+const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
 /** After a line, the camera goes back to the car only if the next line is at least this far off (s). */
 export const BACK_TO_CAR_GAP = 1.2;
 /** A line's first phrase may be found this long before its first word (s), when the line before has ended. */
@@ -54,6 +55,10 @@ export const LANE = 1.9;
 /** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
  *  its first shot stands (m). */
 export const SIGN_SHOT = { dist: 7.5, push: 0.5, over: 3 };
+/** The end, after the last line: on a beat at least `after` s past it (and no later than `before` s ahead of the fade
+ *  out of hearing), the camera glides up and away behind the parked car (m back, up, and how fast each grows), looking
+ *  out over the city's lights (m ahead of the car, below its level). */
+export const END = { after: 0.8, before: 0.6, back: 9, backRate: 1.2, up: 2.5, rise: 0.9, look: 120, under: 18 };
 /** The end: the cut to the motel (s, a half-beat after the last line has been read), and the fade out (s). */
 export const FINALE = { endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
@@ -213,8 +218,14 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   for (const o of setShots) own.add(o);
   // the end: after "crash" (a jolt), the last line low behind the parked car (its tail lights, the banner over it;
   // carriers.ts); then the motel again, empty at night, and its NO goes out
+  // after the last line (the song fading out of hearing), the scene alone: a slow crane up and away from the parked car
+  // over the city's lights; then the motel's sign
+  const lastLine = carriers[carriers.length - 1]!.phrase, park = carFrame(audio.duration), pf = flat(park.fwd);
+  const away = beatAtOrAfter(audio, Math.max(lastLine.end + END.after, AUDIBLE - END.before));
+  const crane: Target = (t) => { const u = Math.max(0, t - away); return lookFrom(park.pos.clone().addScaledVector(pf, -END.back - END.backRate * u).add(new THREE.Vector3(0, END.up + END.rise * u, 0)), park.pos.clone().addScaledVector(pf, END.look).add(new THREE.Vector3(0, -END.under, 0))); };
+  const scene: Shot = { at: away, to: crane, move: 'glide' };
   const endCard: Shot = { at: endCardAt, to: signShot, move: 'cut' };
-  shots.push(endCard); own.add(endCard);
+  shots.push(scene, endCard); own.add(scene); own.add(endCard);
   // a stretch's glide gives way to the phrases' own shots: it may not start within 0.3 s of one, nor while a phrase is
   // still being read (its reading window)
   const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
