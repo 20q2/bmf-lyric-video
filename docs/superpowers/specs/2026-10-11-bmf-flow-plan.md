@@ -58,7 +58,7 @@ The ritual, first and smallest:
 - **"He's so fly, fly"**: a *crane* up from the car to the sky-writing (built).
 - **Out**: *crane* back down from the sky, through the open top into the car: verse 1 starts inside.
 
-### 2 · Verse 1 — 0:31–1:01 · city streets, stop-and-go · L
+### 2 · Verse 1 — 0:31–1:01 · city streets, stop-and-go · L — **built 2026-10-11, in review**
 **The grammar: inside the car at the lights.** At each red light, a held shot through the windshield,
 with the two of them in the foreground. The lyric is on whatever is out there. When the light turns
 green, one cut.
@@ -137,3 +137,25 @@ Stillness: the camera barely moves, and the bills drift.
 2. **Verse 1 inside the car**: is it all right for a whole verse to be seen through the windshield,
    with the two of them in the foreground?
 3. **The outro's crash**: the city's lights going out?
+
+## Build notes
+
+**Verse 1 (2026-10-11).** Built as `app/src/drive/sets/verse1.ts` (the drive model) and `app/src/scenes/sets/verse1.ts`
+(the props). The approved surfaces changed in places to meet the readability guard:
+
+- **The bus** stops alongside in the other lane. Its ad is a wrap high on its side: lower down, his head was in the
+  camera's way.
+- **The car ahead** is a pickup, shot from over our hood: a sedan's bumper stickers were too small to read from inside
+  the car.
+- **The crosswalk signal's hand** is decoration only: at legible size it would be a billboard.
+- **The radio** is a three-line display in a new dash.
+
+**Edit.** Five cuts: into the trailer, onto the bus, onto the radio (on green), onto the menu, onto the receipt. Whips
+take the camera across the car between neighbouring surfaces.
+
+**Fixes found on the way.**
+
+- Lines now belong to their own section: "Going too fast" had fallen into chorus 1 by 0.02 s.
+- The town around the faces had all but emptied: 17 buildings in the film, before this change. Verse 1 now has its
+  own low-rise blocks, and chorus 2's faces start past them.
+

@@ -39,7 +39,7 @@ export function boxAt(route: Route, s: number, lateral: number, w: number, h: nu
   return m;
 }
 
-export function blocksOf(route: Route, motion: Motion, stretches: readonly Stretch[], carriers: readonly Carrier[], tunnels: readonly Tunnel[]): Block[] {
+export function blocksOf(route: Route, motion: Motion, stretches: readonly Stretch[], carriers: readonly Carrier[], tunnels: readonly Tunnel[], keepClear: readonly { side: number; a: number; b: number }[] = [], own: readonly Block[] = []): Block[] {
   const stretchAtS = (s: number): Stretch => {
     for (const st of stretches) if (s < motion.distanceAt(st.end)) return st;
     return stretches[stretches.length - 1]!;
@@ -47,18 +47,22 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
   // where the words stand, per side (−1 left, +1 right): [s from, s to]
   // (a hill sign keeps its whole side of the road clear, from well before it: it's seen across the valley)
   const hills = carriers.filter((c) => c.kind === 'hill').map((c) => ({ side: -1, a: c.s - 260, b: c.s + 60 }));
-  const taken = [...hills, ...carriers.filter((c) => c.solid).flatMap((c) => {
+  // (and what the set-pieces keep clear: a cross street)
+  const taken = [...hills, ...keepClear, ...carriers.filter((c) => c.solid).flatMap((c) => {
     const side = Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) || 1;
-    const here = { side, a: c.s - c.w / 2 - 14, b: c.s + c.w / 2 + 14 };
-    // a face on the left is filmed from across the road (a wide pair stands well back): that side stays open too
+    // a face on the left is filmed from across the road (a wide pair stands well back): that side stays open too, and
+    // its own as far (on a bend, the building on the inside of it stands in that shot)
+    const margin = side < 0 ? c.w / 2 + 24 : 14, here = { side, a: c.s - c.w / 2 - margin, b: c.s + c.w / 2 + margin };
     return side < 0 ? [here, { side: 1, a: c.s - c.w - 24, b: c.s + c.w + 24 }] : [here];
   })];
-  const out: Block[] = [];
+  // a set-piece's own blocks stand where nothing else needs the ground (its own ground it keeps from the town's)
+  const out: Block[] = own.filter((b) => !taken.some((t) => t.side === Math.sign(b.lateral) && b.s + b.w / 2 > t.a && b.s - b.w / 2 < t.b));
+  const owned = own.map((b) => ({ side: Math.sign(b.lateral), a: b.s - b.w / 2 - 4, b: b.s + b.w / 2 + 4 }));
   for (let k = 0; k * PLOT < route.length; k++) {
     for (const side of [1, -1]) {
       const s = k * PLOT + PLOT / 2, b = BLOCKS[stretchAtS(s).id]!;
       if ((side === -1 && b.seaLeft) || hash(k, side, 1) < b.empty) continue;
-      if (nearTunnel(tunnels, s, TUNNEL_CLEAR) || taken.some((t) => t.side === side && s > t.a && s < t.b)) continue;
+      if (nearTunnel(tunnels, s, TUNNEL_CLEAR) || [...taken, ...owned].some((t) => t.side === side && s > t.a && s < t.b)) continue;
       const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), h = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
       const lateral = side * ((b.far ?? NEAR) + d / 2 + 6 * hash(k, side, 5));
       const lift = route.frameAt(s).pos.y + 0.4; // down to the plain: by a raised road it would float

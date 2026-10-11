@@ -11,6 +11,9 @@
 //   street       a green street-name blade, white type; gantry the same green, bigger, over the freeway
 //   banner       a towed banner: dark capitals printed on white cloth, a red hem
 //   tunnel       lit capitals on the tunnel's tiles, glowing sodium orange, the word being sung flaring white
+// and the set-pieces' surfaces, each in its own medium: a speed trailer's amber LEDs, a bus's wrap (its ad is the prop's),
+// a bus bench's blue back, bumper stickers, a California plate, the radio's cyan display, a menu board with its prices,
+// an order screen, a receipt's thermal print.
 // Every face is blank until its reveal (dissolve.ts), its board or wall already standing. A word of emphasis
 // (Phrase.solo) on its own row is set as big as its row allows, and punches up as it's sung (PUNCH).
 // Laid out as carriers.ts says (rows, em). Redrawn only when its karaoke key changes. Browser only (canvas).
@@ -67,6 +70,8 @@ export const wallColor = (c: Carrier) => c.kind === 'neon'
   : new THREE.Color(WORLD.stucco[Math.floor(hash(c.phrase.start, 9) * WORLD.stucco.length)]!);
 const hexOf = (c: THREE.Color) => `#${c.getHexString(THREE.SRGBColorSpace)}`;
 const GREEN = '#1f6b44';
+/** Bumper stickers: [paper, ink, the word being sung]. */
+const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
 interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean }
 function styleOf(c: Carrier): Style {
@@ -92,6 +97,18 @@ function styleOf(c: Carrier): Style {
     case 'tunnel': return c.phrase.line % 2 // (the lines in turn: sodium orange, then cold cyan)
       ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)', tubes: true }
       : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)', tubes: true };
+    case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffb000', '#ffb000', '#fff3c4'], alpha: [0.5, 1], glow: 'rgba(255,170,0,0.85)' };
+    case 'bus': { const a = AD_STYLE[c.ad ?? 'phone']; return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, '#d81e2c'], alpha: [0.72, 1] }; }
+    case 'bench': return { bg: '#1d4fa0', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
+    case 'sticker': { // (each its own: cream, black, yellow or red)
+      const [bg, ink, now] = STICKERS[Math.floor(hash(c.phrase.start, 21) * STICKERS.length)]!;
+      return { bg, border: ink, family: F.archivo(75, 900), caps: true, colors: [ink, ink, now], alpha: [0.75, 1] };
+    }
+    case 'plate': return { bg: '#f2f1ea', border: '#1b2a6b', family: F.archivo(62, 700), caps: true, colors: ['#1b2a6b', '#1b2a6b', '#d81e2c'], alpha: [0.8, 1] };
+    case 'radio': return { bg: '#04080a', family: F.mono(600), caps: true, colors: ['#5fd8ff', '#5fd8ff', '#ffffff'], alpha: [0.55, 1], glow: 'rgba(80,220,255,0.7)' };
+    case 'menu': return { bg: '#1b1714', family: F.archivo(75, 900), caps: true, colors: ['#fff1d0', '#fff1d0', '#ffd65a'], alpha: [0.75, 1] };
+    case 'order': return { bg: '#0d2350', family: F.archivo(100, 700), caps: true, colors: ['#e6ecff', '#e6ecff', '#ffd65a'], alpha: [0.7, 1] };
+    case 'receipt': return { bg: '#fbfaf3', family: F.mono(500), caps: true, colors: ['#2a2a2a', '#2a2a2a', '#c8102e'], alpha: [0.7, 1] };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
@@ -132,8 +149,11 @@ export class CarrierArt {
     if (style.band) { c.fillStyle = style.band; c.fillRect(0, H * 0.9, W, H * 0.1); }
     // the board's art, built round its lyric (never fading for it): an ad's product, or a route sign's shield and arrow
     const share = TEXT_SHARE[carrier.kind] ?? 1;
-    if (carrier.ad) drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' ? undefined : style.colors[1]);
+    // (a bus's ad is the bus's: its rows are the headline over it)
+    if (carrier.ad && carrier.kind !== 'bus') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' ? undefined : style.colors[1]);
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
+    else if (carrier.kind === 'menu') this.drawPrices(c, share);
+    else if (carrier.kind === 'plate') { c.fillStyle = '#c8102e'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.17); c.fillText('California', W / 2, H * 0.15); c.textAlign = 'left'; }
     const TW = W * share; // the lyric's width
     const shown = Math.round(revealAt(carrier, t) * FLIP.steps) / FLIP.steps;
     if (!COPY.has(carrier.kind)) { if (shown > 0) this.drawWords(c, t, TW, shown); return; }
@@ -151,6 +171,14 @@ export class CarrierArt {
       if (squash < 0.02) continue;
       c.drawImage(src, sx, 0, sw, H, sx + (sw * (1 - squash)) / 2, 0, sw * squash, H);
     }
+  }
+
+  /** A menu board's prices, one a row, right of its items (the board's own copy, in its own face). */
+  private drawPrices(c: CanvasRenderingContext2D, share: number) {
+    const { canvas, carrier } = this, W = canvas.width, H = canvas.height, n = carrier.rows.length;
+    c.fillStyle = '#ffd65a'; c.textAlign = 'right'; c.textBaseline = 'middle'; c.font = font(F.archivo(75, 700), (H / n) * 0.42);
+    carrier.rows.forEach((_, r) => c.fillText(`$${(2.49 + Math.floor(hash(carrier.phrase.start, 30 + r) * 6) + 0.5 * Math.floor(hash(carrier.phrase.start, 40 + r) * 2)).toFixed(2)}`, W * 0.97, (H * (r + 0.5)) / n, W * (1 - share) * 0.9));
+    c.textAlign = 'left';
   }
 
   private layers: Record<string, HTMLCanvasElement> = {};

@@ -38,6 +38,10 @@ export function poseFrom(eye: THREE.Vector3, at: THREE.Vector3, roll = 0): Pose 
 export const SWOOP = { lift: 0.35, max: 16 };
 /** A swoop from a to b at u: the eye flies a straight line between theirs, lifted in an arc over whatever stands between
  *  (the town, a board), while the aim slides from one target to the other. One continuous take, no cut. */
+/** From a to b at u with the eye on a straight line between theirs (a whip: no orbit, no arc). */
+export function linePose(a: Pose, b: Pose, u: number): Pose {
+  return poseFrom(eyeOf(a).lerp(eyeOf(b), u), new THREE.Vector3(a.tx, a.ty, a.tz).lerp(new THREE.Vector3(b.tx, b.ty, b.tz), u), a.roll + (b.roll - a.roll) * u);
+}
 export function swoopPose(a: Pose, b: Pose, u: number): Pose {
   const ea = eyeOf(a), eb = eyeOf(b), ta = new THREE.Vector3(a.tx, a.ty, a.tz), tb = new THREE.Vector3(b.tx, b.ty, b.tz);
   const eye = ea.clone().lerp(eb, u).add(new THREE.Vector3(0, Math.min(SWOOP.max, SWOOP.lift * ea.distanceTo(eb)) * Math.sin(Math.PI * u), 0));

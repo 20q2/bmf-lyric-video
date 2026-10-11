@@ -7,14 +7,15 @@ import { WORLD, toon } from '../look/toon';
 import { F } from '../engine/type';
 import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import type { Drive } from './drive';
-import type { Route } from './route';
-import { BANNER, type Carrier, LAYOUT, PAIRABLE, basisOf, solidsOf } from './carriers';
+import { ROAD_HALF, type Route } from './route';
+import { BANNER, type Carrier, LAYOUT, PAIRABLE, type SetKind, basisOf, solidsOf } from './carriers';
+const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'bench', 'sticker', 'plate', 'radio', 'menu', 'order', 'receipt']);
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 
-export const ROAD_HALF = 4;
+export { ROAD_HALF }; // (route.ts: the road's own measure)
 /** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
  *  wider than the road's tightest bend folds over the road there (the hairpin into the hills). */
 export const SHOULDER = 40;
@@ -404,11 +405,17 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill'; // the face is only its letters
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
+  if (c.kind === 'speed' || c.kind === 'radio') mat.color.setScalar(1.6); // (lit displays: they bloom a little)
+  if (SET_KINDS.has(c.kind)) { // a set-piece's surface: just the face; its props stand round it (scenes/sets/)
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), mat);
+    m.name = 'face'; m.matrixAutoUpdate = false; m.matrix.copy(basisOf(c));
+    return m;
+  }
   const g = new THREE.Group();
   const board = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h, c.kind === 'banner' ? FLUTTER.segments : 1, 1), mat);
   board.name = 'face';
@@ -498,6 +505,8 @@ export function buildCar(): THREE.Group {
   box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
   box(Wd - 0.12, 0.05, 0.05, 0, belt + 0.48, 0.92, chrome); // the windshield's top rail
   for (const x of [Wd / 2 - 0.08, -Wd / 2 + 0.08]) box(0.05, 0.5, 0.05, x, belt + 0.24, 0.95, chrome);
+  box(1.7, 0.22, 0.36, 0, 1.1, 0.73, dark); // the dash
+  const bezel = box(0.5, 0.2, 0.03, -0.02, 1.12, 0.545, chrome); bezel.rotation.x = Math.asin(0.3); // the radio's face, tipped back
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.06, depthWrite: false }));
   glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);
   // chrome: the spear down each side, the bumpers

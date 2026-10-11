@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 
 /** A stretch of road: from s0 to s1 (m), turning by `turn` (radians, + to the left) and climbing by `rise` (m). */
+/** The road's half-width (m): a lane each way. */
+export const ROAD_HALF = 4;
 export interface Segment { s0: number; s1: number; turn: number; rise: number }
 export interface RouteFrame {
   pos: THREE.Vector3;

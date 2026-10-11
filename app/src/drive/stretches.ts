@@ -7,12 +7,12 @@ import { Motion, type SpeedKey } from './motion';
 
 export type ChaseName = 'side' | 'behind' | 'front3q' | 'high' | 'overlook' | 'hero';
 /** How fast the car goes through a stretch (m/s): parked (pulling away in its last bar into the next stretch's speed),
- *  cruising, stop-and-go in bars (`go` bars moving, `stop` bars standing), or slowing to a stop by bar `byBar`. */
+ *  cruising, slowing to a stop by bar `byBar`, or scripted by its set-piece (sets/: braking for its lights, its stops). */
 export type Pace =
   | { kind: 'park' }
   | { kind: 'cruise'; v: number }
-  | { kind: 'stopgo'; v: number; go: number; stop: number }
-  | { kind: 'stop'; v: number; byBar: number };
+  | { kind: 'stop'; v: number; byBar: number }
+  | { kind: 'set' };
 
 export interface StretchSpec {
   id: string;
@@ -32,7 +32,7 @@ export interface StretchSpec {
 export const STRETCHES: readonly StretchSpec[] = Object.freeze([
   { id: 'intro', section: null, place: 'pink motel, parked', pace: { kind: 'park' }, turn: 0, rise: 0, chase: 'front3q' },
   { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'hero' },
-  { id: 'verse1', section: 'verse1', place: 'city streets, stop-and-go', pace: { kind: 'stopgo', v: 9, go: 2, stop: 1 }, turn: 90, rise: 0, chase: 'front3q' },
+  { id: 'verse1', section: 'verse1', place: 'city streets: a long red light, a drive-thru', pace: { kind: 'set' }, turn: 90, rise: 0, chase: 'front3q' },
   { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'cruise', v: 26 }, turn: -20, rise: 6, chase: 'high' },
   { id: 'verse2', section: 'verse2', place: 'Slauson, the neighbourhood', pace: { kind: 'cruise', v: 10 }, turn: -90, rise: -6, chase: 'side' },
   { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'hero' },
@@ -65,26 +65,23 @@ export function resolveStretches(audio: AudioData, lyrics: Lyrics): Stretch[] {
   return STRETCHES.map((s, k) => {
     const start = starts[k]!, end = k + 1 < STRETCHES.length ? starts[k + 1]! : audio.duration;
     if (!(end > start)) throw new Error(`stretch ${s.id}: [${start}, ${end}) is empty`);
-    return { ...s, k, start, end, lines: lyrics.lines.filter((l) => l.start >= start && l.start < end) };
+    // (a line belongs to its own section, whatever its first word's time: a pickup can start a hair before the bar)
+    return { ...s, k, start, end, lines: lyrics.lines.filter((l) => (s.section === null ? false : l.section === s.section)) };
   });
 }
 
-/** The car's speed profile through the stretches. */
-export function motionFor(R: readonly Stretch[], audio: AudioData): Motion {
+/** The car's speed profile through the stretches (a set-piece's stretch: its own keys, `scripted`). */
+export function motionFor(R: readonly Stretch[], audio: AudioData, scripted: (s: Stretch) => SpeedKey[] = () => []): Motion {
   const bar = 240 / audio.bpm, keys: SpeedKey[] = [];
-  const cruiseOf = (s: Stretch | undefined) => (s && s.pace.kind !== 'park' ? s.pace.v : 0);
+  const cruiseOf = (s: Stretch | undefined) => (s && 'v' in s.pace ? s.pace.v : 0);
   for (const s of R) {
     const p = s.pace;
     if (p.kind === 'park') {
       keys.push({ t: s.start, v: 0, ramp: 0 }, { t: s.end - bar, v: cruiseOf(R[s.k + 1]), ramp: bar });
     } else if (p.kind === 'cruise') {
       keys.push({ t: s.start, v: p.v, ramp: bar });
-    } else if (p.kind === 'stopgo') {
-      for (let b = 0; s.start + b * bar < s.end - 1e-6; b += p.go + p.stop) {
-        keys.push({ t: s.start + b * bar, v: p.v, ramp: Math.min(1, bar) });
-        const stopAt = s.start + (b + p.go) * bar;
-        if (stopAt < s.end - 1e-6) keys.push({ t: stopAt, v: 0, ramp: 1.5 });
-      }
+    } else if (p.kind === 'set') {
+      keys.push(...scripted(s));
     } else {
       keys.push({ t: s.start, v: p.v, ramp: 1 }, { t: s.start + bar, v: 0, ramp: (p.byBar - 1) * bar });
     }

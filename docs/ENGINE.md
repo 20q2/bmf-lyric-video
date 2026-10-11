@@ -51,6 +51,12 @@ to the user. Only the final export renders video (M5).
   street blades; banners towed by planes; freeway gantries (per-stretch patterns; "fly" lines in the sky) — and how the camera frames it; faces
   drawn in the browser. Each carrier's solid (building or backing board) is in the model, so the guard checks
   occlusion against what the scene builds.
+- `sets/` (M4, the flow plan: docs/superpowers/specs/2026-10-11-bmf-flow-plan.md): a stretch that is its own scene. Its
+  set-piece scripts the car's pace (`pace: { kind: 'set' }`), places its phrases on its own surfaces (SetKind: a speed
+  trailer, a bus's wrap, a bench, stickers and a plate, the radio riding in the dash, a menu board, an order screen, a
+  receipt), frames each (cut / whip / snap), keeps its ground clear and adds its own blocks; `scenes/sets/` builds its
+  props from its plan. The guard checks it like the rest; from inside the car only the cabin (drive.ts CABIN) can hide
+  a word. `verse1.ts`: the long red light and the burger stand.
 - `tunnel.ts`: a stretch marked `tunnel` (the bridge) runs through a headland — its mouths, a lamp over the car on
   every beat; world.ts builds the bore, headland and lamps, the scene darkens and lights it by where the camera is.
 - `dissolve.ts`: when text shows — blank until the camera first comes for it (`reveal`: never more than one phrase,

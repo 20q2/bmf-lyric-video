@@ -5,9 +5,9 @@
 import { expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { LENS, placeCamera } from '../src/drive/camera';
-import { type Carrier, KINDS, basisOf, centerAt, occludersOf } from '../src/drive/carriers';
+import { type Carrier, KINDS, basisOf, centerAt, occludersOf, rideAt } from '../src/drive/carriers';
 import { dwellFor } from '../src/drive/phrases';
-import { CAR_BOX, REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
+import { CABIN, CAR_BOX, REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
 import { LEAD, SNAP_S } from '../src/drive/shots';
 import { dissolveAt, revealAt } from '../src/drive/dissolve';
 import { TUNNEL, TUNNEL_CLEAR, nearTunnel } from '../src/drive/tunnel';
@@ -17,11 +17,11 @@ import { audio, lyrics } from './data';
 const drive = makeDrive(audio, lyrics);
 const cam = new THREE.PerspectiveCamera(LENS.fov, 16 / 9, LENS.near, LENS.far);
 const RATE = 30;
-/** Phrases still readable for less than dwellFor (by 0.03-0.8 s): tight joins in the dense verses, where the line
- *  before ends on another kind of carrier than this one starts on; and (L5.1, L8.1, L17.2, added 2026-10-10 when the
- *  guard learnt occlusion) the second sign of a line, which stands behind the first while that one's framed. M4
- *  designs these shots by hand; the list may only shrink. */
-const KNOWN_SHORT = new Set(['L4.0', 'L5.1', 'L8.1', 'L17.2', 'L21.0', 'L21.1', 'L36.1', 'L42.1', 'L43.1']); // (L5.1, L21.1, L42.1 added 2026-10-10: a line's take glides on to them in 0.12 s where a cut was instant: 0.03-0.1 s short) // (L43.0 added 2026-10-10: chorus 4's ransom line moved to gantries, whose reading time leaves "Put it in drive," a cut on its first word: 1.13 s of 1.2)
+/** Phrases still readable for less than dwellFor (by 0.03-0.8 s): tight joins in the dense verses and choruses, where
+ *  the line before ends on another kind of carrier than this one starts on, or a line's take glides on to them in
+ *  0.12 s where a cut was instant. Each section's set-piece (sets/) designs these shots by hand (verse 1's are gone);
+ *  the list may only shrink. */
+const KNOWN_SHORT = new Set(['L17.2', 'L21.0', 'L21.1', 'L36.1', 'L42.1', 'L43.1']);
 /** Frame margin (NDC), the most a face may turn away from the camera, and the least type size on screen (px at 1080p);
  *  and how long a phrase must stay up (§2: subtitle standards, ⅚ s and 0.3 s a word). */
 const MARGIN = 0.1; // title-safe: the middle 90% of the frame (docs/LYRIC_VIDEO_TENETS.md §3)
@@ -49,13 +49,18 @@ function blockHides(p: THREE.Vector3): boolean {
 }
 /** The other carrier whose solids hide the middle of c's face, or most of its corners, from the camera (if any). */
 const CAR = new THREE.Box3(new THREE.Vector3(-CAR_BOX.w / 2, 0, -CAR_BOX.l / 2), new THREE.Vector3(CAR_BOX.w / 2, CAR_BOX.h, CAR_BOX.l / 2));
+/** From inside the car, only what's in the cabin with the camera can stand in the way. */
+const CABIN_BOXES = CABIN.map(([at, size]) => new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(...at), new THREE.Vector3(...size)));
 function hiddenBy(c: Carrier, t: number): string | null {
   const pts = [c.center, ...corners(c).map((k) => k.clone().lerp(c.center, 0.2))];
   // the car, where it is at t
   const f = drive.carFrame(t), car = new THREE.Matrix4().makeBasis(f.right.clone().negate(), f.up, f.fwd).setPosition(f.pos), inv = car.clone().invert();
+  // (in the car: over its footprint, up to the height of someone standing in the open top)
+  const q = cam.position.clone().applyMatrix4(inv), inside = Math.abs(q.x) < CAR_BOX.w / 2 && Math.abs(q.z) < CAR_BOX.l / 2 && q.y > 0 && q.y < 3.5;
+  const boxes = inside ? CABIN_BOXES : [CAR];
   if (pts.some((p) => {
     const d = p.distanceTo(cam.position), ray = new THREE.Ray(cam.position.clone(), p.clone().sub(cam.position).normalize()).applyMatrix4(inv), hit = new THREE.Vector3();
-    return ray.intersectBox(CAR, hit) && hit.applyMatrix4(car).distanceTo(cam.position) < d - 0.05;
+    return boxes.some((b) => ray.intersectBox(b, hit) && hit.applyMatrix4(car).distanceTo(cam.position) < d - 0.05);
   })) return 'the car';
   if (pts.some(blockHides)) return 'a building';
   if (pts.some(terrainHides)) return 'the ground';
@@ -116,6 +121,7 @@ const toPx = (v: THREE.Vector3) => new THREE.Vector2(((v.x + 1) / 2) * 1920, ((1
 function problems(c: Carrier, t: number): string[] {
   placeCamera(cam, drive.camera(t));
   if (c.vel) c = { ...c, center: centerAt(c, t) }; // a banner, where it has flown to
+  if (c.ride) c = { ...c, ...rideAt(c, drive.carFrame(t)) }; // the radio, where the car has taken it
   const out: string[] = [];
   for (const k of corners(c)) {
     const p = k.clone().project(cam);
@@ -149,7 +155,7 @@ test('every carrier reads while its phrase is sung', { timeout: 120000 }, () => 
   drive.carriers.forEach((c, i) => {
     const from = c.phrase.start - LEAD + SNAP_S;
     const next = drive.carriers[i + 1], nextCue = next ? next.phrase.start - LEAD : Infinity;
-    const to = Math.min(c.phrase.end, nextCue);
+    const to = Math.min(c.phrase.end, nextCue, (c.until ?? Infinity) - 1e-6);
     const bad: string[] = [];
     for (let t = from; t <= to; t += 1 / RATE) {
       const p = problems(c, t);
@@ -179,7 +185,7 @@ test("the car never drives over road paint while it's sung", () => {
 function readable(c: Carrier): number {
   let seen = 0;
   for (let t = c.phrase.start - 1.5; t <= c.phrase.end + 2; t += 1 / RATE) {
-    if (revealAt(c, t) < 1 || (c.kind === 'sky' && (t < c.phrase.start || dissolveAt(c, t) >= 0.5))) continue;
+    if (revealAt(c, t) < 1 || t >= (c.until ?? Infinity) || (c.kind === 'sky' && (t < c.phrase.start || dissolveAt(c, t) >= 0.5))) continue;
     if (!problems(c, t).length) seen += 1 / RATE;
   }
   return seen;

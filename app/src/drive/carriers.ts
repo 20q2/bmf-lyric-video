@@ -17,6 +17,8 @@
 //   hill   giant white capitals standing on a hillside across the valley, as LA signs its hills (the last chorus's
 //          payoff, "Cruise all night"), framed from behind the climbing car, lit at night
 //   tunnel lit up along a tunnel's left wall (the bridge, tunnel.ts), framed from across the bore like the left faces
+// A set-piece's stretch (sets/) places its own, on its own surfaces (SetKind: a speed trailer, a bus's ad, the car
+// ahead's stickers, the radio, a drive-thru's boards…) and frames them itself; placeCarriers skips it.
 // Each phrase's text is blank until the camera first comes for it (`reveal`, set by makeDrive): the world ahead
 // shows its signs and walls, never the song beyond the next phrase.
 // Placement and text layout (rows and type size, in metres) are pure, so the guards can check legibility under bun;
@@ -24,7 +26,7 @@
 import * as THREE from 'three';
 import { OBB } from 'three/addons/math/OBB.js';
 import { hash } from '../engine/util';
-import { LENS, type Pose, eyeOf, fitSign, poseFrom } from './camera';
+import { LENS, type Pose, fitSign, linePose } from './camera';
 import type { Motion } from './motion';
 import type { Phrase } from './phrases';
 import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
@@ -34,8 +36,11 @@ import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
-export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill';
-export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill'];
+/** The set-pieces' surfaces (sets/). */
+export type SetKind = 'speed' | 'bus' | 'bench' | 'sticker' | 'plate' | 'radio' | 'menu' | 'order' | 'receipt';
+export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill' | SetKind;
+export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
+  'speed', 'bus', 'bench', 'sticker', 'plate', 'radio', 'menu', 'order', 'receipt'];
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -77,6 +82,19 @@ export interface Carrier {
   finale?: boolean;
   /** A billboard: the product its ad sells (ads.ts); its lyric is the headline. */
   ad?: Ad;
+  /** Riding in the car (the radio): where it is in the car's frame (x its left, y up from the road, z forward);
+   *  `center`, `normal` and `up` are where it is as its phrase starts (rideAt). */
+  ride?: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3 };
+  /** Gone from then (s): its prop drives off (the car ahead's stickers). */
+  until?: number;
+}
+
+/** The car's frame as a matrix: x its left, y up, z forward, at its position on the road. */
+export const carMatrix = (f: RouteFrame) => new THREE.Matrix4().makeBasis(f.right.clone().negate(), f.up, f.fwd).setPosition(f.pos);
+/** Where a riding carrier is when the car's frame is f. */
+export function rideAt(c: Carrier, f: RouteFrame): Pick<Carrier, 'center' | 'normal' | 'up'> {
+  const m = carMatrix(f), n = new THREE.Matrix3().setFromMatrix4(m);
+  return { center: c.ride!.pos.clone().applyMatrix4(m), normal: c.ride!.normal.clone().applyMatrix3(n).normalize(), up: c.ride!.up.clone().applyMatrix3(n).normalize() };
 }
 /** Where a carrier's centre is at t (a new vector: callers may change it). */
 export const centerAt = (c: Pick<Carrier, 'center' | 'vel' | 'phrase'>, t: number) => (c.vel ? c.center.clone().addScaledVector(c.vel, t - c.phrase.start) : c.center.clone());
@@ -85,25 +103,23 @@ export const centerAt = (c: Pick<Carrier, 'center' | 'vel' | 'phrase'>, t: numbe
 export const PATTERNS: Record<string, readonly Kind[]> = {
   intro: ['sign'],
   chorus1: ['road', 'road', 'billboard', 'sky', 'street'],
-  verse1: ['street', 'wall', 'road', 'sign', 'billboard', 'road', 'storefront'],
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
   verse2: ['storefront', 'street', 'road', 'wall', 'sign', 'road', 'billboard', 'street', 'road'],
   chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint)
   bridge1: ['tunnel'],
   verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
-  chorus4: ['gantry', 'sky', 'hill'], // (no paint on the switchback: the road above would hide it)
+  chorus4: ['road', 'gantry', 'sky', 'hill'], // (no paint on the switchback, after its first line: the road above would hide it)
   outro1: ['sky', 'banner', 'sky', 'banner'],
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
 export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
-  verse1: ['billboard', 'wall', 'billboard', 'storefront'],
   verse2: ['billboard', 'storefront', 'billboard', 'neon'],
   verse3: ['neon', 'billboard', 'neon', 'billboard', 'storefront'],
 };
 
 /** Per kind: a row's height and the face's width (m), and the face's type: its average advance per character (a share
  *  of the em) and the share of a row the em may take. */
-export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; emOfRow: number }> = {
+export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; emOfRow: number; wrap?: number }> = {
   road: { rowH: 3.4, w: 7, advance: 0.62, emOfRow: 0.7 },
   sky: { rowH: 9, w: 40, advance: 0.55, emOfRow: 0.72 },
   banner: { rowH: 5, w: 34, advance: 0.6, emOfRow: 0.72 },
@@ -116,12 +132,22 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   gantry: { rowH: 2, w: 9.5, advance: 0.55, emOfRow: 0.62 },
   tunnel: { rowH: 2, w: 10, advance: 0.62, emOfRow: 0.7 },
   hill: { rowH: 13, w: 120, advance: 0.62, emOfRow: 0.82 },
+  // (the set-pieces' surfaces, each phrase its own panel's rows: `wrap` the longest row it holds)
+  speed: { rowH: 0.4, w: 1.8, advance: 0.6, emOfRow: 0.66, wrap: 15 },
+  bus: { rowH: 0.34, w: 3, advance: 0.55, emOfRow: 0.72, wrap: 22 },
+  bench: { rowH: 0.26, w: 2.3, advance: 0.6, emOfRow: 0.7, wrap: 20 },
+  sticker: { rowH: 0.22, w: 0.84, advance: 0.55, emOfRow: 0.68, wrap: 16 },
+  plate: { rowH: 0.3, w: 0.62, advance: 0.6, emOfRow: 0.62, wrap: 8 },
+  radio: { rowH: 0.05, w: 0.42, advance: 0.6, emOfRow: 0.66, wrap: 28 },
+  menu: { rowH: 0.3, w: 2.1, advance: 0.5, emOfRow: 0.7, wrap: 24 },
+  order: { rowH: 0.2, w: 1.2, advance: 0.6, emOfRow: 0.7, wrap: 20 },
+  receipt: { rowH: 0.07, w: 0.42, advance: 0.6, emOfRow: 0.68, wrap: 22 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;
 export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'bench', 'sticker', 'plate', 'radio', 'menu', 'order', 'receipt']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
  *  valley), how high its letters' centre stands over the road there. */
 export const HILL = { ahead: 150, side: -55, y: 16 };
@@ -176,16 +202,16 @@ export const isFast = (line: { words: readonly { start: number }[]; end: number 
 
 /** A phrase's rows: one, or two balanced; a punctuating word (Phrase.solo) on a row of its own, the rest on one row
  *  unless it runs past SOLO_WRAP_AT (three rows make too tall a face). */
-export function rowsFor(text: string, solo?: Phrase['solo']): string[] {
-  if (!solo) return rowsOf(text);
+export function rowsFor(text: string, solo?: Phrase['solo'], wrap = WRAP_AT): string[] {
+  if (!solo) return rowsOf(text, wrap);
   const words = text.split(' '), rest = (solo === 'first' ? words.slice(1) : words.slice(0, -1)).join(' ');
-  const restRows = rest.length <= SOLO_WRAP_AT ? [rest] : rowsOf(rest);
+  const restRows = rest.length <= Math.max(SOLO_WRAP_AT, wrap) ? [rest] : rowsOf(rest, wrap);
   return solo === 'first' ? [words[0]!, ...restRows] : [...restRows, words[words.length - 1]!];
 }
 export const SOLO_WRAP_AT = 18;
 
-export function rowsOf(text: string): string[] {
-  if (text.length <= WRAP_AT) return [text];
+export function rowsOf(text: string, wrap = WRAP_AT): string[] {
+  if (text.length <= wrap) return [text];
   const words = text.split(' ');
   let best = 1, bestD = Infinity;
   for (let k = 1; k < words.length; k++) {
@@ -196,9 +222,9 @@ export function rowsOf(text: string): string[] {
 }
 
 /** Laid out at `scale` x its kind's size (a banner seen from further off is made bigger). */
-function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 1) {
+export function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 1) {
   const L = LAYOUT[kind], set = CAPS.has(kind) ? text.toUpperCase() : text;
-  const rows = kind === 'banner' ? (set.length <= BANNER_ROW ? [set] : rowsOf(set)) : rowsFor(set, solo);
+  const rows = kind === 'banner' ? (set.length <= BANNER_ROW ? [set] : rowsOf(set)) : rowsFor(set, solo, L.wrap);
   const longest = Math.max(...rows.map((r) => r.length));
   // a billboard's lyric is its ad's headline: it has the ad's left part, and the board is at least an ad's height
   // the lyric has the board's text share (its art has the rest); a billboard is at least an ad's height
@@ -218,7 +244,7 @@ const uprightFor = (normal: THREE.Vector3, fallback: THREE.Vector3) => {
 };
 const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
 
-export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route, tunnels: readonly Tunnel[] = [], solo?: Solo): Carrier[] {
+export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Route, tunnels: readonly Tunnel[] = [], solo?: Solo, skip: ReadonlySet<string> = new Set(), floor: Readonly<Record<string, number>> = {}): Carrier[] {
   const out: Carrier[] = [];
   // anything standing by the road stands clear of a tunnel and its mouths
   const clear = (s: number) => { const tn = nearTunnel(tunnels, s, TUNNEL_CLEAR); return tn ? tn.s1 + TUNNEL_CLEAR : s; };
@@ -228,14 +254,15 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
   let flyCount = 0, campaignCount = 0;
   const nextStart = (i: number) => lines.find((l) => l.i > i)?.words[0]!.start ?? Infinity;
   for (const st of R) {
+    if (skip.has(st.id)) continue; // (a set-piece places its own)
     const pattern = PATTERNS[st.id] ?? ['sign'];
     st.lines.forEach((line, li) => {
       // ("fly" goes in the sky: written there in the first and last choruses, flown on banners in the second)
       let kind: Kind = /\bfly\b/i.test(line.text) ? (st.id === HOOK.bannerIn ? 'banner' : 'sky') : pattern[li % pattern.length]!;
-      // the campaign: "Young and fine and dark and handsome" opens each chorus as his billboards, bigger each time (in
-      // the last verse it keeps the verse's faces, his ad on them: bigger boards there push the gantries after them
-      // out into the sky-writing's way)
-      const his = CAMPAIGN.test(line.text), campaign = his && st.id.startsWith('chorus');
+      // the campaign: "Young and fine and dark and handsome" opens each chorus as his billboards, bigger each time (the
+      // last chorus's keeps its pattern's kind: bigger boards there push its gantries into the sky-writing's way; its
+      // own set-piece is to come, flow plan §8)
+      const his = CAMPAIGN.test(line.text), campaign = his && st.id.startsWith('chorus') && campaignCount < HOOK.campaign.length;
       if (campaign) kind = 'billboard';
       const campaignScale = campaign ? HOOK.campaign[Math.min(campaignCount++, HOOK.campaign.length - 1)]! : 1;
       // a fast line is framed two phrases at a time (pairFraming): on the left, where faces pair side by side (a sign's
@@ -322,7 +349,8 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           // until it stands clear of the one before (their buildings swing into each other on the inside of a turn)
           const L = LEFT[kind_ as LeftKind], before = out.findLast((c) => PAIRABLE.has(c.kind) && c.solid);
           const at = (s: number) => { const f = route.frameAt(s); return { center: f.pos.clone().addScaledVector(f.right, -LEFT_LATERAL).addScaledVector(WORLD_UP, L.y), normal: flat(f.right.clone()), up: WORLD_UP.clone() }; };
-          s = room('left', clear(motion.distanceAt((ph.start + ph.end) / 2)), lay.w + LEFT_GAP);
+          // (past a set-piece's ground: its city stands there; `floor`)
+          s = room('left', Math.max(clear(motion.distanceAt((ph.start + ph.end) / 2)), floor[st.id] ?? -Infinity), lay.w + LEFT_GAP);
           solid = solidFor(kind_, lay.w, lay.h, L.y);
           while (before && overlaps(before, { ...at(s), solid })) s += 1;
           last.left = s;
@@ -546,8 +574,7 @@ export function glideTake(cs: readonly Carrier[], frames: readonly ((t: number) 
     if (t < t0 || p0 === p1) return frames[t < t0 ? 0 : p0]!(t);
     const u = (t - t0) / Math.max(1e-3, t1 - t0);
     // (the eye on a straight line between theirs: a pose's orbit would swing it through a wall)
-    const A = frames[p0]!(t), B = frames[p1]!(t), e = u * u * (3 - 2 * u);
-    return poseFrom(eyeOf(A).lerp(eyeOf(B), e), new THREE.Vector3(A.tx, A.ty, A.tz).lerp(new THREE.Vector3(B.tx, B.ty, B.tz), e));
+    return linePose(frames[p0]!(t), frames[p1]!(t), u * u * (3 - 2 * u));
   };
 }
 /** How far back a pair framing stands, per metre of the pair's extent; and how far it rises (m) per metre further out

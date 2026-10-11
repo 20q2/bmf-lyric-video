@@ -15,6 +15,7 @@ import { type Tunnel, tunnelsOf } from './tunnel';
 import { REVEAL_S } from './dissolve';
 import { type Block, blocksOf } from './blocks';
 import { motelSign } from './landmarks';
+import { type Placed, type SetFrame, SETS } from './sets';
 
 const DEG = Math.PI / 180;
 /** After a line, the camera goes back to the car only if the next line is at least this far off (s). */
@@ -30,6 +31,23 @@ export const SWAY = { amp: 0.35, rate: 0.35 };
 /** The car's bulk (m): world.ts builds it within this box (the two of them sitting up out of it included), its base on
  *  the road at the car's route frame; the guard checks it doesn't hide the lyrics. */
 export const CAR_BOX = { w: 2.05, h: 1.95, l: 5.7 };
+
+/** Inside the car, what of it can stand between the camera and a word (the car's frame: x its left, y up from the road,
+ *  z forward; m, centre and size; world.ts buildCar): their bodies, his head and cap, her head and hair, the seat's
+ *  back, the windshield's frame, the wheel, the dash, the body up to its beltline. */
+export const CABIN: readonly [[number, number, number], [number, number, number]][] = [
+  [[0.44, 1.28, -0.25], [0.42, 0.84, 0.42]], [[-0.44, 1.28, -0.25], [0.42, 0.84, 0.42]],
+  [[0.44, 1.795, -0.175], [0.3, 0.35, 0.39]], [[-0.44, 1.6, -0.275], [0.34, 0.64, 0.39]],
+  [[0, 1.13, -0.55], [1.66, 0.5, 0.18]],
+  [[0.9, 1.22, 0.95], [0.06, 0.5, 0.06]], [[-0.9, 1.22, 0.95], [0.06, 0.5, 0.06]], [[0, 1.46, 0.92], [1.84, 0.06, 0.06]],
+  [[0.44, 1.36, 0.42], [0.42, 0.32, 0.3]],
+  [[0, 1.1, 0.73], [1.7, 0.22, 0.36]],
+  [[0, 0.64, 0], [1.96, 0.68, 5.4]],
+];
+
+/** The faces on the left after a set-piece start this far past its own blocks (m: a wide face's clear zone reaches
+ *  this far back, blocks.ts). */
+export const SET_FLOOR = 40;
 
 /** How far right of the road's centre the car drives (m): in its lane. */
 export const LANE = 1.9;
@@ -73,14 +91,33 @@ export interface Drive {
   stretchAt(t: number): Stretch;
   camera(t: number): Pose;
   shots: Shot[];
+  /** Each set-piece's plan for its props (sets/; scenes/sets/ builds them), by stretch. */
+  plans: Record<string, unknown>;
 }
 
 export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
-  const stretches = resolveStretches(audio, lyrics), motion = motionFor(stretches, audio), route = routeFor(stretches, motion);
+  const stretches = resolveStretches(audio, lyrics);
+  const motion = motionFor(stretches, audio, (s) => SETS[s.id]?.speed(s, audio) ?? []), route = routeFor(stretches, motion);
   const tunnels = tunnelsOf(stretches, motion, audio.beats);
-  const carriers = placeCarriers(stretches, motion, route, tunnels, emphasisOf(lyrics.lines));
   // the car keeps to its lane (the right one), off the centre line
   const carFrame = (t: number) => { const f = route.frameAt(motion.distanceAt(t)); return { ...f, pos: f.pos.clone().addScaledVector(f.right, LANE) }; };
+  // the lyrics on their carriers: the set-pieces' stretches on their own surfaces (sets/), framed as they say
+  const solo = emphasisOf(lyrics.lines), nextStart = (i: number) => lyrics.lines[i + 1]?.words[0]?.start ?? Infinity;
+  const setFrames = new Map<string, SetFrame>(), clears: Placed['clear'] = [], setBlocks: Block[] = [], plans: Record<string, unknown> = {}, ofSets: Carrier[] = [];
+  // (the faces on the left after a set-piece stand past its ground: its own blocks' far end, and their clear zone)
+  const floor: Record<string, number> = {};
+  for (const st of stretches) {
+    const p = SETS[st.id]?.place({ st, audio, route, motion, carFrame, solo, nextStart });
+    if (!p) continue;
+    ofSets.push(...p.carriers);
+    const next = stretches[st.k + 1];
+    if (next && p.blocks.length) floor[next.id] = Math.max(...p.blocks.map((b) => b.s + b.w / 2)) + SET_FLOOR;
+    p.frames.forEach((f, id) => setFrames.set(id, f));
+    clears.push(...p.clear); setBlocks.push(...p.blocks);
+    plans[st.id] = p.plan;
+  }
+  const placed = [...placeCarriers(stretches, motion, route, tunnels, solo, new Set(Object.keys(SETS)), floor), ...ofSets];
+  const carriers = placed.sort((a, b) => a.phrase.words[0]!.gi - b.phrase.words[0]!.gi);
   const stretchAt = (t: number) => stretches.find((s) => t >= s.start && t < s.end) ?? stretches[stretches.length - 1]!;
   const chaseOf = (st: Stretch): Target => (t) => {
     const p = chase(CHASE[st.chase], carFrame(t));
@@ -88,7 +125,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   };
 
   const shots: Shot[] = [];
-  for (const st of stretches) if (st.k > 0) shots.push({ at: st.start, to: chaseOf(st), move: 'glide' });
+  for (const st of stretches) if (st.k > 0 && !SETS[st.id]) shots.push({ at: st.start, to: chaseOf(st), move: 'glide' });
   // pass 1: each phrase's shot. A line's first phrase may be found up to PREROLL early, but not before the phrase before
   // it has been read and sung; every phrase's reading window runs from its shot until it has been up dwellFor.
   const reading: [number, number][] = [], paired: boolean[] = [], phraseShots: Shot[] = [];
@@ -102,12 +139,14 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // a line on faces on the left is one take: the camera drifts along its faces as they're sung (lineTake), on into the
   // next line's first when that one's previewed
   const takes: (Target | undefined)[] = [];
+  const own_ = (i: number) => setFrames.has(carriers[i]!.id); // (a set-piece's: framed as it says)
   for (let i = 0; i < carriers.length;) {
+    if (own_(i)) { takes[i++] = undefined; continue; }
     let j = i + 1;
-    while (j < carriers.length && PAIRABLE.has(carriers[j]!.kind) && PAIRABLE.has(carriers[j - 1]!.kind) && takeable(carriers[j - 1]!, carriers[j]!)
+    while (j < carriers.length && !own_(j) && PAIRABLE.has(carriers[j]!.kind) && PAIRABLE.has(carriers[j - 1]!.kind) && takeable(carriers[j - 1]!, carriers[j]!)
       && (carriers[j]!.phrase.line === carriers[j - 1]!.phrase.line || fastAt(j - 1))) j++;
     // (elsewhere, a line on one kind of sign: from its framing to the next's)
-    if (j === i + 1 && GLIDES.has(carriers[i]!.kind)) while (j < carriers.length && carriers[j]!.phrase.line === carriers[i]!.phrase.line && carriers[j]!.kind === carriers[i]!.kind) j++;
+    if (j === i + 1 && GLIDES.has(carriers[i]!.kind)) while (j < carriers.length && !own_(j) && carriers[j]!.phrase.line === carriers[i]!.phrase.line && carriers[j]!.kind === carriers[i]!.kind) j++;
     const run = carriers.slice(i, j);
     const take = run.length < 2 ? undefined : PAIRABLE.has(run[0]!.kind) ? lineTake(run, run.map((_, k) => fastAt(i + k))) : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t))));
     for (let k = i; k < j; k++) takes[k] = take;
@@ -115,6 +154,13 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   }
   carriers.forEach((c, i) => {
     const w = c.phrase.words[0]!, cue = w.start - LEAD, prev = carriers[i - 1];
+    const sf = setFrames.get(c.id);
+    if (sf) {
+      const shot: Shot = { at: sf.at ?? { start: w.start, w: w.w }, to: sf.to, move: sf.move };
+      phraseShots.push(shot); paired.push(false);
+      reading.push([resolveAt(shot.at), cue + SNAP_S + dwellFor(c.phrase.words.length)]);
+      return shot;
+    }
     const free = prev ? Math.max(reading[i - 1]![1], prev.phrase.end + 0.1) : 0; // read, and done being sung
     const early = !prev || prev.phrase.line !== c.phrase.line ? Math.min(PREROLL, Math.max(0, cue - free)) : 0;
     const next = carriers[i + 1], take = takes[i], pair = !take && next && fastAt(i) ? pairFraming(c, next) : null;
@@ -152,7 +198,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // pass 2: back to the car after a line, once its last phrase has been read, if the next line's shot is far enough off
   carriers.forEach((c, i) => {
     const next = carriers[i + 1];
-    if (!next || next.phrase.line === c.phrase.line) return; // (after the last line, the end card)
+    if (!next || next.phrase.line === c.phrase.line || setFrames.has(c.id)) return; // (after the last line, the end card; a set-piece keeps its camera)
     const back = Math.max(c.phrase.end + 0.05, reading[i]![1]), nextAt = next ? resolveAt(phraseShots[i + 1]!.at) : Infinity;
     // a cut back to the car on the beat after (or the 'land' when the car's chase is near enough to move to)
     const beat = beatAtOrAfter(audio, back), to = chaseOf(stretchAt(beat));
@@ -180,7 +226,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
-  const blocks = blocksOf(route, motion, stretches, carriers, tunnels);
+  const blocks = blocksOf(route, motion, stretches, carriers, tunnels, clears, setBlocks);
   const lastShot = phraseShots[phraseShots.length - 1], lastCut = lastShot ? resolveAt(lastShot.at) : null;
-  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut };
+  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans };
 }
