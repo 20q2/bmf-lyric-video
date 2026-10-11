@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
 import { carMatrix } from '../../drive/carriers';
-import { BUS, PACE, VAN, type Verse1Plan, vanAheadAt } from '../../drive/sets/verse1';
+import { BUS, PACE, VAN, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -181,8 +181,15 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(q);
   }
 
-  /** The bus at t: riding ahead of them until it turns, then on and round the corner into the cross street. */
+  /** The bus at t: waiting at its stop, pulling out ahead of them into their lane, riding ahead of them until it
+   *  turns, then on and round the corner into the cross street. */
   const busMatrix = (t: number): THREE.Matrix4 => {
+    if (t < plan.joinAt) {
+      const tA = plan.joinV / BUS.accel, left = Math.min(tA, plan.joinAt - t), u = 1 - left / tA, e = u * u * (3 - 2 * u);
+      const s = drive.motion.distanceAt(plan.joinAt) + plan.busAhead - (plan.joinV * left - 0.5 * BUS.accel * left * left);
+      const f = route.frameAt(s), fwd = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize(), right = new THREE.Vector3(f.right.x, 0, f.right.z).normalize();
+      return new THREE.Matrix4().makeBasis(right.clone().negate(), UP, fwd).setPosition(f.pos.clone().addScaledVector(f.right, BUS.curb + (LANE - BUS.curb) * e));
+    }
     if (t <= plan.turnAt) return carMatrix(drive.carFrame(t, plan.busAhead));
     const f = drive.carFrame(plan.turnAt, plan.busAhead), fwd = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize(), right = new THREE.Vector3(f.right.x, 0, f.right.z).normalize();
     const d = (t - plan.turnAt) * PACE.cruise, arc = (BUS.R * Math.PI) / 2, C = f.pos.clone().addScaledVector(fwd, BUS.lead).addScaledVector(right, BUS.R);
@@ -198,9 +205,11 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
   return {
     group: root,
     update(t) {
-      bus.matrix.copy(busMatrix(t));
-      bus.visible = t < plan.turnAt + 8;
-      van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
+      // (they're only there for the verse: the bus from its stop, the van once the bus is out of its way)
+      bus.visible = t >= plan.start - BUS.early && t < plan.turnAt + BUS.gone;
+      if (bus.visible) bus.matrix.copy(busMatrix(t));
+      van.visible = vanThere(plan, t);
+      if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
       phone.matrix.copy(carMatrix(drive.carFrame(t)));
       phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
     },

@@ -28,12 +28,15 @@ const CAR_HALF = 2.7;
 
 /** The pace (m/s, s): rushing past the trailer, then cruising with the traffic. */
 export const PACE = { rush: 16, rushRamp: 0.5, cruise: 11, ease: 1, easeBefore: 1.2 };
-/** The bus they tailgate (in their lane, `gap` m off their nose; its half-length; its tail ad's centre's height), turning
- *  off right `turnAfter` s after its line, `lead` m on and round a corner of radius R. */
-export const BUS = { gap: 2, half: 5.5, adY: 1.85, turnAfter: 0.35, lead: 2, R: 10 };
-/** The van ahead of the bus: `gap` m off their nose once it's closed in (at `close` m/s, by `by` s before its line); its
- *  half-length; its back doors (bottom, top) and its stickers' middle; its plate's centre. */
-export const VAN = { gap: 3, half: 2.6, close: 3, by: 0.7, doors: [0.55, 2.35] as [number, number], stickersY: 1.55, plateY: 0.66 };
+/** The bus they tailgate: it pulls out from its stop at the curb (`curb` m off the road's centre, accelerating at
+ *  `accel`) into their lane `join` s before its line, `gap` m off their nose; its half-length; its tail ad's centre's
+ *  height; it turns off right `turnAfter` s after its line, `lead` m on and round a corner of radius R, gone `gone` s
+ *  later. It's only there for the verse: at its stop from `early` s before the verse. */
+export const BUS = { curb: ROAD_HALF - 1.15, accel: 4, join: 0.5, gap: 2, half: 5.5, adY: 1.85, turnAfter: 0.35, lead: 2, R: 10, gone: 3, early: 3 };
+/** The van that was ahead of the bus: there once the bus has turned off (`appear` s after), `gap` m off their nose once
+ *  it's closed in (at `close` m/s, by `by` s before its line); away `leave` s after its line (accelerating at `accel`),
+ *  gone `gone` s later; its half-length; its back doors (bottom, top) and its stickers' middle; its plate's centre. */
+export const VAN = { appear: 1.2, gap: 3, close: 3, by: 0.7, leave: 0.3, accel: 6, gone: 4, half: 2.6, doors: [0.55, 2.35] as [number, number], stickersY: 1.55, plateY: 0.66 };
 /** Where things stand: the speed trailer (where the car passes it, off the road, its display's height); the burger
  *  stand's menu board (passed as its line is sung, how far through) and its marquee (on along the road from the board,
  *  off the road, its centre's height). In the car (x its left, y up, z forward): her phone, the radio in the dash. */
@@ -68,9 +71,10 @@ function stackOn(kind: Kind, phs: readonly Phrase[], P: THREE.Vector3, n: THREE.
 interface Panel { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number; s: number; ground: number }
 export interface Verse1Plan {
   trailerS: number;
-  /** The cross street the bus turns into (its middle, m along the road); when the bus starts to turn; when the van has
-   *  closed in; the menu board (m along the road). */
-  crossS: number; turnAt: number; closeBy: number; menuS: number;
+  /** The cross street the bus turns into (its middle, m along the road); the verse's start; when the bus has joined
+   *  their lane (and its speed then), starts to turn; when the van has closed in and when it leaves; the menu board
+   *  (m along the road). */
+  crossS: number; start: number; joinAt: number; joinV: number; turnAt: number; closeBy: number; leaveAt: number; menuS: number;
   busAd: Ad;
   panels: Record<'trailer' | 'menu' | 'marquee', Panel>;
   /** Where the bus and van ride, ahead of the car (m, centre to centre). */
@@ -80,8 +84,11 @@ export interface Verse1Plan {
   phone: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number; held: [number, number][] };
 }
 
-/** How far ahead of the car the van rides at t: further while the bus is between them, closing in to its gap. */
-export const vanAheadAt = (plan: Verse1Plan, t: number) => plan.vanAhead + Math.max(0, plan.closeBy - t) * VAN.close;
+/** How far ahead of the car the van rides at t: further while the bus is between them, closing in to its gap; then
+ *  away up the street. */
+export const vanAheadAt = (plan: Verse1Plan, t: number) => plan.vanAhead + Math.max(0, plan.closeBy - t) * VAN.close + 0.5 * VAN.accel * Math.max(0, t - plan.leaveAt) ** 2;
+/** Whether the van is there at t (from once the bus is out of its way until it's away up the street). */
+export const vanThere = (plan: Verse1Plan, t: number) => t >= plan.turnAt + VAN.appear && t < plan.leaveAt + VAN.gone;
 
 export const VERSE1: SetPiece = {
   speed(st) {
@@ -98,7 +105,7 @@ export const VERSE1: SetPiece = {
     const l5 = lines[1]!, l6 = lines[2]!, l7 = lines[3]!, l9 = lines[5]!, l11 = lines[7]!;
     const carS = (t: number) => motion.distanceAt(t);
     const busAhead = CAR_HALF + BUS.gap + BUS.half, vanAhead = CAR_HALF + VAN.gap + VAN.half;
-    const turnAt = l5.end + BUS.turnAfter, closeBy = l7.start - VAN.by;
+    const turnAt = l5.end + BUS.turnAfter, closeBy = l7.start - VAN.by, leaveAt = l7.end + VAN.leave, joinAt = l5.start - BUS.join;
     const crossS = carS(turnAt) + busAhead + BUS.lead + BUS.R;
     const menuS = carS(l9.start + (l9.end - l9.start) * AT.menu.through), trailerS = carS(AT.trailer.passAt);
     const atRoad = (s: number, lateral: number, y: number) => { const f = route.frameAt(s); return f.pos.clone().addScaledVector(f.right, lateral).addScaledVector(UP, y); };
@@ -149,7 +156,7 @@ export const VERSE1: SetPiece = {
     // the bus they're tailgating: its tail ad, from the back seat between their heads
     const busAd = adFor(l5.text, l5.start * 1000), back = new THREE.Vector3(0, 0, -1);
     const adPos = new THREE.Vector3(0, BUS.adY, -BUS.half - 0.03);
-    const bus = riding('bus', phs[1]!, adPos, back, busAhead, { ad: busAd, until: turnAt });
+    const bus = riding('bus', phs[1]!, adPos, back, busAhead, { ad: busAd, from: joinAt, until: turnAt });
     hold(bus.cs, (t) => lookFrom(inFrame(EYE.back, t), inFrame(adPos, t, busAhead)), 'cut');
 
     // her phone: the texts she's sending (and, at the end, "…can you?"), over her shoulder
@@ -161,8 +168,8 @@ export const VERSE1: SetPiece = {
 
     // the bus turns off: the van ahead, closed in, its back doors stickered, MY MAN its plate; from over the hood
     const doors = new THREE.Vector3(0, VAN.stickersY, -VAN.half - 0.02), [p0, p1, p2, p3] = phs[3]!;
-    const stickers = riding('sticker', [p0, p1, p2].filter((p): p is Phrase => !!p), doors, back, vanAhead, { from: closeBy }).cs;
-    const plate = p3 ? riding('plate', [p3], new THREE.Vector3(0, VAN.plateY, -VAN.half - 0.06), back, vanAhead, { from: closeBy }).cs : [];
+    const stickers = riding('sticker', [p0, p1, p2].filter((p): p is Phrase => !!p), doors, back, vanAhead, { from: closeBy, until: leaveAt }).cs;
+    const plate = p3 ? riding('plate', [p3], new THREE.Vector3(0, VAN.plateY, -VAN.half - 0.06), back, vanAhead, { from: closeBy, until: leaveAt }).cs : [];
     const vanAim = new THREE.Vector3(0, (VAN.stickersY + VAN.plateY) / 2 + 0.25, -VAN.half);
     hold([...stickers, ...plate], (t) => lookFrom(inFrame(EYE.hood, t), inFrame(vanAim, t, vanAhead)), 'whip');
 
@@ -199,7 +206,7 @@ export const VERSE1: SetPiece = {
     }
 
     const plan: Verse1Plan = {
-      trailerS, crossS, turnAt, closeBy, menuS, busAd, panels, busAhead, vanAhead,
+      trailerS, crossS, start: st.start, joinAt, joinV: motion.speedAt(joinAt), turnAt, closeBy, leaveAt, menuS, busAd, panels, busAhead, vanAhead,
       tailAd: { pos: adPos, w: LAYOUT.bus.w, h: bus.H },
       phone: { pos: AT.phone.clone(), normal: phoneN, up: texts.up, w: LAYOUT.phone.w, h: Math.max(texts.H, reply.H) + 0.04, held },
     };

@@ -183,17 +183,26 @@ export default class DriveScene extends Scene {
       o.matrix.setPosition(centerAt(c, t));
       if (o.visible && c.kind === 'banner') flutter(o, c, t); // (cloth ripples; travelling sky-writing doesn't)
     }
-    // the skywriter, writing the latest sky phrase: at its head along the words' top as they're sung, then away
-    const writing = this.skies.filter((c) => t > c.phrase.start - 0.3 && t < c.phrase.end + SKYWRITER.after).pop();
-    this.writer.visible = !!writing;
-    if (writing) {
-      const w = writing, along = w.up.clone().cross(w.normal).normalize(), dur = Math.max(0.3, w.phrase.end - w.phrase.start);
-      const u = Math.min(1, Math.max(0, (t - w.phrase.start) / dur)), past = Math.max(0, t - w.phrase.end);
-      // sized by a row of its writing, flying just over the top row (never across the words)
-      const k = SKYWRITER.size * (w.h / w.rows.length / 9);
-      const head = centerAt(w, t).addScaledVector(along, -w.w / 2 + u * w.w + past * SKYWRITER.speed)
-        .addScaledVector(w.up, w.h / 2 + 1.2 * k + past * SKYWRITER.climb);
-      this.writer.matrix.makeBasis(along, w.up, w.normal).scale(new THREE.Vector3(k, k, k)).setPosition(head);
+    // the skywriter, writing the line being written: at the head of each phrase along its top as it's sung, gliding on
+    // over the gap to the next phrase's start (one flight across the line), then away after the last
+    const started = this.skies.filter((c) => t > c.phrase.start - 0.3 && t < c.phrase.end + SKYWRITER.after).pop();
+    const line = started ? this.skies.filter((c) => c.phrase.line === started.phrase.line) : [];
+    const i = Math.max(0, line.findLastIndex((c) => t >= c.phrase.start)), w = line[i], next = line[i + 1];
+    this.writer.visible = !!w && t < (next ? Infinity : w.phrase.end + SKYWRITER.after);
+    if (w) {
+      // (over the top of phrase c, a share u along it: sized by a row of its writing, never across the words)
+      const over = (c: Carrier, u: number) => {
+        const a = c.up.clone().cross(c.normal).normalize(), k = SKYWRITER.size * (c.h / c.rows.length / 9);
+        return { a, k, at: centerAt(c, t).addScaledVector(a, -c.w / 2 + u * c.w).addScaledVector(c.up, c.h / 2 + 1.2 * k) };
+      };
+      const dur = Math.max(0.3, w.phrase.end - w.phrase.start), u = Math.min(1, Math.max(0, (t - w.phrase.start) / dur));
+      let { a, k, at } = over(w, u);
+      const past = Math.max(0, t - w.phrase.end);
+      if (past > 0 && next) { // on across the gap to the next phrase's start
+        const g = Math.min(1, past / Math.max(1e-3, next.phrase.start - w.phrase.end)), e = g * g * (3 - 2 * g), to = over(next, 0);
+        at = at.lerp(to.at, e); k += (to.k - k) * e;
+      } else if (past > 0) at.addScaledVector(a, past * SKYWRITER.speed).addScaledVector(w.up, past * SKYWRITER.climb); // away
+      this.writer.matrix.makeBasis(a, w.up, w.normal).scale(new THREE.Vector3(k, k, k)).setPosition(at);
     }
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
