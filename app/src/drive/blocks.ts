@@ -49,16 +49,17 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
   // where the words stand, per side (−1 left, +1 right): [s from, s to]
   // (a hill sign keeps its whole side of the road clear, from well before it: it's seen across the valley)
   const hills = carriers.filter((c) => c.kind === 'hill').map((c) => ({ side: -1, a: c.s - 260, b: c.s + 60 }));
-  // (and what the set-pieces keep clear: a cross street)
-  const taken = [...hills, ...keepClear, ...carriers.filter((c) => c.solid).flatMap((c) => {
+  const faces = [...hills, ...carriers.filter((c) => c.solid).flatMap((c) => {
     const side = Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) || 1;
     // a face on the left is filmed from across the road (a wide pair stands well back): that side stays open too, and
     // its own as far (on a bend, the building on the inside of it stands in that shot)
     const margin = side < 0 ? c.w / 2 + 24 : 14, here = { side, a: c.s - c.w / 2 - margin, b: c.s + c.w / 2 + margin };
     return side < 0 ? [here, { side: 1, a: c.s - c.w - 24, b: c.s + c.w + 24 }] : [here];
   })];
-  // a set-piece's own blocks stand where nothing else needs the ground (its own ground it keeps from the town's)
-  const out: Block[] = own.filter((b) => !taken.some((t) => t.side === Math.sign(b.lateral) && b.s + b.w / 2 > t.a && b.s - b.w / 2 < t.b));
+  // (and what the set-pieces keep clear of the town: a cross street, a freeway's wall)
+  const taken = [...faces, ...keepClear];
+  // a set-piece's own blocks stand where no face needs the ground (the ground it keeps clear is kept from the town's)
+  const out: Block[] = own.filter((b) => !faces.some((t) => t.side === Math.sign(b.lateral) && b.s + b.w / 2 > t.a && b.s - b.w / 2 < t.b));
   const owned = own.map((b) => ({ side: Math.sign(b.lateral), a: b.s - b.w / 2 - 4, b: b.s + b.w / 2 + 4 }));
   for (let k = 0; k * PLOT < route.length; k++) {
     for (const side of [1, -1]) {

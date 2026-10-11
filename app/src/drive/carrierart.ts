@@ -31,7 +31,7 @@ import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 
 const CANVAS_W = 1024;
 /** Boards that show their ad's copy until their lyric flips in (tri-vision: FLIP.slats slats, turning in a wave). */
-const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'sign', 'wall', 'storefront', 'street', 'gantry']);
+const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'wall', 'storefront', 'street', 'gantry']);
 export const FLIP = { slats: 10, stagger: 0.6, steps: 12 };
 /** The word of emphasis's row takes this many shares of its face's height (the others one each). */
 const SOLO_ROW = 1.45;
@@ -85,7 +85,7 @@ function styleOf(c: Carrier): Style {
       return { family: F.archivoItalic(100, 800), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1 };
     }
     case 'wall': return { bg: hexOf(wallColor(c)), family: F.archivo(100, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.72, 1] };
-    case 'billboard': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
+    case 'billboard': case 'poster': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
       // (the word being sung: warm yellow on a dark ad, red on a light one — one rule across the film)
       const a = AD_STYLE[c.ad ?? 'lipstick'], dark = new THREE.Color(a.bg).getHSL({ h: 0, s: 0, l: 0 }).l < 0.4;
       return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, dark ? '#ffd65a' : '#d81e2c'], alpha: [0.72, 1] };
@@ -109,6 +109,7 @@ function styleOf(c: Carrier): Style {
     case 'mirror': return { bg: '#cdd6db', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#b0102a', '#b0102a', '#e8173a'], alpha: [0.55, 1] };
     case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
+    case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
@@ -150,7 +151,7 @@ export class CarrierArt {
     // the board's art, built round its lyric (never fading for it): an ad's product, or a route sign's shield and arrow
     const share = TEXT_SHARE[carrier.kind] ?? 1;
     // (a bus's ad is the bus's: its rows are the headline over it)
-    if (carrier.ad && carrier.kind !== 'bus') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' ? undefined : style.colors[1]);
+    if (carrier.ad && carrier.kind !== 'bus') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1]);
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
     else if (carrier.kind === 'menu') this.drawPrices(c, share);
     else if (carrier.kind === 'plate') { c.fillStyle = '#c8102e'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.17); c.fillText('California', W / 2, H * 0.15); c.textAlign = 'left'; }

@@ -39,10 +39,10 @@ import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
 /** The set-pieces' surfaces (sets/). */
-export type SetKind = 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee';
+export type SetKind = 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee' | 'poster' | 'freeway';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill' | SetKind;
 export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
-  'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee'];
+  'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway'];
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -147,12 +147,14 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   radio: { rowH: 0.05, w: 0.42, advance: 0.6, emOfRow: 0.66, wrap: 28 },
   menu: { rowH: 0.34, w: 2.6, advance: 0.5, emOfRow: 0.7, wrap: 24 },
   marquee: { rowH: 0.6, w: 3.6, advance: 0.58, emOfRow: 0.7, wrap: 18 },
+  poster: { rowH: 1.3, w: 10, advance: 0.52, emOfRow: 0.72 },
+  freeway: { rowH: 1.4, w: 6, advance: 0.55, emOfRow: 0.62, wrap: 10 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;
 export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
  *  valley), how high its letters' centre stands over the road there. */
 export const HILL = { ahead: 150, side: -55, y: 16 };
@@ -237,7 +239,7 @@ export function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 
   const w = kind === 'sky' ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 2) : L.w;
   const textW = w * (TEXT_SHARE[kind] ?? 1), h = L.rowH * rows.length;
   const em = scale * Math.min(L.rowH * L.emOfRow, (textW * TEXT_W) / (longest * L.advance));
-  return { rows, em, w: scale * w, h: scale * (kind === 'billboard' ? Math.max(h, AD.minH) : h) };
+  return { rows, em, w: scale * w, h: scale * (kind === 'billboard' || kind === 'poster' ? Math.max(h, AD.minH) : h) };
 }
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);

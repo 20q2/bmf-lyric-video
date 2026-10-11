@@ -11,6 +11,7 @@ import type { Route, RouteFrame } from '../route';
 import type { Shot, ShotMove, Target } from '../shots';
 import type { Stretch } from '../stretches';
 import type { Block } from '../blocks';
+import { CHORUS2 } from './chorus2';
 import { INTRO } from './intro';
 import { VERSE1 } from './verse1';
 
@@ -57,4 +58,4 @@ export interface SetPiece {
 /** Whether a set-piece places this line of stretch st. */
 export const owned = (line: Line, st: Stretch) => { const set = SETS[st.id]; return !!set && (set.owns?.(line) ?? true); };
 
-export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, verse1: VERSE1 };
+export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, verse1: VERSE1, chorus2: CHORUS2 };
