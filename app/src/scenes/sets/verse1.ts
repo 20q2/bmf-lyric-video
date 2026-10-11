@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
 import { carMatrix } from '../../drive/carriers';
-import { BUS, PACE, VAN, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
+import { AT, BUS, PACE, VAN, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -146,6 +146,23 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(phone);
   }
 
+  // ---- her sun visor, hinged on the windshield's top rail, flipping down: its mirror carries her lipstick (the
+  // carriers) ----
+  const visor = moving(), flap = new THREE.Group();
+  {
+    const Mi = AT.mirror, hinge = new THREE.Vector3(Mi.pos.x, 1.46, 0.9);
+    visor.add(flap); flap.position.copy(hinge);
+    // (hanging down from the hinge: the mirror on its back, toward her, a padded board round it; in the mirror's own
+    // frame, like its carriers)
+    const board = new THREE.Group(); flap.add(board);
+    const up = new THREE.Vector3(0, 1, 0).addScaledVector(Mi.normal, -Mi.normal.y).normalize();
+    board.matrixAutoUpdate = false;
+    board.matrix.makeBasis(up.clone().cross(Mi.normal).normalize(), up, Mi.normal).setPosition(Mi.pos.clone().sub(hinge));
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(Mi.w + 0.06, Mi.h + 0.06, 0.03), toon({ color: '#d8c7a8' }));
+    pad.position.z = -0.02; board.add(pad);
+    root.add(visor);
+  }
+
   // ---- the burger stand: its building and roof sign, the menu board on posts, the marquee up on its pole ----
   {
     const s0 = plan.menuS, bldg = onRoad(s0 + 4, ROAD_HALF + 6.5);
@@ -212,6 +229,13 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
       phone.matrix.copy(carMatrix(drive.carFrame(t)));
       phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
+      // her visor: up against the rail, flipping down for her line, back up after
+      visor.visible = t >= plan.visor.down - 0.5 && t < plan.visor.up + AT.mirror.flip;
+      if (visor.visible) {
+        visor.matrix.copy(carMatrix(drive.carFrame(t)));
+        const down = Math.min(1, Math.max(0, (t - plan.visor.down) / AT.mirror.flip)) * (1 - Math.min(1, Math.max(0, (t - plan.visor.up) / AT.mirror.flip)));
+        flap.rotation.x = (-Math.PI / 2) * (1 - down * down * (3 - 2 * down));
+      }
     },
   };
 }

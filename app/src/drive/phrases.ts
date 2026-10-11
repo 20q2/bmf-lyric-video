@@ -88,10 +88,13 @@ export function phrasesOf(line: Line, after = Infinity, isSolo: Solo = () => fal
     }
   }
   const out: Phrase[] = [];
-  for (let j = n; j > 0; j = from[j]!) {
-    const i = from[j]!, words = ws.slice(i, j);
-    const edge: Phrase['solo'] = words.length < 2 ? undefined : solo[i] ? 'first' : solo[j - 1] ? 'last' : undefined;
-    out.unshift({ line: line.i, words, text: words.map((w) => w.w).join(' '), start: words[0]!.start, end: words[words.length - 1]!.end, ...(edge ? { solo: edge } : {}) });
-  }
+  for (let j = n; j > 0; j = from[j]!) out.unshift(phraseOf(line, from[j]!, j, isSolo));
   return out;
+}
+
+/** Line's words [i, j) as one phrase (a punctuating word at its edge set on a row of its own). */
+export function phraseOf(line: Line, i: number, j: number, isSolo: Solo = () => false): Phrase {
+  const words = line.words.slice(i, j), k0 = line.words.indexOf(words[0]!);
+  const edge: Phrase['solo'] = words.length < 2 ? undefined : isSolo(line, k0) ? 'first' : isSolo(line, k0 + words.length - 1) ? 'last' : undefined;
+  return { line: line.i, words, text: words.map((w) => w.w).join(' '), start: words[0]!.start, end: words[words.length - 1]!.end, ...(edge ? { solo: edge } : {}) };
 }

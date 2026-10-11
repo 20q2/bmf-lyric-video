@@ -1,7 +1,9 @@
 // Verse 1, the city at speed (flow plan §2): the car never stops (the user: stopping "ruins the flow"). Its lyrics
 // ride on what it follows and what's in it, or stand where the camera watches it pass:
 //   "Going too fast, don't hurt yourself"   a speed trailer by the road flashing it; the car rushes past the lens
-//   "…lies you tell yourself"                the bus they're tailgating: its tail ad, framed between their heads
+//   "I can't keep up with"                   the bus they're tailgating: its tail ad, from the back seat
+//   "…all the lies you tell yourself"        in the pause after "with" (the user's pick), up to her visor flipping
+//                                            down: written on its mirror in her lipstick
 //   "You kinda cute… don't play yourself"    her phone: the texts she's sending, bubble by bubble
 //   "I'm not the one… my man"                the bus turns off: the van ahead, its back doors stickered, MY MAN its plate
 //   "You say you feel different…"            the radio's display
@@ -11,7 +13,7 @@
 // Cuts into the trailer, onto the bus, onto the stand, back to the phone; whips between the rest. Pure.
 import * as THREE from 'three';
 import { type Carrier, type Kind, LAYOUT, carMatrix, layout, lookFrom, rideAt } from '../carriers';
-import { type Phrase, phrasesOf } from '../phrases';
+import { type Phrase, phraseOf, phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
 import { type ShotMove, LEAD, WHIP_S } from '../shots';
 import { adFor, type Ad } from '../ads';
@@ -45,6 +47,9 @@ export const AT = {
   menu: { through: 0.45, lateral: ROAD_HALF + 1.3, y: 1.9 },
   marquee: { ds: 7, lateral: ROAD_HALF + 2.6, y: 5 },
   phone: new THREE.Vector3(-0.15, 1.2, 0.15),
+  /** Her sun visor, flipped down from the windshield's top rail: its mirror's centre and facing (tipped toward her),
+   *  its size; how long it takes to flip down, and how much before her line's half it starts. */
+  mirror: { pos: new THREE.Vector3(-0.44, 1.36, 0.875), normal: new THREE.Vector3(0, -0.26, -0.966).normalize(), w: 0.34, h: 0.16, flip: 0.3, before: 0.35 },
   radio: { pos: new THREE.Vector3(-0.02, 1.12, 0.52), normal: new THREE.Vector3(0, 0.3, -0.954).normalize() },
 };
 /** The camera's places (in the car's frame where it rides with it; m). */
@@ -52,6 +57,7 @@ export const EYE = {
   trailer: { back: 4.2, lateral: ROAD_HALF - 0.1, y: 1.15, toRoad: 0.7, down: 0.25 },
   back: new THREE.Vector3(0, 2, -0.7),
   phone: new THREE.Vector3(-0.06, 1.55, -0.12),
+  mirror: new THREE.Vector3(-0.32, 1.5, 0.35),
   hood: new THREE.Vector3(0, 1.62, 2.3),
   radio: new THREE.Vector3(-0.18, 1.42, 0.08),
   menu: { back: 4.2, lateral: ROAD_HALF + 0.2, y: 1.35, toRoad: 0.6, down: 0.2 },
@@ -81,6 +87,8 @@ export interface Verse1Plan {
   busAhead: number; vanAhead: number;
   /** The bus's tail ad in its frame (centre, size); her phone in the car's (centre, normal, up, size) and when she holds it. */
   tailAd: { pos: THREE.Vector3; w: number; h: number };
+  /** Her visor: when it flips down and back up (s). */
+  visor: { down: number; up: number };
   phone: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number; held: [number, number][] };
 }
 
@@ -102,6 +110,12 @@ export const VERSE1: SetPiece = {
   place(ctx: SetContext): Placed {
     const { st, route, motion, carFrame } = ctx;
     const lines = st.lines, phs = lines.map((l) => phrasesOf(l, ctx.nextStart(l.i), ctx.solo));
+    // ("I can't keep up with | all the lies you tell yourself": split at the line's longest pause, after "with", where
+    // it moves from the bus to her mirror; the rest phrased as usual)
+    {
+      const l = lines[1]!, ws = l.words, gaps = ws.slice(1).map((w, k) => w.start - ws[k]!.end), k = gaps.indexOf(Math.max(...gaps)) + 1;
+      phs[1] = [phraseOf(l, 0, k, ctx.solo), ...phrasesOf({ ...l, words: ws.slice(k) }, ctx.nextStart(l.i), ctx.solo)];
+    }
     const l5 = lines[1]!, l6 = lines[2]!, l7 = lines[3]!, l9 = lines[5]!, l11 = lines[7]!;
     const carS = (t: number) => motion.distanceAt(t);
     const busAhead = CAR_HALF + BUS.gap + BUS.half, vanAhead = CAR_HALF + VAN.gap + VAN.half;
@@ -141,11 +155,11 @@ export const VERSE1: SetPiece = {
       }) };
     };
     // (each phrase's shot: its move, from its cue; a whip leaves once the phrase before it is sung)
-    const frame = (c: Carrier, to: SetFrame['to'], move: ShotMove) => {
+    const frame = (c: Carrier, to: SetFrame['to'], move: ShotMove, at?: number) => {
       const prev = carriers[carriers.indexOf(c) - 1], cue = c.phrase.start - LEAD;
-      frames.set(c.id, { to, move, ...(move === 'whip' && prev ? { at: Math.min(cue, Math.max(prev.phrase.end, cue - WHIP_S)) } : {}) });
+      frames.set(c.id, { to, move, ...(at !== undefined ? { at } : move === 'whip' && prev ? { at: Math.min(cue, Math.max(prev.phrase.end, cue - WHIP_S)) } : {}) });
     };
-    const hold = (cs: readonly Carrier[], to: SetFrame['to'], first: ShotMove) => cs.forEach((c, i) => frame(c, to, i ? 'snap' : first));
+    const hold = (cs: readonly Carrier[], to: SetFrame['to'], first: ShotMove, at?: number) => cs.forEach((c, i) => frame(c, to, i ? 'snap' : first, i ? undefined : at));
 
     // "Going too fast": the speed trailer, from upstream of it by the road; the car rushes past the lens
     const trailerP = atRoad(trailerS, AT.trailer.lateral, AT.trailer.y), trailerN = fwd(trailerS).negate();
@@ -153,11 +167,17 @@ export const VERSE1: SetPiece = {
     const E = EYE.trailer, trailerShot = lookFrom(atRoad(trailerS - E.back, E.lateral, E.y), trailerP.clone().addScaledVector(right(trailerS), -E.toRoad).addScaledVector(UP, -E.down));
     hold(speed, () => trailerShot, 'cut');
 
-    // the bus they're tailgating: its tail ad, from the back seat between their heads
+    // the bus they're tailgating: its tail ad, from the back seat (cut to as the trailer's line ends: its one phrase
+    // has five words to be read in)
     const busAd = adFor(l5.text, l5.start * 1000), back = new THREE.Vector3(0, 0, -1);
     const adPos = new THREE.Vector3(0, BUS.adY, -BUS.half - 0.03);
-    const bus = riding('bus', phs[1]!, adPos, back, busAhead, { ad: busAd, from: joinAt, until: turnAt });
-    hold(bus.cs, (t) => lookFrom(inFrame(EYE.back, t), inFrame(adPos, t, busAhead)), 'cut');
+    const [onBus, ...inMirror] = phs[1]!;
+    const bus = riding('bus', [onBus!], adPos, back, busAhead, { ad: busAd, from: joinAt, until: turnAt });
+    hold(bus.cs, (t) => lookFrom(inFrame(EYE.back, t), inFrame(adPos, t, busAhead)), 'cut', Math.max(lines[0]!.end + 0.05, onBus!.start - LEAD - 0.35));
+    // in the pause after "with": up to her visor, flipping down, the rest of the line on its mirror in her lipstick
+    const Mi = AT.mirror, visorDown = (inMirror[0]?.start ?? l5.end) - Mi.before;
+    const mirror = riding('mirror', inMirror, Mi.pos, Mi.normal, 0, { from: visorDown + Mi.flip * 0.5, until: l6.start });
+    hold(mirror.cs, (t) => lookFrom(inFrame(EYE.mirror, t), inFrame(Mi.pos, t)), 'whip');
 
     // her phone: the texts she's sending (and, at the end, "…can you?"), over her shoulder
     const phoneN = EYE.phone.clone().sub(AT.phone).normalize();
@@ -208,6 +228,7 @@ export const VERSE1: SetPiece = {
     const plan: Verse1Plan = {
       trailerS, crossS, start: st.start, joinAt, joinV: motion.speedAt(joinAt), turnAt, closeBy, leaveAt, menuS, busAd, panels, busAhead, vanAhead,
       tailAd: { pos: adPos, w: LAYOUT.bus.w, h: bus.H },
+      visor: { down: visorDown, up: l6.start + 0.3 },
       phone: { pos: AT.phone.clone(), normal: phoneN, up: texts.up, w: LAYOUT.phone.w, h: Math.max(texts.H, reply.H) + 0.04, held },
     };
     return { carriers, frames, clear, blocks, plan };

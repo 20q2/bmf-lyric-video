@@ -9,7 +9,7 @@ import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, type SetKind, basisOf, solidsOf } from './carriers';
-const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee']);
+const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee']);
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';

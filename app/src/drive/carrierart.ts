@@ -12,7 +12,7 @@
 //   banner       a towed banner: dark capitals printed on white cloth, a red hem
 //   tunnel       lit capitals on the tunnel's tiles, glowing sodium orange, the word being sung flaring white
 // and the set-pieces' surfaces, each in its own medium: a speed trailer's amber LEDs, a bus's tail ad (its ad is the
-// prop's), stickers, a California plate, her phone's message bubbles, the radio's cyan display, a menu board with its
+// prop's), her lipstick on her visor's mirror, stickers, a California plate, her phone's message bubbles, the radio's cyan display, a menu board with its
 // prices, a burger stand's marquee in changeable letters.
 // Every face is blank until its reveal (dissolve.ts), its board or wall already standing. A word of emphasis
 // (Phrase.solo) on its own row is set as big as its row allows, and punches up as it's sung (PUNCH).
@@ -106,6 +106,7 @@ function styleOf(c: Carrier): Style {
     case 'plate': return { bg: '#f2f1ea', border: '#1b2a6b', family: F.archivo(62, 700), caps: true, colors: ['#1b2a6b', '#1b2a6b', '#d81e2c'], alpha: [0.8, 1] };
     case 'radio': return { bg: '#04080a', family: F.mono(600), caps: true, colors: ['#5fd8ff', '#5fd8ff', '#ffffff'], alpha: [0.55, 1], glow: 'rgba(80,220,255,0.7)' };
     case 'menu': return { bg: '#1b1714', family: F.archivo(75, 900), caps: true, colors: ['#fff1d0', '#fff1d0', '#ffd65a'], alpha: [0.75, 1] };
+    case 'mirror': return { bg: '#cdd6db', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#b0102a', '#b0102a', '#e8173a'], alpha: [0.55, 1] };
     case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
@@ -226,26 +227,36 @@ export class CarrierArt {
       });
       c.restore();
     }
+    // the word of emphasis, alone on its row: bigger (up to SOLO_MAX x its companions), punching up by `punch`
+    const soloSize = (word: string, rowH: number, punch: number) => {
+      const base = c.measureText(word).width, big = Math.min(PUNCH.fill * rowH, (em * TW * 0.92) / base, em * SOLO_MAX) * (1 + PUNCH.scale * punch);
+      return Math.max(em, Math.min(big, (em * TW * 0.98) / base)); // never past the face's edge
+    };
+    // a sent text: the phrase is one message, its bubble on the right, its rows left-aligned in it (sized as settled,
+    // so the bubble holds still while the word of emphasis punches)
+    let bubbleX = 0;
+    if (style.bubble) {
+      const widths = carrier.rows.map((row, r) => {
+        if (r !== soloRow) return c.measureText(row).width;
+        c.font = font(style.family, soloSize(row, (H * weights[r]!) / sum, 0));
+        const w = c.measureText(row).width; c.font = font(style.family, em); return w;
+      });
+      const pad = em * 0.55, bw = Math.max(...widths) + 2 * pad;
+      bubbleX = TW * 0.96 - bw + pad;
+      c.save(); c.shadowBlur = 0; c.globalAlpha = alpha; c.fillStyle = style.bubble;
+      c.beginPath(); c.roundRect(TW * 0.96 - bw, H * 0.07, bw, H * 0.86, Math.min(H * 0.43, em * 0.9)); c.fill(); c.restore();
+    }
     let wi = 0, top = 0;
     carrier.rows.forEach((row, r) => {
       const n = row.split(' ').length, rowWords = words.slice(wi, wi + n), rowH = (H * weights[r]!) / sum;
       wi += n;
       const y = top + rowH / 2;
       top += rowH;
-      // the word of emphasis, alone on its row: bigger (up to SOLO_MAX x its companions), in the accent colour,
-      // punching up as it's sung
+      // (the word of emphasis in the accent colour, punching up as it's sung)
       const solo = r === soloRow;
-      if (solo) {
-        const base = c.measureText(label(rowWords[0]!)).width;
-        const big = Math.min(PUNCH.fill * rowH, (em * TW * 0.92) / base, em * SOLO_MAX) * (1 + PUNCH.scale * punchAt(carrier, t));
-        c.font = font(style.family, Math.max(em, Math.min(big, (em * TW * 0.98) / base))); // never past the face's edge
-      }
+      if (solo) c.font = font(style.family, soloSize(label(rowWords[0]!), rowH, punchAt(carrier, t)));
       const total = rowWords.reduce((s, w) => s + c.measureText(label(w)).width, 0) + space * (rowWords.length - 1);
-      let x = (TW - total) / 2;
-      if (style.bubble) { // a message bubble behind the row
-        c.save(); c.shadowBlur = 0; c.globalAlpha = alpha; c.fillStyle = style.bubble;
-        c.beginPath(); c.roundRect(x - em * 0.45, y - rowH * 0.44, total + em * 0.9, rowH * 0.88, rowH * 0.4); c.fill(); c.restore();
-      }
+      let x = style.bubble ? bubbleX : (TW - total) / 2;
       for (const w of rowWords) {
         const sung = t >= w.start, now = sung && t < w.end;
         c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];

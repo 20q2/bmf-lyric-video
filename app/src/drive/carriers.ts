@@ -38,10 +38,10 @@ import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
 /** The set-pieces' surfaces (sets/). */
-export type SetKind = 'speed' | 'bus' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee';
+export type SetKind = 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill' | SetKind;
 export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
-  'speed', 'bus', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee'];
+  'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee'];
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -139,6 +139,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   // (the set-pieces' surfaces, each phrase its own panel's rows: `wrap` the longest row it holds)
   speed: { rowH: 0.4, w: 1.8, advance: 0.6, emOfRow: 0.66, wrap: 15 },
   bus: { rowH: 0.36, w: 2.4, advance: 0.55, emOfRow: 0.72, wrap: 17 },
+  mirror: { rowH: 0.06, w: 0.3, advance: 0.5, emOfRow: 0.7, wrap: 18 },
   sticker: { rowH: 0.26, w: 1.6, advance: 0.55, emOfRow: 0.66, wrap: 16 },
   plate: { rowH: 0.3, w: 0.62, advance: 0.6, emOfRow: 0.62, wrap: 8 },
   phone: { rowH: 0.042, w: 0.18, advance: 0.55, emOfRow: 0.62, wrap: 16 },

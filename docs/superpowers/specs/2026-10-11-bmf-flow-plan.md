@@ -149,8 +149,11 @@ trailer at 16 m/s, then cruises at 11 m/s. Its lyrics ride on what it follows an
 camera watches it go by:
 
 - **"Going too fast…"**: the speed trailer, as before.
-- **"…lies you tell yourself"**: the tail ad of the bus they tailgate, seen from the back seat.
-- **"You kinda cute…"**: her phone, the texts she's sending as message bubbles.
+- **"I can't keep up with"**: the tail ad of the bus they tailgate, seen from the back seat.
+- **"…all the lies you tell yourself"**: in the pause after "with" (your pick, 2026-10-11), the camera tilts up to her
+  sun visor flipping down: the line is in her lipstick on its mirror. The set-piece splits the line at its longest
+  pause.
+- **"You kinda cute…"**: her phone, the texts she's sending: one bubble per phrase, on the right like sent texts.
 - **"I'm not the one…"**: the bus turns off at a cross street (its light green), revealing the van ahead with
   stickers on its back doors and MY MAN on its plate, seen from over the hood.
 - **"You say you feel different…"**: the radio, as before.
