@@ -85,7 +85,8 @@ export interface Drive {
   blocks: Block[];
   /** The song's beats (s). */
   beats: readonly number[];
-  carFrame(t: number): RouteFrame;
+  /** The car in its lane at t (or a vehicle `ahead` m in front of it, in its lane). */
+  carFrame(t: number, ahead?: number): RouteFrame;
   /** The cut to the last line (s): every word sung before it goes, so the end starts clean. */
   lastCut: number | null;
   stretchAt(t: number): Stretch;
@@ -100,7 +101,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const motion = motionFor(stretches, audio, (s) => SETS[s.id]?.speed(s, audio) ?? []), route = routeFor(stretches, motion);
   const tunnels = tunnelsOf(stretches, motion, audio.beats);
   // the car keeps to its lane (the right one), off the centre line
-  const carFrame = (t: number) => { const f = route.frameAt(motion.distanceAt(t)); return { ...f, pos: f.pos.clone().addScaledVector(f.right, LANE) }; };
+  const carFrame = (t: number, ahead = 0) => { const f = route.frameAt(motion.distanceAt(t) + ahead); return { ...f, pos: f.pos.clone().addScaledVector(f.right, LANE) }; };
   // the lyrics on their carriers: the set-pieces' stretches on their own surfaces (sets/), framed as they say
   const solo = emphasisOf(lyrics.lines), nextStart = (i: number) => lyrics.lines[i + 1]?.words[0]?.start ?? Infinity;
   const setFrames = new Map<string, SetFrame>(), clears: Placed['clear'] = [], setBlocks: Block[] = [], plans: Record<string, unknown> = {}, ofSets: Carrier[] = [];

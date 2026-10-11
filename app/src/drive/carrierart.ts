@@ -11,9 +11,9 @@
 //   street       a green street-name blade, white type; gantry the same green, bigger, over the freeway
 //   banner       a towed banner: dark capitals printed on white cloth, a red hem
 //   tunnel       lit capitals on the tunnel's tiles, glowing sodium orange, the word being sung flaring white
-// and the set-pieces' surfaces, each in its own medium: a speed trailer's amber LEDs, a bus's wrap (its ad is the prop's),
-// a bus bench's blue back, bumper stickers, a California plate, the radio's cyan display, a menu board with its prices,
-// an order screen, a receipt's thermal print.
+// and the set-pieces' surfaces, each in its own medium: a speed trailer's amber LEDs, a bus's tail ad (its ad is the
+// prop's), stickers, a California plate, her phone's message bubbles, the radio's cyan display, a menu board with its
+// prices, a burger stand's marquee in changeable letters.
 // Every face is blank until its reveal (dissolve.ts), its board or wall already standing. A word of emphasis
 // (Phrase.solo) on its own row is set as big as its row allows, and punches up as it's sung (PUNCH).
 // Laid out as carriers.ts says (rows, em). Redrawn only when its karaoke key changes. Browser only (canvas).
@@ -73,7 +73,7 @@ const GREEN = '#1f6b44';
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
@@ -99,7 +99,6 @@ function styleOf(c: Carrier): Style {
       : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)', tubes: true };
     case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffb000', '#ffb000', '#fff3c4'], alpha: [0.5, 1], glow: 'rgba(255,170,0,0.85)' };
     case 'bus': { const a = AD_STYLE[c.ad ?? 'phone']; return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, '#d81e2c'], alpha: [0.72, 1] }; }
-    case 'bench': return { bg: '#1d4fa0', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'sticker': { // (each its own: cream, black, yellow or red)
       const [bg, ink, now] = STICKERS[Math.floor(hash(c.phrase.start, 21) * STICKERS.length)]!;
       return { bg, border: ink, family: F.archivo(75, 900), caps: true, colors: [ink, ink, now], alpha: [0.75, 1] };
@@ -107,8 +106,8 @@ function styleOf(c: Carrier): Style {
     case 'plate': return { bg: '#f2f1ea', border: '#1b2a6b', family: F.archivo(62, 700), caps: true, colors: ['#1b2a6b', '#1b2a6b', '#d81e2c'], alpha: [0.8, 1] };
     case 'radio': return { bg: '#04080a', family: F.mono(600), caps: true, colors: ['#5fd8ff', '#5fd8ff', '#ffffff'], alpha: [0.55, 1], glow: 'rgba(80,220,255,0.7)' };
     case 'menu': return { bg: '#1b1714', family: F.archivo(75, 900), caps: true, colors: ['#fff1d0', '#fff1d0', '#ffd65a'], alpha: [0.75, 1] };
-    case 'order': return { bg: '#0d2350', family: F.archivo(100, 700), caps: true, colors: ['#e6ecff', '#e6ecff', '#ffd65a'], alpha: [0.7, 1] };
-    case 'receipt': return { bg: '#fbfaf3', family: F.mono(500), caps: true, colors: ['#2a2a2a', '#2a2a2a', '#c8102e'], alpha: [0.7, 1] };
+    case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
+    case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
@@ -243,6 +242,10 @@ export class CarrierArt {
       }
       const total = rowWords.reduce((s, w) => s + c.measureText(label(w)).width, 0) + space * (rowWords.length - 1);
       let x = (TW - total) / 2;
+      if (style.bubble) { // a message bubble behind the row
+        c.save(); c.shadowBlur = 0; c.globalAlpha = alpha; c.fillStyle = style.bubble;
+        c.beginPath(); c.roundRect(x - em * 0.45, y - rowH * 0.44, total + em * 0.9, rowH * 0.88, rowH * 0.4); c.fill(); c.restore();
+      }
       for (const w of rowWords) {
         const sung = t >= w.start, now = sung && t < w.end;
         c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];

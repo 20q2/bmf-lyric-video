@@ -19,8 +19,8 @@ export interface SetContext {
   audio: AudioData;
   route: Route;
   motion: Motion;
-  /** The car (in its lane) at t. */
-  carFrame: (t: number) => RouteFrame;
+  /** The car (in its lane) at t, or a vehicle `ahead` m in front of it. */
+  carFrame: (t: number, ahead?: number) => RouteFrame;
   solo?: Solo;
   /** When the line after line i starts (s). */
   nextStart: (i: number) => number;

@@ -140,22 +140,31 @@ Stillness: the camera barely moves, and the bills drift.
 
 ## Build notes
 
-**Verse 1 (2026-10-11).** Built as `app/src/drive/sets/verse1.ts` (the drive model) and `app/src/scenes/sets/verse1.ts`
-(the props). The approved surfaces changed in places to meet the readability guard:
+**Verse 1 (2026-10-11), second version.** Built as `app/src/drive/sets/verse1.ts` (the drive model) and
+`app/src/scenes/sets/verse1.ts` (the props).
 
-- **The bus** stops alongside in the other lane. Its ad is a wrap high on its side: lower down, his head was in the
-  camera's way.
-- **The car ahead** is a pickup, shot from over our hood: a sedan's bumper stickers were too small to read from inside
-  the car.
-- **The crosswalk signal's hand** is decoration only: at legible size it would be a billboard.
-- **The radio** is a three-line display in a new dash.
+The first version stopped the car at a red light and a drive-thru. You liked the creativity but not the stops: "I don't
+like the car stopping. I feel like that really ruins the flow." So the car now never stops: it rushes past the speed
+trailer at 16 m/s, then cruises at 11 m/s. Its lyrics ride on what it follows and what's in it, or stand where the
+camera watches it go by:
 
-**Edit.** Five cuts: into the trailer, onto the bus, onto the radio (on green), onto the menu, onto the receipt. Whips
-take the camera across the car between neighbouring surfaces.
+- **"Going too fast…"**: the speed trailer, as before.
+- **"…lies you tell yourself"**: the tail ad of the bus they tailgate, seen from the back seat.
+- **"You kinda cute…"**: her phone, the texts she's sending as message bubbles.
+- **"I'm not the one…"**: the bus turns off at a cross street (its light green), revealing the van ahead with
+  stickers on its back doors and MY MAN on its plate, seen from over the hood.
+- **"You say you feel different…"**: the radio, as before.
+- **"Compliment my energy…"**: a burger stand's menu board, the car passing it.
+- **"All I ask…"**: the stand's marquee, up on its pole.
+- **"…can you?"**: back on her phone.
+
+**Edit.** Four cuts in thirty seconds (into the trailer, onto the bus, onto the stand, back to the phone), plus the cut
+into chorus 2; whips between the rest.
 
 **Fixes found on the way.**
 
 - Lines now belong to their own section: "Going too fast" had fallen into chorus 1 by 0.02 s.
 - The town around the faces had all but emptied: 17 buildings in the film, before this change. Verse 1 now has its
-  own low-rise blocks, and chorus 2's faces start past them.
-
+  own low-rise blocks along its street, and chorus 2's faces start past them.
+- Set-piece panels carry their backings as solids, so the guard sees them. Without that, a shot looked straight into
+  the menu board's back.

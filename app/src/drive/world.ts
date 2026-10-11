@@ -9,7 +9,7 @@ import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, type SetKind, basisOf, solidsOf } from './carriers';
-const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'bench', 'sticker', 'plate', 'radio', 'menu', 'order', 'receipt']);
+const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee']);
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
@@ -410,7 +410,7 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
-  if (c.kind === 'speed' || c.kind === 'radio') mat.color.setScalar(1.6); // (lit displays: they bloom a little)
+  if (c.kind === 'speed' || c.kind === 'radio' || c.kind === 'phone') mat.color.setScalar(1.6); // (lit displays: they bloom a little)
   if (SET_KINDS.has(c.kind)) { // a set-piece's surface: just the face; its props stand round it (scenes/sets/)
     const m = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), mat);
     m.name = 'face'; m.matrixAutoUpdate = false; m.matrix.copy(basisOf(c));

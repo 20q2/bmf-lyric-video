@@ -86,7 +86,7 @@ export default class DriveScene extends Scene {
   /** The set-pieces' props (scenes/sets/), moved each frame. */
   private sets: { group: THREE.Group; update(t: number): void }[] = [];
   /** Carriers riding in the car (the radio), with their place in its frame. */
-  private riding: [THREE.Object3D, THREE.Matrix4][] = [];
+  private riding: [THREE.Object3D, THREE.Matrix4, number][] = [];
 
   override init() {
     const { audio, lyrics, renderer } = this.ctx;
@@ -111,7 +111,7 @@ export default class DriveScene extends Scene {
     }
     for (const c of this.drive.carriers) if (c.ride) {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
-      this.riding.push([this.placed.find(([k]) => k === c)![1], local]);
+      this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
     for (const set of [buildVerse1(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
@@ -169,9 +169,9 @@ export default class DriveScene extends Scene {
     // (at the cut to the last line every word sung before it goes: the end starts clean)
     const cleared = d.lastCut !== null && t >= d.lastCut ? d.lastCut : -Infinity;
     // (road paint is retired a little after it's sung: from the shots after it'd read upside down)
-    for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER && c.phrase.end > cleared && (c.kind !== 'road' || t < c.phrase.end + PAINT_LASTS) && t < (c.until ?? Infinity);
+    for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER && c.phrase.end > cleared && (c.kind !== 'road' || t < c.phrase.end + PAINT_LASTS) && t < (c.until ?? Infinity) && t >= (c.from ?? -Infinity);
     // the radio, in the car; the set-pieces' props, where they've moved to
-    for (const [o, local] of this.riding) o.matrix.multiplyMatrices(carMatrix(cf), local);
+    for (const [o, local, ahead] of this.riding) o.matrix.multiplyMatrices(carMatrix(ahead ? d.carFrame(t, ahead) : cf), local);
     for (const set of this.sets) set.update(t);
     // banners where they've flown to; each plane in the sky only around its line
     for (const [c, o] of this.flying) {

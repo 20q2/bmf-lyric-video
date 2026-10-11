@@ -17,8 +17,9 @@
 //   hill   giant white capitals standing on a hillside across the valley, as LA signs its hills (the last chorus's
 //          payoff, "Cruise all night"), framed from behind the climbing car, lit at night
 //   tunnel lit up along a tunnel's left wall (the bridge, tunnel.ts), framed from across the bore like the left faces
-// A set-piece's stretch (sets/) places its own, on its own surfaces (SetKind: a speed trailer, a bus's ad, the car
-// ahead's stickers, the radio, a drive-thru's boards…) and frames them itself; placeCarriers skips it.
+// A set-piece's stretch (sets/) places its own, on its own surfaces (SetKind: a speed trailer, the bus ahead's tail
+// ad, the van ahead's stickers, her phone, the radio, a burger stand's boards…) and frames them itself; placeCarriers
+// skips it.
 // Each phrase's text is blank until the camera first comes for it (`reveal`, set by makeDrive): the world ahead
 // shows its signs and walls, never the song beyond the next phrase.
 // Placement and text layout (rows and type size, in metres) are pure, so the guards can check legibility under bun;
@@ -37,10 +38,10 @@ import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
 export type LeftKind = 'wall' | 'billboard' | 'storefront' | 'neon';
 /** The set-pieces' surfaces (sets/). */
-export type SetKind = 'speed' | 'bus' | 'bench' | 'sticker' | 'plate' | 'radio' | 'menu' | 'order' | 'receipt';
+export type SetKind = 'speed' | 'bus' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill' | SetKind;
 export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'wall', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
-  'speed', 'bus', 'bench', 'sticker', 'plate', 'radio', 'menu', 'order', 'receipt'];
+  'speed', 'bus', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee'];
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -82,10 +83,13 @@ export interface Carrier {
   finale?: boolean;
   /** A billboard: the product its ad sells (ads.ts); its lyric is the headline. */
   ad?: Ad;
-  /** Riding in the car (the radio): where it is in the car's frame (x its left, y up from the road, z forward);
-   *  `center`, `normal` and `up` are where it is as its phrase starts (rideAt). */
-  ride?: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3 };
-  /** Gone from then (s): its prop drives off (the car ahead's stickers). */
+  /** Riding in the car (the radio, her phone), or on a vehicle `ahead` m in front of it in its lane (the bus, the van
+   *  they follow): where it is in that frame (x its left, y up from the road, z forward); `center`, `normal` and `up`
+   *  are where it is as its phrase starts (rideAt). */
+  ride?: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; ahead?: number };
+  /** Not there before `from`, gone from `until` (s): its prop comes and goes (the van closing in, the bus turning off,
+   *  her phone in her hand). */
+  from?: number;
   until?: number;
 }
 
@@ -134,20 +138,19 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   hill: { rowH: 13, w: 120, advance: 0.62, emOfRow: 0.82 },
   // (the set-pieces' surfaces, each phrase its own panel's rows: `wrap` the longest row it holds)
   speed: { rowH: 0.4, w: 1.8, advance: 0.6, emOfRow: 0.66, wrap: 15 },
-  bus: { rowH: 0.34, w: 3, advance: 0.55, emOfRow: 0.72, wrap: 22 },
-  bench: { rowH: 0.26, w: 2.3, advance: 0.6, emOfRow: 0.7, wrap: 20 },
-  sticker: { rowH: 0.22, w: 0.84, advance: 0.55, emOfRow: 0.68, wrap: 16 },
+  bus: { rowH: 0.36, w: 2.4, advance: 0.55, emOfRow: 0.72, wrap: 17 },
+  sticker: { rowH: 0.26, w: 1.6, advance: 0.55, emOfRow: 0.66, wrap: 16 },
   plate: { rowH: 0.3, w: 0.62, advance: 0.6, emOfRow: 0.62, wrap: 8 },
+  phone: { rowH: 0.042, w: 0.18, advance: 0.55, emOfRow: 0.62, wrap: 16 },
   radio: { rowH: 0.05, w: 0.42, advance: 0.6, emOfRow: 0.66, wrap: 28 },
-  menu: { rowH: 0.3, w: 2.1, advance: 0.5, emOfRow: 0.7, wrap: 24 },
-  order: { rowH: 0.2, w: 1.2, advance: 0.6, emOfRow: 0.7, wrap: 20 },
-  receipt: { rowH: 0.07, w: 0.42, advance: 0.6, emOfRow: 0.68, wrap: 22 },
+  menu: { rowH: 0.34, w: 2.6, advance: 0.5, emOfRow: 0.7, wrap: 24 },
+  marquee: { rowH: 0.6, w: 3.6, advance: 0.58, emOfRow: 0.7, wrap: 18 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;
 export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'bench', 'sticker', 'plate', 'radio', 'menu', 'order', 'receipt']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'wall', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
  *  valley), how high its letters' centre stands over the road there. */
 export const HILL = { ahead: 150, side: -55, y: 16 };

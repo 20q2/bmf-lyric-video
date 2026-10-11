@@ -121,7 +121,7 @@ const toPx = (v: THREE.Vector3) => new THREE.Vector2(((v.x + 1) / 2) * 1920, ((1
 function problems(c: Carrier, t: number): string[] {
   placeCamera(cam, drive.camera(t));
   if (c.vel) c = { ...c, center: centerAt(c, t) }; // a banner, where it has flown to
-  if (c.ride) c = { ...c, ...rideAt(c, drive.carFrame(t)) }; // the radio, where the car has taken it
+  if (c.ride) c = { ...c, ...rideAt(c, drive.carFrame(t, c.ride.ahead)) }; // in the car, or on the vehicle ahead
   const out: string[] = [];
   for (const k of corners(c)) {
     const p = k.clone().project(cam);
@@ -153,7 +153,7 @@ test('the carriers are a mix: every kind is used', () => {
 test('every carrier reads while its phrase is sung', { timeout: 120000 }, () => {
   const fails: string[] = [];
   drive.carriers.forEach((c, i) => {
-    const from = c.phrase.start - LEAD + SNAP_S;
+    const from = Math.max(c.phrase.start - LEAD + SNAP_S, c.from ?? -Infinity);
     const next = drive.carriers[i + 1], nextCue = next ? next.phrase.start - LEAD : Infinity;
     const to = Math.min(c.phrase.end, nextCue, (c.until ?? Infinity) - 1e-6);
     const bad: string[] = [];
@@ -185,7 +185,7 @@ test("the car never drives over road paint while it's sung", () => {
 function readable(c: Carrier): number {
   let seen = 0;
   for (let t = c.phrase.start - 1.5; t <= c.phrase.end + 2; t += 1 / RATE) {
-    if (revealAt(c, t) < 1 || t >= (c.until ?? Infinity) || (c.kind === 'sky' && (t < c.phrase.start || dissolveAt(c, t) >= 0.5))) continue;
+    if (revealAt(c, t) < 1 || t >= (c.until ?? Infinity) || t < (c.from ?? -Infinity) || (c.kind === 'sky' && (t < c.phrase.start || dissolveAt(c, t) >= 0.5))) continue;
     if (!problems(c, t).length) seen += 1 / RATE;
   }
   return seen;
