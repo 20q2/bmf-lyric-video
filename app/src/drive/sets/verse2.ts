@@ -1,72 +1,137 @@
-// Verse 2, Slauson (flow plan §4): low and slow off the freeway into the neighbourhood, lowrider culture, the lyrics
-// painted by hand. The car never stops (10 m/s).
-//   "Ooh, he bossy… them chickens you been trickin' on"   one take: the camera rides alongside as the car cruises a
-//          block of murals on the left (a style a line), a SLAUSON street sign on the corner, the chicken shack's wall
-//          (a chicken on its roof); the car three-wheels on "crip walkin'"
-//   "I can be your ride or die…"                         a hand car wash's sign, the car rolling past
-//   "Trust me, boy, I'm good in every hood"               their own car, from in front: the windshield banner, then
-//                                                         the hood's airbrushed lettering
-//   "Trickin', finna fall in backwards"                   a whip round behind to the club plaque on the rear deck as
-//                                                         the car lays back on its hydraulics
-//   "I'm just tryna show you… if you my man"             a giant mural of him at the end of the street, the car
-//                                                         driving on toward it (into chorus 3)
-// Three cuts in thirty seconds. Pure.
+// Verse 2, Slauson (flow plan §4; the user, 2026-10-12: the murals read as floating text — "a chicken PLACE with signs
+// in front of it would be way better"): low and slow off the freeway into the neighbourhood, lowrider pace, the lyrics
+// on the signs of a fried chicken spot on the corner of Slauson, its chicken standing on its roof. A take a line, cut
+// between lines; the car never stops:
+//   "Ooh, he bossy, ooh, he crip walkin'"      its tall pole sign's lightbox at the curb, from low across the street:
+//                                               the car three-wheels past under it
+//   "Took me | to Slauson | and he slut me out" a chalk A-frame, the SLAUSON street blade on the corner, another A-frame
+//                                               past it, from the far lane, drifting along them
+//   "And when I got a problem, he get to packing"   painted on its front windows
+//   "He 'bout all that action, call him Mr. Handle It"  its vinyl banner under the eaves
+//   "You know I'm hella different… trickin' on"  the big sign on its roof, the chicken standing on it, from below
+//   "I can be your ride or die…"               a hand car wash's sign, an ad: the words flush left, the suds right
+//   "Trust me, boy, I'm good in every hood"     their own car, from in front: the windshield banner, the hood
+//   "Trickin', finna fall in backwards"         a whip round behind, low: TRICKIN' on their plate, the rest on bumper
+//                                               stickers, as the car lays back on its hydraulics
+//   "I'm just tryna show you… my man"          his giant mural on the end wall of a building up the street, the car
+//                                               driving on toward it (into chorus 3)
+// Pure.
 import * as THREE from 'three';
-import { type Carrier, type Kind, STREET, carMatrix, layout, lineTake, lookFrom, rideAt } from '../carriers';
-import { type Phrase, phrasesOf } from '../phrases';
+import { type Carrier, type Kind, LAYOUT, STREET, carMatrix, glideTake, layout, lookFrom, rideAt } from '../carriers';
+import { type Phrase, phraseOf, phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
 import { type ShotMove, LEAD, WHIP_S } from '../shots';
 import { type Block, boxAt } from '../blocks';
-import { hash } from '../../engine/util';
+import { CAR } from '../world';
 import type { Placed, SetContext, SetFrame, SetPiece } from './index';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
 const uprightFor = (n: THREE.Vector3) => UP.clone().addScaledVector(n, -n.dot(UP)).normalize();
+const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 
-/** The block of murals on the left: its buildings' fronts (m off the road's centre), their depth, heights and widths
- *  along the street, the corner (a side street) at the SLAUSON sign; the murals' centres' height and the gap between
- *  them along the wall. */
-export const BLOCK = { face: -8, d: 10, h: [6, 9] as [number, number], w: [14, 22] as [number, number], alley: 1.5, corner: 7 };
-/** (proud of the fronts: the street bends, each building a straight box along it, so its corners stand a little out) */
-export const MURAL = { y: 4.2, gap: 1.2, proud: 0.3 };
-const STREET_SCALE = 1.25;
-/** The take along it: the mural sung as the car three-wheels stands where the car is this far through its phrase. */
-export const TAKE = { through: 0.55 };
-/** The car wash on the right: its sign (off the road, its centre's height; passed this far through its line), the
- *  camera upstream on the sidewalk; its building. */
-export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 1.6, y: 3.6, through: 0.5, eye: { back: 5.2, lateral: ROAD_HALF + 0.3, y: 1.4, toRoad: 0.5, down: 0.3 } };
-/** On their car (its frame: x its left, y up, z forward): the windshield banner, the hood's lettering, the club plaque
- *  on the rear deck; the camera high in front, and behind. */
+/** The pace (m/s): crawling past the chicken spot; up to cruising this long before the car wash's line, over `up` s. */
+export const PACE = { slow: 5.5, cruise: 10, upBefore: 1.6, up: 1.2 };
+/** The chicken spot, on the left (m; along the road from where the car is as the named words are sung):
+ *  pole     its tall sign at the curb (a little short of where the car is on "crip"), its lightbox's centre's
+ *           height, turned toward the coming car (radians)
+ *  corner   the side street, Slauson (where the car is as it's named; its width), its street blade on the near corner
+ *  aframes  the chalk A-frames: the first short of the corner (from its near edge), the second under the blade (on
+ *           from it: read together, the blade over it), off the road, their middles' height, turned
+ *  shop     past the corner (its start), its length, its front off the road's centre, its depth and height; its two
+ *           windows (centres from its start, width, height, middle's height); the banner under its eaves (centre from
+ *           its start, its middle's height); the sign on its roof (centre from its start, over the roof) */
+export const SHACK = {
+  pole: { lateral: -(ROAD_HALF + 1.6), y: 5.8, turn: 0.55, before: 5 },
+  corner: { w: 9, blade: -1.2, lateral: -(ROAD_HALF + 1.2) },
+  aframes: { first: 6.5, second: 1, lateral: -(ROAD_HALF + 2.4), y: 0.95, turn: 0.5 },
+  shop: { from: 3, len: 34, face: -(ROAD_HALF + 5), d: 14, h: 5.6, windows: [5.5, 13.5], window: { w: 6.2, h: 2.7, y: 2.3 }, banner: { at: 24, y: 3.0 }, sign: { at: 26.5, over: 1.2 } },
+};
+/** The takes (m): the pole sign's, from the right sidewalk back up the street (back of the sign, off the road's centre,
+ *  up, drifting on, m/s); the corner's, from out along their facing (how far, how high): the first A-frame close, then
+ *  the blade and the A-frame under it together; the shop's from across the street, along its faces (back of the first,
+ *  off the road's centre, up; on past the last by the line's end). */
+export const SHOTS = {
+  pole: { back: 8, lateral: ROAD_HALF + 1.4, y: 1.3, drift: 0.4 },
+  corner: { aframe: { out: 4.6, y: 1.7 }, pair: { out: 7, y: 2.2 } },
+  windows: { back: 4, lateral: 3, y: 2.5, end: 3 },
+  banner: { back: 5, lateral: 2.5, y: 1.6, end: 2 },
+  sign: { back: 12.5, lateral: ROAD_HALF + 2, y: 3, end: 3 },
+};
+/** The car wash on the right: its sign (off the road, its centre's height; passed this far through its line), its
+ *  board round the words (its width; header over them, footer under, the margin on the left; the suds right of them;
+ *  m), the camera upstream on the sidewalk; its building. */
+export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 1.8, y: 3.6, through: 0.5, board: { w: 5.8, head: 0.8, foot: 0.55, pad: 0.25 }, eye: { back: 5.6, lateral: ROAD_HALF + 0.3, y: 1.4, toRoad: 0.6, down: 0.3 } };
+/** On their car (its frame: x its left, y up, z forward): the windshield banner, the hood's lettering; their plate
+ *  between the tail lights, the bumper stickers on the rear bumper either side (sized from the van's: `scale`); the
+ *  camera high in front, and low behind. */
 export const ON_CAR = {
   visor: { pos: new THREE.Vector3(0, 1.327, 0.925), normal: new THREE.Vector3(0, 0.247, 0.969) },
   hood: { pos: new THREE.Vector3(0, 1.0, 1.62), normal: new THREE.Vector3(0, 0.998, 0.057) },
-  plaque: { pos: new THREE.Vector3(0, 1.32, -1.9), normal: new THREE.Vector3(0, 0, -1) },
-  front: new THREE.Vector3(0, 2.75, 4.4), behind: new THREE.Vector3(0, 1.55, -6.4),
+  plate: { pos: new THREE.Vector3(0, 0.7, -CAR.length / 2 - 0.1), scale: 0.72 },
+  stickers: { y: 0.42, x: 0.52, z: -CAR.length / 2 - 0.14, scale: 0.44 },
+  // (behind: room under the stickers for the tail dropping as it lays back)
+  front: new THREE.Vector3(0, 2.75, 4.4), behind: new THREE.Vector3(0, 1.0, -5), behindAim: new THREE.Vector3(0, 0.48, -2.7),
 };
 /** The giant mural of him at the end of the street: where the car is when its line ends (m short of it), off to the
- *  left, its centre's height, turned toward the coming car; the camera waits in the street before it (m short of it,
- *  off the road's centre, up), the car driving up into the frame. */
-export const GIANT = { short: 20, lateral: -14, y: 7.5, turn: (35 * Math.PI) / 180, w: 22, h: 12, text: 0.62, eye: { short: 24, lateral: 3, up: 2.4 } };
+ *  left, its centre's height, turned toward the coming car, its size and its words' share of it; its building (how
+ *  much bigger than the mural, deep); the camera waits in the street before it (m short of it, off the road's centre,
+ *  up), the car driving up into the frame. */
+export const GIANT = { short: 20, lateral: -14, y: 7.5, turn: (35 * Math.PI) / 180, w: 22, h: 12, text: 0.62, building: { margin: 1.4, d: 12 }, eye: { short: 24, lateral: 3, up: 2.4 } };
 
+interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Verse2Plan {
-  /** The block's stretch of road and its buildings' colours come from the drive's blocks; the chicken shack (its s). */
-  chickenS: number;
-  wash: { s: number; sign: { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number } };
-  giant: { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number };
+  /** The pole sign (its lightbox), the side street (its middle, width), the blade's pole, the A-frames (their boards). */
+  pole: Face & { s: number };
+  corner: { s: number; w: number; blade: number };
+  aframes: (Face & { s: number })[];
+  /** The shop: its block, its windows (centres along the road), its banner and roof sign (their faces). */
+  shop: Block;
+  windows: number[];
+  banner: Face;
+  sign: Face;
+  wash: { s: number; board: Face };
+  giant: Face;
+  /** Its building. */
+  giantBlock: Block;
   /** When the car lays back (the word "backwards"). */
   layBack: number;
 }
 
 export const VERSE2: SetPiece = {
+  speed(st, audio) {
+    const bar = 240 / audio.bpm, wash = st.lines[5];
+    return [
+      { t: st.start, v: PACE.slow, ramp: bar },
+      ...(wash ? [{ t: wash.start - PACE.upBefore, v: PACE.cruise, ramp: PACE.up }] : []),
+    ];
+  },
+
   place(ctx: SetContext): Placed {
     const { st, route, motion, carFrame } = ctx;
     const lines = st.lines, phs = lines.map((l) => phrasesOf(l, ctx.nextStart(l.i), ctx.solo));
+    // ("Took me | to Slauson | and he slut me out": the street's name on its own, on its blade)
+    {
+      const l = lines[1]!, ws = l.words, to = ws.findIndex((w) => /^to$/i.test(w.w)), and = ws.findIndex((w) => /^slauson/i.test(w.w)) + 1;
+      if (to > 0 && and > to && and < ws.length) phs[1] = [phraseOf(l, 0, to, ctx.solo), phraseOf(l, to, and, ctx.solo), phraseOf(l, and, ws.length, ctx.solo)];
+    }
+    // ("You know I'm hella different | from them chickens | you been trickin' on": "chickens" a phrase's end, under the
+    // chicken)
+    {
+      const l = lines[4]!, ws = l.words, from = ws.findIndex((w) => /^from$/i.test(w.w)), you = ws.findIndex((w, k) => k > from && /^you$/i.test(w.w));
+      if (from > 0 && you > from + 1 && you < ws.length) phs[4] = [phraseOf(l, 0, from, ctx.solo), phraseOf(l, from, you, ctx.solo), phraseOf(l, you, ws.length, ctx.solo)];
+    }
+    // ("Trickin', | finna fall in | backwards": the plate, a sticker each)
+    {
+      const l = lines[7]!, ws = l.words, back = ws.findIndex((w) => /^backwards/i.test(w.w));
+      if (back > 1) phs[7] = [phraseOf(l, 0, 1, ctx.solo), phraseOf(l, 1, back, ctx.solo), phraseOf(l, back, ws.length, ctx.solo)];
+    }
     const carS = (t: number) => motion.distanceAt(t);
     const atRoad = (s: number, lateral: number, y: number) => { const f = route.frameAt(s); return f.pos.clone().addScaledVector(f.right, lateral).addScaledVector(UP, y); };
     const right = (s: number) => flat(route.frameAt(s).right), fwd = (s: number) => flat(route.frameAt(s).fwd);
     const ground = (s: number) => route.frameAt(s).pos.y;
     const inCar = (p: THREE.Vector3, t: number) => p.clone().applyMatrix4(carMatrix(carFrame(t)));
+    const wordAt = (l: number, re: RegExp, through = 0) => { const w = lines[l]!.words.find((x) => re.test(x.w)); return w ? w.start + (w.end - w.start) * through : lines[l]!.start; };
     const carriers: Carrier[] = [], frames = new Map<string, SetFrame>();
     const idOf = (ph: Phrase) => `L${ph.line}.${phs[lines.findIndex((l) => l.i === ph.line)]!.indexOf(ph)}`;
     const add = (kind: Kind, ph: Phrase, s: number, center: THREE.Vector3, normal: THREE.Vector3, up: THREE.Vector3, lay: ReturnType<typeof layout>, extra: Partial<Carrier> = {}) => {
@@ -79,101 +144,136 @@ export const VERSE2: SetPiece = {
       frames.set(c.id, { to, move, ...(move === 'whip' && prev ? { at: Math.min(cue, Math.max(prev.phrase.end, cue - WHIP_S)) } : {}) });
     };
     const hold = (cs: readonly Carrier[], to: SetFrame['to'], first: ShotMove) => cs.forEach((c, i) => frame(c, to, i ? 'snap' : first));
-    /** A panel's phrases one under the next, riding in the car (P, n in its frame). */
-    const riding = (kind: Kind, list: readonly Phrase[], P: THREE.Vector3, n: THREE.Vector3, up = uprightFor(n)) => {
+    /** A panel's phrases one under the next, read top-down: their centres (P its centre, n its facing). */
+    const stack = (kind: Kind, list: readonly Phrase[], P: THREE.Vector3, n: THREE.Vector3, up = uprightFor(n)) => {
       const lays = list.map((ph) => layout(kind, ph.text, ph.solo)), H = lays.reduce((a, l) => a + l.h, 0);
       let top = H / 2;
-      return list.map((ph, i) => {
-        const L = lays[i]!, pos = P.clone().addScaledVector(up, top - L.h / 2); top -= L.h;
-        const ride = { pos, normal: n.clone(), up: up.clone() }, at = rideAt({ ride } as Carrier, carFrame(ph.start));
-        return add(kind, ph, carS(ph.start), at.center, at.normal, at.up, L, { ride });
-      });
+      return { H, items: list.map((ph, i) => { const L = lays[i]!, c = P.clone().addScaledVector(up, top - L.h / 2); top -= L.h; return { ph, lay: L, center: c }; }) };
+    };
+    /** A phrase riding on the car (at its own place in its frame). */
+    const riding = (kind: Kind, ph: Phrase, pos: THREE.Vector3, n: THREE.Vector3, up = uprightFor(n), scale = 1) => {
+      const ride = { pos, normal: n.clone(), up: up.clone() }, at = rideAt({ ride } as Carrier, carFrame(ph.start));
+      return add(kind, ph, carS(ph.start), at.center, at.normal, at.up, layout(kind, ph.text, ph.solo, scale), { ride });
+    };
+    /** A take along a run of faces on the left, from across the street: the eye drifting on from `back` short of the
+     *  first to `end` past that from the last by the line's end, the aim swinging on to each as it's sung. */
+    const along = (cs: readonly Carrier[], E: { back: number; lateral: number; y: number; end: number }) => {
+      const t0 = cs[0]!.phrase.start - 0.6, t1 = cs[cs.length - 1]!.phrase.end + 0.6, s0 = cs[0]!.s - E.back, s1 = Math.max(s0, cs[cs.length - 1]!.s - E.back + E.end);
+      return (t: number) => {
+        // (on to the next once the one before is sung)
+        const aim = cs[0]!.center.clone();
+        for (let i = 1; i < cs.length; i++) { const at = cs[i]!.phrase.start; aim.lerp(cs[i]!.center, smooth(Math.max(cs[i - 1]!.phrase.end, at - 0.45), at + 0.25, t)); }
+        return lookFrom(atRoad(s0 + (s1 - s0) * smooth(t0, t1, t), E.lateral, E.y), aim);
+      };
     };
 
-    // ---- the take: the block of murals on the left, the camera riding alongside ----
-    const take = lines.slice(0, 5), tps = take.flatMap((l) => phs[lines.indexOf(l)]!);
-    // (the murals one after the next along the wall, the run placed so the one being sung as the car three-wheels
-    // stands where the car is then: the camera drifts along them, holding each as it's sung (lineTake), the car rolling
-    // through)
-    // (the SLAUSON sign a size up: it stands out from the wall, the camera framed on the murals behind it)
-    const lays = tps.map((ph) => (/slauson/i.test(ph.text) ? layout('street', ph.text, ph.solo, STREET_SCALE) : layout('mural', ph.text, ph.solo)));
-    const offs: number[] = []; let x = 0;
-    lays.forEach((l, i) => { if (i) x += lays[i - 1]!.w / 2 + MURAL.gap + l.w / 2; offs.push(x); });
-    const crip = Math.max(0, tps.findIndex((ph) => /crip/i.test(ph.text))), cw = tps[crip]!;
-    const base = carS(cw.start + (cw.end - cw.start) * TAKE.through) - offs[crip]!;
-    let wallEnd = -Infinity, sign: Carrier | undefined;
-    for (const [i, ph] of tps.entries()) {
-      const slauson = /slauson/i.test(ph.text), kind: Kind = slauson ? 'street' : 'mural', lay = lays[i]!;
-      const s = base + offs[i]!;
-      wallEnd = s + lay.w / 2;
-      const n = right(s);
-      if (slauson) { // the street sign on the corner, on its pole by the curb
-        const c = atRoad(s, -STREET.lateral, STREET.y);
-        // (no solid of its own: a blade on a pole, and a solid would clear the block's buildings round it)
-        sign = add('street', ph, s, c, n, UP.clone(), lay);
-      } else add('mural', ph, s, atRoad(s, BLOCK.face + MURAL.proud, MURAL.y), n, UP.clone(), lay);
-    }
-    hold(carriers, lineTake(carriers, carriers.map(() => false)), 'cut');
-    const chickenLine = take[4]!, chicken = carriers.filter((c) => c.phrase.line === chickenLine.i);
-    const chickenS = chicken.length ? (chicken[0]!.s + chicken[chicken.length - 1]!.s) / 2 : 0;
+    // ---- the chicken spot ----
+    const S = SHACK, poleS = carS(wordAt(0, /^crip/i)) - S.pole.before, cornerS = carS(wordAt(1, /^slauson/i));
+    const shop0 = cornerS + S.corner.w / 2 + S.shop.from;
+    // its pole sign at the curb, its lightbox turned toward the coming car: "Ooh, he bossy, ooh, he crip walkin'"
+    const poleN = fwd(poleS).negate().multiplyScalar(Math.cos(S.pole.turn)).addScaledVector(right(poleS), Math.sin(S.pole.turn)).normalize();
+    const poleP = atRoad(poleS, S.pole.lateral, S.pole.y), pole = stack('polesign', phs[0]!, poleP, poleN);
+    const poleCs = pole.items.map(({ ph, lay, center }) => add('polesign', ph, poleS, center, poleN, uprightFor(poleN), lay));
+    const P = SHOTS.pole;
+    hold(poleCs, (t) => lookFrom(atRoad(poleS - P.back + P.drift * (t - st.start), P.lateral, P.y), poleP.clone().addScaledVector(UP, -0.5)), 'cut');
+    // the corner: an A-frame, the SLAUSON blade on its pole, another A-frame: "Took me | to Slauson | and he slut me out"
+    const A = S.aframes, bladeS = cornerS - S.corner.w / 2 + S.corner.blade, ends = [cornerS - S.corner.w / 2 - A.first, bladeS + A.second];
+    const aN = (s: number) => right(s).multiplyScalar(Math.cos(A.turn)).addScaledVector(fwd(s), -Math.sin(A.turn)).normalize();
+    const [took, toSlauson, slut] = phs[1]!;
+    const corner: Carrier[] = [], aframes: Verse2Plan['aframes'] = [];
+    const aframe = (ph: Phrase, s: number) => {
+      const n = aN(s), c = atRoad(s, A.lateral, A.y), lay = layout('aframe', ph.text, ph.solo);
+      aframes.push({ s, center: c, normal: n, up: uprightFor(n), w: lay.w, h: lay.h });
+      return add('aframe', ph, s, c, n, uprightFor(n), lay);
+    };
+    if (took) corner.push(aframe(took, ends[0]!));
+    if (toSlauson) corner.push(add('street', toSlauson, bladeS, atRoad(bladeS, S.corner.lateral, STREET.y), right(bladeS), UP.clone(), layout('street', toSlauson.text, toSlauson.solo)));
+    if (slut) corner.push(aframe(slut, ends[1]!));
+    // (the first held close, then the blade and the A-frame under it together: it's up while the street's named)
+    const out = (cs: readonly Carrier[], E: { out: number; y: number }) => {
+      const at = cs.reduce((p, c) => p.add(c.center), new THREE.Vector3()).divideScalar(cs.length), n = cs[0]!.normal;
+      const eye = at.clone().addScaledVector(n, E.out); eye.y = ground(cs[0]!.s) + E.y;
+      return lookFrom(eye, at);
+    };
+    const first = out(corner.slice(0, 1), SHOTS.corner.aframe), pair = out(corner.slice(1), SHOTS.corner.pair);
+    hold(corner, glideTake(corner, corner.map((_, i) => () => (i ? pair : first))), 'cut');
+    // its windows, painted: "And when I got a problem, he get to packing"
+    const Sh = S.shop, winS = Sh.windows.map((x) => shop0 + x);
+    const wins = phs[2]!.map((ph, i) => { const s = winS[Math.min(i, winS.length - 1)]!; return add('window', ph, s, atRoad(s, Sh.face + 0.05, Sh.window.y + (i >= winS.length ? -0.9 : 0)), right(s), UP.clone(), layout('window', ph.text, ph.solo)); });
+    hold(wins, along(wins, SHOTS.windows), 'cut');
+    // its banner under the eaves: "He 'bout all that action, call him Mr. Handle It"
+    const bS = shop0 + Sh.banner.at, bN = right(bS), bP = atRoad(bS, Sh.face + 0.12, Sh.banner.y), banner = stack('vinyl', phs[3]!, bP, bN);
+    const bannerCs = banner.items.map(({ ph, lay, center }) => add('vinyl', ph, bS, center, bN, UP.clone(), lay));
+    hold(bannerCs, along(bannerCs, SHOTS.banner), 'cut');
+    // the big sign on its roof, the chicken standing on it: "You know I'm hella different | from them chickens | you
+    // been trickin' on"
+    const rS = shop0 + Sh.sign.at, rN = right(rS), rH = phs[4]!.reduce((a, ph) => a + layout('roofsign', ph.text, ph.solo).h, 0);
+    const rP = atRoad(rS, Sh.face - 1.2, Sh.h + Sh.sign.over + rH / 2), roof = stack('roofsign', phs[4]!, rP, rN);
+    const roofCs = roof.items.map(({ ph, lay, center }) => add('roofsign', ph, rS, center, rN, UP.clone(), lay));
+    hold(roofCs, along(roofCs, SHOTS.sign), 'cut');
+    const shopS = shop0 + Sh.len / 2, shopLat = Sh.face - Sh.d / 2;
+    const shop: Block = { s: shopS, lateral: shopLat, w: Sh.len, h: Sh.h, d: Sh.d, color: 0.4, bare: true, prop: true, matrix: boxAt(route, shopS, shopLat, Sh.d, Sh.h, Sh.len) };
 
-    // ---- the car wash on the right: its sign facing the traffic, the car rolling past ----
-    const wl = lines[5]!, ws = carS(wl.start + (wl.end - wl.start) * WASH.through), wn = fwd(ws).negate(), wP = atRoad(ws, WASH.lateral, WASH.y);
-    const wlays = phs[5]!.map((ph) => layout('carwash', ph.text, ph.solo)), wH = wlays.reduce((a, l) => a + l.h, 0);
-    let wtop = wH / 2;
-    const wash = phs[5]!.map((ph, i) => { const L = wlays[i]!, c = wP.clone().addScaledVector(UP, wtop - L.h / 2); wtop -= L.h; return add('carwash', ph, ws, c, wn, UP.clone(), L, i ? {} : { solid: { at: new THREE.Vector3(0, L.h / 2 - wH / 2, -0.12), size: new THREE.Vector3(L.w + 0.3, wH + 0.3, 0.14) } }); });
-    const WE = WASH.eye, washShot = lookFrom(atRoad(ws - WE.back, WE.lateral, WE.y), wP.clone().addScaledVector(right(ws), -WE.toRoad).addScaledVector(UP, -WE.down));
+    // ---- the car wash on the right: its sign an ad facing the traffic, the words flush left, the car rolling past ----
+    const W = WASH, wl = lines[5]!, ws = carS(wl.start + (wl.end - wl.start) * W.through), wn = fwd(ws).negate(), wAlong = UP.clone().cross(wn).normalize();
+    const wH = phs[5]!.reduce((a, ph) => a + layout('carwash', ph.text, ph.solo).h, 0), boardH = W.board.head + wH + W.board.foot, boardP = atRoad(ws, W.lateral, W.y);
+    // (the words' column: the board's left, under its header)
+    const textP = boardP.clone().addScaledVector(wAlong, -W.board.w / 2 + W.board.pad + LAYOUT.carwash.w / 2).addScaledVector(UP, boardH / 2 - W.board.head - wH / 2);
+    const wash = stack('carwash', phs[5]!, textP, wn).items.map(({ ph, lay, center }) => add('carwash', ph, ws, center, wn, UP.clone(), lay));
+    const WE = W.eye, washShot = lookFrom(atRoad(ws - WE.back, WE.lateral, WE.y), boardP.clone().addScaledVector(right(ws), -WE.toRoad).addScaledVector(UP, -WE.down));
     hold(wash, () => washShot, 'cut');
 
     // ---- their car, from in front: the windshield banner, the hood's lettering ----
     const [trust, good] = phs[6]!, V = ON_CAR.visor, Hd = ON_CAR.hood;
-    const visor = trust ? riding('visor', [trust], V.pos, V.normal.clone().normalize()) : [];
+    const visor = trust ? [riding('visor', trust, V.pos, V.normal.clone().normalize())] : [];
     const hoodUp = new THREE.Vector3(0, 0.057, -0.998).normalize(); // (its letters stand toward the windshield: read from in front)
-    const hood = good ? riding('hood', [good], Hd.pos, Hd.normal.clone().normalize(), hoodUp) : [];
+    const hood = good ? [riding('hood', good, Hd.pos, Hd.normal.clone().normalize(), hoodUp)] : [];
     const frontShot = (t: number) => lookFrom(inCar(ON_CAR.front, t), inCar(new THREE.Vector3(0, 1.05, 1.1), t));
     hold([...visor, ...hood], frontShot, 'cut');
 
-    // ---- a whip round behind: the club plaque on the rear deck, the car laying back ----
-    const P = ON_CAR.plaque, plaque = riding('plaque', phs[7]!, P.pos, P.normal);
-    hold(plaque, (t) => lookFrom(inCar(ON_CAR.behind, t), inCar(P.pos, t)), 'whip');
+    // ---- a whip round behind, low: TRICKIN' on their plate, the rest on bumper stickers, the car laying back ----
+    const back = new THREE.Vector3(0, 0, -1), [trickin, finna, backwards] = phs[7]!, St = ON_CAR.stickers;
+    const rear = [
+      ...(trickin ? [riding('plate', trickin, ON_CAR.plate.pos, back, UP.clone(), ON_CAR.plate.scale)] : []),
+      // (left to right from behind: the car's left is the screen's left)
+      ...(finna ? [riding('sticker', finna, new THREE.Vector3(St.x, St.y, St.z), back, UP.clone(), St.scale)] : []),
+      ...(backwards ? [riding('sticker', backwards, new THREE.Vector3(-St.x, St.y, St.z), back, UP.clone(), St.scale)] : []),
+    ];
+    hold(rear, (t) => lookFrom(inCar(ON_CAR.behind, t), inCar(ON_CAR.behindAim, t)), 'whip');
 
-    // ---- the giant mural of him at the end of the street, the car driving on toward it ----
-    const gl = lines[8]!, gs = carS(gl.end) + GIANT.short, gf = route.frameAt(gs);
-    const gn = flat(gf.fwd).negate().multiplyScalar(Math.cos(GIANT.turn)).addScaledVector(flat(gf.right), Math.sin(GIANT.turn)).normalize();
-    const gP = atRoad(gs, GIANT.lateral, GIANT.y), gUp = uprightFor(gn);
+    // ---- the giant mural of him at the end of the street, on its building's end wall, the car driving on toward it ----
+    const G = GIANT, gl = lines[8]!, gs = carS(gl.end) + G.short, gf = route.frameAt(gs);
+    const gn = flat(gf.fwd).negate().multiplyScalar(Math.cos(G.turn)).addScaledVector(flat(gf.right), Math.sin(G.turn)).normalize();
+    const gP = atRoad(gs, G.lateral, G.y), gUp = uprightFor(gn);
     const glays = phs[8]!.map((ph) => layout('giant', ph.text, ph.solo)), gH = glays.reduce((a, l) => a + l.h, 0);
     let gtop = gH / 2;
     // (its words on the left of it, his portrait on the right: the prop paints it)
-    const along = gUp.clone().cross(gn).normalize(), textX = -GIANT.w / 2 + (GIANT.w * GIANT.text) / 2;
-    const giant = phs[8]!.map((ph, i) => { const L = glays[i]!, c = gP.clone().addScaledVector(gUp, gtop - L.h / 2).addScaledVector(along, textX); gtop -= L.h; return add('giant', ph, gs, c, gn, gUp.clone(), L, { ad: 'him' }); });
-    const giantShot = lookFrom(atRoad(gs - GIANT.eye.short, GIANT.eye.lateral, GIANT.eye.up), gP.clone().addScaledVector(along, -2));
+    const gAlong = gUp.clone().cross(gn).normalize(), textX = -G.w / 2 + (G.w * G.text) / 2;
+    const giant = phs[8]!.map((ph, i) => { const L = glays[i]!, c = gP.clone().addScaledVector(gUp, gtop - L.h / 2).addScaledVector(gAlong, textX); gtop -= L.h; return add('giant', ph, gs, c, gn, gUp.clone(), L, { ad: 'him' }); });
+    const giantShot = lookFrom(atRoad(gs - G.eye.short, G.eye.lateral, G.eye.up), gP.clone().addScaledVector(gAlong, -2));
     hold(giant, () => giantShot, 'whip');
+    // (its building: the mural on its end wall, down to the ground)
+    const GB = G.building, gbw = G.w + 2 * GB.margin, gbh = G.y + G.h / 2 + GB.margin, gB = gP.clone().addScaledVector(gn, -GB.d / 2 - 0.05), gLat = gB.clone().sub(gf.pos).dot(gf.right);
+    const giantBlock: Block = { s: gs, lateral: gLat, w: gbw, h: gbh, d: GB.d, color: 0.5, bare: true, prop: true, matrix: new THREE.Matrix4().makeBasis(gAlong, UP, gn).scale(new THREE.Vector3(gbw, gbh, GB.d)).setPosition(gB.x, ground(gs) + gbh / 2, gB.z) };
 
-    // the block's buildings on the left (concrete: no; the town's kind), a side street at the SLAUSON corner; the
-    // town keeps off the block and the car wash
-    const blocks: Block[] = [], s0 = carS(st.start) - 5, s1 = wallEnd + 15, corner = sign ? sign.s : -Infinity;
-    for (let s = s0, k = 0; s < s1; k++) {
-      const w = BLOCK.w[0] + (BLOCK.w[1] - BLOCK.w[0]) * hash(k, 3, 61), e = s + w;
-      if (e > corner - BLOCK.corner && s < corner + BLOCK.corner) { s = corner + BLOCK.corner; continue; }
-      const h = BLOCK.h[0] + (BLOCK.h[1] - BLOCK.h[0]) * hash(k, 3, 62), mid = (s + e) / 2, lateral = BLOCK.face - BLOCK.d / 2;
-      blocks.push({ s: mid, lateral, w: w - BLOCK.alley, h, d: BLOCK.d, color: hash(k, 3, 63), bare: true, matrix: boxAt(route, mid, lateral, BLOCK.d, h, w - BLOCK.alley) });
-      s = e;
-    }
-    // the car wash's building on the right, his mural's on the left (blocks: the guard sees them)
-    const washB = { s: ws + WASH.building.ds, lateral: WASH.building.lateral, w: 18, h: 4.6, d: 10 };
+    // the car wash's building on the right (the guard sees it); the town keeps off the chicken spot's block (and the far
+    // side, where its takes stand), the car wash and his mural's
+    const blocks: Block[] = [shop, giantBlock];
+    const washB = { s: ws + W.building.ds, lateral: W.building.lateral, w: 18, h: 4.6, d: 10 };
     blocks.push({ ...washB, color: 0.9, matrix: boxAt(route, washB.s, washB.lateral, washB.d, washB.h, washB.w) });
-    const gB = gP.clone().addScaledVector(gn, -6.1), gfB = route.frameAt(gs), gLat = gB.clone().sub(gfB.pos).dot(gfB.right);
-    blocks.push({ s: gs, lateral: gLat, w: GIANT.w + 2, h: GIANT.y + GIANT.h / 2 + 2, d: 12, color: 0.5, matrix: new THREE.Matrix4().makeBasis(gUp.clone().cross(gn).normalize(), UP, gn).scale(new THREE.Vector3(GIANT.w + 2, GIANT.y + GIANT.h / 2 + 2, 12)).setPosition(gB.x, ground(gs) + (GIANT.y + GIANT.h / 2 + 2) / 2, gB.z) });
-    // (the town keeps off the block, the far side where the take's camera stands, the car wash and his mural)
-    const clear = [{ side: -1, a: s0, b: s1 }, { side: 1, a: s0, b: s1 }, { side: 1, a: ws - 25, b: ws + 25 }, { side: -1, a: gs - 30, b: gs + 30 }];
-    const backwards = lines[7]!.words.find((w) => /^backwards/i.test(w.w))?.start ?? lines[7]!.end;
+    const clear = [{ side: -1, a: poleS - 20, b: shop0 + Sh.len + 12 }, { side: 1, a: poleS - 20, b: shop0 + Sh.len + 12 }, { side: 1, a: ws - 25, b: ws + 25 }, { side: -1, a: gs - 30, b: gs + 30 }];
     const plan: Verse2Plan = {
-      chickenS,
-      wash: { s: ws, sign: { center: wP, normal: wn, up: UP.clone(), w: wlays[0]?.w ?? 3.6, h: wH } },
-      giant: { center: gP, normal: gn, up: gUp, w: GIANT.w, h: GIANT.h },
-      layBack: backwards,
+      pole: { s: poleS, center: poleP, normal: poleN, up: uprightFor(poleN), w: LAYOUT.polesign.w, h: pole.H },
+      corner: { s: cornerS, w: S.corner.w, blade: bladeS },
+      aframes, shop, windows: winS,
+      banner: { center: bP, normal: bN, up: UP.clone(), w: LAYOUT.vinyl.w, h: banner.H },
+      sign: { center: rP, normal: rN, up: UP.clone(), w: LAYOUT.roofsign.w, h: rH },
+      wash: { s: ws, board: { center: boardP, normal: wn, up: UP.clone(), w: W.board.w, h: boardH } },
+      giant: { center: gP, normal: gn, up: gUp, w: G.w, h: G.h },
+      giantBlock,
+      layBack: lines[7]!.words.find((w) => /^backwards/i.test(w.w))?.start ?? lines[7]!.end,
     };
-    // (chorus 3's faces stand past his mural)
-    return { carriers, frames, clear, blocks, plan, floor: gs + GIANT.w + 30 };
+    // (chorus 3's faces stand past his mural, and past where their own clear zone would take his building)
+    return { carriers, frames, clear, blocks, plan, floor: gs + G.w + 45 };
   },
 };

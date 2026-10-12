@@ -209,3 +209,34 @@ the road paint and "fly" on the towed banners stay as the drive places them.
 - Verse 2 has no palms or power lines: they stood where the take's camera rides.
 - Signs on the car move with its hydraulics.
 
+
+**Review round (2026-10-12): your notes on the intro, verse 1 and verse 2.**
+
+- **Intro.** The road now runs on behind the light (the route goes straight back past its start), with shops along it on
+  both sides and a liquor store on the far right corner. The first shot circles the street signs against the open sky:
+  no motel sign, no palm. It holds through the old drop, and the car sits low from the start. The mast's second SZA AV
+  sign is gone. The wide shot looks back down the street at the car.
+- **Chorus 1's first line** (`sets/chorus1.ts`). "Young and fine | and dark and handsome" is in gold leaf on a
+  barbershop's two windows on the far left corner. It's one take from the mouth of the cross street: the light changes
+  up over the lane and the car crosses the frame. There are no cuts inside the line. The repeated yellow billboards
+  stay for a later chorus.
+- **Verse 1.**
+  - The skywriter dips under the second "fly" and loops round it.
+  - Every sign's own words (headers, prices, ad copy, exit and place signs) are set in IBM Plex Mono, never the lyrics'
+    Archivo. The title's street blades and the motel stay as they are.
+  - The visors belong to the car (`look/dash.ts`) and sit folded back from the start. Hers flips down to a real mirror
+    with the street behind them in it.
+  - The texts are "You kinda cute," then "but" on its own, then "play too much, don't play yourself".
+  - The dash has gauges and a head unit playing the song. The radio line is written across its screen.
+- **Verse 2** (rebuilt). The car crawls at 5.5 m/s past a fried chicken spot on the corner of Slauson, with each line on
+  a real object:
+  - its pole sign's lightbox;
+  - a chalk A-frame, then the SLAUSON blade with a second A-frame under it;
+  - its painted front windows;
+  - its vinyl banner;
+  - the big bulb-lit sign on its roof, with the chicken standing on it.
+
+  It's one take per line, with cuts between lines. The car wash's sign is an ad: HAND WASH over the words (flush left),
+  suds and a shining car beside them, the price under. "Trickin'" is on their vanity plate and the rest is on bumper
+  stickers, shot low from behind. His giant mural is painted on the end wall of a real building, which chorus 3's first
+  billboard had been clearing away.

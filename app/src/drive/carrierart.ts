@@ -14,8 +14,9 @@
 // and the set-pieces' surfaces, each in its own medium: a speed trailer's amber LEDs, a bus's tail ad (its ad is the
 // prop's), her lipstick on her visor's mirror, stickers, a California plate, her phone's message bubbles, the radio's cyan display, a menu board with its
 // prices, a burger stand's marquee in changeable letters; his posters on the freeway's wall, its big sign's panels;
-// murals by a sign painter (a style a line: outlined, shadowed), a hand car wash's sign, their car's windshield banner,
-// its hood's airbrushed lettering and its club plaque, and his giant mural's words (the mural is the prop's).
+// a fried chicken spot's pole sign lightbox, chalk A-frames, painted windows, vinyl banner and roof sign; a hand car
+// wash's ad (its words left-aligned, the suds the prop's), their car's windshield banner and its hood's airbrushed
+// lettering, and his giant mural's words (the mural is the prop's).
 // Every face is blank until its reveal (dissolve.ts), its board or wall already standing. A word of emphasis
 // (Phrase.solo) on its own row is set as big as its row allows, and punches up as it's sung (PUNCH).
 // And the barbershop's windows, its lyric in gold leaf on the glass.
@@ -73,18 +74,10 @@ export const wallColor = (c: Carrier) => c.kind === 'neon'
   : new THREE.Color(WORLD.stucco[Math.floor(hash(c.phrase.start, 9) * WORLD.stucco.length)]!);
 const hexOf = (c: THREE.Color) => `#${c.getHexString(THREE.SRGBColorSpace)}`;
 const GREEN = '#1f6b44';
-/** The murals' styles, one a line: [panel, letters, the word being sung, outline and shadow, face]. */
-const MURALS: readonly [string, string, string, string, string][] = [
-  ['#2b78a6', '#ffd65a', '#ffffff', '#141218', F.archivo(100, 900)],
-  ['#f6dd8f', '#c8102e', '#141218', '#5a0614', F.bodoni(700, { italic: true })],
-  ['#1f6b44', '#ffffff', '#ffd65a', '#0b2a1a', F.archivo(62, 900)],
-  ['#c8102e', '#ffd65a', '#ffffff', '#2a0309', F.archivo(100, 900)],
-  ['#ffd65a', '#c8102e', '#141218', '#7a0a1a', F.archivo(125, 900)],
-];
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
@@ -120,14 +113,14 @@ function styleOf(c: Carrier): Style {
     case 'mirror': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#b0102a', '#b0102a', '#e8173a'], alpha: [0.6, 1], shadow: 'rgba(90,0,20,0.35)' }; // (on the glass: the mirror is the visor's)
     case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
-    case 'mural': { // a sign painter's: a style a line (its panel, its letters, outlined and shadowed)
-      const [bg, ink, now, outline, family] = MURALS[c.phrase.line % MURALS.length]!;
-      return { bg, border: outline, family, caps: family !== F.bodoni(700, { italic: true }), colors: [ink, ink, now], alpha: [0.7, 1], outline, shadow: outline };
-    }
-    case 'carwash': return { bg: '#1f8fd6', border: '#ffffff', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.72, 1], outline: '#0b3a66' };
+    case 'polesign': return { bg: '#fbf7ee', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
+    case 'aframe': return { bg: '#1f2b26', border: '#3c4a43', family: F.archivo(87, 800), caps: true, colors: ['#f3efe6', '#f3efe6', '#ffd65a'], alpha: [0.7, 0.95], roughen: true }; // chalk
+    case 'window': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.82, 1], outline: '#c8102e', shadow: '#5a0614' }; // painted on the glass
+    case 'vinyl': return { bg: '#c8202e', border: '#ffffff', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
+    case 'roofsign': return { bg: '#ffd65a', border: '#c8202e', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
+    case 'carwash': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1], outline: '#0b3a66', align: 'left' }; // (on the prop's board)
     case 'visor': return { bg: '#0e0d10', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.7, 1] };
     case 'hood': return { family: F.archivoItalic(100, 800), caps: true, colors: ['#ffd65a', '#ffd65a', '#ffffff'], alpha: [0.75, 1], outline: '#5a0614', shadow: '#2a0309' };
-    case 'plaque': return { bg: '#c9c4ba', border: '#4a4550', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#1b1820', '#1b1820', '#c8102e'], alpha: [0.7, 1] };
     case 'giant': return { family: F.archivo(62, 900), caps: true, colors: [AD_STYLE.him.ink, AD_STYLE.him.ink, '#c8102e'], alpha: [0.72, 1] };
     case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
@@ -209,11 +202,13 @@ export class CarrierArt {
     return l;
   }
 
-  /** The ad's own copy where its headline will go: its maker in capitals, its line under it (route signs: NEXT EXIT). */
+  /** The ad's own copy where its headline will go: its maker in capitals, its line under it (a route sign has none: its
+   *  shield and arrow, and the blade blank till its words come). */
   private drawCopy(c: CanvasRenderingContext2D, TW: number) {
     const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height;
     c.clearRect(0, 0, W, H);
-    const [brand, line] = carrier.ad ? BRAND[carrier.ad] : ['NEXT EXIT', '1 MILE'];
+    if (!carrier.ad) return;
+    const [brand, line] = BRAND[carrier.ad];
     c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = style.colors[1];
     const big = Math.min(H * 0.34, (TW * 0.8) / Math.max(4, brand.length * 0.58));
     c.font = font(F.sign(600), big * 0.9); c.fillText(brand, TW / 2, H * 0.44, TW * 0.86);
@@ -277,7 +272,7 @@ export class CarrierArt {
       const solo = r === soloRow;
       if (solo) c.font = font(style.family, soloSize(label(rowWords[0]!), rowH, punchAt(carrier, t)));
       const total = rowWords.reduce((s, w) => s + c.measureText(label(w)).width, 0) + space * (rowWords.length - 1);
-      let x = style.bubble ? bubbleX : (TW - total) / 2;
+      let x = style.bubble ? bubbleX : style.align === 'left' ? TW * 0.04 : (TW - total) / 2;
       for (const w of rowWords) {
         const sung = t >= w.start, now = sung && t < w.end;
         c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];
@@ -294,6 +289,12 @@ export class CarrierArt {
         }
         if (style.outline) { c.save(); c.lineWidth = em * 0.12; c.lineJoin = 'round'; c.strokeStyle = style.outline; c.strokeText(label(w), fx, fy); c.restore(); }
         for (let k = 0; k < (style.glowPasses ?? 1); k++) c.fillText(label(w), fx, fy);
+        if (style.roughen && style.bg) { // chalk: flecks of the board showing through its strokes
+          const ww = c.measureText(label(w)).width;
+          c.save(); c.globalAlpha = 0.55; c.fillStyle = style.bg;
+          for (let k = 0; k < 40; k++) c.fillRect(fx + hash(w.gi, k, 1) * ww, fy + (hash(w.gi, k, 2) - 0.5) * em * 0.8, em * 0.05, em * 0.02);
+          c.restore();
+        }
         if (fall) c.restore();
         x += c.measureText(label(w)).width + space;
       }

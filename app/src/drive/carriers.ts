@@ -39,12 +39,12 @@ import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
 export type LeftKind = 'billboard' | 'storefront' | 'neon';
 /** The set-pieces' surfaces (sets/). */
-export type SetKind = 'barber' | 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee' | 'poster' | 'freeway' | 'mural' | 'carwash' | 'visor' | 'hood' | 'plaque' | 'giant';
+export type SetKind = 'barber' | 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee' | 'poster' | 'freeway' | 'polesign' | 'aframe' | 'window' | 'vinyl' | 'roofsign' | 'carwash' | 'visor' | 'hood' | 'giant';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill' | SetKind;
 export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
-  'barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'mural', 'carwash', 'visor', 'hood', 'plaque', 'giant'];
+  'barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'visor', 'hood', 'giant'];
 /** The set-pieces' kinds (world.ts draws just their faces: their props stand round them). */
-export const SET_KINDS: ReadonlySet<Kind> = new Set<SetKind>(['barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'mural', 'carwash', 'visor', 'hood', 'plaque', 'giant']);
+export const SET_KINDS: ReadonlySet<Kind> = new Set<SetKind>(['barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'visor', 'hood', 'giant']);
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -124,7 +124,7 @@ export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
 
 /** Per kind: a row's height and the face's width (m), and the face's type: its average advance per character (a share
  *  of the em) and the share of a row the em may take. */
-export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; emOfRow: number; wrap?: number; fit?: boolean }> = {
+export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; emOfRow: number; wrap?: number }> = {
   road: { rowH: 3.4, w: 7, advance: 0.62, emOfRow: 0.7 },
   sky: { rowH: 9, w: 40, advance: 0.55, emOfRow: 0.72 },
   banner: { rowH: 5, w: 34, advance: 0.6, emOfRow: 0.72 },
@@ -142,26 +142,31 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   bus: { rowH: 0.36, w: 2.4, advance: 0.55, emOfRow: 0.72, wrap: 17 },
   mirror: { rowH: 0.06, w: 0.3, advance: 0.5, emOfRow: 0.7, wrap: 18 },
   sticker: { rowH: 0.26, w: 1.6, advance: 0.55, emOfRow: 0.66, wrap: 16 },
-  plate: { rowH: 0.3, w: 0.62, advance: 0.6, emOfRow: 0.62, wrap: 8 },
+  plate: { rowH: 0.3, w: 0.62, advance: 0.6, emOfRow: 0.62, wrap: 10 },
   phone: { rowH: 0.042, w: 0.18, advance: 0.55, emOfRow: 0.62, wrap: 16 },
   radio: { rowH: 0.05, w: 0.42, advance: 0.6, emOfRow: 0.66, wrap: 28 },
   menu: { rowH: 0.34, w: 2.6, advance: 0.5, emOfRow: 0.7, wrap: 24 },
   marquee: { rowH: 0.6, w: 3.6, advance: 0.58, emOfRow: 0.7, wrap: 18 },
   poster: { rowH: 1.3, w: 10, advance: 0.52, emOfRow: 0.72 },
   freeway: { rowH: 1.4, w: 6, advance: 0.55, emOfRow: 0.62, wrap: 10 },
-  // (a mural is as wide as its words, up to w)
-  mural: { rowH: 1.1, w: 9.5, advance: 0.6, emOfRow: 0.68, wrap: 16, fit: true },
-  carwash: { rowH: 0.5, w: 3.6, advance: 0.55, emOfRow: 0.7, wrap: 16 },
+  // (the chicken spot's: its pole sign's lightbox, chalk A-frames, its painted windows, the vinyl banner under its eaves,
+  // the big sign on its roof)
+  polesign: { rowH: 0.95, w: 5.2, advance: 0.6, emOfRow: 0.68, wrap: 15 },
+  aframe: { rowH: 0.5, w: 2.5, advance: 0.6, emOfRow: 0.68, wrap: 9 },
+  window: { rowH: 0.8, w: 5.4, advance: 0.6, emOfRow: 0.68, wrap: 14 },
+  vinyl: { rowH: 0.62, w: 10, advance: 0.6, emOfRow: 0.7, wrap: 30 },
+  roofsign: { rowH: 1.1, w: 10.5, advance: 0.6, emOfRow: 0.68, wrap: 22 },
+  // (the car wash's ad: the words on its left, the suds on its right: the prop's)
+  carwash: { rowH: 0.5, w: 3.4, advance: 0.55, emOfRow: 0.7, wrap: 14 },
   visor: { rowH: 0.26, w: 1.7, advance: 0.6, emOfRow: 0.72, wrap: 16 },
   hood: { rowH: 0.38, w: 1.6, advance: 0.6, emOfRow: 0.7, wrap: 12 },
-  plaque: { rowH: 0.24, w: 1.3, advance: 0.55, emOfRow: 0.7, wrap: 12 },
   giant: { rowH: 2.8, w: 13.6, advance: 0.55, emOfRow: 0.72, wrap: 20 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;
 export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'barber', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster', 'mural', 'carwash', 'hood', 'giant']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'barber', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'hood', 'giant']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
  *  valley), how high its letters' centre stands over the road there. */
 export const HILL = { ahead: 150, side: -55, y: 16 };
@@ -242,7 +247,7 @@ export function layout(kind: Kind, text: string, solo?: Phrase['solo'], scale = 
   // a billboard's lyric is its ad's headline: it has the ad's left part, and the board is at least an ad's height
   // the lyric has the board's text share (its art has the rest); a billboard is at least an ad's height
   // (sky-writing is as wide as its words: the guard frames the face, and a wide empty face won't fit two in a shot)
-  const w = kind === 'sky' ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 2) : L.fit ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 0.9) : L.w;
+  const w = kind === 'sky' ? Math.min(L.w, (longest * L.advance * L.rowH * L.emOfRow) / TEXT_W + 2) : L.w;
   const textW = w * (TEXT_SHARE[kind] ?? 1), h = L.rowH * rows.length;
   const em = scale * Math.min(L.rowH * L.emOfRow, (textW * TEXT_W) / (longest * L.advance));
   return { rows, em, w: scale * w, h: scale * (kind === 'billboard' || kind === 'poster' ? Math.max(h, AD.minH) : h) };
