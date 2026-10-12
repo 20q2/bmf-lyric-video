@@ -18,6 +18,7 @@
 // its hood's airbrushed lettering and its club plaque, and his giant mural's words (the mural is the prop's).
 // Every face is blank until its reveal (dissolve.ts), its board or wall already standing. A word of emphasis
 // (Phrase.solo) on its own row is set as big as its row allows, and punches up as it's sung (PUNCH).
+// And the barbershop's windows, its lyric in gold leaf on the glass.
 // Laid out as carriers.ts says (rows, em). Redrawn only when its karaoke key changes. Browser only (canvas).
 import * as THREE from 'three';
 import type { Word } from '../engine/lyrics';
@@ -106,6 +107,7 @@ function styleOf(c: Carrier): Style {
     case 'tunnel': return c.phrase.line % 2 // (the lines in turn: sodium orange, then cold cyan)
       ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)', tubes: true }
       : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)', tubes: true };
+    case 'barber': return { family: F.archivo(100, 900), caps: true, colors: ['#e9c46a', '#ffd76a', '#fff6d8'], alpha: [0.8, 1], outline: '#3a2408', shadow: '#120b04' }; // gold leaf on the glass
     case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffb000', '#ffb000', '#fff3c4'], alpha: [0.5, 1], glow: 'rgba(255,170,0,0.85)' };
     case 'bus': { const a = AD_STYLE[c.ad ?? 'phone']; return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, '#d81e2c'], alpha: [0.72, 1] }; }
     case 'sticker': { // (each its own: cream, black, yellow or red)

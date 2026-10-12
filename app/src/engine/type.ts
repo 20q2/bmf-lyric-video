@@ -32,6 +32,11 @@ export const F = {
   archivoItalic(width = 100, weight = 800): string {
     return `ArchivoItalic-${width < 88 ? 750 : 1000}-${weight < 600 ? 400 : 800}`;
   },
+  /** The signs' own words (a shop's name, a board's header, a price): IBM Plex Mono, never the lyrics' heavy Archivo,
+   *  so the eye knows what to read (the user, 2026-10-12). */
+  sign(weight = 500): string {
+    return F.mono(weight);
+  },
   mono(weight = 400, italic = false): string {
     if (italic) return 'PlexItalic-400';
     return `Plex-${nearest([300, 400, 500, 600, 700], weight)}`;

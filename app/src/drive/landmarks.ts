@@ -10,8 +10,8 @@ export const MOTEL_SIGN = { s: -4, lateral: 8, w: 4.4, h: 5.4, y: 5.4 };
 
 /** The sign's panel: its centre, the way it faces (toward the road and up it), and its size. */
 export function motelSign(route: Route) {
-  const M = MOTEL_SIGN, f = route.frameAt(0);
-  const foot = f.pos.clone().addScaledVector(f.fwd, M.s).addScaledVector(f.right, M.lateral);
+  const M = MOTEL_SIGN, f = route.frameAt(M.s);
+  const foot = f.pos.clone().addScaledVector(f.right, M.lateral);
   const normal = f.fwd.clone().addScaledVector(f.right, -0.8 * Math.sign(M.lateral)).setY(0).normalize();
   return { foot, center: foot.clone().add(new THREE.Vector3(0, M.y, 0)), normal, w: M.w, h: M.h };
 }

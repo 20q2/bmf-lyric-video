@@ -71,7 +71,9 @@ export class Route {
   }
 
   frameAt(s: number): RouteFrame {
-    const c = Math.max(0, Math.min(this.length, s)), x = c / STEP, i = Math.min(Math.floor(x), this.xs.length - 2), f = x - i;
+    // (behind the start, straight on back: the corner where the car waits has a street behind it)
+    if (s < 0) { const f = this.frameAt(0); f.pos.addScaledVector(f.fwd, s); return f; }
+    const c = Math.min(this.length, s), x = c / STEP, i = Math.min(Math.floor(x), this.xs.length - 2), f = x - i;
     const pos = new THREE.Vector3(
       this.xs[i]! + (this.xs[i + 1]! - this.xs[i]!) * f,
       this.height(c),

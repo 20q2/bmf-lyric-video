@@ -1,5 +1,4 @@
-// The lowrider dances: the Impala's body on its hydraulics, a function of song time. It sits jacked up in the intro and
-// drops on a downbeat; it hops on the choruses' downbeats (every other bar), nose and tail in turn; it squats low on
+// The lowrider dances: the Impala's body on its hydraulics, a function of song time. It hops on the choruses' downbeats (every other bar), nose and tail in turn; it squats low on
 // "dropping"; on "crip walkin'" it lifts a front corner and rolls onto three wheels; on "backwards" it lays back, nose
 // up, tail down. The wheels stay on the road; the
 // body (and the two of them) moves. Pure.
@@ -7,9 +6,9 @@ import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
 import type { Stretch } from './stretches';
 
-/** The intro's drop (s, a downbeat) and how high it sits before (m); the hops (m, s); the squat (m, how long it holds,
- *  s); the three-wheel (m of lift at the front corner, radians of roll). */
-export const HYDRAULICS = { dropAt: 4.34, raised: 0.3, hop: 0.24, hopS: 0.42, squat: 0.14, squatHold: 1.3, threeLift: 0.22, threeRoll: 0.09, layBack: 0.13, layHold: 0.8 };
+/** The hops (m, s); the squat (m, how long it holds, s); the three-wheel (m of lift at the front corner, radians of
+ *  roll); the lay-back (radians, how long it holds, s). */
+export const HYDRAULICS = { hop: 0.24, hopS: 0.42, squat: 0.14, squatHold: 1.3, threeLift: 0.22, threeRoll: 0.09, layBack: 0.13, layHold: 0.8 };
 
 export interface Stance { lift: number; pitch: number; roll: number }
 
@@ -26,7 +25,7 @@ export function hydraulics(audio: AudioData, lyrics: Lyrics, stretches: readonly
   const back = words.filter((w) => /^backwards/i.test(w.w)).map((w) => w.start);
   const walkEnd = (t0: number) => words.find((w) => w.start >= t0 && /^walkin/i.test(w.w))?.end ?? t0 + 1;
   return (t) => {
-    let lift = t < H.dropAt ? H.raised : H.raised * settle(t - H.dropAt), pitch = 0, roll = 0;
+    let lift = 0, pitch = 0, roll = 0;
     hops.forEach((d, k) => {
       const tau = t - d;
       if (tau < 0 || tau > 1.2) return;

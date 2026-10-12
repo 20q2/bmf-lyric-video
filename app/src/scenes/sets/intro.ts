@@ -1,11 +1,13 @@
 // The intro's props (drive/sets/intro.ts): the corner where the car waits at the light — the street signs on the near
-// corner's pole (BMF BLVD along the road over SZA AVE across it: the title), the stop line and crosswalks, the cross
-// street, the far corner's mast with its signal heads over the lanes (red, then green on the first kick), its lit street
-// sign, and the walk countdown ticking off the last beats. Browser only (canvas).
+// corner's pole (BMF BLVD along the road over SZA AVE across it: the title, once), the stop line and crosswalks, the
+// cross street, the far corner's mast with its signal heads over the lanes (red, then green on the first kick) and the
+// walk countdown ticking off the last beats; the liquor store on the far right corner. Browser only (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
-import { CORNER, COUNTDOWN, type IntroPlan, MAST, SIGNS } from '../../drive/sets/intro';
+import { CORNER, COUNTDOWN, type IntroPlan, LIQUOR, MAST, SIGNS } from '../../drive/sets/intro';
+import { pic, plane as flat, rightFront, signFace } from './kit';
+import { glassTex } from './chorus1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -97,12 +99,6 @@ export function buildIntro(drive: Drive): { group: THREE.Group; update(t: number
         (k === 0 ? lit.red : lit.green).push(on);
       }
     }
-    const street = canvasTex(1024, 220, (c) => {
-      c.fillStyle = '#1f6b44'; c.fillRect(0, 0, 1024, 220); c.strokeStyle = '#f4f4f0'; c.lineWidth = 10; c.strokeRect(14, 14, 996, 192);
-      c.fillStyle = '#f4f4f0'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.archivo(100, 900), 140); c.fillText('SZA AV', 512, 118);
-    });
-    const ms = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.52), new THREE.MeshBasicMaterial({ map: street, color: new THREE.Color(1.3, 1.3, 1.3) }));
-    ms.position.set(MAST.lateral, 5.95, -0.1); ms.rotation.y = Math.PI; mast.add(ms);
     // the countdown: orange digits on black, facing the waiting car
     box(mast, 0.5, 0.5, 0.25, 0, MAST.countY, -0.25, black);
     count.faces = Array.from({ length: COUNTDOWN + 1 }, (_, n) => canvasTex(256, 256, (c) => {
@@ -112,6 +108,28 @@ export function buildIntro(drive: Drive): { group: THREE.Group; update(t: number
     }));
     count.mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42), new THREE.MeshBasicMaterial({ map: count.faces[0]!, color: new THREE.Color(1.6, 1.6, 1.6) }));
     count.mesh.position.set(0, MAST.countY, -0.38); count.mesh.rotation.y = Math.PI; mast.add(count.mesh);
+  }
+
+  // the liquor store on the far right corner: pale green, a red band, its window full of posters, its sign up on the
+  // roof (in the signs' face), OPEN in neon
+  {
+    const L = LIQUOR, w = L.s[1] - L.s[0], g = rightFront(route, root)((L.s[0] + L.s[1]) / 2, L.back);
+    box(g, w, L.h, L.d, 0, L.h / 2, -L.d / 2, toon({ color: '#b5d3a8' }));
+    box(g, w + 0.06, 0.5, 0.06, 0, L.h - 0.6, 0.03, toon({ color: '#c8202e' }));
+    box(g, w + 0.2, 0.25, 0.3, 0, L.h - 0.12, 0.05, toon({ color: '#f4f0e6' }));
+    flat(g, w - 3.4, 2.3, 1.2, 1.75, 0.02, pic(glassTex()));
+    box(g, 1.2, 2.4, 0.06, -w / 2 + 1.1, 1.2, 0.03, black); // its door
+    const posters = canvasTex(1024, 256, (c) => {
+      const cols = ['#ffd65a', '#c8202e', '#2b78a6', '#f4f0e6', '#1f6b44'];
+      for (let i = 0; i < 9; i++) { c.fillStyle = cols[i % cols.length]!; c.fillRect(20 + i * 110, 40 + (i % 3) * 18, 90, 150); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(30 + i * 110, 70 + (i % 3) * 18, 70, 14); }
+    });
+    flat(g, w - 3.6, 0.9, 1.2, 1.25, 0.03, pic(posters, { transparent: true }));
+    const open = canvasTex(256, 96, (c) => { c.strokeStyle = '#ff4f6d'; c.lineWidth = 6; c.strokeRect(8, 8, 240, 80); c.fillStyle = '#ff6f8a'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(600), 58); c.fillText('OPEN', 128, 52); });
+    flat(g, 1.2, 0.45, w / 2 - 2.2, 2.4, 0.04, new THREE.MeshBasicMaterial({ map: open, transparent: true, color: new THREE.Color(2.2, 2.2, 2.2), toneMapped: false }));
+    // the roof sign on its posts
+    for (const px of [-2.4, 2.4]) box(g, 0.14, 1.4, 0.14, px, L.h + 0.7, -1.5, dark);
+    box(g, 6.6, 1.5, 0.16, 0, L.h + 1.9, -1.6, toon({ color: '#f4f0e6' }));
+    flat(g, 6.3, 1.25, 0, L.h + 1.9, -1.51, pic(signFace('LIQUOR', 1024, 200, '#c8202e', '#f4f0e6', F.sign(700), 0.7, 0.22)));
   }
 
   return {

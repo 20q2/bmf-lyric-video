@@ -8,12 +8,12 @@ import { F } from '../engine/type';
 import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
-import { BANNER, type Carrier, LAYOUT, PAIRABLE, type SetKind, basisOf, solidsOf } from './carriers';
-const SET_KINDS: ReadonlySet<string> = new Set<SetKind>(['speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'mural', 'carwash', 'visor', 'hood', 'plaque', 'giant']);
+import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
 import { MOTEL_SIGN, motelSign } from './landmarks';
+import { CORNER } from './sets/intro';
 
 export { ROAD_HALF }; // (route.ts: the road's own measure)
 /** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
@@ -26,6 +26,8 @@ export const SLOPE = 1;
 /** The road runs on this far past where the car parks, to the overlook's edge (m). */
 const OVERLOOK_LIP = 9;
 const STEP = 2;
+/** The road (its verges, its dashes) starts this far behind where the car waits at the light (m). */
+export const ROAD_START = -160;
 
 /** Each section's ground (sRGB; others the golden fields). */
 const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
@@ -35,9 +37,9 @@ const PALMS = new Set(['intro', 'chorus1', 'verse3']); // (none in verse 2: its 
  *  coloured per sample. */
 function strip(route: Route, a: number | ((s: number) => number), b: number | ((s: number) => number), dy: number, colorAt: (s: number) => THREE.Color, end = route.length): THREE.BufferGeometry {
   const at = (x: number | ((s: number) => number), s: number) => (typeof x === 'number' ? x : x(s));
-  const n = Math.ceil(end / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
+  const n = Math.ceil((end - ROAD_START) / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
   for (let i = 0; i < n; i++) {
-    const s = Math.min(end, i * STEP), f = route.frameAt(s), c = colorAt(s);
+    const s = Math.min(end, ROAD_START + i * STEP), f = route.frameAt(s), c = colorAt(s);
     const p = f.pos.clone().addScaledVector(f.right, at(a, s)), q = f.pos.clone().addScaledVector(f.right, at(b, s));
     pos.set([p.x, p.y + dy, p.z, q.x, q.y + dy, q.z], i * 6);
     col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
@@ -54,10 +56,10 @@ function strip(route: Route, a: number | ((s: number) => number), b: number | ((
 /** An embankment along one side of the road (side: -1 left, +1 right): from the verge's edge (`edge` m out) down to
  *  the plain at SLOPE, wherever the road stands above it. */
 function skirt(route: Route, side: number, edge: (s: number) => number, end = route.length): THREE.BufferGeometry {
-  const n = Math.ceil(end / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
+  const n = Math.ceil((end - ROAD_START) / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
   const c = new THREE.Color(WORLD.ground).multiplyScalar(0.8);
   for (let i = 0; i < n; i++) {
-    const s = Math.min(end, i * STEP), f = route.frameAt(s), h = Math.max(0, f.pos.y + 0.4), e = edge(s);
+    const s = Math.min(end, ROAD_START + i * STEP), f = route.frameAt(s), h = Math.max(0, f.pos.y + 0.4), e = edge(s);
     const p = f.pos.clone().addScaledVector(f.right, side * e).addScaledVector(f.up, -0.05);
     const q = f.pos.clone().addScaledVector(f.right, side * (e + SLOPE * h)); q.y = -0.4;
     pos.set([p.x, p.y, p.z, q.x, q.y, q.z], i * 6);
@@ -108,13 +110,13 @@ export function buildWorld(drive: Drive): THREE.Group {
   // flat: a flat box's normals are NaN, and the bloom spreads a NaN into a white dot)
   const paint = drive.carriers.filter((c) => c.kind === 'road');
   const dashAt: number[] = [];
-  for (let s = 0; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2)) dashAt.push(s);
+  for (let s = ROAD_START; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2)) dashAt.push(s);
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
   dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
   g.add(named(dashes, 'dashes'));
 
   // the town's buildings (blocks.ts: the guard checks them too)
-  const towns = drive.blocks.filter((b) => !b.concrete), concrete = drive.blocks.filter((b) => b.concrete);
+  const towns = drive.blocks.filter((b) => !b.concrete && !b.prop), concrete = drive.blocks.filter((b) => b.concrete && !b.prop);
   const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), Math.max(1, towns.length));
   towns.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
   blocks.count = towns.length;
@@ -131,7 +133,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   const trunks: THREE.Matrix4[] = [], crowns: THREE.Matrix4[] = [];
   for (let k = 0; k * 30 < route.length; k++) {
     const s = k * 30 + 5;
-    if (!PALMS.has(stretchAtS(s).id)) continue;
+    if (!PALMS.has(stretchAtS(s).id) || s < CORNER.cross[1] + 15) continue; // (none on the intro's corner: the signs stand against the sky)
     for (const side of [1, -1]) {
       if (side === -1 && BLOCKS[stretchAtS(s).id]!.seaLeft) continue;
       if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR)) continue; // nor in the rock
@@ -155,11 +157,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   // the motel on the corner, behind the car waiting at the light
   const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon({ color: WORLD.motel })));
   motel.matrixAutoUpdate = false;
-  { // (before the road's start: frameAt clamps there, so laid off its first frame by hand)
-    const f = route.frameAt(0), M = { s: -17, lateral: 20, w: 30, h: 9, d: 14 };
-    motel.matrix.makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), f.fwd).scale(new THREE.Vector3(M.w, M.h, M.d))
-      .setPosition(f.pos.clone().addScaledVector(f.fwd, M.s).addScaledVector(f.right, M.lateral).add(new THREE.Vector3(0, M.h / 2, 0)));
-  }
+  { const M = { s: -17, lateral: 20, w: 30, h: 9, d: 14 }; motel.matrix.copy(boxAt(route, M.s, M.lateral, M.w, M.h, M.d)); }
   const sign = buildMotelSign(route);
   g.add(motel, sign);
   g.userData.sign = sign.userData;
@@ -230,7 +228,7 @@ function dressing(drive: Drive): THREE.Group {
   const g = new THREE.Group(), { route } = drive, awn: THREE.Matrix4[] = [], awnCol: THREE.Color[] = [], roof: THREE.Matrix4[] = [];
   const palette = ['#ff5a36', '#2b78a6', '#1f6b44', '#f6dd8f', '#c8102e', '#ffffff'];
   drive.blocks.forEach((b, i) => {
-    if (b.concrete) return;
+    if (b.concrete || b.prop) return;
     const side = Math.sign(b.lateral), front = Math.abs(b.lateral) - b.d / 2;
     if (b.h > 4 && !b.bare && hash(i, 41) < 0.6) {
       // an awning, 1.6 m out from the face toward the road, over the door
@@ -417,7 +415,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant'; // the face is only its letters
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night

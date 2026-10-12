@@ -27,6 +27,7 @@ import { AUDIBLE } from '../drive/stretches';
 import { carMatrix } from '../drive/carriers';
 import { buildChorus2 } from './sets/chorus2';
 import { buildIntro } from './sets/intro';
+import { buildChorus1 } from './sets/chorus1';
 import { buildVerse2 } from './sets/verse2';
 import { buildVerse1 } from './sets/verse1';
 
@@ -117,7 +118,7 @@ export default class DriveScene extends Scene {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
       this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
-    for (const set of [buildIntro(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
+    for (const set of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {
