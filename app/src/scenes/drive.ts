@@ -10,7 +10,7 @@ import { H, W, makeRT } from '../engine/gl';
 import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
-import { type Carrier, centerAt } from '../drive/carriers';
+import { type Carrier, FLY, centerAt } from '../drive/carriers';
 import { daylight, skyStateAt } from '../drive/sky';
 import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
@@ -28,6 +28,7 @@ import { carMatrix } from '../drive/carriers';
 import { buildChorus2 } from './sets/chorus2';
 import { buildIntro } from './sets/intro';
 import { buildChorus1 } from './sets/chorus1';
+import type { buildDash } from '../look/dash';
 import { buildVerse2 } from './sets/verse2';
 import { buildVerse1 } from './sets/verse1';
 
@@ -38,6 +39,10 @@ const TUNNEL_DARK = new THREE.Color('#120a05');
 const BANNER_SKY = { before: 0.8, after: 4 };
 /** The skywriter flies on this long after its phrase (s), this fast along it and up (m/s). */
 const SKYWRITER = { after: 1.4, speed: 30, climb: 8, size: 0.7 };
+/** On the hook's last word (the second "fly": the user, 2026-10-12) it dips below the word and loops round it as it's
+ *  written: in this long (s), this far clear of the word (shares of its row's height), starting this far round
+ *  (radians) before the bottom of the loop. */
+const LOOP = { over: 1.8, clear: [0.3, 0.32] as [number, number], before: 0.5 };
 /** Road paint stays this long after its phrase (s). */
 const PAINT_LASTS = 3;
 /** Carriers further along the road than this from the car (m) are put away. */
@@ -89,7 +94,7 @@ export default class DriveScene extends Scene {
   /** In a tunnel: the sodium light of the lamps nearest the camera. */
   private sodium = [0, 1, 2].map(() => new THREE.PointLight('#ffa24a', 0, TUNNEL_LIGHT.reach, 1.5));
   /** The set-pieces' props (scenes/sets/), moved each frame. */
-  private sets: { group: THREE.Group; update(t: number): void }[] = [];
+  private sets: { group: THREE.Group; update(t: number, car: THREE.Object3D): void }[] = [];
   /** Carriers riding in the car (the radio), with their place in its frame. */
   private riding: [THREE.Object3D, THREE.Matrix4, number][] = [];
 
@@ -180,7 +185,8 @@ export default class DriveScene extends Scene {
     // (in the car, on its body: lifted, pitched and rolled with it on its hydraulics)
     const bodyM = new THREE.Matrix4().compose(new THREE.Vector3(0, st.lift, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(st.pitch, 0, st.roll)), new THREE.Vector3(1, 1, 1));
     for (const [o, local, ahead] of this.riding) o.matrix.multiplyMatrices(ahead ? carMatrix(d.carFrame(t, ahead)) : carMatrix(cf).multiply(bodyM), local);
-    for (const set of this.sets) set.update(t);
+    for (const set of this.sets) set.update(t, this.car);
+    (this.car.userData.dash as ReturnType<typeof buildDash> | undefined)?.update(t, this.ctx.audio.duration, d.motion.speedAt(t));
     // banners where they've flown to; each plane in the sky only around its line
     for (const [c, o] of this.flying) {
       const line = this.ctx.lyrics.lines[c.phrase.line]!;
@@ -197,21 +203,38 @@ export default class DriveScene extends Scene {
     const started = this.skies.filter((c) => t > c.phrase.start - 0.3 && t < c.phrase.end + SKYWRITER.after).pop();
     const line = started ? this.skies.filter((c) => c.phrase.line === started.phrase.line) : [];
     const i = Math.max(0, line.findLastIndex((c) => t >= c.phrase.start)), w = line[i], next = line[i + 1];
-    this.writer.visible = !!w && t < (next ? Infinity : w.phrase.end + SKYWRITER.after);
+    // (the hook's last word, alone after the first: looped round)
+    const loops = (c: Carrier) => line.length > 1 && c === line[line.length - 1] && FLY.test(this.ctx.lyrics.lines[c.phrase.line]!.text);
+    const done = w ? (loops(w) ? w.phrase.start + LOOP.over : w.phrase.end) : 0;
+    this.writer.visible = !!w && t < (next ? Infinity : done + SKYWRITER.after);
     if (w) {
       // (over the top of phrase c, a share u along it: sized by a row of its writing, never across the words)
       const over = (c: Carrier, u: number) => {
         const a = c.up.clone().cross(c.normal).normalize(), k = SKYWRITER.size * (c.h / c.rows.length / 9);
-        return { a, k, at: centerAt(c, t).addScaledVector(a, -c.w / 2 + u * c.w).addScaledVector(c.up, c.h / 2 + 1.2 * k) };
+        return { a, k, at: centerAt(c, t).addScaledVector(a, -c.w / 2 + u * c.w).addScaledVector(c.up, c.h / 2 + 1.2 * k), up: c.up.clone() };
+      };
+      // (round phrase c, a share u of the way: an inside loop, anticlockwise on screen, from below its left end, under
+      // it heading right, up its right side, over the top upside down, down its left side and out along the bottom;
+      // its wings level to the loop, its top toward the word; placed by its middle)
+      const round = (c: Carrier, u: number) => {
+        const a = c.up.clone().cross(c.normal).normalize(), k = SKYWRITER.size * (c.h / c.rows.length / 9), rowH = c.h / c.rows.length;
+        const rx = c.w / 2 + LOOP.clear[0] * rowH, ry = c.h / 2 + LOOP.clear[1] * rowH;
+        const th = -Math.PI / 2 - LOOP.before + (2 * Math.PI + LOOP.before) * u, C = centerAt(c, t);
+        const p = C.clone().addScaledVector(a, rx * Math.cos(th)).addScaledVector(c.up, ry * Math.sin(th));
+        const head = a.clone().multiplyScalar(-rx * Math.sin(th)).addScaledVector(c.up, ry * Math.cos(th)).normalize();
+        const top = C.clone().sub(p); top.addScaledVector(head, -top.dot(head)).normalize();
+        return { a: head, k, at: p.addScaledVector(head, -3 * k), up: top };
       };
       const dur = Math.max(0.3, w.phrase.end - w.phrase.start), u = Math.min(1, Math.max(0, (t - w.phrase.start) / dur));
-      let { a, k, at } = over(w, u);
-      const past = Math.max(0, t - w.phrase.end);
-      if (past > 0 && next) { // on across the gap to the next phrase's start
-        const g = Math.min(1, past / Math.max(1e-3, next.phrase.start - w.phrase.end)), e = g * g * (3 - 2 * g), to = over(next, 0);
+      let { a, k, at, up } = loops(w) ? round(w, Math.min(1, Math.max(0, (t - w.phrase.start) / LOOP.over))) : over(w, u);
+      const past = Math.max(0, t - done);
+      if (past > 0 && next) { // on across the gap to the next phrase's start (down to below it, to loop it)
+        const g = Math.min(1, past / Math.max(1e-3, next.phrase.start - w.phrase.end)), e = g * g * (3 - 2 * g), to = loops(next) ? round(next, 0) : over(next, 0);
         at = at.lerp(to.at, e); k += (to.k - k) * e;
+        a = a.clone().lerp(to.a, e).normalize(); up = up.clone().lerp(to.up, e).normalize();
       } else if (past > 0) at.addScaledVector(a, past * SKYWRITER.speed).addScaledVector(w.up, past * SKYWRITER.climb); // away
-      this.writer.matrix.makeBasis(a, w.up, w.normal).scale(new THREE.Vector3(k, k, k)).setPosition(at);
+      up.addScaledVector(a, -up.dot(a)).normalize();
+      this.writer.matrix.makeBasis(a, up, a.clone().cross(up)).scale(new THREE.Vector3(k, k, k)).setPosition(at);
     }
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });

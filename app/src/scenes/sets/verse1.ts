@@ -1,7 +1,8 @@
 // Verse 1's props (drive/sets/verse1.ts places them and the lyrics on them): the speed trailer by the road; the bus
 // they tailgate, its tail ad, turning off right at a cross street (the light green, the crosswalks, the DONT WALK hand);
-// the van ahead, closing in; her phone in her hand; the burger stand with its menu board and its marquee on a pole. (The
-// city's blocks are the drive's: blocks.ts.) Browser only (canvas).
+// the van ahead, closing in; her phone in her hand; the burger stand with its menu board and its marquee on a pole; and
+// her visor (the car's own: look/dash.ts) flipping down. (The city's blocks are the drive's: blocks.ts.) Browser only
+// (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
@@ -43,7 +44,7 @@ function onPanel(p: Panel): THREE.Group {
 }
 const moving = () => { const g = new THREE.Group(); g.matrixAutoUpdate = false; return g; };
 
-export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
+export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: number, car: THREE.Object3D): void } | null {
   const plan = drive.plans.verse1 as Verse1Plan | undefined;
   if (!plan) return null;
   const { route } = drive, P = plan.panels, root = new THREE.Group();
@@ -64,7 +65,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     const head = canvasTex(512, 120, (c) => {
       c.fillStyle = '#f4f2ea'; c.fillRect(0, 0, 512, 120);
       c.fillStyle = '#16131a'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = font(F.archivo(100, 900), 64); c.fillText('YOUR SPEED', 256, 62);
+      c.font = font(F.sign(600), 60); c.fillText('YOUR SPEED', 256, 62);
     });
     plane(g, w, 0.42, 0, h / 2 + 0.27, 0.0, new THREE.MeshBasicMaterial({ map: head }));
     box(g, 0.14, drop - h / 2 - 0.1, 0.14, 0, -(drop + h / 2) / 2 - 0.05, -0.2, dark);
@@ -146,23 +147,6 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(phone);
   }
 
-  // ---- her sun visor, hinged on the windshield's top rail, flipping down: its mirror carries her lipstick (the
-  // carriers) ----
-  const visor = moving(), flap = new THREE.Group();
-  {
-    const Mi = AT.mirror, hinge = new THREE.Vector3(Mi.pos.x, 1.46, 0.9);
-    visor.add(flap); flap.position.copy(hinge);
-    // (hanging down from the hinge: the mirror on its back, toward her, a padded board round it; in the mirror's own
-    // frame, like its carriers)
-    const board = new THREE.Group(); flap.add(board);
-    const up = new THREE.Vector3(0, 1, 0).addScaledVector(Mi.normal, -Mi.normal.y).normalize();
-    board.matrixAutoUpdate = false;
-    board.matrix.makeBasis(up.clone().cross(Mi.normal).normalize(), up, Mi.normal).setPosition(Mi.pos.clone().sub(hinge));
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(Mi.w + 0.06, Mi.h + 0.06, 0.03), toon({ color: '#d8c7a8' }));
-    pad.position.z = -0.02; board.add(pad);
-    root.add(visor);
-  }
-
   // ---- the burger stand: its building and roof sign, the menu board on posts, the marquee up on its pole ----
   {
     const s0 = plan.menuS, bldg = onRoad(s0 + 4, ROAD_HALF + 6.5);
@@ -171,7 +155,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(bldg, 0.05, 1.2, 2.4, 2.53, 1.6, -2, black); // its window, on the road (its left)
     const sign = canvasTex(1024, 256, (c) => {
       c.fillStyle = '#d23a2a'; c.fillRect(0, 0, 1024, 256); c.fillStyle = '#fff1d0'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = font(F.archivo(125, 900), 170); c.fillText('BURGERS', 512, 136);
+      c.font = font(F.sign(700), 170); c.fillText('BURGERS', 512, 136);
     });
     plane(bldg, 7, 1.75, 2.2, 4.6, 0, new THREE.MeshBasicMaterial({ map: sign })).rotation.y = Math.PI / 2;
     box(bldg, 0.12, 1.2, 0.12, 2.2, 3.6, -2.8, dark); box(bldg, 0.12, 1.2, 0.12, 2.2, 3.6, 2.8, dark);
@@ -181,7 +165,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(m, w + 0.2, h + 0.5, 0.1, 0, 0.15, -0.07, toon({ color: '#3a2a22' }));
     const head = canvasTex(512, 96, (c) => {
       c.fillStyle = '#d23a2a'; c.fillRect(0, 0, 512, 96); c.fillStyle = '#fff1d0'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = font(F.archivo(100, 900), 62); c.fillText('MENU', 256, 52);
+      c.font = font(F.sign(600), 60); c.fillText('MENU', 256, 52);
     });
     plane(m, w, 0.32, 0, h / 2 + 0.2, 0.0, new THREE.MeshBasicMaterial({ map: head }));
     for (const x of [-w / 2 + 0.2, w / 2 - 0.2]) box(m, 0.1, drop - h / 2, 0.1, x, -(drop + h / 2) / 2, -0.1, dark);
@@ -191,7 +175,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(q, qw + 0.3, qh + 0.3, 0.3, 0, 0, -0.17, toon({ color: '#d23a2a' }));
     const top = canvasTex(1024, 256, (c) => {
       c.fillStyle = '#ffd65a'; c.fillRect(0, 0, 1024, 256); c.fillStyle = '#d23a2a'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = font(F.archivo(125, 900), 180); c.fillText('BURGERS', 512, 136);
+      c.font = font(F.sign(700), 176); c.fillText('BURGERS', 512, 136);
     });
     plane(q, qw + 0.3, 0.95, 0, qh / 2 + 0.62, -0.02, new THREE.MeshBasicMaterial({ map: top, color: new THREE.Color(1.3, 1.3, 1.3) }));
     box(q, 0.3, qdrop - qh / 2 - 0.15, 0.3, 0, -(qdrop + qh / 2) / 2 - 0.07, -0.2, dark);
@@ -221,7 +205,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
   };
   return {
     group: root,
-    update(t) {
+    update(t, car) {
       // (they're only there for the verse: the bus from its stop, the van once the bus is out of its way)
       bus.visible = t >= plan.start - BUS.early && t < plan.turnAt + BUS.gone;
       if (bus.visible) bus.matrix.copy(busMatrix(t));
@@ -229,13 +213,12 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
       phone.matrix.copy(carMatrix(drive.carFrame(t)));
       phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
-      // her visor: up against the rail, flipping down for her line, back up after
-      visor.visible = t >= plan.visor.down - 0.5 && t < plan.visor.up + AT.mirror.flip;
-      if (visor.visible) {
-        visor.matrix.copy(carMatrix(drive.carFrame(t)));
-        const down = Math.min(1, Math.max(0, (t - plan.visor.down) / AT.mirror.flip)) * (1 - Math.min(1, Math.max(0, (t - plan.visor.up) / AT.mirror.flip)));
-        flap.rotation.x = (-Math.PI / 2) * (1 - down * down * (3 - 2 * down));
-      }
+      // her visor (the car's: look/dash.ts): folded back flat, flipping down for her line, back up after; its mirror
+      // only reflects while it's down
+      const down = Math.min(1, Math.max(0, (t - plan.visor.down) / AT.mirror.flip)) * (1 - Math.min(1, Math.max(0, (t - plan.visor.up) / AT.mirror.flip)));
+      const flap = car.getObjectByName('herVisor'), glass = car.getObjectByName('herMirror');
+      if (flap) flap.rotation.x = (Math.PI / 2) * (1 - down * down * (3 - 2 * down));
+      if (glass) glass.visible = down > 0.05;
     },
   };
 }

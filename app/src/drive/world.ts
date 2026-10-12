@@ -14,6 +14,7 @@ import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
+import { buildDash } from '../look/dash';
 
 export { ROAD_HALF }; // (route.ts: the road's own measure)
 /** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
@@ -300,8 +301,8 @@ function placeSigns(drive: Drive): THREE.Group {
     x.fillStyle = '#1f6b44'; x.fillRect(0, 0, W, H);
     x.strokeStyle = '#f4f4f0'; x.lineWidth = 10; x.strokeRect(14, 14, W - 28, H - 28);
     x.fillStyle = '#f4f4f0'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.font = `${H * 0.3}px "${F.archivo(100, 700)}"`; x.fillText(name, W / 2, H * 0.36, W * 0.88);
-    x.font = `${H * 0.17}px "${F.archivo(100, 700)}"`; x.fillText(sub, W / 2, H * 0.72, W * 0.8);
+    x.font = `${H * 0.28}px "${F.sign(600)}"`; x.fillText(name, W / 2, H * 0.36, W * 0.88);
+    x.font = `${H * 0.16}px "${F.sign(500)}"`; x.fillText(sub, W / 2, H * 0.72, W * 0.8);
     if (sprayed) { // the old name struck out, the new one sprayed over in pink
       const wSub = x.measureText(sub).width;
       x.strokeStyle = '#ff4fa3'; x.lineWidth = 9; x.beginPath(); x.moveTo(W / 2 - wSub / 2 - 10, H * 0.74); x.lineTo(W / 2 + wSub / 2 + 10, H * 0.68); x.stroke();
@@ -415,7 +416,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber'; // the face is only its letters
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber' || c.kind === 'mirror'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night
@@ -515,8 +516,8 @@ export function buildCar(): THREE.Group {
   box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
   box(Wd - 0.12, 0.05, 0.05, 0, belt + 0.48, 0.92, chrome); // the windshield's top rail
   for (const x of [Wd / 2 - 0.08, -Wd / 2 + 0.08]) box(0.05, 0.5, 0.05, x, belt + 0.24, 0.95, chrome);
-  box(1.7, 0.22, 0.36, 0, 1.1, 0.73, dark); // the dash
-  const bezel = box(0.5, 0.2, 0.03, -0.02, 1.12, 0.545, chrome); bezel.rotation.x = Math.asin(0.3); // the radio's face, tipped back
+  box(1.7, 0.22, 0.36, 0, 1.1, 0.73, dark); // the dash (its gauges, head unit and the visors: look/dash.ts)
+  g.userData.dash = buildDash(body);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.06, depthWrite: false }));
   glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);
   // chrome: the spear down each side, the bumpers

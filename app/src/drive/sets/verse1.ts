@@ -19,6 +19,7 @@ import { type ShotMove, LEAD, WHIP_S } from '../shots';
 import { adFor, type Ad } from '../ads';
 import { type Block, boxAt } from '../blocks';
 import { hash } from '../../engine/util';
+import { HEAD_UNIT, VISOR } from '../cabin';
 import type { Placed, SetContext, SetFrame, SetPiece } from './index';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -47,19 +48,21 @@ export const AT = {
   menu: { through: 0.45, lateral: ROAD_HALF + 1.3, y: 1.9 },
   marquee: { ds: 7, lateral: ROAD_HALF + 2.6, y: 5 },
   phone: new THREE.Vector3(-0.15, 1.2, 0.15),
-  /** Her sun visor, flipped down from the windshield's top rail: its mirror's centre and facing (tipped toward her),
-   *  its size; how long it takes to flip down, and how much before her line's half it starts. */
-  mirror: { pos: new THREE.Vector3(-0.44, 1.36, 0.875), normal: new THREE.Vector3(0, -0.26, -0.966).normalize(), w: 0.34, h: 0.16, flip: 0.3, before: 0.35 },
-  radio: { pos: new THREE.Vector3(-0.02, 1.12, 0.52), normal: new THREE.Vector3(0, 0.3, -0.954).normalize() },
+  /** Her sun visor's mirror (cabin.ts), flipped down from the windshield's top rail: how long it takes to flip down,
+   *  and how much before her line's half it starts. */
+  mirror: { ...VISOR.mirror, flip: 0.3, before: 0.35 },
+  /** The head unit's screen (cabin.ts), the lyric across its middle. */
+  radio: HEAD_UNIT,
 };
 /** The camera's places (in the car's frame where it rides with it; m). */
 export const EYE = {
   trailer: { back: 4.2, lateral: ROAD_HALF - 0.1, y: 1.15, toRoad: 0.7, down: 0.25 },
   back: new THREE.Vector3(0, 2, -0.7),
   phone: new THREE.Vector3(-0.06, 1.55, -0.12),
-  mirror: new THREE.Vector3(-0.32, 1.5, 0.35),
+  // (her eye, just under the mirror's level, over the dash: in the mirror, the street behind them)
+  mirror: new THREE.Vector3(-0.4, 1.27, 0.3),
   hood: new THREE.Vector3(0, 1.62, 2.3),
-  radio: new THREE.Vector3(-0.18, 1.42, 0.08),
+  radio: new THREE.Vector3(-0.12, 1.5, -0.1),
   menu: { back: 4.2, lateral: ROAD_HALF + 0.2, y: 1.35, toRoad: 0.6, down: 0.2 },
   marquee: { past: 1, lateral: ROAD_HALF - 0.2, y: 2.2 },
 };
@@ -115,6 +118,12 @@ export const VERSE1: SetPiece = {
     {
       const l = lines[1]!, ws = l.words, gaps = ws.slice(1).map((w, k) => w.start - ws[k]!.end), k = gaps.indexOf(Math.max(...gaps)) + 1;
       phs[1] = [phraseOf(l, 0, k, ctx.solo), ...phrasesOf({ ...l, words: ws.slice(k) }, ctx.nextStart(l.i), ctx.solo)];
+    }
+    // ("You kinda cute, | But | play too much, don't play yourself": three texts, "But" on its own to land the beat (the
+    // user, 2026-10-12))
+    {
+      const l = lines[2]!, ws = l.words, but = ws.findIndex((w) => /^but$/i.test(w.w));
+      if (but > 0 && but < ws.length - 1) phs[2] = [phraseOf(l, 0, but, ctx.solo), phraseOf(l, but, but + 1, ctx.solo), phraseOf(l, but + 1, ws.length, ctx.solo)];
     }
     const l5 = lines[1]!, l6 = lines[2]!, l7 = lines[3]!, l9 = lines[5]!, l11 = lines[7]!;
     const carS = (t: number) => motion.distanceAt(t);
@@ -176,7 +185,8 @@ export const VERSE1: SetPiece = {
     hold(bus.cs, (t) => lookFrom(inFrame(EYE.back, t), inFrame(adPos, t, busAhead)), 'cut', Math.max(lines[0]!.end + 0.05, onBus!.start - LEAD - 0.35));
     // in the pause after "with": up to her visor, flipping down, the rest of the line on its mirror in her lipstick
     const Mi = AT.mirror, visorDown = (inMirror[0]?.start ?? l5.end) - Mi.before;
-    const mirror = riding('mirror', inMirror, Mi.pos, Mi.normal, 0, { from: visorDown + Mi.flip * 0.5, until: l6.start });
+    // (a hair off the glass: in front of it, and left out of its reflection)
+    const mirror = riding('mirror', inMirror, Mi.pos.clone().addScaledVector(Mi.normal, 0.004), Mi.normal, 0, { from: visorDown + Mi.flip * 0.5, until: l6.start });
     hold(mirror.cs, (t) => lookFrom(inFrame(EYE.mirror, t), inFrame(Mi.pos, t)), 'whip');
 
     // her phone: the texts she's sending (and, at the end, "…can you?"), over her shoulder

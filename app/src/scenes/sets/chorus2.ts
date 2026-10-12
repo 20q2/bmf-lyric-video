@@ -87,9 +87,9 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
     const g = onRoad(plan.exitS, ROAD_HALF + 2.5), tex = canvasTex(1024, 512, (c) => {
       c.fillStyle = '#1f6b44'; c.fillRect(0, 0, 1024, 512); c.strokeStyle = '#f4f4f0'; c.lineWidth = 12; c.strokeRect(18, 18, 988, 476);
       c.fillStyle = '#f4f4f0'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = font(F.archivo(100, 700), 150); c.fillText('Slauson Av', 512, 190);
-      c.font = font(F.archivo(100, 700), 80); c.fillText('EXIT  1/4 MILE', 512, 360);
-      c.fillStyle = '#ffd65a'; c.fillRect(760, 30, 230, 80); c.fillStyle = '#1f6b44'; c.font = font(F.archivo(100, 900), 54); c.fillText('EXIT 12', 875, 72);
+      c.font = font(F.sign(600), 140); c.fillText('Slauson Av', 512, 190);
+      c.font = font(F.sign(500), 76); c.fillText('EXIT  1/4 MILE', 512, 360);
+      c.fillStyle = '#ffd65a'; c.fillRect(760, 30, 230, 80); c.fillStyle = '#1f6b44'; c.font = font(F.sign(700), 50); c.fillText('EXIT 12', 875, 72);
     });
     box(g, 0.35, 7.6, 0.35, 0, 3.8, 0, steel);
     box(g, ROAD_HALF + 2.5 - LANE + 2.4, 0.3, 0.3, (ROAD_HALF + 2.5 - LANE + 2.4) / 2, 7.4, 0, steel); // (out over their lane: to the road's left)

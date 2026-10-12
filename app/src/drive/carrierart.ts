@@ -117,7 +117,7 @@ function styleOf(c: Carrier): Style {
     case 'plate': return { bg: '#f2f1ea', border: '#1b2a6b', family: F.archivo(62, 700), caps: true, colors: ['#1b2a6b', '#1b2a6b', '#d81e2c'], alpha: [0.8, 1] };
     case 'radio': return { bg: '#04080a', family: F.mono(600), caps: true, colors: ['#5fd8ff', '#5fd8ff', '#ffffff'], alpha: [0.55, 1], glow: 'rgba(80,220,255,0.7)' };
     case 'menu': return { bg: '#1b1714', family: F.archivo(75, 900), caps: true, colors: ['#fff1d0', '#fff1d0', '#ffd65a'], alpha: [0.75, 1] };
-    case 'mirror': return { bg: '#cdd6db', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#b0102a', '#b0102a', '#e8173a'], alpha: [0.55, 1] };
+    case 'mirror': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#b0102a', '#b0102a', '#e8173a'], alpha: [0.6, 1], shadow: 'rgba(90,0,20,0.35)' }; // (on the glass: the mirror is the visor's)
     case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
     case 'mural': { // a sign painter's: a style a line (its panel, its letters, outlined and shadowed)
@@ -197,7 +197,7 @@ export class CarrierArt {
   /** A menu board's prices, one a row, right of its items (the board's own copy, in its own face). */
   private drawPrices(c: CanvasRenderingContext2D, share: number) {
     const { canvas, carrier } = this, W = canvas.width, H = canvas.height, n = carrier.rows.length;
-    c.fillStyle = '#ffd65a'; c.textAlign = 'right'; c.textBaseline = 'middle'; c.font = font(F.archivo(75, 700), (H / n) * 0.42);
+    c.fillStyle = '#ffd65a'; c.textAlign = 'right'; c.textBaseline = 'middle'; c.font = font(F.sign(500), (H / n) * 0.42);
     carrier.rows.forEach((_, r) => c.fillText(`$${(2.49 + Math.floor(hash(carrier.phrase.start, 30 + r) * 6) + 0.5 * Math.floor(hash(carrier.phrase.start, 40 + r) * 2)).toFixed(2)}`, W * 0.97, (H * (r + 0.5)) / n, W * (1 - share) * 0.9));
     c.textAlign = 'left';
   }
@@ -216,8 +216,8 @@ export class CarrierArt {
     const [brand, line] = carrier.ad ? BRAND[carrier.ad] : ['NEXT EXIT', '1 MILE'];
     c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = style.colors[1];
     const big = Math.min(H * 0.34, (TW * 0.8) / Math.max(4, brand.length * 0.58));
-    c.font = font(F.archivo(62, 900), big); c.fillText(brand, TW / 2, H * 0.44, TW * 0.86);
-    c.globalAlpha = 0.8; c.font = font(F.bodoni(700, { italic: true }), big * 0.42); c.fillText(line, TW / 2, H * 0.44 + big * 0.72, TW * 0.86);
+    c.font = font(F.sign(600), big * 0.9); c.fillText(brand, TW / 2, H * 0.44, TW * 0.86);
+    c.globalAlpha = 0.8; c.font = font(F.sign(400), big * 0.4); c.fillText(line, TW / 2, H * 0.44 + big * 0.72, TW * 0.86);
     c.globalAlpha = 1; c.textAlign = 'left';
   }
 

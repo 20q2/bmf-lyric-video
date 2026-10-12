@@ -63,7 +63,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     box(sign, 0.25, drop - W.sign.h / 2, 0.25, 0, -(drop + W.sign.h / 2) / 2, -0.2, dark);
     const head = canvasTex(1024, 220, (c) => {
       c.fillStyle = '#ffd65a'; c.fillRect(0, 0, 1024, 220); c.fillStyle = '#0b3a66'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = font(F.archivo(125, 900), 130); c.fillText('HAND WASH', 512, 118);
+      c.font = font(F.sign(700), 124); c.fillText('HAND WASH', 512, 118);
     });
     const hp = new THREE.Mesh(new THREE.PlaneGeometry(W.sign.w + 0.35, 0.8), new THREE.MeshBasicMaterial({ map: head })); hp.position.set(0, W.sign.h / 2 + 0.6, -0.02); sign.add(hp);
     root.add(sign);
