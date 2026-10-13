@@ -93,6 +93,13 @@ export interface Verse1Plan {
   /** Her visor: when it flips down and back up (s). */
   visor: { down: number; up: number };
   phone: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number; held: [number, number][] };
+  /** The Read receipt under her texts (he's seen them and said nothing): from when, and each bubble's underside
+   *  (along the phone's up from its centre, m) with its phrase's start — the receipt rides under the last sent
+   *  bubble. */
+  read: { at: number; bubbles: { start: number; dy: number }[] };
+  /** The one oncoming car (the other lane is a lane): where it passes them (m along the road) and when (s), coming
+   *  on at `v` (m/s). */
+  oncoming: { s0: number; t0: number; v: number };
 }
 
 /** How far ahead of the car the van rides at t: further while the bus is between them, closing in to its gap; then
@@ -235,11 +242,22 @@ export const VERSE1: SetPiece = {
       s = e;
     }
 
+    // the Read receipt: visible once her first text has landed (he's seen it and said nothing — then "but"); it sits
+    // under the last sent bubble, so each bubble's underside in the car's frame
+    const read = {
+      at: phs[2]![0]!.start + 0.9,
+      bubbles: texts.cs.map((c) => ({ start: c.phrase.start, dy: c.ride!.pos.clone().sub(AT.phone).dot(texts.up) - layout('phone', c.phrase.text, c.phrase.solo).h / 2 })),
+    };
+    // the one oncoming car: past them in the other lane during the radio's insert (visible through the windshield,
+    // beyond the dash: it can't stand in front of an interior surface)
+    const l8 = lines[4]!, passAt = (l8.start + l8.end) / 2;
+    const oncoming = { s0: carS(passAt), t0: passAt, v: PACE.cruise };
     const plan: Verse1Plan = {
       trailerS, crossS, start: st.start, joinAt, joinV: motion.speedAt(joinAt), turnAt, closeBy, leaveAt, menuS, busAd, panels, busAhead, vanAhead,
       tailAd: { pos: adPos, w: LAYOUT.bus.w, h: bus.H },
       visor: { down: visorDown, up: l6.start + 0.3 },
       phone: { pos: AT.phone.clone(), normal: phoneN, up: texts.up, w: LAYOUT.phone.w, h: Math.max(texts.H, reply.H) + 0.04, held },
+      read, oncoming,
     };
     return { carriers, frames, clear, blocks, plan };
   },

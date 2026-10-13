@@ -14,6 +14,7 @@ import { GLOW, lampMaterial } from '../../look/night';
 import { drawAd } from '../../look/adart';
 import { F, font } from '../../engine/type';
 import { TEXT_SHARE } from '../../drive/ads';
+import { sedan } from './kit';
 
 const UP = new THREE.Vector3(0, 1, 0);
 type Panel = Verse1Plan['panels'][keyof Verse1Plan['panels']];
@@ -71,6 +72,23 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(g, 0.14, drop - h / 2 - 0.1, 0.14, 0, -(drop + h / 2) / 2 - 0.05, -0.2, dark);
     box(g, 1.7, 0.5, 1.2, 0, -drop + 0.55, -0.6, toon({ color: '#e8a33a' }));
     for (const x of [-0.75, 0.75]) { const wh = cyl(g, 0.28, 0.18, x, -drop + 0.28, -0.6, black); wh.rotation.z = Math.PI / 2; }
+    root.add(g);
+  }
+  // under the display, the trailer's live readout (the world working before the lyric hijacks the board): their real
+  // speed and SLOW DOWN, blinking in turn, amber LEDs
+  const readout = { planes: [] as THREE.Mesh[] };
+  {
+    const g = onPanel(P.trailer), { h } = P.trailer;
+    box(g, 1.1, 0.4, 0.1, 0, -h / 2 - 0.33, -0.07, black);
+    const led = (text: string) => {
+      const tex = canvasTex(512, 160, (c) => {
+        c.fillStyle = '#0e0d10'; c.fillRect(0, 0, 512, 160);
+        c.fillStyle = '#ffb000'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = font(F.mono(700), text.length > 4 ? 72 : 120); c.fillText(text, 256, 86);
+      });
+      return plane(g, 1.0, 0.31, 0, -h / 2 - 0.33, -0.01, new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.6, 1.6, 1.6) }));
+    };
+    readout.planes = [led(String(Math.round(PACE.rush))), led('SLOW DOWN')];
     root.add(g);
   }
 
@@ -135,17 +153,31 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(van);
   }
 
-  // ---- her phone, in her hand: the screen's rows are the carriers; the phone round them ----
+  // ---- her phone, in her hand: the screen's rows are the carriers; the phone round them; the Read receipt under the
+  // last sent bubble (he's seen them and said nothing) ----
   const phone = moving();
+  let receipt!: THREE.Mesh;
   {
     const p = plan.phone, along = p.up.clone().cross(p.normal).normalize(), slab = new THREE.Group();
     slab.matrixAutoUpdate = false;
     slab.matrix.makeBasis(along, p.up, p.normal).setPosition(p.pos);
     const body = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.024, p.h + 0.05, 0.012), toon({ color: '#121016' }));
     body.position.z = -0.008; slab.add(body);
+    const readTex = canvasTex(256, 64, (c) => {
+      c.fillStyle = '#8a93a6'; c.textAlign = 'right'; c.textBaseline = 'middle';
+      c.font = font(F.sign(500), 40); c.fillText('Read', 246, 36);
+    });
+    receipt = new THREE.Mesh(new THREE.PlaneGeometry(0.044, 0.011), new THREE.MeshBasicMaterial({ map: readTex, transparent: true, color: new THREE.Color(1.5, 1.5, 1.5) }));
+    receipt.position.set(p.w * 0.37, 0, 0.002); // (right-aligned under the bubbles, like a sent thread's)
+    slab.add(receipt);
     phone.add(slab);
     root.add(phone);
   }
+
+  // ---- the one oncoming car, past them in the other lane during the radio's insert ----
+  const oncoming = moving();
+  oncoming.add(sedan({ color: '#6a7d5a' }));
+  root.add(oncoming);
 
   // ---- the burger stand: its building and roof sign, the menu board on posts, the marquee up on its pole ----
   {
@@ -213,6 +245,21 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
       phone.matrix.copy(carMatrix(drive.carFrame(t)));
       phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
+      // the Read receipt, under the last sent bubble
+      const sent = plan.read.bubbles.filter((b) => t >= b.start);
+      receipt.visible = t >= plan.read.at && sent.length > 0;
+      if (receipt.visible) receipt.position.y = sent[sent.length - 1]!.dy - 0.012;
+      // their real speed, blinking with SLOW DOWN in turn on the trailer's readout
+      const phase = Math.floor(t / 0.55) % 2;
+      readout.planes.forEach((p, i) => (p.visible = i === phase));
+      // the oncoming car, closing and gone
+      const O = plan.oncoming, os = O.s0 - O.v * (t - O.t0);
+      oncoming.visible = Math.abs(os - drive.motion.distanceAt(t)) < 90;
+      if (oncoming.visible) {
+        const f = route.frameAt(os), fwd = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize(), right = new THREE.Vector3(f.right.x, 0, f.right.z).normalize();
+        // (in the other lane, nose back down the road)
+        oncoming.matrix.makeBasis(right, UP, fwd.clone().negate()).setPosition(f.pos.clone().addScaledVector(f.right, -LANE));
+      }
       // her visor (the car's: look/dash.ts): folded back flat, flipping down for her line, back up after; its mirror
       // only reflects while it's down
       const down = Math.min(1, Math.max(0, (t - plan.visor.down) / AT.mirror.flip)) * (1 - Math.min(1, Math.max(0, (t - plan.visor.up) / AT.mirror.flip)));
