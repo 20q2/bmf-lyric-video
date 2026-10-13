@@ -45,6 +45,11 @@ function onPanel(p: Panel): THREE.Group {
 }
 const moving = () => { const g = new THREE.Group(); g.matrixAutoUpdate = false; return g; };
 
+/** Her phone's screen round the thread (m): its status bar and his name above, the text field below; the Read receipt's
+ *  width, and its gap under the last bubble. */
+const PHONE = { top: 0.034, bottom: 0.022, receipt: { w: 0.07 } };
+const P_GAP = 0.006;
+
 export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: number, car: THREE.Object3D): void } | null {
   const plan = drive.plans.verse1 as Verse1Plan | undefined;
   if (!plan) return null;
@@ -161,22 +166,42 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     const p = plan.phone, along = p.up.clone().cross(p.normal).normalize(), slab = new THREE.Group();
     slab.matrixAutoUpdate = false;
     slab.matrix.makeBasis(along, p.up, p.normal).setPosition(p.pos);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.024, p.h + 0.05, 0.012), toon({ color: '#121016' }));
-    body.position.z = -0.008; slab.add(body);
+    // (its screen: a status bar and his name over the thread, the text field under it; the bubbles are the carriers)
+    const P = PHONE, H = p.h + P.top + P.bottom, mid = (P.top - P.bottom) / 2;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.024, H + 0.03, 0.012), toon({ color: '#121016' }));
+    body.position.set(0, mid, -0.008); slab.add(body);
+    const px = 512 / p.w, screen = canvasTex(512, Math.round(H * px), (c) => {
+      const w = 512, h = c.canvas.height, top = P.top * px, bottom = P.bottom * px;
+      c.fillStyle = '#0b0b10'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#e8e8ee'; c.textBaseline = 'middle'; c.font = font(F.sign(600), top * 0.22); c.textAlign = 'left'; c.fillText('7:41', w * 0.08, top * 0.18);
+      c.fillRect(w * 0.82, top * 0.12, w * 0.09, top * 0.12); c.fillStyle = '#0b0b10'; c.fillRect(w * 0.905, top * 0.15, w * 0.006, top * 0.06); // (the battery)
+      c.fillStyle = '#5a5f6e'; c.beginPath(); c.arc(w / 2, top * 0.5, top * 0.17, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#e8e8ee'; c.textAlign = 'center'; c.font = font(F.sign(500), top * 0.17); c.fillText('Him', w / 2, top * 0.82);
+      c.fillStyle = '#26262e'; c.fillRect(0, top - 2, w, 2);
+      c.strokeStyle = '#3a3a46'; c.lineWidth = 3; c.beginPath(); c.roundRect(w * 0.06, h - bottom * 0.78, w * 0.74, bottom * 0.56, bottom * 0.28); c.stroke();
+      c.fillStyle = '#5a5f6e'; c.textAlign = 'left'; c.font = font(F.sign(400), bottom * 0.26); c.fillText('iMessage', w * 0.11, h - bottom * 0.5);
+      c.fillStyle = '#2f7cf6'; c.beginPath(); c.arc(w * 0.88, h - bottom * 0.5, bottom * 0.26, 0, Math.PI * 2); c.fill();
+    });
+    // (as bright as the bubbles' panels: lit displays are drawn at 1.6, world.ts buildCarrier — no seam round the thread)
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(p.w + 0.01, H), new THREE.MeshBasicMaterial({ map: screen, color: new THREE.Color(1.6, 1.6, 1.6) }));
+    glass.position.set(0, mid, -0.0015); slab.add(glass);
     // her hand round it (the cast's dark): the phone reads as held, not floating in the cabin's dark
     const hand = toon({ color: '#241f2a' });
     const palm = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.06, 4, 10), hand);
-    palm.position.set(p.w / 2 - 0.008, -p.h / 2 + 0.01, -0.02); palm.rotation.z = 0.5; slab.add(palm);
+    // (gripping its foot, the thumb over the text field: never over the thread)
+    const foot = -p.h / 2 - P.bottom;
+    palm.position.set(p.w / 2 - 0.006, foot - 0.006, -0.02); palm.rotation.z = 0.5; slab.add(palm);
     const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.035, 4, 8), hand);
-    thumb.position.set(p.w / 2 - 0.012, -p.h / 2 + 0.035, 0.012); thumb.rotation.z = -0.8; slab.add(thumb);
+    thumb.position.set(p.w / 2 - 0.02, foot + 0.004, 0.006); thumb.rotation.z = -1.1; slab.add(thumb);
     const wrist = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.09, 4, 10), hand);
-    wrist.position.set(p.w / 2 + 0.03, -p.h / 2 - 0.07, -0.03); wrist.rotation.z = 0.7; slab.add(wrist);
-    const readTex = canvasTex(256, 64, (c) => {
-      c.fillStyle = '#8a93a6'; c.textAlign = 'right'; c.textBaseline = 'middle';
-      c.font = font(F.sign(500), 40); c.fillText('Read', 246, 36);
+    wrist.position.set(p.w / 2 + 0.03, foot - 0.07, -0.03); wrist.rotation.z = 0.7; slab.add(wrist);
+    // the Read receipt: grey, small, right-aligned with the bubbles' right edge (carrierart.ts: 0.96 of the face's width)
+    const readTex = canvasTex(512, 64, (c) => {
+      c.fillStyle = '#8f96a8'; c.textAlign = 'right'; c.textBaseline = 'middle';
+      c.font = font(F.sign(500), 34); c.fillText('Read 7:41 PM', 506, 34);
     });
-    receipt = new THREE.Mesh(new THREE.PlaneGeometry(0.044, 0.011), new THREE.MeshBasicMaterial({ map: readTex, transparent: true, color: new THREE.Color(1.5, 1.5, 1.5) }));
-    receipt.position.set(p.w * 0.37, 0, 0.002); // (right-aligned under the bubbles, like a sent thread's)
+    receipt = new THREE.Mesh(new THREE.PlaneGeometry(P.receipt.w, P.receipt.w / 8), new THREE.MeshBasicMaterial({ map: readTex, transparent: true, color: new THREE.Color(1.3, 1.3, 1.3) }));
+    receipt.position.set(p.w * 0.46 - P.receipt.w / 2, 0, 0.002);
     slab.add(receipt);
     phone.add(slab);
     root.add(phone);
@@ -253,10 +278,10 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
       phone.matrix.copy(carMatrix(drive.carFrame(t)));
       phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
-      // the Read receipt, under the last sent bubble
-      const sent = plan.read.bubbles.filter((b) => t >= b.start);
-      receipt.visible = t >= plan.read.at && sent.length > 0;
-      if (receipt.visible) receipt.position.y = sent[sent.length - 1]!.dy - 0.012;
+      // the Read receipt, under the last sent bubble of the thread on screen
+      const thread = plan.phone.held.findIndex(([a, b]) => t >= a && t < b), sent = plan.read.bubbles.filter((b) => b.thread === thread && t >= b.start);
+      receipt.visible = thread >= 0 && t >= plan.read.at[thread]! && sent.length > 0;
+      if (receipt.visible) receipt.position.y = sent[sent.length - 1]!.dy - P_GAP;
       // their real speed, blinking with SLOW DOWN in turn on the trailer's readout
       const phase = Math.floor(t / 0.55) % 2;
       readout.planes.forEach((p, i) => (p.visible = i === phase));

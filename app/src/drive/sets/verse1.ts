@@ -93,10 +93,10 @@ export interface Verse1Plan {
   /** Her visor: when it flips down and back up (s). */
   visor: { down: number; up: number };
   phone: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number; held: [number, number][] };
-  /** The Read receipt under her texts (he's seen them and said nothing): from when, and each bubble's underside
-   *  (along the phone's up from its centre, m) with its phrase's start — the receipt rides under the last sent
-   *  bubble. */
-  read: { at: number; bubbles: { start: number; dy: number }[] };
+  /** The Read receipt under her texts (he's seen them and said nothing): in each of her two threads (held[i]) from
+   *  `at` (s), under its last sent bubble — each bubble's underside (along the phone's up from its centre, m), its
+   *  phrase's start and its thread. */
+  read: { at: number[]; bubbles: { start: number; dy: number; thread: number }[] };
   /** The one oncoming car (the other lane is a lane): where it passes them (m along the road) and when (s), coming
    *  on at `v` (m/s). */
   oncoming: { s0: number; t0: number; v: number };
@@ -244,9 +244,10 @@ export const VERSE1: SetPiece = {
 
     // the Read receipt: visible once her first text has landed (he's seen it and said nothing — then "but"); it sits
     // under the last sent bubble, so each bubble's underside in the car's frame
+    const under = (c: Carrier, thread: number) => ({ start: c.phrase.start, thread, dy: c.ride!.pos.clone().sub(AT.phone).dot(texts.up) - layout('phone', c.phrase.text, c.phrase.solo).h / 2 });
     const read = {
-      at: phs[2]![0]!.start + 0.9,
-      bubbles: texts.cs.map((c) => ({ start: c.phrase.start, dy: c.ride!.pos.clone().sub(AT.phone).dot(texts.up) - layout('phone', c.phrase.text, c.phrase.solo).h / 2 })),
+      at: [phs[2]![0]!.start + 0.9, (phs[7]![0]?.start ?? Infinity) + 0.9],
+      bubbles: [...texts.cs.map((c) => under(c, 0)), ...reply.cs.map((c) => under(c, 1))],
     };
     // the one oncoming car: past them in the other lane during the radio's insert (visible through the windshield,
     // beyond the dash: it can't stand in front of an interior surface)
