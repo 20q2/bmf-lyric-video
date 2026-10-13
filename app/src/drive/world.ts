@@ -15,6 +15,7 @@ import { BLOCKS, boxAt } from './blocks';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
 import { buildDash } from '../look/dash';
+import { candyPaint, chrome as heroChrome } from '../look/hero';
 
 export { ROAD_HALF }; // (route.ts: the road's own measure)
 /** The ground is a flat base plane under shoulders that follow the road this far out (m; the sea, further): a strip much
@@ -498,7 +499,8 @@ export function buildCar(): THREE.Group {
   const g = new THREE.Group(), body = new THREE.Group(), { length: L, width: Wd, belt, wheelZ, wheelR } = CAR, hl = L / 2;
   body.name = 'body';
   g.add(body);
-  const paint = toon({ color: WORLD.car }), dark = toon({ color: WORLD.carDark }), chrome = toon({ color: WORLD.chrome });
+  // (the hero: candy paint and chrome in real light, the sky in them; look/hero.ts)
+  const paint = candyPaint(WORLD.car, '#ff5a66'), dark = toon({ color: WORLD.carDark }), chrome = heroChrome();
   const white = toon({ color: '#f4efe4' }), seat = toon({ color: '#3a1820' });
   const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, to: THREE.Object3D = body) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); to.add(o); return o; };
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => add(new THREE.BoxGeometry(w, h, d), m, x, y, z);

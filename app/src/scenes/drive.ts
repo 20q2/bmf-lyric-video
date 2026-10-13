@@ -17,6 +17,7 @@ import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
 import { QUALITY } from '../look/quality';
+import { SkyEnv } from '../look/envsky';
 import { GLOW, NIGHT } from '../look/night';
 import { buildCity } from '../look/city';
 import { type Stance, hydraulics } from '../drive/hydraulics';
@@ -74,6 +75,8 @@ export default class DriveScene extends Scene {
   private moon = new THREE.DirectionalLight('#9fa8ff', 0);
   private hemi = new THREE.HemisphereLight('#ffffff', '#3a3326', 1.2);
   private dome = new SkyDome();
+  /** The sky as the hero sees it (its reflections). */
+  private env!: SkyEnv;
   private print = new PrintPass();
   private fogColor = new THREE.Color();
   private city!: ReturnType<typeof buildCity>;
@@ -110,6 +113,7 @@ export default class DriveScene extends Scene {
     this.rt.depthTexture = new THREE.DepthTexture(this.rt.width, this.rt.height, THREE.FloatType);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.env = new SkyEnv(renderer, QUALITY.envStep);
     const world = buildWorld(this.drive);
     this.sign = world.userData.sign;
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
@@ -135,7 +139,7 @@ export default class DriveScene extends Scene {
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
-      const lit = o.material instanceof THREE.MeshToonMaterial;
+      const lit = o.material instanceof THREE.MeshToonMaterial || o.material instanceof THREE.MeshStandardMaterial;
       o.castShadow = o.receiveShadow = lit;
     });
     const sh = this.sun.shadow;
@@ -255,9 +259,9 @@ export default class DriveScene extends Scene {
     placeCamera(this.cam, d.camera(t));
 
     // the sky, the sun or the moon, the fog
-    const sky = skyStateAt(t), day = daylight(t), e = sky.sunElev;
-    const sunDir = this.sunAz.clone().multiplyScalar(Math.cos(e)).add(new THREE.Vector3(0, Math.sin(e), 0)).normalize();
-    const sunColor = SUN.high.clone().lerp(SUN.low, 1 - smooth(0, 10 * DEG, e));
+    const { sky, sunDir, sunColor } = this.skyAt(t), day = daylight(t), e = sky.sunElev;
+    // (the hero's reflections: the sky of this moment, remade on steps of song time)
+    this.world.environment = this.env.update(t, (tau) => this.skyAt(tau));
     this.dome.update(sky, sunDir, sunColor, this.cam, t);
     // the sun lights from no lower than 4° (its shadows stay finite), fading out as it sets
     const lightDir = this.sunAz.clone().multiplyScalar(Math.cos(Math.max(e, 4 * DEG))).add(new THREE.Vector3(0, Math.sin(Math.max(e, 4 * DEG)), 0));
@@ -320,6 +324,14 @@ export default class DriveScene extends Scene {
     };
   }
 
+  /** The sky at song time t: its state, where the sun is (unit) and its colour. */
+  private skyAt(t: number) {
+    const sky = skyStateAt(t), e = sky.sunElev;
+    const sunDir = this.sunAz.clone().multiplyScalar(Math.cos(e)).add(new THREE.Vector3(0, Math.sin(e), 0)).normalize();
+    const sunColor = SUN.high.clone().lerp(SUN.low, 1 - smooth(0, 10 * DEG, e));
+    return { sky, sunDir, sunColor };
+  }
+
   /** Where along the road `p` is nearest, searching around `near` (m). */
   private roadS(p: THREE.Vector3, near: number): number {
     let best = near, bd = Infinity;
@@ -333,6 +345,7 @@ export default class DriveScene extends Scene {
   override dispose() {
     for (const a of this.arts) a.dispose();
     this.rt.dispose();
+    this.env.dispose();
     this.world.clear();
   }
 }

@@ -5,8 +5,9 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { F } from '../engine/type';
-import { WORLD, toon } from './toon';
+import { toon } from './toon';
 import { HEAD_UNIT, VISOR } from '../drive/cabin';
+import { chrome as heroChrome } from './hero';
 
 const UP = new THREE.Vector3(0, 1, 0);
 /** A group in a face's own frame (x along it, y its up, z out of it), at p. */
@@ -87,7 +88,7 @@ function gauge(label: string): THREE.CanvasTexture {
 
 /** Fits the cabin into the car's body: returns what the scene runs each frame. */
 export function buildDash(body: THREE.Group): { update(t: number, duration: number, speed: number): void } {
-  const chrome = toon({ color: WORLD.chrome }), dark = toon({ color: '#0d0b10' });
+  const chrome = heroChrome(), dark = toon({ color: '#0d0b10' });
   // the head unit, its chrome bezel round it, set into the dash
   const hu = headUnit(), screen = faceFrame(HEAD_UNIT.pos.clone().addScaledVector(HEAD_UNIT.normal, -0.004), HEAD_UNIT.normal);
   hu.mesh.position.x = -HEAD_UNIT.lyricAt; // (its middle off the lyric's panel's: the art that side)

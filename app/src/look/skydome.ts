@@ -17,7 +17,7 @@ void main() {
 
 const FRAG = /* glsl */ `
 uniform vec3 zenith, horizon, sunDir, sunColor;
-uniform float stars, bands, sunR, sunHDR, time;
+uniform float stars, bands, sunR, sunHDR, time, groundMix;
 varying vec3 vDir;
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 void main() {
@@ -28,6 +28,9 @@ void main() {
   float q = (floor(b) + smoothstep(1.0 - aa, 1.0, fract(b))) / bands;
   q = mix(q, g, stars); // by night the bands melt into one gradient (seen looking up they'd ring the frame)
   vec3 c = mix(horizon, zenith, q);
+  // (under the horizon, in the hero's reflections only: dark ground, so chrome shows a horizon line — the world hides
+  // it in the main view)
+  c = mix(c, horizon * 0.22, smoothstep(0.0, 0.06, -d.y) * groundMix);
   // the glow round the sun, warmest on the horizon, also banded
   float toSun = max(dot(d, sunDir), 0.0), glow = pow(toSun, 6.0) * (1.0 - g) ;
   float gq = floor(glow * 4.0 + 0.5) / 4.0;
@@ -58,7 +61,7 @@ export class SkyDome {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
       sunDir: { value: new THREE.Vector3(0, 0.2, -1).normalize() }, sunColor: { value: new THREE.Color('#ffd9a0') },
       stars: { value: 0 }, bands: { value: SKYDOME.bands }, sunR: { value: (SKYDOME.sunDeg * Math.PI) / 180 },
-      sunHDR: { value: SKYDOME.sunHDR }, time: { value: 0 },
+      sunHDR: { value: SKYDOME.sunHDR }, time: { value: 0 }, groundMix: { value: 0 },
     };
     const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: this.u, side: THREE.BackSide, depthWrite: false, fog: false });
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(SKYDOME.radius, 48, 24), mat);
@@ -66,7 +69,10 @@ export class SkyDome {
     this.mesh.renderOrder = -1;
   }
 
-  update(s: SkyState, sunDir: THREE.Vector3, sunColor: THREE.Color, camera: THREE.Camera, t: number) {
+  /** Draws the ground under the horizon (the hero's environment: look/envsky.ts). */
+  withGround() { this.u.groundMix!.value = 1; }
+
+  update(s: SkyState, sunDir: THREE.Vector3, sunColor: THREE.Color, camera: THREE.Object3D, t: number) {
     this.u.zenith!.value.copy(s.zenith);
     this.u.horizon!.value.copy(s.horizon);
     this.u.sunDir!.value.copy(sunDir);
