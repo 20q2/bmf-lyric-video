@@ -16,6 +16,7 @@ import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '..
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
+import { QUALITY } from '../look/quality';
 import { GLOW, NIGHT } from '../look/night';
 import { buildCity } from '../look/city';
 import { type Stance, hydraulics } from '../drive/hydraulics';
@@ -58,7 +59,7 @@ const SUN_AZ = (SUN_AZ_DEG * Math.PI) / 180;
 /** Sunlight (low and warm, warmest as it sets), moonlight (cool, from high in the east), and the shadows' reach (m). */
 const SUN = { intensity: 2.8, high: new THREE.Color('#ffe6b8'), low: new THREE.Color('#ff8a4c') };
 const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * Math.PI) / 180 };
-const SHADOW = { half: 110, map: 2048 };
+const SHADOW = { half: 110 };
 const DEG = Math.PI / 180;
 const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 
@@ -138,7 +139,7 @@ export default class DriveScene extends Scene {
       o.castShadow = o.receiveShadow = lit;
     });
     const sh = this.sun.shadow;
-    sh.mapSize.set(SHADOW.map, SHADOW.map);
+    sh.mapSize.set(QUALITY.shadowMap, QUALITY.shadowMap);
     Object.assign(sh.camera, { left: -SHADOW.half, right: SHADOW.half, top: SHADOW.half, bottom: -SHADOW.half, near: 1, far: 1200 });
     sh.camera.updateProjectionMatrix();
     sh.bias = -0.001; sh.normalBias = 0.12;
