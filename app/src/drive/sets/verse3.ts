@@ -36,8 +36,10 @@ export const SIGNS: readonly { kind: Kind; theme: Theme; side: -1 | 1; scale?: n
   { kind: 'storefront', theme: 'pawn', side: 1, eye: { out: 18, y: 1.8, along: 5 } },
   { kind: 'neon', theme: 'chapel', side: -1, eye: { out: 22, y: 2.6, along: 6 } },
 ];
-/** The signs' faces off the road's centre (m), and the two-shot's aim swing (s round the second line's start). */
-export const STRIP = { lateral: 15, swing: [0.45, 0.15] as [number, number] };
+/** The signs' faces off the road's centre (m), the two-shot's aim swing (s round the second line's start), and where
+ *  its eye tracks along the strip, from and to (0: facing the first face, 1: the second), and how much further apart
+ *  its two faces stand than neighbours do (m: closer, the first stood cut by the frame's edge through the second). */
+export const STRIP = { lateral: 15, swing: [0.45, 0.15] as [number, number], track: [0.1, 1] as [number, number], pairGap: 9 };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Verse3Plan {
@@ -66,7 +68,7 @@ export const VERSE3: SetPiece = {
       const prev = lastOn[spec.side];
       const minS = Math.max(
         li === 0 ? carS(st.start) + TUNNEL_CLEAR + W / 2 + 1 : -Infinity,
-        prev ? prev.s + (prev.w + W) / 2 + LEFT_GAP : -Infinity,
+        prev ? prev.s + (prev.w + W) / 2 + LEFT_GAP + (spec.theme === 'tiki2' ? STRIP.pairGap : 0) : -Infinity,
       );
       const s = Math.max(carS(mid), minS);
       lastOn[spec.side] = { s, w: W };
@@ -100,10 +102,15 @@ export const VERSE3: SetPiece = {
       return lookFrom(eye, sk.aim);
     };
     stacks.forEach((sk, k) => {
-      if (sk.spec.theme === 'tiki2') { // the pair's one take: a static eye between the faces, the aim swinging over
+      if (sk.spec.theme === 'tiki2') { // the pair's one take: the eye tracking along the strip from the first face to
+        // the second, the aim swinging over with it (from a static eye between them, the first face's words stood cut
+        // by the frame's edge while the second's were read)
         const a = stacks[k - 1]!, E = sk.spec.eye;
-        const eye = atRoad((a.s + sk.s) / 2 - E.along, sk.spec.side * (STRIP.lateral - E.out), E.y);
-        const to = (t: number) => lookFrom(eye, a.aim.clone().lerp(sk.aim, smooth(Math.max(a.end - 0.1, sk.start - STRIP.swing[0]), sk.start + STRIP.swing[1], t)));
+        const eyeAt = (s: number) => atRoad(s - E.along, sk.spec.side * (STRIP.lateral - E.out), E.y);
+        const to = (t: number) => {
+          const u = smooth(Math.max(a.end - 0.1, sk.start - STRIP.swing[0]), sk.start + STRIP.swing[1], t);
+          return lookFrom(eyeAt(a.s + (sk.s - a.s) * (STRIP.track[0] + (STRIP.track[1] - STRIP.track[0]) * u)), a.aim.clone().lerp(sk.aim, u));
+        };
         a.cs.forEach((c, i) => frames.set(c.id, { to, move: i ? 'snap' : 'cut' }));
         sk.cs.forEach((c) => frames.set(c.id, { to, move: 'snap' }));
         return;
