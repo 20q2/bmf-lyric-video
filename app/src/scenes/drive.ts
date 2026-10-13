@@ -31,6 +31,7 @@ import { buildChorus1 } from './sets/chorus1';
 import type { buildDash } from '../look/dash';
 import { buildVerse2 } from './sets/verse2';
 import { buildVerse1 } from './sets/verse1';
+import { buildChorus3 } from './sets/chorus3';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
 const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
@@ -49,8 +50,9 @@ const PAINT_LASTS = 3;
 const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
 const FACE_WINDOW = 12;
-/** The sun sets over the sea: it stands this far (radians) left of the coast road's heading (at COAST_T). */
-const SUN_AZ = (35 * Math.PI) / 180, COAST_T = 110;
+/** The sun sets over the sea: it stands this far (radians) left of the coast road's heading (at COAST_T) — inside
+ *  the arch wide's frame, kissing the water (sets/chorus3.ts). */
+const SUN_AZ = (26 * Math.PI) / 180, COAST_T = 110;
 /** Sunlight (low and warm, warmest as it sets), moonlight (cool, from high in the east), and the shadows' reach (m). */
 const SUN = { intensity: 2.8, high: new THREE.Color('#ffe6b8'), low: new THREE.Color('#ff8a4c') };
 const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * Math.PI) / 180 };
@@ -123,7 +125,7 @@ export default class DriveScene extends Scene {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
       this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
-    for (const set of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
+    for (const set of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive), buildChorus3(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {

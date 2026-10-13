@@ -327,7 +327,7 @@ function placeSigns(drive: Drive): THREE.Group {
 export const STREETLIGHTS = { from: 92, beats: 2, gap: 18, lateral: 6.2, h: 7.2, reach: 3.6 };
 function buildStreetlights(drive: Drive): THREE.Group {
   const { route, motion } = drive, g = new THREE.Group(), at: number[] = [];
-  const signs = drive.carriers.filter((c) => c.kind === 'sign' || c.kind === 'street' || c.kind === 'gantry');
+  const signs = drive.carriers.filter((c) => c.kind === 'sign' || c.kind === 'street' || c.kind === 'gantry' || c.kind === 'arch');
   for (const b of drive.beats.filter((b, i) => b >= STREETLIGHTS.from && i % STREETLIGHTS.beats === 0)) {
     const s = motion.distanceAt(b);
     if (at.length && s - at[at.length - 1]! < STREETLIGHTS.gap) continue;
