@@ -485,6 +485,10 @@ export function buildPlane(k = 1): THREE.Group {
   box(1.5 * k, 0.12 * k, 10 * k, 3.9 * k, 0.6 * k, 0, body); // the wing, over the cabin
   box(0.8 * k, 0.08 * k, 3.4 * k, 0.35 * k, 0.1 * k, 0, body); // tailplane
   box(1 * k, 1.5 * k, 0.08 * k, 0.4 * k, 0.75 * k, 0, trim); // fin
+  // a red band round its nose, its canopy, its wheels
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * k, 0.5 * k, 0.6 * k, 10), trim); band.rotation.z = -Math.PI / 2; band.position.set(5.4 * k, 0, 0); g.add(band);
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.42 * k, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), toon({ color: '#28323c' })); canopy.position.set(4.2 * k, 0.35 * k, 0); canopy.scale.set(1.6, 1, 1); g.add(canopy);
+  for (const z of [-0.8, 0.8]) { const wh = new THREE.Mesh(new THREE.SphereGeometry(0.2 * k, 8, 6), toon({ color: '#1b1820' })); wh.position.set(4.3 * k, -0.85 * k, z * k); g.add(wh); }
   const prop = new THREE.Mesh(new THREE.CircleGeometry(1.1 * k, 16), new THREE.MeshBasicMaterial({ color: '#2a2a30', transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
   prop.rotation.y = Math.PI / 2; prop.position.set(6.05 * k, 0, 0); g.add(prop); // spinning, a blur
   return g;

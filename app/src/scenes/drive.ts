@@ -137,7 +137,7 @@ export default class DriveScene extends Scene {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
       this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
-    for (const set of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive), buildChorus3(this.drive), buildBridge1(this.drive), buildVerse3(this.drive), buildChorus4(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
+    for (const [k, set] of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive), buildChorus3(this.drive), buildBridge1(this.drive), buildVerse3(this.drive), buildChorus4(this.drive)].entries()) if (set) { set.group.name = `set-${['intro', 'chorus1', 'verse1', 'chorus2', 'verse2', 'chorus3', 'bridge1', 'verse3', 'chorus4'][k]}`; this.sets.push(set); this.world.add(set.group); }
     // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
     this.hidden = typeof location === 'undefined' ? [] : (new URLSearchParams(location.search).get('hide') ?? '').split(',').filter(Boolean);
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
@@ -304,7 +304,7 @@ export default class DriveScene extends Scene {
     this.moon.intensity = MOON.intensity * smooth(-2 * DEG, -9 * DEG, e);
     this.hemi.color.copy(sky.zenith);
     this.hemi.groundColor.copy(sky.horizon).multiplyScalar(0.35);
-    this.hemi.intensity = 0.55 + 0.75 * day;
+    this.hemi.intensity = 0.7 + 0.6 * day; // (QA: low sun left roofs in shadow near black: the sky's fill)
     const air = airAt(t);
     this.fogColor.copy(sky.horizon).lerp(air.tint, air.mix); // (graded per section: drive/sky.ts AIR_KEYS)
     NIGHT.value = smooth(2 * DEG, -8 * DEG, e); // the lights come on as the sun goes

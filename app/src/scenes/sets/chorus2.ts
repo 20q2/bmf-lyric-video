@@ -23,10 +23,14 @@ const box = (g: THREE.Object3D, w: number, h: number, d: number, x: number, y: n
   const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b;
 };
 
+
 export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.chorus2 as Chorus2Plan | undefined;
   if (!plan) return null;
   const { route } = drive, root = new THREE.Group();
+  // (the freeway's furniture is put away as its stretch ends, before verse 2's first cut: its sound wall and catenary
+  // stood in the chicken spot's frames)
+  const freewayEnd = drive.stretches.find((st) => st.id === 'chorus2')?.end ?? Infinity;
   /** The road's frame at s (x to its left, y up, z forward), `lateral` right of its centre, on its surface. */
   const frameAt = (s: number, lateral: number, m = new THREE.Matrix4()) => {
     const f = route.frameAt(s), fwd = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize(), right = new THREE.Vector3(f.right.x, 0, f.right.z).normalize();
@@ -111,6 +115,7 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
   return {
     group: root,
     update(t) {
+      root.visible = t < freewayEnd && drive.motion.distanceAt(t) > plan.s0 - 400;
       const there = t >= T.from && t < T.until;
       for (const [k, c] of cars.entries()) {
         c.visible = there;

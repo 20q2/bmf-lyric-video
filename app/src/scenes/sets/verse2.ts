@@ -24,7 +24,10 @@ function chicken(g: THREE.Object3D, y: number, k = 1) {
   for (let i = 0; i < 3; i++) box(g, 0.14 * k, 0.32 * k, 0.22 * k, 0, y + 3.95 * k, (0.75 + i * 0.2) * k, red);
   ball(g, 0.16 * k, 0, y + 2.95 * k, 1.4 * k, red).scale.set(0.7, 1.4, 0.7);
   const beak = new THREE.Mesh(new THREE.ConeGeometry(0.16 * k, 0.45 * k, 10), orange); beak.rotation.x = Math.PI / 2; beak.position.set(0, y + 3.25 * k, 1.6 * k); g.add(beak);
-  ball(g, 0.8 * k, 0, y + 2.2 * k, -1.4 * k, white).scale.set(0.5, 1.2, 0.7); // its tail
+  // its tail, a fan of three feathers; its wings folded at its sides; its eyes
+  for (const a of [-0.35, 0, 0.35]) { const f = ball(g, 0.55 * k, 0, y + 2.6 * k, -1.45 * k, white); f.scale.set(0.35, 1.3, 0.55); f.rotation.x = -0.5; f.rotation.z = a; }
+  for (const x of [-1, 1]) { const wing = ball(g, 0.85 * k, x * 0.95 * k, y + 2.05 * k, -0.15 * k, toon({ color: '#ece4d2' })); wing.scale.set(0.3, 0.6, 1.0); wing.rotation.x = 0.25; }
+  for (const x of [-1, 1]) ball(g, 0.07 * k, x * 0.38 * k, y + 3.42 * k, 1.32 * k, toon({ color: '#141218' }));
 }
 /** A row of bulbs along a line in g (from a to b): each takes a material from `ms` in turn (the chase's phases). */
 function bulbs(g: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, n: number, ms: readonly THREE.Material[], phase0 = 0) {
@@ -76,6 +79,11 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   {
     const B = plan.shop, Sh = SHACK.shop, g = front(B.s, Sh.face), x = (s: number) => s - B.s, w = B.w;
     box(g, w, Sh.h, Sh.d, 0, Sh.h / 2, -Sh.d / 2, toon({ color: '#f7f1e3' }));
+    // its end toward the corner: two windows, a red band; on the roof, its air units (QA: a bare box)
+    const endGlass = toon({ color: '#28323c' });
+    for (const z of [-3.2, -8.8]) { const p = plane(g, 3, 1.8, -w / 2 - 0.012, 2.1, z, endGlass); p.rotation.y = -Math.PI / 2; }
+    box(g, 0.06, 0.5, Sh.d, -w / 2 - 0.03, 0.25, -Sh.d / 2, toon({ color: red }));
+    for (const [x, z] of [[-w / 4, -4], [w / 5, -8], [w / 3, -3.5]]) box(g, 1.6, 0.9, 1.6, x!, Sh.h + 0.45, z!, toon({ color: '#b9ada0' }));
     box(g, w + 0.06, 0.5, 0.06, 0, 0.25, 0.03, toon({ color: red }));
     box(g, w + 0.3, 0.8, 0.5, 0, Sh.h - 0.4, 0.2, toon({ color: red }));
     for (let k = 0; k < 3; k++) plane(g, 8, 0.7, -w / 2 + 6 + k * 11, Sh.h - 0.4, 0.46, name(8, 0.7));

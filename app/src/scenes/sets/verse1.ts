@@ -140,6 +140,17 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(bus, 2.52, 0.9, 2 * H - 1.2, 0, 2.55, 0.3, black); // the windows down its sides
     for (const z of [-H + 1.9, H - 1.7]) for (const x of [-1.15, 1.15]) wheel(bus, 0.5, x, z, black);
     for (const x of [-1.05, 1.05]) plane(bus, 0.2, 0.3, x, 0.75, -H - 0.01, tail).rotation.y = Math.PI;
+    // its back: the rear window over the ad, an amber route sign over that, the engine's louvres under it, a bumper, a
+    // plate; an air-conditioning pod on the roof (QA: a bare box filling the frame for seconds)
+    const glassM = toon({ color: '#28323c' });
+    box(bus, 2.22, 0.72, 0.03, 0, 2.75, -H - 0.005, black);
+    plane(bus, 2.1, 0.6, 0, 2.75, -H - 0.025, glassM).rotation.y = Math.PI;
+    const route = canvasTex(512, 48, (c) => { c.fillStyle = '#120c06'; c.fillRect(0, 0, 512, 48); c.fillStyle = '#ffb000'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 34); c.fillText('210  CRENSHAW', 256, 26); });
+    plane(bus, 1.6, 0.15, 0, 3.14, -H - 0.012, new THREE.MeshBasicMaterial({ map: route, color: new THREE.Color(1.6, 1.6, 1.6) })).rotation.y = Math.PI;
+    for (let k = 0; k < 5; k++) box(bus, 1.5, 0.035, 0.03, 0, 1.0 + k * 0.08, -H - 0.01, black);
+    box(bus, 2.56, 0.28, 0.16, 0, 0.48, -H - 0.06, black);
+    plane(bus, 0.5, 0.25, 0, 0.75, -H - 0.012, toon({ color: '#f2f1ea' })).rotation.y = Math.PI;
+    box(bus, 1.7, 0.32, 2.6, 0, 3.41, -H + 2.2, body);
     const { w, h, pos } = plan.tailAd, share = TEXT_SHARE.bus ?? 0.8;
     const art = canvasTex(1024, Math.round((1024 * (h + 0.2)) / (w + 0.08)), (c) => drawAd(c, plan.busAd, c.canvas.width, c.canvas.height, share));
     plane(bus, w + 0.08, h + 0.2, 0, pos.y, -H - 0.02, new THREE.MeshBasicMaterial({ map: art })).rotation.y = Math.PI;
@@ -154,6 +165,12 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(van, 2.06, 0.16, 0.14, 0, 0.36, -H - 0.04, chrome);
     for (const x of [-0.9, 0.9]) plane(van, 0.14, 0.3, x, 1.0, -H - 0.01, tail).rotation.y = Math.PI;
     for (const z of [-H + 0.8, H - 0.9]) for (const x of [-0.9, 0.9]) wheel(van, 0.36, x, z, black);
+    // its rear windows over the stickers, its roof's cap, the cab's side windows, its mirrors
+    const glassM = toon({ color: '#28323c' });
+    for (const x of [-0.47, 0.47]) plane(van, 0.82, 0.3, x, 2.13, -H - 0.012, glassM).rotation.y = Math.PI;
+    box(van, 2.0, 0.08, 2 * H, 0, 2.39, 0, toon({ color: '#ece8de' }));
+    box(van, 2.02, 0.5, 1.5, 0, 1.92, H - 0.95, glassM);
+    for (const x of [-1.08, 1.08]) box(van, 0.08, 0.22, 0.12, x, 1.75, H - 0.45, black);
     root.add(van);
   }
 
