@@ -90,6 +90,20 @@ tests; the kit fills it with detail that never sticks out past it toward the roa
 - **Set-piece props.** The barbershop, the liquor store, the chicken spot, the car wash, the bus, the van and the rest
   are upgraded with the same kit as their sections come up.
 
+**Built (M5b, 2026-10-13):**
+- The town's depth: rows of buildings behind the street (`blocks.ts` BACK), never on the road (tests/town.test.ts,
+  which also caught verse 2's mural building poking its corner to the road's edge).
+- Mountains on the horizon (`look/skydome.ts`). They're small at playback size: the town fills most horizons.
+- Street fronts on every town block (`look/facades.ts`), inside their boxes (tests/town.test.ts). Left-side fronts are
+  mirrored, with their winding and sign text turned back.
+- LA palms (`look/palms.ts`).
+- Kerbs and sidewalks (`world.ts` SIDEWALKS), broken at the sets' `openings`.
+- The lofted Impala on rolling wire wheels (`look/impala.ts`), inside CAR_BOX (tests/impala.test.ts). CAR now lives in
+  `drive/cabin.ts`.
+- The motel's rooms and walkway, and the billboards' steel.
+
+Street furniture, parked cars, traffic and pedestrians wait for a later plan.
+
 ## 4. The style breaks
 
 A break is a small, self-contained effect pinned to its word's timing (or its hit's), composed from up to three tools:
