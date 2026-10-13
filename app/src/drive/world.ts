@@ -196,6 +196,8 @@ export function buildWorld(drive: Drive): THREE.Group {
       // nor where the car is while sky-writing's up: the low camera behind it looks up past them into the words (and the
       // skywriter's loop)
       if (skyRoad.some(([a, b]) => s > a && s < b)) continue;
+      // nor by a set-piece's sign: its own designed shots stand close to it (a palm by the lens at the chapel)
+      if (drive.carriers.some((c) => SET_KINDS.has(c.kind) && !c.ride && Math.abs(c.s - s) < c.w / 2 + 20)) continue;
       const h = 10 + 6 * hash(k, side, 8), f = route.frameAt(s), at = f.pos.clone().addScaledVector(f.right, side * 11.5);
       const m = new THREE.Matrix4().compose(at, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(k, side, 9) * Math.PI * 2), new THREE.Vector3().setScalar(h / PALM.h));
       placed[Math.floor(hash(k, side, 7) * VARIANTS)]!.push(m);

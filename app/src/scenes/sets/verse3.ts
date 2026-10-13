@@ -40,6 +40,9 @@ const flickAt = (t: number, start: number) => {
   return (t * 13) % 1 < 0.25 + 0.55 * u ? 1 : 0.05;
 };
 
+/** The tiki bar's torches: their poles' height (m). */
+const TORCH = { h: 2.6 };
+
 export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.verse3 as Verse3Plan | undefined;
   if (!plan) return null;
@@ -81,7 +84,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           c.fillStyle = '#ffd65a';
           for (const [bx, by, r] of [[160, 46, 10], [210, 24, 13], [258, 52, 9]] as const) { c.beginPath(); c.arc(bx, by, r, 0, Math.PI * 2); c.fill(); }
         });
-        neon(g, 2.1, 2.5, -W / 2 - 1.7, 0.3, 0.1, glass, start);
+        neon(g, 1.5, 1.8, -W / 2 - 0.5, 0.4, 0.1, glass, start); // (on the board, at its left edge: hung past it, its edge sliced the glass in two)
         neon(g, 5.2, 1.15, 0, H / 2 + 1.0, 0.1, neonText('LIQUOR', '#ffd65a', 110, false), start, { peak: 1.55 });
         break;
       }
@@ -100,13 +103,15 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         // the bamboo frame and the first torch (TARZAN & JANE hangs by the second face)
         for (const x of [-W / 2 - 0.35, W / 2 + 0.35]) cyl(g, 0.14, H + 1.6, x, 0, 0.05, bamboo);
         for (const y of [-H / 2 - 0.3, H / 2 + 0.3]) { const b = box(g, W + 1.1, 0.24, 0.24, 0, y, 0.05, bamboo); b.rotation.z = 0.015; }
+        // (a torch at the kerb: its pole up to a man's reach, the flame on top — mid-height by the board it read as a
+        // sticker on a stick)
         const pole = -W / 2 - 1.6;
-        cyl(g, 0.1, foot - 1, pole, groundY + (foot - 1) / 2, 0.15, bamboo);
+        cyl(g, 0.1, TORCH.h, pole, groundY + TORCH.h / 2, 0.15, bamboo);
         const flame = neonTex(220, 300, '#ff8a2a', (c) => {
           c.fillStyle = '#ff8a2a';
           c.beginPath(); c.moveTo(110, 20); c.quadraticCurveTo(190, 130, 110, 270); c.quadraticCurveTo(30, 130, 110, 20); c.fill();
         });
-        neon(g, 0.9, 1.25, pole, foot - 1 + groundY + 0.75, 0.15, flame, start - 2, { peak: 2.6, dance: true }); // (torches burn before the line)
+        neon(g, 0.9, 1.25, pole, groundY + TORCH.h + 0.55, 0.15, flame, start - 2, { peak: 2.6, dance: true }); // (torches burn before the line)
         break;
       }
       case 'tiki2': {
@@ -114,12 +119,12 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         for (const x of [-W / 2 - 0.35, W / 2 + 0.35]) cyl(g, 0.14, H + 1.6, x, 0, 0.05, bamboo);
         neon(g, 10, 1.75, 0, H / 2 + 1.2, 0.1, neonText('Tarzan & Jane', '#4de0c0', 128), start, { peak: 1.55 });
         const pole = W / 2 + 1.6;
-        cyl(g, 0.1, foot - 1, pole, groundY + (foot - 1) / 2, 0.15, bamboo);
+        cyl(g, 0.1, TORCH.h, pole, groundY + TORCH.h / 2, 0.15, bamboo);
         const flame = neonTex(220, 300, '#ff8a2a', (c) => {
           c.fillStyle = '#ff8a2a';
           c.beginPath(); c.moveTo(110, 20); c.quadraticCurveTo(190, 130, 110, 270); c.quadraticCurveTo(30, 130, 110, 20); c.fill();
         });
-        neon(g, 0.9, 1.25, pole, foot - 1 + groundY + 0.75, 0.15, flame, start - 4, { peak: 2.6, dance: true });
+        neon(g, 0.9, 1.25, pole, groundY + TORCH.h + 0.55, 0.15, flame, start - 4, { peak: 2.6, dance: true });
         break;
       }
       case 'phone': {
