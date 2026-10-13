@@ -7,6 +7,7 @@ import { WORLD, toon } from '../look/toon';
 import { F } from '../engine/type';
 import { GLOW, glowMaterial, lampMaterial, nightGlass, withWindows } from '../look/night';
 import { facades, signAtlas } from '../look/facades';
+import { PALM, palmVariant } from '../look/palms';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
@@ -133,8 +134,9 @@ export function buildWorld(drive: Drive): THREE.Group {
   g.add(named(dressing(drive), 'dressing'));
   g.add(named(placeSigns(drive), 'places'));
 
-  // palms: a trunk and a crown, behind the roadside signs' line
-  const trunks: THREE.Matrix4[] = [], crowns: THREE.Matrix4[] = [];
+  // palms: LA's (look/palms.ts), behind the roadside signs' line, a few seeded variants instanced, each its own height
+  // and turn
+  const VARIANTS = 4, placed: THREE.Matrix4[][] = Array.from({ length: VARIANTS }, () => []);
   for (let k = 0; k * 30 < route.length; k++) {
     const s = k * 30 + 5;
     if (!PALMS.has(stretchAtS(s).id) || s < CORNER.cross[1] + 15) continue; // (none on the intro's corner: the signs stand against the sky)
@@ -144,16 +146,23 @@ export function buildWorld(drive: Drive): THREE.Group {
       // none by a face on the left: they'd stand between it and the camera across the road (on the right too: a wide
       // pair shot stands back past them)
       if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + (side === -1 ? 8 : 28))) continue;
-      const h = 9 + 4 * hash(k, side, 8);
-      trunks.push(boxAt(route, s, side * 11.5, 0.35, h, 0.35));
-      crowns.push(boxAt(route, s, side * 11.5, 3.2, 1.2, 3.2, h));
+      const h = 10 + 6 * hash(k, side, 8), f = route.frameAt(s), at = f.pos.clone().addScaledVector(f.right, side * 11.5);
+      const m = new THREE.Matrix4().compose(at, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(k, side, 9) * Math.PI * 2), new THREE.Vector3().setScalar(h / PALM.h));
+      placed[Math.floor(hash(k, side, 7) * VARIANTS)]!.push(m);
     }
   }
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.6, 1, 6), toon({ color: WORLD.trunk }), trunks.length);
-  trunks.forEach((m, i) => trunk.setMatrixAt(i, m));
-  const crown = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 7, 4), toon({ color: WORLD.crown }), crowns.length);
-  crowns.forEach((m, i) => crown.setMatrixAt(i, m));
-  g.add(named(trunk, 'palms'), named(crown, 'palms'));
+  const bark = new THREE.Color(WORLD.trunk), scar = bark.clone().lerp(new THREE.Color('#c9a27a'), 0.35);
+  const palms = new THREE.Group(), leaves = toon({ color: WORLD.crown, side: THREE.DoubleSide }), dead = toon({ color: '#7a5f3c', side: THREE.DoubleSide }), wood = toon({ vertexColors: true });
+  placed.forEach((ms, v) => {
+    if (!ms.length) return;
+    const p = palmVariant(v + 1, bark, scar);
+    for (const [geo, mat] of [[p.trunk, wood], [p.skirt, dead], [p.crown, leaves]] as const) {
+      const im = new THREE.InstancedMesh(geo, mat, ms.length);
+      ms.forEach((m, i) => im.setMatrixAt(i, m));
+      palms.add(im);
+    }
+  });
+  g.add(named(palms, 'palms'));
 
   for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
   g.add(named(buildStreetlights(drive), 'streetlights'));
