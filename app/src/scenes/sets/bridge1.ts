@@ -11,6 +11,11 @@ import { WORLD, toon } from '../../look/toon';
 import { F, font } from '../../engine/type';
 import { box, canvasTex, pic, plane, roadFrame, signFace } from './kit';
 
+/** The exit's haze: veils this far back from the mouth (m), each adding this much of EXIT_GLOW. */
+const EXIT_HAZE: readonly [number, number][] = [[2, 0.14], [6, 0.08], [12, 0.04]];
+/** The exit's glare: its colour, and how bright (HDR multiple: it blooms). */
+const EXIT_GLOW = '#ffd2c8', EXIT_GLARE = 1.8;
+
 export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.bridge1 as Bridge1Plan | undefined;
   if (!plan) return null;
@@ -47,13 +52,38 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
     heads.push(m);
   }
 
-  // ---- strip lights along both walls at the haunch: the bore reads as a tube receding, the fog takes the far end ----
-  const strip = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.15, 0.72, 0.38) });
+  // ---- strip lights along both walls at the haunch: the bore reads as a tube receding, the fog takes the far end;
+  // each swept along the road, so they follow the bore round its bend (straight boxes kinked against the wall) ----
+  const strip = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.15, 0.72, 0.38), side: THREE.DoubleSide });
+  const lit: number[] = [];
   for (let s = plan.s0 + 4; s < plan.s1 - 4; s += 10) {
     for (const side of [-1, 1]) {
-      const g = onRoad(s + 5, side * (TUNNEL.halfW - 0.12));
-      box(g, 0.1, 0.09, 9.4, 0, TUNNEL.h - 0.75, 0, strip);
+      for (let a = s + 0.3; a < s + 9.7 - 1e-6; a += 1) {
+        const ring = [a, Math.min(a + 1, s + 9.7)].flatMap((u) => {
+          const f = route.frameAt(u), at = f.pos.clone().addScaledVector(f.right, side * (TUNNEL.halfW - 0.17));
+          return [at.clone().setY(at.y + TUNNEL.h - 0.795), at.clone().setY(at.y + TUNNEL.h - 0.705)];
+        });
+        const [p0, p1, q0, q1] = ring as [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3];
+        for (const v of [p0, q0, p1, p1, q0, q1]) lit.push(v.x, v.y, v.z);
+      }
     }
+  }
+  const strips = new THREE.BufferGeometry();
+  strips.setAttribute('position', new THREE.Float32BufferAttribute(lit, 3));
+  root.add(new THREE.Mesh(strips, strip));
+
+  // ---- the light at the end: the way out a glare (it blooms; the car drives into it), and veils across the bore by
+  // it, thickening toward it, the light spilling in (the sky through the mouth read as a hard cut-out, the town's ink
+  // drawn over it) ----
+  const veil = new THREE.PlaneGeometry(2 * TUNNEL.halfW, TUNNEL.h).translate(0, TUNNEL.h / 2, 0);
+  {
+    const g = onRoad(plan.s1 - 0.2, 0), glare = new THREE.Mesh(veil, new THREE.MeshBasicMaterial({ color: new THREE.Color(EXIT_GLOW).multiplyScalar(EXIT_GLARE), fog: false }));
+    glare.rotation.y = Math.PI; // (facing back down the bore; from outside, the bore shows through)
+    g.add(glare);
+  }
+  for (const [back, k] of EXIT_HAZE) {
+    const g = onRoad(plan.s1 - back, 0);
+    g.add(new THREE.Mesh(veil, new THREE.MeshBasicMaterial({ color: new THREE.Color(EXIT_GLOW).multiplyScalar(k), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false })));
   }
 
   // ---- SOS niches on the right wall: a small lit orange box every so often ----
