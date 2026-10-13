@@ -57,3 +57,33 @@ export function daylight(t: number): number {
   const u = Math.min(1, Math.max(0, (e + 12) / 22));
   return 0.25 + 0.75 * u * u * (3 - 2 * u);
 }
+
+/** The air through the song (spec §2: distance haze graded per section): [song s, fog's near and far (m), its tint
+ *  (sRGB), how far the fog's colour leans from the horizon's toward the tint]. Golden dust on the corner and the
+ *  boulevard, the city's warm haze, the freeway's clearer air, the neighbourhood's rose, sea haze on the coast, the
+ *  night's violet. (By night the scene pulls the far end in further; in a tunnel the dark takes over.) */
+export const AIR_KEYS: readonly [number, number, number, string, number][] = Object.freeze([
+  [0, 70, 900, '#FFD39A', 0.3],
+  [30, 90, 1000, '#F7B98A', 0.25],
+  [60, 120, 1200, '#F0A07A', 0.2],
+  [75, 80, 900, '#E88F8A', 0.25],
+  [105, 120, 1300, '#FF9A6A', 0.3],
+  [135, 140, 950, '#8E3D7C', 0.15],
+  [182, 140, 900, '#3F2560', 0.15],
+]);
+const AIR_LIN = AIR_KEYS.map(([t, n, f, c, m]) => [t, n, f, new THREE.Color(c), m] as const); // (tints linear)
+
+export interface Air { near: number; far: number; tint: THREE.Color; mix: number }
+
+/** The air at t (its tint linear). */
+export function airAt(t: number, out: Air = { near: 0, far: 0, tint: new THREE.Color(), mix: 0 }): Air {
+  let k = 1;
+  while (k < AIR_LIN.length - 1 && t > AIR_LIN[k]![0]) k++;
+  const [t0, n0, f0, c0, m0] = AIR_LIN[k - 1]!, [t1, n1, f1, c1, m1] = AIR_LIN[k]!;
+  const u = Math.min(1, Math.max(0, (t - t0) / (t1 - t0)));
+  out.near = n0 + (n1 - n0) * u;
+  out.far = f0 + (f1 - f0) * u;
+  out.tint.copy(c0).lerp(c1, u);
+  out.mix = m0 + (m1 - m0) * u;
+  return out;
+}

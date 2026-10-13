@@ -11,7 +11,7 @@ import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, FLY, centerAt } from '../drive/carriers';
-import { COAST_T, SUN_AZ_DEG, daylight, skyStateAt } from '../drive/sky';
+import { COAST_T, SUN_AZ_DEG, airAt, daylight, skyStateAt } from '../drive/sky';
 import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
@@ -277,7 +277,8 @@ export default class DriveScene extends Scene {
     this.hemi.color.copy(sky.zenith);
     this.hemi.groundColor.copy(sky.horizon).multiplyScalar(0.35);
     this.hemi.intensity = 0.55 + 0.75 * day;
-    this.fogColor.copy(sky.horizon);
+    const air = airAt(t);
+    this.fogColor.copy(sky.horizon).lerp(air.tint, air.mix); // (graded per section: drive/sky.ts AIR_KEYS)
     NIGHT.value = smooth(2 * DEG, -8 * DEG, e); // the lights come on as the sun goes
 
     // in a tunnel (by where the camera is): the daylight shut out, the lamps' light on the tiles and the car
@@ -300,8 +301,8 @@ export default class DriveScene extends Scene {
     fog.color.copy(this.fogColor);
     // (by night the fog pulls in: the far world melts into the dark — the climbing switchback's embankment would
     // otherwise loom behind the Strip as an unlit wall)
-    const far = 1100 - 500 * NIGHT.value;
-    fog.near = 140 - 130 * inside;
+    const far = air.far - 500 * NIGHT.value;
+    fog.near = air.near - (air.near - 10) * inside;
     fog.far = far - (far - 140) * inside;
 
     this.city.update(t, this.cam.position, this.rt.width / W);
