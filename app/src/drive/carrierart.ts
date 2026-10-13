@@ -77,7 +77,7 @@ const GREEN = '#1f6b44';
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean; /** Ransom-note lettering: each letter its own pasted scrap, seeded. */ ransom?: boolean }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
@@ -124,7 +124,10 @@ function styleOf(c: Carrier): Style {
     case 'giant': return { family: F.archivo(62, 900), caps: true, colors: [AD_STYLE.him.ink, AD_STYLE.him.ink, '#c8102e'], alpha: [0.72, 1] };
     case 'arch': return { bg: '#f6edd6', border: '#2b4a66', family: F.archivo(100, 900), caps: true, colors: ['#2b4a66', '#2b4a66', '#d81e2c'], alpha: [0.75, 1] }; // the beach town's band
     case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
-    case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
+    case 'street': case 'gantry': return c.kind === 'gantry' && c.stretch === 'chorus4'
+      // the hijacked sign: the route's shield stays, the words pasted over it in ransom-note scraps
+      ? { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 900), caps: true, colors: ['#16131a', '#16131a', '#d81e2c'], alpha: [0.8, 1], ransom: true }
+      : { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
 }
@@ -278,6 +281,10 @@ export class CarrierArt {
         const sung = t >= w.start, now = sung && t < w.end;
         c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];
         c.globalAlpha = (solo ? 1 : style.alpha[sung ? 1 : 0]) * (1 - gone) * alpha;
+        if (style.ransom) { // each letter its own pasted scrap (the word being sung tilts a touch more)
+          x += this.drawRansom(c, label(w), x, y, em, now) + space;
+          continue;
+        }
         // dissolving: the letters drift apart and up, a little more each word along
         const fall = fallAt(w, t, rowH);
         if (fall) { c.save(); c.translate(x, y + fall.dy); c.rotate(fall.tilt); }
@@ -303,6 +310,34 @@ export class CarrierArt {
     });
     c.globalAlpha = 1;
     c.shadowBlur = 0;
+  }
+
+  /** A word in ransom-note letters: each its own scrap of paper (seeded colour, face, size, tilt), the ink in the
+   *  current fillStyle/alpha. Returns the word's advance (px). */
+  private drawRansom(c: CanvasRenderingContext2D, word: string, x: number, y: number, em: number, now: boolean): number {
+    const scraps = ['#f4f0e6', '#ffd65a', '#ffffff', '#f4b6c2'];
+    const faces = [F.archivo(100, 900), F.bodoni(700, { italic: true }), F.mono(700)];
+    const ink = c.fillStyle as string, alpha = c.globalAlpha;
+    let dx = 0;
+    for (let i = 0; i < word.length; i++) {
+      const seed = word.charCodeAt(i) * 31 + i * 7 + word.length;
+      const size = em * (0.78 + 0.42 * hash(seed, 1)) * (now ? 1.08 : 1);
+      const tilt = (hash(seed, 2) - 0.5) * 0.26, lift = (hash(seed, 3) - 0.5) * em * 0.18;
+      c.save();
+      c.font = font(faces[Math.floor(hash(seed, 4) * faces.length)]!, size);
+      const wd = c.measureText(word[i]!).width;
+      c.translate(x + dx + wd / 2, y + lift);
+      c.rotate(tilt);
+      c.globalAlpha = alpha;
+      c.fillStyle = scraps[Math.floor(hash(seed, 5) * scraps.length)]!;
+      c.fillRect(-wd / 2 - size * 0.1, -size * 0.62, wd + size * 0.2, size * 1.22);
+      c.fillStyle = ink;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(word[i]!, 0, size * 0.02);
+      c.restore();
+      dx += wd + em * 0.07;
+    }
+    return dx;
   }
 
   dispose() { this.texture.dispose(); }

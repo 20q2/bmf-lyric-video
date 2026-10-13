@@ -107,6 +107,29 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
     needles.push(needle);
     body.add(g);
   }
+  // the shift indicator in front of him, under the gauges: P R N D L in the signs' face, its D a lamp the last chorus
+  // flares on "Put it in drive" (scenes/sets/chorus4.ts, by name)
+  {
+    const g = faceFrame(new THREE.Vector3(0.44, 1.063, 0.558), HEAD_UNIT.normal);
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112;
+    const c = cv.getContext('2d')!;
+    c.fillStyle = '#0d0b10'; c.fillRect(0, 0, 512, 112);
+    c.strokeStyle = '#3a3540'; c.lineWidth = 6; c.strokeRect(4, 4, 504, 104);
+    c.fillStyle = '#6a7580'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `58px "${F.sign(600)}"`;
+    'PRNDL'.split('').forEach((ch, i) => c.fillText(ch, (0.14 + i * 0.18) * 512, 60));
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.057), new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.2, 1.2, 1.2) }));
+    g.add(strip);
+    const bez = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.075, 0.02), chrome); bez.position.z = -0.012; g.add(bez);
+    const dcv = document.createElement('canvas'); dcv.width = dcv.height = 96;
+    const dc = dcv.getContext('2d')!;
+    dc.fillStyle = '#ffb000'; dc.textAlign = 'center'; dc.textBaseline = 'middle'; dc.font = `64px "${F.sign(700)}"`; dc.fillText('D', 48, 52);
+    const dtex = new THREE.CanvasTexture(dcv); dtex.colorSpace = THREE.SRGBColorSpace;
+    const dLamp = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.05), new THREE.MeshBasicMaterial({ map: dtex, transparent: true, color: new THREE.Color(0.35, 0.35, 0.35), depthWrite: false }));
+    dLamp.name = 'shiftD';
+    dLamp.position.set((0.68 - 0.5) * 0.26, 0.001, 0.002); g.add(dLamp);
+    body.add(g);
+  }
   // the visors: hinged on the top rail over each seat, folded back flat; hers (on the car's right: −x) has a mirror
   const M = VISOR.mirror, flaps: THREE.Group[] = [];
   for (const side of [1, -1]) {

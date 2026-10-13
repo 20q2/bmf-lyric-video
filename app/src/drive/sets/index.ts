@@ -14,6 +14,7 @@ import type { Block } from '../blocks';
 import { CHORUS1 } from './chorus1';
 import { CHORUS2 } from './chorus2';
 import { CHORUS3 } from './chorus3';
+import { CHORUS4 } from './chorus4';
 import { INTRO } from './intro';
 import { VERSE1 } from './verse1';
 import { VERSE2 } from './verse2';
@@ -62,4 +63,4 @@ export interface SetPiece {
 /** Whether a set-piece places this line of stretch st. */
 export const owned = (line: Line, st: Stretch) => { const set = SETS[st.id]; return !!set && (set.owns?.(line) ?? true); };
 
-export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, chorus1: CHORUS1, verse1: VERSE1, chorus2: CHORUS2, verse2: VERSE2, chorus3: CHORUS3, verse3: VERSE3 };
+export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, chorus1: CHORUS1, verse1: VERSE1, chorus2: CHORUS2, verse2: VERSE2, chorus3: CHORUS3, verse3: VERSE3, chorus4: CHORUS4 };
