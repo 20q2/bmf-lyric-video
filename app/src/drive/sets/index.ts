@@ -17,6 +17,7 @@ import { CHORUS3 } from './chorus3';
 import { INTRO } from './intro';
 import { VERSE1 } from './verse1';
 import { VERSE2 } from './verse2';
+import { VERSE3 } from './verse3';
 
 /** How a set frames one of its phrases: the target, the move onto it, and when it starts (default: its cue). */
 export interface SetFrame { to: Target; move: ShotMove; at?: number }
@@ -61,4 +62,4 @@ export interface SetPiece {
 /** Whether a set-piece places this line of stretch st. */
 export const owned = (line: Line, st: Stretch) => { const set = SETS[st.id]; return !!set && (set.owns?.(line) ?? true); };
 
-export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, chorus1: CHORUS1, verse1: VERSE1, chorus2: CHORUS2, verse2: VERSE2, chorus3: CHORUS3 };
+export const SETS: Readonly<Record<string, SetPiece>> = { intro: INTRO, chorus1: CHORUS1, verse1: VERSE1, chorus2: CHORUS2, verse2: VERSE2, chorus3: CHORUS3, verse3: VERSE3 };

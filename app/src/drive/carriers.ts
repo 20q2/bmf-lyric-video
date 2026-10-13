@@ -113,14 +113,12 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
   chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint; its set owns the arch's line)
   bridge1: ['tunnel'],
-  verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
+  // (verse3 has no pattern: its set-piece owns every line, sets/verse3.ts)
   chorus4: ['road', 'gantry', 'sky', 'hill'], // (its set owns the campaign's line — his biggest board, on the hillside — and the drive insert's; the ransom line keeps its gantries, hijacked: carrierart.ts)
   outro1: ['sky'], // (constellations: no banner planes at night; carrierart.ts draws night sky-writing as stars)
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
-export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
-  verse3: ['neon', 'billboard', 'neon', 'billboard', 'storefront'],
-};
+export const FAST_LEFT: Record<string, readonly LeftKind[]> = {};
 
 /** Per kind: a row's height and the face's width (m), and the face's type: its average advance per character (a share
  *  of the em) and the share of a row the em may take. */
