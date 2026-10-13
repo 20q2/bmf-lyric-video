@@ -43,6 +43,9 @@ export interface Chorus2Plan {
   posters: number[];
   gantryS: number; panels: Panel[];
   exitS: number;
+  /** Slower cars in the outside lane, overtaken through the chorus (the cheapest speed there is: relative motion):
+   *  each where it is when they pass it (m along the road, s), its own speed (m/s) and its lane (m off the centre). */
+  traffic: { s0: number; t0: number; v: number; lat: number }[];
 }
 
 export const CHORUS2: SetPiece = {
@@ -103,9 +106,14 @@ export const CHORUS2: SetPiece = {
       blocks.push({ s: m, lateral: WALL.face - WALL.d / 2, w: WALL.seg, h: WALL.h, d: WALL.d, color: 0, concrete: true, matrix: boxAt(route, m, WALL.face - WALL.d / 2, WALL.d, WALL.h, WALL.seg + 0.05) });
     }
     const until = at + (s1 - tailS) / TRAIN.v;
+    // slower traffic in the outside lane, one overtaken in each third of the chorus
+    const traffic = ([[0.23, 18], [0.55, 17], [0.84, 20]] as const).map(([u, v]) => {
+      const t0 = st.start + (st.end - st.start) * u;
+      return { s0: carS(t0), t0, v, lat: 4.6 };
+    });
     const plan: Chorus2Plan = {
       s0, s1, train: { tailS, at, from: Math.max(st.start - 1, at - 4), until }, posters: posters.map((c) => c.s),
-      gantryS, panels, exitS: carS(st.end - EXIT.before) + 40,
+      gantryS, panels, exitS: carS(st.end - EXIT.before) + 40, traffic,
     };
     return { carriers, frames, clear: [{ side: -1, a: s0, b: s1 }], blocks, plan };
   },

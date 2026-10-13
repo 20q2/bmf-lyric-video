@@ -10,6 +10,7 @@ import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { F, font } from '../../engine/type';
+import { sedan } from './kit';
 
 const UP = new THREE.Vector3(0, 1, 0);
 function canvasTex(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -47,16 +48,17 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
   strip(MEDIAN.barrier, 0.6, MEDIAN.barrierH, 0, concrete);
   strip(MEDIAN.tracks, 4.2, 0.18, 0, toon({ color: '#7b6f68' }));
   for (const x of [-0.75, 0.75]) strip(MEDIAN.tracks + x, 0.08, 0.12, 0.18, steel);
-  // the catenary: a pole every 40 m between the tracks and the wall (none in front of his posters), the wire over the
-  // tracks
+  // the catenary: a pole every 40 m between the tracks and the wall, the wire over the tracks; through the posters'
+  // run the poles keep their rhythm but stand at the boards' gaps, never over his face or the words
   strip(MEDIAN.tracks, 0.04, 0.04, 5.6, steel);
   const run = [plan.posters[0]! - 15, plan.posters[plan.posters.length - 1]! + 15];
-  for (let s = plan.s0 + 20; s < plan.s1; s += 40) {
-    if (s > run[0]! && s < run[1]!) continue;
+  const poleAt = (s: number) => {
     const p = onRoad(s, MEDIAN.tracks - 2.6);
     box(p, 0.22, 6, 0.22, 0, 3, 0, steel);
     box(p, 2.8, 0.1, 0.1, -1.4, 5.8, 0, steel); // (its arm out over the tracks: to the road's right, the frame's -x)
-  }
+  };
+  for (let s = plan.s0 + 20; s < plan.s1; s += 40) if (s <= run[0]! || s >= run[1]!) poleAt(s);
+  for (let i = 1; i < plan.posters.length; i += 2) poleAt((plan.posters[i - 1]! + plan.posters[i]!) / 2);
 
   // the train: three cars, silver with a gold stripe, a dark band of windows, red lamps on the last
   const cars: THREE.Group[] = [], body = toon({ color: '#d8dade' }), gold = toon({ color: '#e0a526' }), glass = toon({ color: '#1d2230' });
@@ -82,6 +84,14 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
     }
   }
 
+  // slower traffic in the outside lane, overtaken (the cheapest speed there is)
+  const traffic = plan.traffic.map((T, i) => {
+    const g = new THREE.Group(); g.matrixAutoUpdate = false;
+    g.add(sedan({ color: ['#e8e2d2', '#5a6a7d', '#b0532e'][i % 3]! }));
+    root.add(g);
+    return { T, g };
+  });
+
   // the SLAUSON exit sign over their lane, on a cantilever from the right shoulder
   {
     const g = onRoad(plan.exitS, ROAD_HALF + 2.5), tex = canvasTex(1024, 512, (c) => {
@@ -105,6 +115,11 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
       for (const [k, c] of cars.entries()) {
         c.visible = there;
         if (there) frameAt(T.tailS + TRAIN.v * (t - T.at) + (k + 0.5) * TRAIN.car + k * TRAIN.gap, MEDIAN.tracks, c.matrix);
+      }
+      for (const { T: tr, g } of traffic) {
+        const s = tr.s0 + tr.v * (t - tr.t0);
+        g.visible = s > plan.s0 + 10 && s < plan.s1 - 5;
+        if (g.visible) frameAt(s, tr.lat, g.matrix);
       }
     },
   };
