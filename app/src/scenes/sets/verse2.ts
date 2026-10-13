@@ -12,7 +12,7 @@ import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { drawAd } from '../../look/adart';
 import { F, font } from '../../engine/type';
-import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, signFace } from './kit';
+import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, sedan, signFace } from './kit';
 import { glassTex } from './chorus1';
 
 /** The chicken: white, a red comb and wattle, an orange beak, its tail; standing at (0, y, 0) of g, facing +z. */
@@ -26,16 +26,19 @@ function chicken(g: THREE.Object3D, y: number, k = 1) {
   const beak = new THREE.Mesh(new THREE.ConeGeometry(0.16 * k, 0.45 * k, 10), orange); beak.rotation.x = Math.PI / 2; beak.position.set(0, y + 3.25 * k, 1.6 * k); g.add(beak);
   ball(g, 0.8 * k, 0, y + 2.2 * k, -1.4 * k, white).scale.set(0.5, 1.2, 0.7); // its tail
 }
-/** A row of bulbs along a line in g (from a to b), lit at night. */
-function bulbs(g: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, n: number, m: THREE.Material) {
-  for (let i = 0; i <= n; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), m); s.position.copy(a.clone().lerp(b, i / n)); g.add(s); }
+/** A row of bulbs along a line in g (from a to b): each takes a material from `ms` in turn (the chase's phases). */
+function bulbs(g: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, n: number, ms: readonly THREE.Material[], phase0 = 0) {
+  for (let i = 0; i <= n; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), ms[(phase0 + i) % ms.length]!); s.position.copy(a.clone().lerp(b, i / n)); g.add(s); }
 }
 
 export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.verse2 as Verse2Plan | undefined;
   if (!plan) return null;
+  const drifting: THREE.Mesh[] = [];
   const { route } = drive, root = new THREE.Group(), onRoad = roadFrame(route, root), front = leftFront(route, root);
-  const dark = toon({ color: WORLD.post }), red = '#c8202e', bulb = lampMaterial('#ffe08a', GLOW.lamp, 0.9);
+  const dark = toon({ color: WORLD.post }), red = '#c8202e';
+  // the roof sign's bulbs chase in three phases on the half-beat (classic chicken-shack energy)
+  const chase = [0, 1, 2].map(() => lampMaterial('#ffe08a', GLOW.lamp, 0.9));
   const name = (w: number, h: number) => pic(signFace('FRIED CHICKEN', 1024, Math.round((1024 * h) / w), '#fff6e0', red, F.sign(700), 0.56, 0.12));
 
   // ---- the pole sign at the curb: its name over the lightbox (the lyric's: the carriers), a chicken on top, up on a
@@ -69,6 +72,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
 
   // ---- the shop: white, a red fascia with its name, a red base; its windows (painted: the carriers), the door between,
   // the banner's grommets under the eaves, the sign on its roof with the chicken standing on it ----
+  let roofChicken!: THREE.Group;
   {
     const B = plan.shop, Sh = SHACK.shop, g = front(B.s, Sh.face), x = (s: number) => s - B.s, w = B.w;
     box(g, w, Sh.h, Sh.d, 0, Sh.h / 2, -Sh.d / 2, toon({ color: '#f7f1e3' }));
@@ -89,16 +93,16 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     const bn = onPanel(plan.banner), chrome = toon({ color: WORLD.chrome });
     for (const [px, py] of [[-1, 1], [1, 1], [-1, -1], [1, -1]] as const) ball(bn, 0.05, (px * plan.banner.w) / 2 - px * 0.12, (py * plan.banner.h) / 2 - py * 0.1, 0.01, chrome);
     root.add(bn);
-    // the roof sign: its red frame, bulbs round it, legs down to the roof, the chicken standing on it
+    // the roof sign: its red frame, bulbs round it (chasing), legs down to the roof, the chicken standing on it
     const R = plan.sign, rg = onPanel(R), legs = R.center.y - R.h / 2 - (route.frameAt(B.s).pos.y + Sh.h);
     box(rg, R.w + 0.5, R.h + 0.5, 0.35, 0, 0, -0.2, toon({ color: red }));
     const e = (R.w + 0.25) / 2, f = (R.h + 0.25) / 2;
-    bulbs(rg, new THREE.Vector3(-e, f, 0.02), new THREE.Vector3(e, f, 0.02), 24, bulb);
-    bulbs(rg, new THREE.Vector3(-e, -f, 0.02), new THREE.Vector3(e, -f, 0.02), 24, bulb);
-    bulbs(rg, new THREE.Vector3(-e, -f, 0.02), new THREE.Vector3(-e, f, 0.02), 9, bulb);
-    bulbs(rg, new THREE.Vector3(e, -f, 0.02), new THREE.Vector3(e, f, 0.02), 9, bulb);
+    bulbs(rg, new THREE.Vector3(-e, f, 0.02), new THREE.Vector3(e, f, 0.02), 24, chase);
+    bulbs(rg, new THREE.Vector3(e, -f, 0.02), new THREE.Vector3(-e, -f, 0.02), 24, chase, 1); // (back along the foot: the chase runs round)
+    bulbs(rg, new THREE.Vector3(-e, -f, 0.02), new THREE.Vector3(-e, f, 0.02), 9, chase, 2);
+    bulbs(rg, new THREE.Vector3(e, f, 0.02), new THREE.Vector3(e, -f, 0.02), 9, chase, 1);
     for (const lx of [-R.w / 3, R.w / 3]) box(rg, 0.2, legs, 0.2, lx, -R.h / 2 - legs / 2, -0.25, dark);
-    const top = new THREE.Group(); top.position.set(0, R.h / 2 + 0.25, -0.2); rg.add(top); chicken(top, 0, 0.9);
+    roofChicken = new THREE.Group(); roofChicken.position.set(0, R.h / 2 + 0.25, -0.2); rg.add(roofChicken); chicken(roofChicken, 0, 0.9);
     root.add(rg);
   }
 
@@ -143,6 +147,20 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     for (const z of [-5, 0, 5]) box(b, 0.05, 3, 3.6, 5.03, 1.5, z, toon({ color: '#1d2230' }));
     const suds = toon({ color: '#ffffff' });
     for (let k = 0; k < 14; k++) ball(b, 0.25 + 0.35 * ((k * 0.37) % 1), 5.6 + ((k * 0.61) % 1.4), 0.3 + ((k * 0.43) % 1) * 1.8, -7 + k, suds);
+    // a few soap bubbles drifting up from the bays (background of the sign's shot, never near the board)
+    for (const [k, z] of [-6, -2, 3].entries()) drifting.push(ball(b, 0.14 + 0.05 * k, 5.9, 0.5, z, suds));
+  }
+
+  // ---- parked lowriders at the left curb (the neighbourhood's own), one laid nose-down on its suspension ----
+  {
+    const spots = [
+      { s: plan.pole.s - 14, color: '#8a5f9e', low: true },
+      { s: plan.shop.s + plan.shop.w / 2 + 16, color: '#2f7a5a', low: false },
+    ];
+    for (const sp of spots) {
+      const g = onRoad(sp.s, -(ROAD_HALF - 1.15)), car = sedan({ color: sp.color, length: 5.2, low: sp.low });
+      g.add(car);
+    }
   }
 
   // ---- his giant mural, painted on the end wall of its building: his portrait on the right (its words: the carriers) ----
@@ -157,5 +175,31 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(wall);
   }
 
-  return { group: root, update() {} };
+  const beat = drive.beats.length > 1 ? drive.beats[1]! - drive.beats[0]! : 0.47;
+  return {
+    group: root,
+    update(t) {
+      // the chase, stepping on the half-beat
+      const step = Math.floor(t / (beat / 2)) % 3;
+      chase.forEach((m, i) => {
+        const lit = i === step;
+        m.uniforms.day!.value = lit ? 1.5 : 0.3;
+        m.uniforms.strength!.value = GLOW.lamp * (lit ? 1.2 : 0.3);
+      });
+      // the roof chicken hops on the word "chickens", settling
+      const tau = t - plan.chickens;
+      if (tau >= 0 && tau < 1.1) {
+        const up = tau < 0.3 ? Math.sin((Math.PI * tau) / 0.3) : 0.3 * Math.exp(-(tau - 0.3) * 7) * Math.cos((tau - 0.3) * 18);
+        roofChicken.position.y = (plan.sign.h / 2 + 0.25) + 0.45 * up;
+        roofChicken.rotation.z = 0.1 * up;
+      } else { roofChicken.position.y = plan.sign.h / 2 + 0.25; roofChicken.rotation.z = 0; }
+      // soap bubbles drifting up from the bays
+      drifting.forEach((b, k) => {
+        const u = (t * 0.22 + k * 0.37) % 1;
+        b.position.y = 0.5 + u * 2.6;
+        b.position.x = 5.9 + 0.4 * Math.sin(t * 0.8 + k * 2.1);
+        b.scale.setScalar(1 - 0.35 * u);
+      });
+    },
+  };
 }

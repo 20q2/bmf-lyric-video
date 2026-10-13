@@ -94,8 +94,9 @@ export interface Verse2Plan {
   giant: Face;
   /** Its building. */
   giantBlock: Block;
-  /** When the car lays back (the word "backwards"). */
+  /** When the car lays back (the word "backwards"), and when the word "chickens" lands (the roof chicken hops). */
   layBack: number;
+  chickens: number;
 }
 
 export const VERSE2: SetPiece = {
@@ -272,6 +273,7 @@ export const VERSE2: SetPiece = {
       giant: { center: gP, normal: gn, up: gUp, w: G.w, h: G.h },
       giantBlock,
       layBack: lines[7]!.words.find((w) => /^backwards/i.test(w.w))?.start ?? lines[7]!.end,
+      chickens: wordAt(4, /^chickens/i),
     };
     // (chorus 3's faces stand past his mural, and past where their own clear zone would take his building)
     return { carriers, frames, clear, blocks, plan, floor: gs + G.w + 45 };
