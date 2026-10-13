@@ -6,27 +6,32 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import type { Carrier } from './carriers';
 import type { Motion } from './motion';
-import type { Route } from './route';
+import { ROAD_HALF, type Route } from './route';
 import type { Stretch } from './stretches';
 import { TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 
-/** Per stretch: building heights (m, min–max), how many plots stay empty, which side is the sea, and how far back
- *  (m) the near row starts. */
-export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number }> = {
-  intro: { h: [6, 10], empty: 0.5 },
-  chorus1: { h: [8, 22], empty: 0.3 },
-  verse1: { h: [14, 40], empty: 0.1 },
-  chorus2: { h: [6, 14], empty: 0.6, far: 40 },
-  verse2: { h: [4, 8], empty: 0.3 },
-  chorus3: { h: [5, 10], empty: 0.6, seaLeft: true },
+/** Per stretch: building heights (m, min–max), how many plots stay empty, which side is the sea, how far back (m) the
+ *  near row starts, and the rows behind it (how many, their heights). */
+export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number; back?: [number, number, number] }> = {
+  intro: { h: [6, 10], empty: 0.5, back: [2, 8, 16] },
+  chorus1: { h: [8, 22], empty: 0.3, back: [2, 10, 26] },
+  verse1: { h: [14, 40], empty: 0.1, back: [3, 18, 50] },
+  chorus2: { h: [6, 14], empty: 0.6, far: 40, back: [1, 8, 18] },
+  verse2: { h: [4, 8], empty: 0.3, back: [1, 6, 10] },
+  chorus3: { h: [5, 10], empty: 0.6, seaLeft: true, back: [1, 6, 12] },
   bridge1: { h: [5, 9], empty: 1, seaLeft: true }, // in the tunnel
-  verse3: { h: [8, 18], empty: 0.05 },
+  verse3: { h: [8, 18], empty: 0.05, back: [2, 12, 28] },
   chorus4: { h: [3, 6], empty: 0.8 },
   outro1: { h: [0, 0], empty: 1 },
 };
 /** Plots every PLOT m; the near row at least `far` m off the road's centre. */
 export const PLOT = 22;
 const NEAR = 18;
+/** The rows behind the street: the first this far off the road's centre (m), each next one this much further; none
+ *  within this far of the road (wherever it bends back past them); a quarter of their plots empty (lots, parking). */
+export const BACK = { from: 44, step: 26, road: 8, empty: 0.25 };
+/** A footprint's sample points (the unit box's base). */
+const FOOTPRINT = [-0.5, -0.25, 0, 0.25, 0.5].flatMap((x) => [-0.5, -0.25, 0, 0.25, 0.5].map((z) => [x, z] as const));
 
 /** A box standing by the road: a building (the town's), or concrete (a set-piece's structure: a viaduct's deck, its
  *  piers); `lateral` and `w` across the road, `d` along it. */
@@ -70,6 +75,29 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
       const lateral = side * ((b.far ?? NEAR) + d / 2 + 6 * hash(k, side, 5));
       const lift = route.frameAt(s).pos.y + 0.4; // down to the plain: by a raised road it would float
       out.push({ s, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, s, lateral, d, h + lift, w, -lift) }); // (w along the road, d deep)
+    }
+  }
+  // the rows behind the street: the town's depth (none by the sea, in a tunnel's rock, or across the valley a hill sign
+  // is seen over), never on the road where it bends back past them
+  const roadPts: [number, number][] = [];
+  for (let s = 0; s <= route.length; s += 4) { const p = route.frameAt(s).pos; roadPts.push([p.x, p.z]); }
+  const offRoad = (m: THREE.Matrix4) => FOOTPRINT.every(([x, z]) => {
+    const p = new THREE.Vector3(x, -0.5, z).applyMatrix4(m);
+    return roadPts.every(([rx, rz]) => Math.hypot(rx - p.x, rz - p.z) >= ROAD_HALF + BACK.road);
+  });
+  for (let k = 0; k * PLOT < route.length; k++) {
+    for (const side of [1, -1]) {
+      const s = k * PLOT + PLOT / 2, b = BLOCKS[stretchAtS(s).id]!;
+      if (!b.back || (side === -1 && b.seaLeft) || nearTunnel(tunnels, s, TUNNEL_CLEAR) || hills.some((t) => t.side === side && s > t.a && s < t.b)) continue;
+      const [rows, h0, h1] = b.back;
+      for (let r = 0; r < rows; r++) {
+        if (hash(k, side, 20 + r) < BACK.empty) continue;
+        const w = 14 + 10 * hash(k, side, 30 + r), d = 14 + 8 * hash(k, side, 40 + r), h = h0 + (h1 - h0) * hash(k, side, 50 + r);
+        const at = s + (hash(k, side, 70 + r) - 0.5) * 6, lateral = side * (BACK.from + r * BACK.step + d / 2 + 6 * hash(k, side, 60 + r));
+        const lift = route.frameAt(at).pos.y + 0.4, m = boxAt(route, at, lateral, d, h + lift, w, -lift);
+        if (!offRoad(m)) continue;
+        out.push({ s: at, lateral, w, h, d, color: hash(k, side, 80 + r), matrix: m });
+      }
     }
   }
   return out;
