@@ -607,7 +607,9 @@ export function buildCar(): THREE.Group {
   g.add(body);
   // (the hero: candy paint and chrome in real light, the sky in them; look/hero.ts)
   const paint = candyPaint(WORLD.car, '#ff5a66'), dark = toon({ color: WORLD.carDark }), chrome = heroChrome();
-  const white = toon({ color: '#f4efe4' }), seat = toon({ color: '#3a1820' });
+  // (the cabin's own colours: oxblood tuck-and-roll, a dark plum dash — the two of them stay the cast's dark: in the
+  // in-car shots the dash and seats read as forms, not black slabs)
+  const white = toon({ color: '#f4efe4' }), seat = toon({ color: '#6e2533' }), cabin = toon({ color: '#3d2a36' });
   const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, to: THREE.Object3D = body) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); to.add(o); return o; };
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => add(new THREE.BoxGeometry(w, h, d), m, x, y, z);
 
@@ -620,12 +622,12 @@ export function buildCar(): THREE.Group {
     box(0.09, 0.025, cl, x * (IMPALA.halfWidth(cm) - 0.04), belt + 0.012, cm, chrome);
   }
   box(Wd - 0.2, 0.02, cl - 0.05, 0, IMPALA.cockpit.floor + 0.012, cm, seat); // the floor's carpet
-  box(Wd - 0.2, belt - IMPALA.cockpit.floor, 0.05, 0, (belt + IMPALA.cockpit.floor) / 2, cz1 - 0.03, dark); // the firewall under the dash
+  box(Wd - 0.2, belt - IMPALA.cockpit.floor, 0.05, 0, (belt + IMPALA.cockpit.floor) / 2, cz1 - 0.03, cabin); // the firewall under the dash
   // the cockpit: seats and the windshield
   box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
   box(Wd - 0.12, 0.05, 0.05, 0, belt + 0.48, 0.92, chrome); // the windshield's top rail
   for (const x of [Wd / 2 - 0.08, -Wd / 2 + 0.08]) box(0.05, 0.5, 0.05, x, belt + 0.24, 0.95, chrome);
-  box(1.7, 0.22, 0.36, 0, 1.1, 0.73, dark); // the dash (its gauges, head unit and the visors: look/dash.ts)
+  box(1.7, 0.22, 0.36, 0, 1.1, 0.73, cabin); // the dash (its gauges, head unit and the visors: look/dash.ts)
   g.userData.dash = buildDash(body);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.06, depthWrite: false }));
   glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);

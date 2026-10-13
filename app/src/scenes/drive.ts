@@ -60,7 +60,10 @@ const SUN_AZ = (SUN_AZ_DEG * Math.PI) / 180;
 /** Sunlight (low and warm, warmest as it sets), moonlight (cool, from high in the east), and the shadows' reach (m). */
 const SUN = { intensity: 2.8, high: new THREE.Color('#ffe6b8'), low: new THREE.Color('#ff8a4c') };
 const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * Math.PI) / 180 };
-const SHADOW = { half: 110 };
+/** The sun's shadows cover what the camera sees, not where the car is: a square this many metres either side of a point
+ *  this far ahead of the lens along the ground (QA 2026-10-13: at ±110 m round the car close shots got 11–14 cm
+ *  shadow texels, stair-stepped palms; shots looking far ahead ran off its edge). */
+const SHADOW = { half: 60, ahead: 32 };
 const DEG = Math.PI / 180;
 const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 
@@ -150,6 +153,9 @@ export default class DriveScene extends Scene {
     sh.camera.updateProjectionMatrix();
     sh.bias = -0.001; sh.normalBias = 0.12;
     this.sun.castShadow = true;
+    // (nothing up in the sky casts: the skywriter, the banners' tow planes — their shadows fell on the facades out of
+    // nowhere)
+    for (const o of [this.writer, ...this.flying.map(([, f]) => f)]) o.traverse((m) => { if (m instanceof THREE.Mesh) m.castShadow = false; });
     const coast = this.drive.route.frameAt(this.drive.motion.distanceAt(COAST_T));
     this.sunAz.set(coast.fwd.x, 0, coast.fwd.z).normalize().multiplyScalar(Math.cos(SUN_AZ))
       .addScaledVector(new THREE.Vector3(coast.right.x, 0, coast.right.z).normalize(), -Math.sin(SUN_AZ)).normalize();
@@ -281,8 +287,14 @@ export default class DriveScene extends Scene {
     this.dome.update(sky, sunDir, sunColor, this.cam, t, cloudsAt(t), raysAt(t));
     // the sun lights from no lower than 4° (its shadows stay finite), fading out as it sets
     const lightDir = this.sunAz.clone().multiplyScalar(Math.cos(Math.max(e, 4 * DEG))).add(new THREE.Vector3(0, Math.sin(Math.max(e, 4 * DEG)), 0));
-    this.sun.position.copy(cf.pos).addScaledVector(lightDir, 500);
-    this.sun.target.position.copy(cf.pos);
+    // (centred ahead of the lens, snapped to the map's texels in the light's own frame: no shimmer as the camera moves)
+    const look = new THREE.Vector3(); this.cam.getWorldDirection(look); look.y = 0;
+    const centre = this.cam.position.clone().addScaledVector(look.lengthSq() > 1e-6 ? look.normalize() : look, SHADOW.ahead); centre.y = cf.pos.y;
+    const texel = (2 * SHADOW.half) / QUALITY.shadowMap, lz = lightDir.clone().normalize(), lx = new THREE.Vector3(0, 1, 0).cross(lz).normalize(), ly = lz.clone().cross(lx);
+    const snap = (v: number) => Math.round(v / texel) * texel;
+    centre.copy(lx.clone().multiplyScalar(snap(centre.dot(lx)))).addScaledVector(ly, snap(centre.dot(ly))).addScaledVector(lz, centre.dot(lz));
+    this.sun.position.copy(centre).addScaledVector(lightDir, 500);
+    this.sun.target.position.copy(centre);
     this.sun.color.copy(sunColor);
     this.sun.intensity = SUN.intensity * smooth(-3 * DEG, 3 * DEG, e);
     const moonDir = this.sunAz.clone().multiplyScalar(-Math.cos(MOON.elev)).add(new THREE.Vector3(0, Math.sin(MOON.elev), 0));
