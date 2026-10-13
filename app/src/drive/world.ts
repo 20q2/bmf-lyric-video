@@ -423,6 +423,7 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   if (c.kind === 'speed' || c.kind === 'radio' || c.kind === 'phone') mat.color.setScalar(1.6); // (lit displays: they bloom a little)
   if (c.kind === 'polesign' || c.kind === 'roofsign') mat.color.setScalar(1.25); // (lightboxes)
+  if (c.kind === 'tunnelsign') mat.color.setScalar(1.7); // (a lit box in the dark bore)
   if (c.kind === 'plate' || c.kind === 'sticker') mat.color.setScalar(1.25); // (plate lamps: the rear reads at dusk)
   if (SET_KINDS.has(c.kind)) { // a set-piece's surface: just the face; its props stand round it (scenes/sets/)
     const m = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), mat);

@@ -36,13 +36,14 @@ import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 const CANVAS_W = 1024;
 /** Boards that show their ad's copy — or their own in-world copy (OWN_COPY) — until their lyric flips in (tri-vision:
  *  FLIP.slats slats, turning in a wave). A lit board that is simply blank reads as a bug, not anticipation. */
-const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'storefront', 'street', 'gantry', 'freeway', 'marquee', 'roofsign', 'vinyl']);
+const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'storefront', 'street', 'gantry', 'freeway', 'marquee', 'roofsign', 'vinyl', 'tunnelsign']);
 /** What a set-piece's board says before its lyric comes (its own words, in the signs' face: never the song's). */
 const OWN_COPY: Partial<Record<Carrier['kind'], [string, string]>> = {
   freeway: ['NORTH', '5'],
   marquee: ['OPEN LATE', ''],
   roofsign: ['CHICKEN', 'DINNERS'],
   vinyl: ['GRAND OPENING', ''],
+  tunnelsign: ['THE STRIP', 'AHEAD'],
 };
 export const FLIP = { slats: 10, stagger: 0.6, steps: 12 };
 /** The word of emphasis's row takes this many shares of its face's height (the others one each). */
@@ -135,6 +136,7 @@ function styleOf(c: Carrier): Style {
     case 'hood': return { family: F.archivoItalic(100, 800), caps: true, colors: ['#ffd65a', '#ffd65a', '#ffffff'], alpha: [0.75, 1], outline: '#5a0614', shadow: '#2a0309' };
     case 'giant': return { family: F.archivo(62, 900), caps: true, colors: [AD_STYLE.him.ink, AD_STYLE.him.ink, '#c8102e'], alpha: [0.72, 1] };
     case 'arch': return { bg: '#f6edd6', border: '#2b4a66', family: F.archivo(100, 900), caps: true, colors: ['#2b4a66', '#2b4a66', '#d81e2c'], alpha: [0.75, 1] }; // the beach town's band
+    case 'tunnelsign': return { bg: '#0b0d12', border: '#454b58', family: F.archivo(100, 800), caps: true, colors: ['#ffe2a8', '#ffd98a', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(255,180,80,0.85)' }; // a lit box in the bore
     case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     case 'street': case 'gantry': return c.kind === 'gantry' && c.stretch === 'chorus4'
       // the hijacked sign: the route's shield stays, the words pasted over it in ransom-note scraps

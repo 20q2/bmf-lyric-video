@@ -170,8 +170,9 @@ test('every carrier reads while its phrase is sung', () => {
   expect(fails).toEqual([]);
 }, 120000);
 
-test('only tunnel lettering stands in a tunnel or by its mouths, and it stands inside one', () => {
- const wrong = drive.carriers.filter((c) => c.kind !== 'sky' && c.kind !== 'banner' && (c.kind === 'tunnel') !== !!nearTunnel(drive.tunnels, c.s, c.kind === 'tunnel' ? -c.w / 2 : TUNNEL_CLEAR));
+test('only tunnel furniture (wall lettering, overhead signs) stands in a tunnel or by its mouths, and it stands inside one', () => {
+  const inTunnel = (c: Carrier) => c.kind === 'tunnel' || c.kind === 'tunnelsign';
+  const wrong = drive.carriers.filter((c) => c.kind !== 'sky' && c.kind !== 'banner' && inTunnel(c) !== !!nearTunnel(drive.tunnels, c.s, inTunnel(c) ? -c.w / 2 : TUNNEL_CLEAR));
   expect(wrong.map((c) => `${c.id} ${c.kind} s=${c.s.toFixed(0)}`)).toEqual([]);
 });
 

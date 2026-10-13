@@ -342,3 +342,19 @@ Rejected or deferred, with reasons:
   section), whips living only in the verses, and the NO VACANCY end beat.
 - Deferred to M5 (fidelity): the riders' blob heads in over-shoulder shots, palm crowns reading as discs, billboard
   void dressing, floodlights under the chorus-4 board, curbs and corners for verse 2's lot.
+
+**Bridge rework (2026-10-13): "the tunnel scene needs work" — fifteen seconds of one tiled wall becomes a set-piece
+(`sets/bridge1.ts`).**
+
+- The "Blowin' money fast" lines keep their wall lettering (sodium, then cyan: the look the section was kept for).
+- The two "Tryna make it last" lines each hang on a lit overhead sign in the bore (`tunnelsign`, THE STRIP · AHEAD
+  until the words flip in), shot from a waiting eye low in the oncoming lane: the car's headlights come up the dark,
+  pass the lens, and drive on beneath the sign toward the lamps' vanishing point. The second sign holds the exit's
+  night in its arch — the time-skip visible before the burst-out.
+- "We might crash" is an event now: lane-control signals hung down the bore flip from green arrows to red X on the
+  word, the lamps die (as before), and the car fishtails (hydraulics.ts: a damped swerve, caught; tunnel crashes only
+  — the outro's lands parked). All green and steady again as "tryna make it last" answers.
+- The bore is furnished: dim strip lights along both walls at the haunch (the tunnel reads as a tube receding, the
+  fog taking the far end, instead of a black void), SOS niches on the right, and MT. SOMEWHERE TUNNEL over the
+  entrance portal in the signs' face.
+- The guard's tunnel rule now admits tunnel furniture: wall lettering and overhead signs both live only inside.

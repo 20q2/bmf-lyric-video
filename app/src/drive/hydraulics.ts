@@ -1,16 +1,17 @@
 // The lowrider dances: the Impala's body on its hydraulics, a function of song time. It hops on the choruses' downbeats (every other bar), nose and tail in turn; it squats low on
 // "dropping"; on "crip walkin'" it lifts a front corner and rolls onto three wheels; on "backwards" it lays back, nose
-// up, tail down. The wheels stay on the road; the
+// up, tail down; and on the tunnel's "crash" it fishtails — a damped swerve, caught. The wheels stay on the road; the
 // body (and the two of them) moves. Pure.
 import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
 import type { Stretch } from './stretches';
 
 /** The hops (m, s); the squat (m, how long it holds, s); the three-wheel (m of lift at the front corner, radians of
- *  roll); the lay-back (radians, how long it holds, s). */
-export const HYDRAULICS = { hop: 0.24, hopS: 0.42, squat: 0.14, squatHold: 1.3, threeLift: 0.22, threeRoll: 0.09, layBack: 0.13, layHold: 0.8 };
+ *  roll); the lay-back (radians, how long it holds, s); the fishtail on the tunnel's "crash" (radians of yaw, caught
+ *  over `catchS` s). */
+export const HYDRAULICS = { hop: 0.24, hopS: 0.42, squat: 0.14, squatHold: 1.3, threeLift: 0.22, threeRoll: 0.09, layBack: 0.13, layHold: 0.8, swerve: 0.1, catchS: 1.3 };
 
-export interface Stance { lift: number; pitch: number; roll: number }
+export interface Stance { lift: number; pitch: number; roll: number; swerve: number }
 
 /** A damped bounce after an impulse at 0 (1 at once, settling). */
 const settle = (tau: number) => (tau < 0 ? 0 : Math.exp(-7 * tau) * Math.cos(15 * tau));
@@ -23,9 +24,12 @@ export function hydraulics(audio: AudioData, lyrics: Lyrics, stretches: readonly
   const drops = words.filter((w) => /^dropping/i.test(w.w)).map((w) => w.start);
   const crip = words.filter((w) => /^crip/i.test(w.w)).map((w) => w.start);
   const back = words.filter((w) => /^backwards/i.test(w.w)).map((w) => w.start);
+  // (the fishtail only where the car is driving through a tunnel: the outro's "crash" lands parked)
+  const bores = stretches.filter((s) => s.tunnel);
+  const crashes = words.filter((w) => /^crash/i.test(w.w) && bores.some((s) => w.start >= s.start && w.start < s.end)).map((w) => w.start);
   const walkEnd = (t0: number) => words.find((w) => w.start >= t0 && /^walkin/i.test(w.w))?.end ?? t0 + 1;
   return (t) => {
-    let lift = 0, pitch = 0, roll = 0;
+    let lift = 0, pitch = 0, roll = 0, swerve = 0;
     hops.forEach((d, k) => {
       const tau = t - d;
       if (tau < 0 || tau > 1.2) return;
@@ -49,6 +53,13 @@ export function hydraulics(audio: AudioData, lyrics: Lyrics, stretches: readonly
       const k = Math.min(1, tau / 0.2) * (tau > H.layHold ? 1 - (tau - H.layHold) / 0.5 : 1);
       pitch -= H.layBack * k; lift -= 0.06 * k;
     }
-    return { lift, pitch, roll };
+    for (const c of crashes) { // the fishtail: the tail steps out, snaps back, settles — caught
+      const tau = t - c;
+      if (tau < 0 || tau > H.catchS) continue;
+      const k = Math.exp(-3.2 * tau) * Math.sin(12 * tau);
+      swerve += H.swerve * k;
+      roll -= 0.055 * k;
+    }
+    return { lift, pitch, roll, swerve };
   };
 }

@@ -34,6 +34,7 @@ import { buildVerse1 } from './sets/verse1';
 import { buildChorus3 } from './sets/chorus3';
 import { buildVerse3 } from './sets/verse3';
 import { buildChorus4 } from './sets/chorus4';
+import { buildBridge1 } from './sets/bridge1';
 
 /** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
 const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
@@ -130,7 +131,7 @@ export default class DriveScene extends Scene {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
       this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
-    for (const set of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive), buildChorus3(this.drive), buildVerse3(this.drive), buildChorus4(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
+    for (const set of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive), buildChorus3(this.drive), buildBridge1(this.drive), buildVerse3(this.drive), buildChorus4(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {
@@ -171,7 +172,7 @@ export default class DriveScene extends Scene {
     this.car.matrixAutoUpdate = false;
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
     const st = this.stance(t), body = this.car.getObjectByName('body')!;
-    body.position.y = st.lift; body.rotation.set(st.pitch, 0, st.roll);
+    body.position.y = st.lift; body.rotation.set(st.pitch, st.swerve, st.roll);
     for (const strut of this.car.getObjectByName('struts')!.children) { // from the hub up to the chassis
       const top = 0.18 + st.lift, bottom = CAR.wheelR;
       strut.scale.y = Math.max(0.01, top - bottom); strut.position.y = (top + bottom) / 2;
