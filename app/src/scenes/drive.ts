@@ -316,7 +316,9 @@ export default class DriveScene extends Scene {
     // the end: the motel fades away
     const [f0, f1] = FINALE.fade, gone = Math.min(1, Math.max(0, (t - f0) / (f1 - f0)));
     return {
-      bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06, grain: 0.072, vignette: 0.22,
+      bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06,
+      haze: 0.06 + 0.32 * NIGHT.value, // (a breath of it round the sun by day; neon in damp air by night)
+      grain: 0.072, vignette: 0.22,
       zoom: 1 + 0.007 * f.a.kick * drums + 0.03 * hit,
       shake: [jolt * Math.sin(t * 91), jolt * Math.cos(t * 77)],
       flash: 0.08 * hit,

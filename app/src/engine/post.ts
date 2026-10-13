@@ -25,6 +25,7 @@ export interface PostParams {
   bloomKnee: number; // soft knee width
   bloomRadius: number; // 0..1 upsample spread
   halation: number; // neutral-white halation around highlights
+  haze: number; // 0..1: a very wide glow in the light's own colour round HDR highlights (damp night air round neon)
   ca: number; // chromatic aberration in px at the frame edge
   grain: number; // grain amplitude (sRGB units, before its tone weighting), ~0.03-0.1
   grainShadow: number; // 0..1: grain weighted to mid-tones (0, a printed page) or to shadows (1, a camera sensor)
@@ -52,6 +53,7 @@ export const DEFAULT_POST: PostParams = {
   bloomKnee: 0.5,
   bloomRadius: 0.75,
   halation: 0,
+  haze: 0,
   // no chromatic aberration by default (it fringes every hard edge blue and cyan); the parameter stays for deliberate use
   ca: 0,
   grain: 0.03,
@@ -127,7 +129,7 @@ ${SCALE === 1 ? `        c += texture(src, vUv + texel * vec2(-1, -1)).rgb; c +=
         fragColor = vec4(texture(prev, vUv).rgb + s / 16.0, 1.0);
       }`, { src: { value: null }, prev: { value: null }, texel: { value: new THREE.Vector2() }, radius: { value: 1 } });
     this.final = new FSPass(/* glsl */ `
-      uniform sampler2D src; uniform sampler2D bloomTex; uniform sampler2D haloTex;
+      uniform sampler2D src; uniform sampler2D bloomTex; uniform sampler2D haloTex; uniform sampler2D hazeTex; uniform float haze;
       uniform float exposure, bloom, halation, ca, grain, grainShadow, contrast, contrastPivot, contrastInvPivot, vignette, fade, flash, time, zoom, invert;
       uniform vec2 shake; uniform vec2 res;
       ${SHOULDER_GLSL}
@@ -144,6 +146,7 @@ ${SCALE === 1 ? `        c += texture(src, vUv + texel * vec2(-1, -1)).rgb; c +=
         vec3 ha = texture(haloTex, uv).rgb;
         col += bl * bloom;
         col += vec3(1.0) * luma(ha) * halation; // neutral-white halation
+        col += texture(hazeTex, uv).rgb * haze; // the haze: the widest tier, in the lights' own colour
         col *= exposure;
         // contrast: a power curve per channel, pivoted at contrastPivot. Each channel below the pivot darkens, so lit
         // paper's red stays while its green and blue deepen slightly (~1-3 levels) and near-neutrals gain saturation.
@@ -176,7 +179,7 @@ ${SCALE === 1 ? `        float g1 = hash12(gl_FragCoord.xy + fract(time * 13.37)
         s += (hash12(gl_FragCoord.xy * 1.37 + time) - 0.5) / 255.0; // dither
         fragColor = vec4(sat(s), 1.0);
       }`, {
-      src: { value: null }, bloomTex: { value: null }, haloTex: { value: null },
+      src: { value: null }, bloomTex: { value: null }, haloTex: { value: null }, hazeTex: { value: null }, haze: { value: 0 },
       exposure: { value: 1 }, bloom: { value: 0.5 }, halation: { value: 0.2 }, ca: { value: 1 }, grain: { value: 0.05 },
       grainShadow: { value: 0 }, contrast: { value: 0 },
       contrastPivot: { value: DEFAULT_POST.contrastPivot }, contrastInvPivot: { value: 1 / DEFAULT_POST.contrastPivot },
@@ -214,6 +217,8 @@ ${SCALE === 1 ? `        float g1 = hash12(gl_FragCoord.xy + fract(time * 13.37)
     f.src!.value = src;
     f.bloomTex!.value = this.ups[0]!.texture;
     f.haloTex!.value = this.ups[3]!.texture;
+    f.hazeTex!.value = this.ups[MIPS - 2]!.texture;
+    f.haze!.value = p.haze;
     f.exposure!.value = p.exposure;
     f.bloom!.value = p.bloom / 3; // pyramid sums ~MIPS levels; normalize
     f.halation!.value = p.halation;
