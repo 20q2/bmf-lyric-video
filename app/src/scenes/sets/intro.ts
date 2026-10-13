@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
 import { CORNER, COUNTDOWN, type IntroPlan, LIQUOR, MAST, SIGNS } from '../../drive/sets/intro';
-import { pic, plane as flat, rightFront, signFace } from './kit';
+import { pic, plane as flat, rightFront, sedan, signFace, walker } from './kit';
 import { glassTex } from './chorus1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
@@ -132,6 +132,17 @@ export function buildIntro(drive: Drive): { group: THREE.Group; update(t: number
     flat(g, 6.3, 1.25, 0, L.h + 1.9, -1.51, pic(signFace('LIQUOR', 1024, 200, '#c8202e', '#f4f0e6', F.sign(700), 0.7, 0.22)));
   }
 
+  // the pedestrian the countdown counts for, crossing the main road on the near crosswalk (right to left, toward the
+  // barbershop's corner); the hips named for the walk
+  const Wk = plan.walker, walk = onRoad(Wk.s, 0), ped = walker();
+  ped.rotation.y = Math.PI / 2; // (walking along +x: the road's left)
+  walk.add(ped);
+  // one car through the intersection on the cross street while the light holds them: its frame's x is the road's left,
+  // so it drives along -x (the road's right to its left), nose that way
+  const Cr = plan.cross, lane = onRoad(Cr.s, 0), car = sedan({ color: '#2b78a6' });
+  car.rotation.y = Math.sign(Cr.v) > 0 ? Math.PI / 2 : -Math.PI / 2;
+  lane.add(car);
+
   return {
     group: root,
     update(t) {
@@ -142,6 +153,19 @@ export function buildIntro(drive: Drive): { group: THREE.Group; update(t: number
       const k = plan.countdown.findLastIndex((b) => t >= b), n = k < 0 || green ? 0 : COUNTDOWN - k;
       const m = count.mesh!.material as THREE.MeshBasicMaterial;
       if (m.map !== count.faces[n]) { m.map = count.faces[n]!; m.needsUpdate = true; }
+      // the pedestrian: on from their first step, off on the far sidewalk; legs scissoring with their stride
+      const walked = (t - Wk.t0) * Wk.v, across = 2 * Wk.from;
+      ped.visible = t >= Wk.t0 && walked < across;
+      if (ped.visible) {
+        ped.position.x = -Wk.from + walked; // (lateral right is the frame's -x)
+        const swing = 0.5 * Math.sin(walked * 4.8);
+        (ped.getObjectByName('legL')!).rotation.x = swing;
+        (ped.getObjectByName('legR')!).rotation.x = -swing;
+      }
+      // the cross street's car, through while its light is green
+      const lat = Cr.from + Cr.v * (t - Cr.t0);
+      car.visible = Math.abs(lat) < 50 && t < plan.green;
+      if (car.visible) car.position.x = -lat;
     },
   };
 }

@@ -2,6 +2,7 @@
 // the road's frame or a panel's. Browser only (canvas).
 import * as THREE from 'three';
 import type { Route } from '../../drive/route';
+import { WORLD, toon } from '../../look/toon';
 
 export const UP = new THREE.Vector3(0, 1, 0);
 
@@ -67,6 +68,38 @@ export function onPanel(p: { center: THREE.Vector3; normal: THREE.Vector3; up: T
   g.matrix.makeBasis(along, p.up, p.normal).setPosition(p.center);
   return g;
 }
+/** A background car for the world's traffic and curbs: a blocky sedan (body, cab, dark windows, chrome bumpers,
+ *  wheels), nose along +z, its base on the ground at y 0. `low` drops it on its suspension, lowrider-parked, nose down. */
+export function sedan(opts: { color: string; length?: number; low?: boolean }): THREE.Group {
+  const g = new THREE.Group(), L = opts.length ?? 4.6, hl = L / 2, W = 1.78;
+  const paint = toon({ color: opts.color }), dark = toon({ color: '#1d2026' }), chrome = toon({ color: WORLD.chrome });
+  const drop = opts.low ? 0.12 : 0;
+  const body = new THREE.Group(); body.position.y = -drop; if (opts.low) body.rotation.x = 0.02; // (parked low, nose down)
+  g.add(body);
+  box(body, W, 0.52, L, 0, 0.56, 0, paint);
+  box(body, W - 0.3, 0.46, L * 0.45, 0, 1.02, -0.25, paint);
+  box(body, W - 0.26, 0.34, L * 0.45 - 0.24, 0, 1.03, -0.25, dark); // the glasshouse
+  box(body, W + 0.06, 0.1, 0.12, 0, 0.42, hl + 0.04, chrome);
+  box(body, W + 0.06, 0.1, 0.12, 0, 0.42, -hl - 0.04, chrome);
+  for (const z of [hl - 0.85, -hl + 0.85]) for (const x of [W / 2 - 0.1, -W / 2 + 0.1]) {
+    const w = cyl(g, 0.3, 0.2, x, 0.3, z, dark, 14); w.rotation.z = Math.PI / 2;
+  }
+  return g;
+}
+
+/** A pedestrian as a flat silhouette (the cast's dark): a body, a head, two legs hinged at the hip (named 'legL',
+ *  'legR': the scene scissors them as they walk), facing +z, feet at y 0. */
+export function walker(): THREE.Group {
+  const g = new THREE.Group(), dark = toon({ color: '#241f2a' });
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.5, 4, 10), dark); torso.position.y = 1.15; g.add(torso);
+  ball(g, 0.11, 0, 1.62, 0, dark);
+  for (const [name, x] of [['legL', 0.08], ['legR', -0.08]] as const) {
+    const hip = new THREE.Group(); hip.name = name; hip.position.set(x, 0.86, 0); g.add(hip);
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.68, 4, 8), dark); leg.position.y = -0.43; hip.add(leg);
+  }
+  return g;
+}
+
 /** A shop's sign: its words in the signs' face (F.sign: never the lyrics'), `ink` on `bg`, centred, letter-spaced. */
 export function signFace(text: string, w: number, h: number, ink: string, bg: string | null, family: string, size = 0.62, spacing = 0.08): THREE.CanvasTexture {
   return canvasTex(w, h, (c) => {

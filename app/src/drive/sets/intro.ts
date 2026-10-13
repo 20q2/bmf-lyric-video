@@ -48,6 +48,12 @@ export interface IntroPlan {
   countdown: number[];
   /** The liquor store's block. */
   liquor: Block;
+  /** The pedestrian the countdown counts for: crossing the main road on the near crosswalk (m along the road), from
+   *  the right sidewalk (m off the road's centre) toward the left, from `t0` at `v` (m/s), across by the green. */
+  walker: { s: number; t0: number; v: number; from: number };
+  /** One car through the intersection on the cross street (its light is green) during the wide shot: where it starts
+   *  (m off the road's centre, left negative), from `t0` at `v` (m/s), left to right. */
+  cross: { s: number; t0: number; v: number; from: number };
 }
 
 export const INTRO: SetPiece = {
@@ -90,6 +96,14 @@ export const INTRO: SetPiece = {
     blocks.push(liquor);
     // the town keeps clear of the cross street and the motel's lot
     const clear = [-1, 1].map((side) => ({ side, a: C.stopLine - 2, b: C.cross[1] + 6 })).concat([{ side: 1, a: B.motelLot[0], b: B.motelLot[1] }]);
-    return { carriers: [], frames: new Map(), clear, blocks, shots, floor: FLOOR, plan: { green, countdown, liquor } satisfies IntroPlan };
+    // the pedestrian the countdown counts for: onto the near crosswalk at the second cut, across the road right to
+    // left (toward the barbershop's corner), on the far sidewalk at least a second before the green
+    const span = 2 * (ROAD_HALF + 1.5);
+    const walker = { s: C.cross[0] - 1.4, t0: bars[1]!, v: span / Math.max(4, green - 1 - bars[1]!), from: ROAD_HALF + 1.5 };
+    // one car through on the cross street (its light is the green one), mid-intersection halfway through the wide
+    // shot; from the road's right toward its left (screen left to right in the wide, which looks back down the road)
+    const crossV = -12, crossFrom = 45, crossMid = (bars[2]! + bars[3]!) / 2;
+    const cross = { s: (C.cross[0] + C.cross[1]) / 2, t0: crossMid - crossFrom / -crossV, v: crossV, from: crossFrom };
+    return { carriers: [], frames: new Map(), clear, blocks, shots, floor: FLOOR, plan: { green, countdown, liquor, walker, cross } satisfies IntroPlan };
   },
 };
