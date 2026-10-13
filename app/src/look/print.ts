@@ -2,6 +2,7 @@
 //   ink      a plum outline wherever something stands in front of something further off (from the depth buffer), so
 //            every silhouette is drawn; fading with distance, as the fog does
 //   halftone a dot screen in the shadows (45°, `cell` logical px), dots growing as the tone darkens
+//   contact  a shade where things meet (nearer depth round a pixel), printed into the dots
 //   tint     shadows pulled toward violet, highlights left warm: the sunset's complementary
 //   hero     a hero surface (its alpha low: look/hero.ts) keeps its light: no halftone or tint, its ink kept
 //   register the red and blue plates a pixel out of register; paper fibre under it all
@@ -18,15 +19,18 @@ export interface PrintParams {
   misreg: number; paper: number;
   /** How far shadows are pulled toward the violet tint 0..1. */
   tint: number;
+  /** The contact shade: how much nearer surfaces round a pixel darken it (0..1: where things meet the ground, in
+   *  creases), and its reach (logical px, for a surface 12 m off; nearer reaches further). */
+  ao: number; aoPx: number;
 }
 
-export const PRINT: PrintParams = { ink: 0.95, inkPx: 2, inkFar: 600, halftone: 0.6, cell: 5.5, lo: 0.02, hi: 0.2, tint: 0.5, misreg: 1.3, paper: 0.035 };
+export const PRINT: PrintParams = { ink: 0.95, inkPx: 2, inkFar: 600, halftone: 0.6, cell: 5.5, lo: 0.02, hi: 0.2, tint: 0.5, misreg: 1.3, paper: 0.035, ao: 0.6, aoPx: 10 };
 const INK = new THREE.Color('#1c0f22'), SHADE = new THREE.Color('#5a3d8a');
 
 const FRAG = /* glsl */ `
 uniform sampler2D src, depth;
 uniform vec2 texel;
-uniform float near, far, ink, inkPx, inkFar, halftone, cell, lo, hi, tint, misreg, paper;
+uniform float near, far, ink, inkPx, inkFar, halftone, cell, lo, hi, tint, misreg, paper, ao, aoPx;
 uniform vec3 inkColor, shade;
 float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * near * far / (far + near - z * (far - near)); }
 void main() {
@@ -48,14 +52,25 @@ void main() {
     e = max(e, smoothstep(0.06, 0.2, (2.0 * w0 - wa - wb) / w0));
   }
   e *= 1.0 - smoothstep(inkFar * 0.5, inkFar, z0);
+  // the contact shade: nearer surfaces round this pixel (the ground under the car, a wall's foot, a crease) darken it;
+  // a silhouette's far side doesn't count (the step's too big). Printed as the shadows are: dots and the violet shade.
+  float occ = 0.0;
+  vec2 ro = texel * aoPx * PX_SCALE * clamp(12.0 / z0, 0.25, 3.0);
+  for (int k = 0; k < 8; k++) {
+    float a = float(k) * PI / 4.0 + 0.39, rk = mod(float(k), 2.0) < 0.5 ? 1.0 : 0.55;
+    float dz = z0 - lin(texture(depth, vUv + ro * vec2(cos(a), sin(a)) * rk).r);
+    occ += smoothstep(0.08, 0.5, dz) * (1.0 - smoothstep(1.5, 4.0, dz));
+  }
+  occ = occ / 8.0 * ao * step(z0, far * 0.99) * (1.0 - hero);
   // shadows toward violet: the same tone, the shade's hue
-  float L = luma(c);
+  float L = luma(c) * (1.0 - 0.6 * occ);
   vec3 shadeN = shade / luma(shade);
   float sh = 1.0 - smoothstep(lo, hi * 1.5, L);
   float mx = max(c.r, max(c.g, c.b)), chroma = (mx - min(c.r, min(c.g, c.b))) / max(mx, 1e-4);
   float keep = smoothstep(0.55, 0.9, chroma); // strong colours (the car's red, neon) keep their hue
   sh *= (1.0 - 0.85 * keep) * (1.0 - hero);
   c = mix(c, shadeN * L, sh * tint);
+  c *= 1.0 - 0.35 * occ;
   // halftone dots in the shadows
   vec2 q = rot2(PI / 4.0) * FRAG_PX / cell, f = fract(q) - 0.5;
   float r = 0.5 * sqrt(1.0 - smoothstep(lo, hi, L)) * 1.1, d = length(f), aa = fwidth(d) * 1.2;
@@ -75,7 +90,7 @@ export class PrintPass {
       src: { value: null }, depth: { value: null }, texel: { value: new THREE.Vector2() },
       near: { value: 0.1 }, far: { value: 3000 }, ink: { value: PRINT.ink }, inkPx: { value: PRINT.inkPx }, inkFar: { value: PRINT.inkFar },
       halftone: { value: PRINT.halftone }, cell: { value: PRINT.cell }, lo: { value: PRINT.lo }, hi: { value: PRINT.hi }, tint: { value: PRINT.tint },
-      misreg: { value: PRINT.misreg }, paper: { value: PRINT.paper },
+      misreg: { value: PRINT.misreg }, paper: { value: PRINT.paper }, ao: { value: PRINT.ao }, aoPx: { value: PRINT.aoPx },
       inkColor: { value: new THREE.Vector3(...INK.toArray()) }, shade: { value: new THREE.Vector3(...SHADE.toArray()) },
     });
   }
@@ -86,7 +101,7 @@ export class PrintPass {
     u.depth!.value = rt.depthTexture;
     u.texel!.value.set(1 / rt.width, 1 / rt.height);
     u.near!.value = cam.near; u.far!.value = cam.far;
-    for (const k of ['ink', 'inkPx', 'inkFar', 'halftone', 'cell', 'lo', 'hi', 'tint', 'misreg', 'paper'] as const) u[k]!.value = q[k];
+    for (const k of ['ink', 'inkPx', 'inkFar', 'halftone', 'cell', 'lo', 'hi', 'tint', 'misreg', 'paper', 'ao', 'aoPx'] as const) u[k]!.value = q[k];
     this.pass.render(renderer, out);
   }
 }
