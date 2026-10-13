@@ -181,6 +181,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   // palms: LA's (look/palms.ts), behind the roadside signs' line, a few seeded variants instanced, each its own height
   // and turn
   const VARIANTS = 4, placed: THREE.Matrix4[][] = Array.from({ length: VARIANTS }, () => []);
+  const skyRoad = drive.carriers.filter((c) => c.kind === 'sky').map((c) => [motion.distanceAt(c.phrase.start) - 20, motion.distanceAt(c.phrase.end + 1.5) + 40] as const);
   for (let k = 0; k * 30 < route.length; k++) {
     const s = k * 30 + 5;
     if (!PALMS.has(stretchAtS(s).id) || s < CORNER.cross[1] + 15) continue; // (none on the intro's corner: the signs stand against the sky)
@@ -190,6 +191,9 @@ export function buildWorld(drive: Drive): THREE.Group {
       // none by a face on the left: they'd stand between it and the camera across the road (on the right too: a wide
       // pair shot stands back past them)
       if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + (side === -1 ? 8 : 28))) continue;
+      // nor where the car is while sky-writing's up: the low camera behind it looks up past them into the words (and the
+      // skywriter's loop)
+      if (skyRoad.some(([a, b]) => s > a && s < b)) continue;
       const h = 10 + 6 * hash(k, side, 8), f = route.frameAt(s), at = f.pos.clone().addScaledVector(f.right, side * 11.5);
       const m = new THREE.Matrix4().compose(at, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(k, side, 9) * Math.PI * 2), new THREE.Vector3().setScalar(h / PALM.h));
       placed[Math.floor(hash(k, side, 7) * VARIANTS)]!.push(m);

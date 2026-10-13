@@ -250,10 +250,21 @@ export default class DriveScene extends Scene {
       const dur = Math.max(0.3, w.phrase.end - w.phrase.start), u = Math.min(1, Math.max(0, (t - w.phrase.start) / dur));
       let { a, k, at, up } = loops(w) ? round(w, Math.min(1, Math.max(0, (t - w.phrase.start) / LOOP.over))) : over(w, u);
       const past = Math.max(0, t - done);
-      if (past > 0 && next) { // on across the gap to the next phrase's start (down to below it, to loop it)
-        const g = Math.min(1, past / Math.max(1e-3, next.phrase.start - w.phrase.end)), e = g * g * (3 - 2 * g), to = loops(next) ? round(next, 0) : over(next, 0);
-        at = at.lerp(to.at, e); k += (to.k - k) * e;
-        a = a.clone().lerp(to.a, e).normalize(); up = up.clone().lerp(to.up, e).normalize();
+      if (past > 0 && next) { // on across the gap to the next phrase's start
+        const g = Math.min(1, past / Math.max(1e-3, next.phrase.start - w.phrase.end));
+        if (loops(next)) {
+          // (diving to loop it: one smooth curve from level flight along the phrase's top down and round into the loop's
+          // entry under the next word, the plane's nose along it — a Hermite curve, its ends' tangents the two headings)
+          const to = round(next, 0), P0 = at.clone(), L = P0.distanceTo(to.at) * 1.3, h00 = 2 * g ** 3 - 3 * g * g + 1, h10 = g ** 3 - 2 * g * g + g, h01 = -2 * g ** 3 + 3 * g * g, h11 = g ** 3 - g * g;
+          at = P0.clone().multiplyScalar(h00).addScaledVector(a, L * h10).addScaledVector(to.at, h01).addScaledVector(to.a, L * h11);
+          const d00 = 6 * g * g - 6 * g, d10 = 3 * g * g - 4 * g + 1, d01 = -6 * g * g + 6 * g, d11 = 3 * g * g - 2 * g;
+          const head = P0.clone().multiplyScalar(d00).addScaledVector(a, L * d10).addScaledVector(to.at, d01).addScaledVector(to.a, L * d11).normalize();
+          k += (to.k - k) * g; up = up.clone().lerp(to.up, g).normalize(); a = head;
+        } else {
+          const e = g * g * (3 - 2 * g), to = over(next, 0);
+          at = at.lerp(to.at, e); k += (to.k - k) * e;
+          a = a.clone().lerp(to.a, e).normalize(); up = up.clone().lerp(to.up, e).normalize();
+        }
       } else if (past > 0) at.addScaledVector(a, past * SKYWRITER.speed).addScaledVector(w.up, past * SKYWRITER.climb); // away
       up.addScaledVector(a, -up.dot(a)).normalize();
       this.writer.matrix.makeBasis(a, up, a.clone().cross(up)).scale(new THREE.Vector3(k, k, k)).setPosition(at);
