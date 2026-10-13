@@ -154,7 +154,7 @@ test('the carriers are a mix: every kind is used', () => {
   expect(new Set(drive.carriers.map((c) => c.kind))).toEqual(new Set(KINDS));
 });
 
-test('every carrier reads while its phrase is sung', { timeout: 120000 }, () => {
+test('every carrier reads while its phrase is sung', () => {
   const fails: string[] = [];
   drive.carriers.forEach((c, i) => {
     const from = Math.max(c.phrase.start - LEAD + SNAP_S, c.from ?? -Infinity);
@@ -168,7 +168,7 @@ test('every carrier reads while its phrase is sung', { timeout: 120000 }, () => 
     if (bad.length) fails.push(`${c.id} ${c.kind} "${c.phrase.text}" [${c.stretch}] ${bad.length} samples, first ${bad[0]}`);
   });
   expect(fails).toEqual([]);
-});
+}, 120000);
 
 test('only tunnel lettering stands in a tunnel or by its mouths, and it stands inside one', () => {
  const wrong = drive.carriers.filter((c) => c.kind !== 'sky' && c.kind !== 'banner' && (c.kind === 'tunnel') !== !!nearTunnel(drive.tunnels, c.s, c.kind === 'tunnel' ? -c.w / 2 : TUNNEL_CLEAR));
@@ -196,10 +196,10 @@ function readable(c: Carrier): number {
 }
 const isShort = (c: Carrier) => readable(c) < dwellFor(c.phrase.words.length) - 1e-6;
 
-test('every phrase is readable on screen long enough: dwellFor(words), counting time before and after it is sung', { timeout: 120000 }, () => {
+test('every phrase is readable on screen long enough: dwellFor(words), counting time before and after it is sung', () => {
   const short = drive.carriers.filter((c) => !KNOWN_SHORT.has(c.id) && isShort(c));
   expect(short.map((c) => `${c.id} ${c.kind} "${c.phrase.text}" readable ${readable(c).toFixed(2)} s of ${dwellFor(c.phrase.words.length).toFixed(2)}`)).toEqual([]);
-});
+}, 120000);
 
 test("nothing shows the song ahead: a phrase's text appears only as the camera comes for it, at most one phrase early", () => {
   const early = drive.carriers.filter((c) => c.phrase.start - c.reveal > REVEAL_AHEAD + 1e-9).map((c) => `${c.id} ${(c.phrase.start - c.reveal).toFixed(2)} s`);

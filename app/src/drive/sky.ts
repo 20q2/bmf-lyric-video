@@ -10,7 +10,8 @@ export const SKY_KEYS: readonly [number, string, string, number][] = Object.free
   [30, '#EE8A55', '#FFD08E', 17],
   [60, '#DA6A5E', '#FFB97C', 12],
   [90, '#B04E78', '#FF9A6A', 4],
-  [112, '#7C3A7E', '#F7745F', -1],
+  // (the sun touches the sea at 112 s: inside chorus 3's arch shot, 109-112.4)
+  [112, '#7C3A7E', '#F7745F', 0],
   [125, '#4B2A6E', '#D9567A', -5],
   [140, '#261A4C', '#8E3D7C', -10],
   [165, '#110D2E', '#3F2560', -16],

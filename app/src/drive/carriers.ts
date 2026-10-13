@@ -111,11 +111,11 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   intro: ['sign'],
   chorus1: ['road', 'road', 'billboard', 'sky', 'street'],
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
-  chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint)
+  chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint; its set owns the arch's line)
   bridge1: ['tunnel'],
   verse3: ['neon', 'sign', 'billboard', 'sky', 'neon', 'street', 'storefront', 'sign', 'road'],
-  chorus4: ['road', 'gantry', 'sky', 'hill'], // (no paint on the switchback, after its first line: the road above would hide it)
-  outro1: ['sky', 'banner', 'sky', 'banner'],
+  chorus4: ['road', 'gantry', 'sky', 'hill'], // (its set owns the campaign's line — his biggest board, on the hillside — and the drive insert's; the ransom line keeps its gantries, hijacked: carrierart.ts)
+  outro1: ['sky'], // (constellations: no banner planes at night; carrierart.ts draws night sky-writing as stars)
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
 export const FAST_LEFT: Record<string, readonly LeftKind[]> = {
@@ -285,8 +285,9 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
       if (campaign) kind = 'billboard';
       const campaignScale = campaign ? HOOK.campaign[Math.min(campaignCount++, HOOK.campaign.length - 1)]! : 1;
       // a fast line is framed two phrases at a time (pairFraming): on the left, where faces pair side by side (a sign's
-      // next stands behind it; paint on a moving road lies too far on to share a readable frame)
-      if (isFast(line) && kind !== 'sky' && !PAIRABLE.has(kind)) { const fl = FAST_LEFT[st.id] ?? ['storefront']; kind = fl[li % fl.length]!; }
+      // next stands behind it; paint on a moving road lies too far on to share a readable frame). Never in a tunnel:
+      // a left face would be pushed past its far mouth while the line is sung inside.
+      if (isFast(line) && kind !== 'sky' && kind !== 'tunnel' && !PAIRABLE.has(kind)) { const fl = FAST_LEFT[st.id] ?? ['storefront']; kind = fl[li % fl.length]!; }
       const phs = phrasesOf(line, nextStart(line.i), solo);
       phs.forEach((ph, pi) => {
         // a line's first phrase too short to read alone, straight after the line before, stays on that line's kind of
