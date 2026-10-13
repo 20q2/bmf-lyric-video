@@ -77,7 +77,7 @@ export const ON_CAR = {
  *  left, its centre's height, turned toward the coming car, its size and its words' share of it; its building (how
  *  much bigger than the mural, deep); the camera waits in the street before it (m short of it, off the road's centre,
  *  up), the car driving up into the frame. */
-export const GIANT = { short: 20, lateral: -14, y: 7.5, turn: (35 * Math.PI) / 180, w: 22, h: 12, text: 0.62, building: { margin: 1.4, d: 12 }, eye: { short: 24, lateral: 3, up: 2.4 } };
+export const GIANT = { short: 20, lateral: -15.5, y: 7.5, turn: (35 * Math.PI) / 180, w: 22, h: 12, text: 0.62, building: { margin: 1.4, d: 12 }, eye: { short: 24, lateral: 3, up: 2.4 } };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Verse2Plan {
