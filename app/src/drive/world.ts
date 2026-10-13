@@ -461,7 +461,8 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
     }
     case 'hill': {
       // the mound it stands on (from the plain up to the letters' feet), and the scaffold behind each letter
-      const mh = c.foot - c.h / 2 + 2, mound = new THREE.Mesh(new THREE.ConeGeometry(c.w * 0.75, mh, 24, 1), toon({ color: '#5a4a52' }));
+      // (a low shoulder, not a mountain: the outro's crane looks past it at the city)
+      const mh = c.foot - c.h / 2 + 2, mound = new THREE.Mesh(new THREE.ConeGeometry(c.w * 0.48, mh, 24, 1), toon({ color: '#5a4a52' }));
       mound.position.set(0, -c.h / 2 + 2 - mh / 2, -6); mound.scale.z = 0.5; g.add(mound);
       for (let i = 0; i < 16; i++) box(0.4, c.h * 0.9, 0.4, -c.w * 0.45 + (i * c.w * 0.9) / 15, -c.h * 0.05, -1.2, grey(WORLD.post));
       break;
@@ -550,6 +551,7 @@ export function buildCar(): THREE.Group {
   const P = throwGeo.attributes.position!;
   for (let i = 0; i < P.count; i++) { const far = P.getZ(i) < 0 ? 1 : 0; P.setXYZ(i, P.getX(i) * (far ? 7 : 1.6), 0.04, hl + 0.4 + far * 22); }
   const lit = new THREE.Mesh(throwGeo, glowMaterial('#ffe6bd', GLOW.beam, false, true));
+  lit.name = 'beams'; // (the scene ties the throw to speed: parked at the overlook it would searchlight off the cliff)
   g.add(lit); // (on the road, not on the body)
   // the two of them: him at the wheel (+x: the car's left) in a cap, a hand on it; her, her hair down her back, an arm
   // that goes up (cast.ts); their heads on pivots at the neck (hers turns to him, his nods): named for the scene

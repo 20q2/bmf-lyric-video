@@ -358,3 +358,23 @@ Rejected or deferred, with reasons:
   fog taking the far end, instead of a black void), SOS niches on the right, and MT. SOMEWHERE TUNNEL over the
   entrance portal in the signs' face.
 - The guard's tunnel rule now admits tunnel furniture: wall lettering and overhead signs both live only inside.
+
+**Back-half direction change (2026-10-13, the user): verse 3 rebuilt for flow; no ransom lettering; no outro lyrics;
+no money; the ending rebuilt.**
+
+- **Verse 3** (`sets/verse3.ts`, rebuilt). The one slow take read as a metronome against the song's fastest verse. Now
+  the signs stand on BOTH sides of the strip and every line gets its own designed shot, cut on the line's beat — low
+  and close under the pharmacy's pill, across the street at the liquor store, head-on at the marquee, the tiki pair
+  held in one two-shot, kerb-level by the payphones, low at the pawn shop — and the chapel's pulls wide with the lit
+  strip behind it, handing to chorus 4's climb. Right-side eyes either hug their own kerb or stand fully across (the
+  ray clears the car's roof); the camera never sits in the lane.
+- **Chorus 4**: the ransom-note lettering is gone (the user: it looked weird) — the gantries read as plain green
+  signs again. The hill sign stands deeper across the valley (HILL.ahead 230, side −70) on a lower shoulder, and dims
+  to ambient once its line is read: the end belongs to the city.
+- **The outro**: no lyrics at all (AUDIBLE 165.5 — the song is already fading, and the end speaks for itself), so the
+  constellation rendering is gone too. No money anywhere in the film (look/money.ts deleted): her arm still goes up on
+  the blowin'-money lines, now just singing along. The ending sequence: "CRUISE ALL NIGHT" → the city's carpet wakes
+  as they park → the long crane, aimed a little right of the hill sign's shoulder → the blackout rolls through the
+  whole grid ON screen (spread tightened; the freeways die last, before the end card) → her head leans onto his
+  shoulder, his tilting to meet it (cast.ts LEAN, after the last "crash") → tail lights alone → the motel's NO goes
+  out. The headlights' throw follows speed, so the parked car no longer searchlights off the cliff.

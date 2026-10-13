@@ -58,7 +58,7 @@ export const SIGN_SHOT = { dist: 7.5, push: 0.5, over: 3 };
 /** The end, after the last line: on a beat at least `after` s past it (and no later than `before` s ahead of the fade
  *  out of hearing), the camera glides up and away behind the parked car (m back, up, and how fast each grows), looking
  *  out over the city's lights (m ahead of the car, below its level). */
-export const END = { after: 0.8, before: 0.6, back: 9, backRate: 1.2, up: 2.5, rise: 0.9, look: 120, under: 18 };
+export const END = { after: 0.8, before: 0.6, back: 9, backRate: 1.2, up: 2.5, rise: 0.9, look: 120, under: 18, side: 22 };
 /** The end: the cut to the motel (s, a half-beat after the last line has been read), and the fade out (s). */
 export const FINALE = { endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
@@ -220,9 +220,11 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // carriers.ts); then the motel again, empty at night, and its NO goes out
   // after the last line (the song fading out of hearing), the scene alone: a slow crane up and away from the parked car
   // over the city's lights; then the motel's sign
-  const lastLine = carriers[carriers.length - 1]!.phrase, park = carFrame(audio.duration), pf = flat(park.fwd);
+  const lastLine = carriers[carriers.length - 1]!.phrase, park = carFrame(audio.duration), pf = flat(park.fwd), pr = flat(park.right);
   const away = beatAtOrAfter(audio, Math.max(lastLine.end + END.after, AUDIBLE - END.before));
-  const crane: Target = (t) => { const u = Math.max(0, t - away); return lookFrom(park.pos.clone().addScaledVector(pf, -END.back - END.backRate * u).add(new THREE.Vector3(0, END.up + END.rise * u, 0)), park.pos.clone().addScaledVector(pf, END.look).add(new THREE.Vector3(0, -END.under, 0))); };
+  // (aimed a little right of straight ahead: the hill sign's shoulder stands off to the left, and the end belongs to
+  // the city)
+  const crane: Target = (t) => { const u = Math.max(0, t - away); return lookFrom(park.pos.clone().addScaledVector(pf, -END.back - END.backRate * u).add(new THREE.Vector3(0, END.up + END.rise * u, 0)), park.pos.clone().addScaledVector(pf, END.look).addScaledVector(pr, END.side).add(new THREE.Vector3(0, -END.under, 0))); };
   const scene: Shot = { at: away, to: crane, move: 'glide' };
   const endCard: Shot = { at: endCardAt, to: signShot, move: 'cut' };
   shots.push(scene, endCard); own.add(scene); own.add(endCard);

@@ -114,8 +114,8 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint; its set owns the arch's line)
   bridge1: ['tunnel'],
   // (verse3 has no pattern: its set-piece owns every line, sets/verse3.ts)
-  chorus4: ['road', 'gantry', 'sky', 'hill'], // (its set owns the campaign's line — his biggest board, on the hillside — and the drive insert's; the ransom line keeps its gantries, hijacked: carrierart.ts)
-  outro1: ['sky'], // (constellations: no banner planes at night; carrierart.ts draws night sky-writing as stars)
+  chorus4: ['road', 'gantry', 'sky', 'hill'], // (its set owns the campaign's line — his biggest board, on the hillside — and the drive insert's)
+  // (the outro has no pattern: no lines are shown past AUDIBLE — the end is the scene's own)
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
 export const FAST_LEFT: Record<string, readonly LeftKind[]> = {};
@@ -171,8 +171,9 @@ export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 
 /** Kinds set in capitals. */
 export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'barber', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'hood', 'giant', 'arch', 'tunnelsign']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
- *  valley), how high its letters' centre stands over the road there. */
-export const HILL = { ahead: 150, side: -55, y: 16 };
+ *  valley), how high its letters' centre stands over the road there. (Far enough out that the parked outro sits NEAR
+ *  the sign, not under it: its letters and scaffold were looming over the whole ending.) */
+export const HILL = { ahead: 230, side: -70, y: 16 };
 /** A phrase longer than this (characters) takes two rows. */
 export const WRAP_AT = 13;
 const TEXT_W = 0.9;
@@ -462,7 +463,7 @@ function overlaps(a: Placed, b: Placed): boolean {
  *  (m, over the car's bulk: drive.ts CAR_BOX), aimed this far (radians) under the writing. */
 /** The end's tail-light shot: how far behind the car, off its side and up (m), and how far under the writing it aims. */
 export const TAIL = { back: 7.5, side: 1.4, up: 0.9, under: 5 };
-export const CABIN = { stretches: new Set(['chorus1', 'outro1']), back: 3.4, up: 2.3, under: (8 * Math.PI) / 180 };
+export const CABIN = { stretches: new Set(['chorus1']), back: 3.4, up: 2.3, under: (8 * Math.PI) / 180 };
 
 /** The pose for a camera at `eye` looking at `at`. */
 export function lookFrom(eye: THREE.Vector3, at: THREE.Vector3): Pose {

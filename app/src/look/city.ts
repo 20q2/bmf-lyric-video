@@ -11,7 +11,7 @@ import { NIGHT } from './night';
 /** Where the city spreads (m ahead of the parked car, and either side), its streets' spacing, the wave (when it starts,
  *  how fast it rolls out), how bright its lights shine (HDR), and the blackout (each block's lights die within `spread`
  *  s of the crash, over `die` s; the freeways this much later). */
-export const CITY = { near: 320, far: 3600, half: 2600, street: 85, step: 16, waveAt: 165.6, wave: 1500, glow: 2.4, freeways: 4, spread: 2.2, die: 0.35, freewayLag: 2.6 };
+export const CITY = { near: 320, far: 3600, half: 2600, street: 85, step: 16, waveAt: 165.6, wave: 1500, glow: 2.4, freeways: 4, spread: 1.5, die: 0.3, freewayLag: 1.5 };
 
 const VERT = /* glsl */ `
 attribute vec3 color; attribute float size; attribute float wake; attribute float sleep;

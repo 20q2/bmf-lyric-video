@@ -49,9 +49,9 @@ export interface Stretch extends StretchSpec {
   lines: Line[];
 }
 
-/** The song has faded out of hearing by here (s, the user's ear, 2026-10-11): no line ending later is shown; the end
- *  is the scene's own. */
-export const AUDIBLE = 174;
+/** No line ending later than this is shown (s): the song is already fading through the outro, and the end speaks for
+ *  itself (the user, 2026-10-13: no outro lyrics — the scene is the words). The end is the scene's own. */
+export const AUDIBLE = 165.5;
 /** Whether a line is shown: it ends while the song can still be heard. */
 export const shown = (l: Line) => l.end <= AUDIBLE;
 

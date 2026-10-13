@@ -62,10 +62,13 @@ export function buildIntro(drive: Drive): { group: THREE.Group; update(t: number
   // the near corner's pole: BMF BLVD along the road, SZA AVE across it, each readable from both sides
   {
     const pole = onRoad(C.pole, SIGNS.lateral), W = 2.1, H = 0.45;
-    // (the blades sit on top of the pole, a thin bracket between them: nothing in front of their faces)
-    const top = SIGNS.across - H / 2 - 0.02;
+    // (the blades sit on top of the pole, the pole carrying on between them at full thickness, a clamp where it grips
+    // each blade's edge: nothing in front of their faces but the clamps on the border)
+    const top = SIGNS.across - H / 2 - 0.02, gap = SIGNS.along - SIGNS.across - H;
     cyl(pole, 0.06, top, 0, top / 2, 0, dark);
-    cyl(pole, 0.012, SIGNS.along - SIGNS.across, 0, (SIGNS.along + SIGNS.across) / 2, 0, dark);
+    cyl(pole, 0.06, gap, 0, SIGNS.across + H / 2 + gap / 2, 0, dark);
+    for (const y of [SIGNS.across - H / 2, SIGNS.across + H / 2]) box(pole, 0.22, 0.07, 0.07, 0, y, 0, dark);
+    box(pole, 0.07, 0.07, 0.22, 0, SIGNS.along - H / 2, 0, dark);
     const along = blade('BMF', 'BLVD', '100'), across = blade('SZA', 'AVE', '400');
     // (a face's plane in its own frame: x along its text, y up, z out of it, so it reads from that side)
     const face = (tex: THREE.Texture, n: THREE.Vector3, y: number) => {

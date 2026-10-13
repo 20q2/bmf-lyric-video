@@ -16,9 +16,8 @@ import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '..
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
-import { NIGHT } from '../look/night';
+import { GLOW, NIGHT } from '../look/night';
 import { buildCity } from '../look/city';
-import { Money } from '../look/money';
 import { type Stance, hydraulics } from '../drive/hydraulics';
 import { neonAt } from '../drive/landmarks';
 import { type Cast, castOf } from '../drive/cast';
@@ -77,7 +76,6 @@ export default class DriveScene extends Scene {
   private print = new PrintPass();
   private fogColor = new THREE.Color();
   private city!: ReturnType<typeof buildCity>;
-  private money!: Money;
   /** (debugging: the named parts hidden, ?hide=) */
   private hidden: string[] = [];
   /** The motel sign's neon (its material and its two faces), and the car's body on its hydraulics. */
@@ -159,8 +157,6 @@ export default class DriveScene extends Scene {
     const lastCrash = crashes.length ? Math.max(...crashes) : undefined;
     this.city = buildCity(end.pos, end.fwd, end.right, -0.4, lastCrash);
     this.world.add(this.city.points);
-    this.money = new Money(lyrics, (t) => this.drive.carFrame(t), (t) => this.drive.motion.speedAt(t));
-    this.world.add(this.money.mesh);
     // (the last, under the fade, isn't heard: no jolt)
     this.crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w) && w.start < AUDIBLE).map((w) => w.start));
   }
@@ -177,11 +173,15 @@ export default class DriveScene extends Scene {
       const top = 0.18 + st.lift, bottom = CAR.wheelR;
       strut.scale.y = Math.max(0.01, top - bottom); strut.position.y = (top + bottom) / 2;
     }
-    // the two of them: her arm up (it swings out and over), her look to him, his nod
+    // the two of them: her arm up (it swings out and over), her look to him, his nod — and at the end her head onto
+    // his shoulder, his tilting to meet it
     const cast = this.cast(t);
     body.getObjectByName('herArm')!.rotation.set(0, 0, -2.7 * cast.herArm);
-    body.getObjectByName('herHead')!.rotation.set(0, 0.7 * cast.herLook, 0);
-    body.getObjectByName('hisHead')!.rotation.set(cast.hisNod, 0, 0);
+    body.getObjectByName('herHead')!.rotation.set(0, 0.7 * cast.herLook, -0.55 * cast.lean);
+    body.getObjectByName('hisHead')!.rotation.set(cast.hisNod, 0, 0.2 * cast.lean);
+    // the headlights' throw follows the speed: parked, the beams settle to a glow at the nose
+    const beams = this.car.getObjectByName('beams') as THREE.Mesh | undefined;
+    if (beams) (beams.material as THREE.ShaderMaterial).uniforms.strength!.value = GLOW.beam * Math.min(1, 0.15 + d.motion.speedAt(t) / 4);
     // the motel's neon: flickering on, and at the end its NO going out
     const neon = neonAt(t, f.beat);
     this.sign.neon.color.setScalar(0.25 + 1.45 * neon.lit);
@@ -247,8 +247,8 @@ export default class DriveScene extends Scene {
       up.addScaledVector(a, -up.dot(a)).normalize();
       this.writer.matrix.makeBasis(a, up, a.clone().cross(up)).scale(new THREE.Vector3(k, k, k)).setPosition(at);
     }
-    // the hill sign dims once its line is read: the eye moves on to the star-writing it hands off to
-    for (const [c, m] of this.hillFaces) m.color.setScalar(1.5 - 0.95 * smooth(c.phrase.end + 1.2, c.phrase.end + 3.4, t));
+    // the hill sign dims once its line is read: the end belongs to the city's lights and the two of them
+    for (const [c, m] of this.hillFaces) m.color.setScalar(1.5 - 1.2 * smooth(c.phrase.end + 1.2, c.phrase.end + 3.4, t));
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
     placeCamera(this.cam, d.camera(t));
@@ -300,9 +300,6 @@ export default class DriveScene extends Scene {
     fog.far = far - (far - 140) * inside;
 
     this.city.update(t, this.cam.position, this.rt.width / W);
-    // the lyrics showing now, for the bills to keep out of
-    const showing = d.carriers.filter((c) => t > c.reveal && t < c.phrase.end + 1).map((c) => ({ at: centerAt(c, t), r: Math.hypot(c.w, c.h) / 2 }));
-    this.money.update(t, this.cam.position, showing);
     renderer.setRenderTarget(this.rt);
     renderer.clear(true, true, true); // the engine leaves autoClear off; the dome draws the sky, so nothing else clears
     renderer.render(this.world, this.cam);

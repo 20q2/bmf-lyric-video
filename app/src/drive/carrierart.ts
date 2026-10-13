@@ -86,17 +86,16 @@ const GREEN = '#1f6b44';
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean; /** Ransom-note lettering: each letter its own pasted scrap, seeded. */ ransom?: boolean; /** The words as constellations: stars along the letters' strokes (the outro's night sky). */ stars?: boolean }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
     // by day a soft plum shade under the white (it reads on a pale sky and on the buildings), by night a white glow
     case 'sky': {
-      // (a heavy italic sans: smoke letters, sturdy at a distance where a Didone's hairlines drop out); by day its shade
-      // laid twice, by night a glow — and at full night (the outro) the words are written in stars, a constellation
-      const light = daylight(c.phrase.start), day = light > 0.6;
-      // (by day a hard plum drop shadow besides the shade: white script on a pale sky needs an edge to read on a phone)
-      return { family: F.archivoItalic(100, 800), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 3 : 1, shadow: day ? 'rgba(46,16,52,0.75)' : undefined, stars: light < 0.35 };
+      // (a heavy italic sans: smoke letters, sturdy at a distance where a Didone's hairlines drop out); by day its
+      // shade laid thrice and a hard plum drop shadow besides — white script on a pale sky needs an edge on a phone
+      const day = daylight(c.phrase.start) > 0.6;
+      return { family: F.archivoItalic(100, 800), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 3 : 1, shadow: day ? 'rgba(46,16,52,0.75)' : undefined };
     }
     case 'billboard': case 'poster': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
       // (the word being sung: warm yellow on a dark ad, red on a light one — one rule across the film)
@@ -138,10 +137,7 @@ function styleOf(c: Carrier): Style {
     case 'arch': return { bg: '#f6edd6', border: '#2b4a66', family: F.archivo(100, 900), caps: true, colors: ['#2b4a66', '#2b4a66', '#d81e2c'], alpha: [0.75, 1] }; // the beach town's band
     case 'tunnelsign': return { bg: '#0b0d12', border: '#454b58', family: F.archivo(100, 800), caps: true, colors: ['#ffe2a8', '#ffd98a', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(255,180,80,0.85)' }; // a lit box in the bore
     case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
-    case 'street': case 'gantry': return c.kind === 'gantry' && c.stretch === 'chorus4'
-      // the hijacked sign: the route's shield stays, the words pasted over it in ransom-note scraps
-      ? { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 900), caps: true, colors: ['#16131a', '#16131a', '#d81e2c'], alpha: [0.8, 1], ransom: true }
-      : { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
+    case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
 }
@@ -311,19 +307,10 @@ export class CarrierArt {
         const sung = t >= w.start, now = sung && t < w.end;
         c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];
         c.globalAlpha = (solo ? 1 : style.alpha[sung ? 1 : 0]) * (1 - gone) * alpha;
-        if (style.ransom) { // each letter its own pasted scrap (the word being sung tilts a touch more)
-          x += this.drawRansom(c, label(w), x, y, em * 0.74, now) + space * 1.5;
-          continue;
-        }
         // dissolving: the letters drift apart and up, a little more each word along
         const fall = fallAt(w, t, rowH);
         if (fall) { c.save(); c.translate(x, y + fall.dy); c.rotate(fall.tilt); }
         const [fx, fy] = fall ? [0, 0] : [x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6];
-        if (style.stars) { // the word as a constellation: stars sampled along its strokes
-          x += this.drawConstellation(c, label(w), fx, fy, em, now) + space;
-          if (fall) c.restore();
-          continue;
-        }
         if (style.tubes) { // neon: the tube's brighter core line over its glow
           c.save(); c.lineWidth = Math.max(2, em * 0.035); c.strokeStyle = 'rgba(255,255,255,0.75)'; c.strokeText(label(w), fx, fy); c.restore();
         }
@@ -345,76 +332,6 @@ export class CarrierArt {
     });
     c.globalAlpha = 1;
     c.shadowBlur = 0;
-  }
-
-  /** A word written in stars: a faint ghost of the letterform (star dust, so the word reads), then the word's strokes
-   *  sampled on a grid with a four-point star at each sample (seeded sizes, the current fillStyle and alpha).
-   *  Returns the word's advance (px). */
-  private drawConstellation(c: CanvasRenderingContext2D, word: string, fx: number, fy: number, em: number, now: boolean): number {
-    c.font = font(this.style.family, em);
-    const wd = c.measureText(word).width;
-    const ink = c.fillStyle as string, alpha = c.globalAlpha;
-    // the ghost: the letterform itself, dim — without it the stars are sparkle clumps, not words
-    c.save();
-    c.globalAlpha = alpha * 0.26;
-    c.shadowColor = 'rgba(255,255,255,0.5)'; c.shadowBlur = em * 0.12;
-    c.fillStyle = ink;
-    c.fillText(word, fx, fy);
-    c.restore();
-    // rasterise the word on a scratch layer, downsampled for cheap reads
-    const K = 4, raster = this.layer('stars'), rc = raster.getContext('2d')!;
-    const rw = Math.max(2, Math.ceil(wd / K)), rh = Math.max(2, Math.ceil(em * 1.4 / K));
-    rc.clearRect(0, 0, rw + 2, rh + 2);
-    rc.font = font(this.style.family, em / K);
-    rc.textBaseline = 'middle'; rc.textAlign = 'left';
-    rc.fillStyle = '#fff';
-    rc.fillText(word, 0, rh / 2);
-    const img = rc.getImageData(0, 0, rw, rh).data;
-    c.save();
-    c.shadowColor = 'rgba(255,255,255,0.9)';
-    const step = Math.max(1, Math.round(em * 0.095 / K));
-    for (let gy = 0; gy < rh; gy += step) for (let gx = 0; gx < rw; gx += step) {
-      if (img[(gy * rw + gx) * 4 + 3]! < 128) continue;
-      const seed = gx * 131 + gy * 29 + word.length;
-      const px = fx + gx * K + (hash(seed, 1) - 0.5) * em * 0.04, py = fy - em * 0.7 + gy * K + (hash(seed, 2) - 0.5) * em * 0.04;
-      const r = em * (0.04 + 0.06 * hash(seed, 3)) * (now ? 1.35 : 1);
-      c.globalAlpha = alpha * (0.7 + 0.3 * hash(seed, 4));
-      c.fillStyle = ink;
-      c.shadowBlur = r * 2.2;
-      c.beginPath();
-      c.moveTo(px, py - r * 2); c.quadraticCurveTo(px, py, px + r * 2, py); c.quadraticCurveTo(px, py, px, py + r * 2); c.quadraticCurveTo(px, py, px - r * 2, py); c.quadraticCurveTo(px, py, px, py - r * 2);
-      c.fill();
-    }
-    c.restore();
-    return wd;
-  }
-
-  /** A word in ransom-note letters: each its own scrap of paper (seeded colour, face, size, tilt), the ink in the
-   *  current fillStyle/alpha. Returns the word's advance (px). */
-  private drawRansom(c: CanvasRenderingContext2D, word: string, x: number, y: number, em: number, now: boolean): number {
-    const scraps = ['#f4f0e6', '#ffd65a', '#ffffff', '#f4b6c2'];
-    const faces = [F.archivo(100, 900), F.bodoni(700, { italic: true }), F.mono(700)];
-    const ink = c.fillStyle as string, alpha = c.globalAlpha;
-    let dx = 0;
-    for (let i = 0; i < word.length; i++) {
-      const seed = word.charCodeAt(i) * 31 + i * 7 + word.length;
-      const size = em * (0.78 + 0.42 * hash(seed, 1)) * (now ? 1.08 : 1);
-      const tilt = (hash(seed, 2) - 0.5) * 0.26, lift = (hash(seed, 3) - 0.5) * em * 0.18;
-      c.save();
-      c.font = font(faces[Math.floor(hash(seed, 4) * faces.length)]!, size);
-      const wd = c.measureText(word[i]!).width, scrapW = Math.max(wd + size * 0.2, size * 0.5); // (an I's scrap stays a scrap)
-      c.translate(x + dx + wd / 2, y + lift);
-      c.rotate(tilt);
-      c.globalAlpha = alpha;
-      c.fillStyle = scraps[Math.floor(hash(seed, 5) * scraps.length)]!;
-      c.fillRect(-scrapW / 2, -size * 0.62, scrapW, size * 1.22);
-      c.fillStyle = ink;
-      c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText(word[i]!, 0, size * 0.02);
-      c.restore();
-      dx += wd + em * 0.07;
-    }
-    return dx;
   }
 
   dispose() { this.texture.dispose(); }
