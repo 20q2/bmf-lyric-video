@@ -26,7 +26,10 @@ export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLef
 };
 /** Plots every PLOT m; the near row at least `far` m off the road's centre. */
 export const PLOT = 22;
-const NEAR = 18;
+const NEAR = 11;
+/** The front row stands low (m) along the road where the car is while sky-writing is up (its camera looks up past
+ *  it). */
+const NEAR_UNDER_SKY = 8;
 /** The rows behind the street: the first this far off the road's centre (m), each next one this much further; none
  *  within this far of the road (wherever it bends back past them); a quarter of their plots empty (lots, parking). */
 export const BACK = { from: 44, step: 26, road: 8, empty: 0.25 };
@@ -64,6 +67,7 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
   // (and what the set-pieces keep clear of the town: a cross street, a freeway's wall)
   const taken = [...faces, ...keepClear];
   // a set-piece's own blocks stand where no face needs the ground (the ground it keeps clear is kept from the town's)
+  const skyRoad = carriers.filter((c) => c.kind === 'sky').map((c) => [motion.distanceAt(c.phrase.start) - 20, motion.distanceAt(c.phrase.end + 1.5) + 60] as const);
   const out: Block[] = own.filter((b) => !faces.some((t) => t.side === Math.sign(b.lateral) && b.s + b.w / 2 > t.a && b.s - b.w / 2 < t.b));
   const owned = own.map((b) => ({ side: Math.sign(b.lateral), a: b.s - b.w / 2 - 4, b: b.s + b.w / 2 + 4 }));
   for (let k = 0; k * PLOT < route.length; k++) {
@@ -71,7 +75,9 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
       const s = k * PLOT + PLOT / 2, b = BLOCKS[stretchAtS(s).id]!;
       if ((side === -1 && b.seaLeft) || hash(k, side, 1) < b.empty) continue;
       if (nearTunnel(tunnels, s, TUNNEL_CLEAR) || [...taken, ...owned].some((t) => t.side === side && s > t.a && s < t.b)) continue;
-      const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), h = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
+      const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), tall = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
+      // (low where the car is while sky-writing's up: the camera low behind it looks up past them at the words)
+      const h = skyRoad.some(([a, z]) => s > a && s < z) ? Math.min(tall, NEAR_UNDER_SKY) : tall;
       const lateral = side * ((b.far ?? NEAR) + d / 2 + 6 * hash(k, side, 5));
       const lift = route.frameAt(s).pos.y + 0.4; // down to the plain: by a raised road it would float
       out.push({ s, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, s, lateral, d, h + lift, w, -lift) }); // (w along the road, d deep)
