@@ -5,6 +5,7 @@
 //   pools     the streetlights' circles of light on the road
 // All additive or emissive HDR, so they bloom. Browser and bun (shaders are strings).
 import * as THREE from 'three';
+import { toon } from './toon';
 
 export const NIGHT: THREE.IUniform<number> = { value: 0 };
 /** How bright the lights shine (HDR multiples). */
@@ -92,4 +93,21 @@ void main() {
 }`,
     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
   });
+}
+
+/** Window glass on the street fronts (look/facades.ts): dark by day; by night lit where its `lit` attribute is 1, warm. */
+export function nightGlass(): THREE.MeshToonMaterial {
+  const m = toon({ color: '#28323c' });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.night = NIGHT;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+attribute float lit; varying float vLit;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+vLit = lit;`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+uniform float night; varying float vLit;`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+totalEmissiveRadiance += vec3(1.0, 0.66, 0.32) * vLit * night * ${GLOW.window.toFixed(2)};`);
+  };
+  m.customProgramCacheKey = () => 'nightGlass';
+  return m;
 }

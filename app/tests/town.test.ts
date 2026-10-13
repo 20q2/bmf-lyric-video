@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { makeDrive } from '../src/drive/drive';
 import { ROAD_HALF } from '../src/drive/route';
 import { ROAD_START } from '../src/drive/world';
+import { facadeOf } from '../src/look/facades';
 import { audio, lyrics } from './data';
 
 const drive = makeDrive(audio, lyrics);
@@ -29,4 +30,20 @@ test('no building stands on the road', () => {
     if (near < ROAD_HALF + 0.5) on.push(`block ${i} s=${b.s.toFixed(0)} lateral=${b.lateral.toFixed(0)}: ${near.toFixed(1)} m from the centre line`);
   });
   expect(on).toEqual([]);
+});
+
+test('every facade stays inside its block: the box the guard checks', () => {
+  const out: string[] = [];
+  drive.blocks.forEach((b, i) => {
+    if (b.concrete || b.prop) return;
+    const inv = b.matrix.clone().invert(), f = facadeOf(b);
+    for (const [name, g] of Object.entries(f)) {
+      const p = g.getAttribute('position'), v = new THREE.Vector3();
+      for (let k = 0; k < p.count; k++) {
+        v.fromBufferAttribute(p, k).applyMatrix4(inv);
+        if (Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)) > 0.5 + 1e-3) { out.push(`block ${i} ${name}: (${v.toArray().map((x) => x.toFixed(3)).join(', ')})`); break; }
+      }
+    }
+  });
+  expect(out).toEqual([]);
 });

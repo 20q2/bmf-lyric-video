@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import { WORLD, toon } from '../look/toon';
 import { F } from '../engine/type';
-import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
+import { GLOW, glowMaterial, lampMaterial, nightGlass, withWindows } from '../look/night';
+import { facades, signAtlas } from '../look/facades';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
@@ -119,10 +120,11 @@ export function buildWorld(drive: Drive): THREE.Group {
 
   // the town's buildings (blocks.ts: the guard checks them too)
   const towns = drive.blocks.filter((b) => !b.concrete && !b.prop), concrete = drive.blocks.filter((b) => b.concrete && !b.prop);
-  const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon()), Math.max(1, towns.length));
-  towns.forEach((b, i) => { blocks.setMatrixAt(i, b.matrix); blocks.setColorAt(i, new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!)); });
-  blocks.count = towns.length;
-  g.add(named(blocks, 'blocks'));
+  // (each a street front: look/facades.ts — its body, storefront, windows, sign and cornice, inside its box)
+  const town = facades(towns), fronts = new THREE.Group();
+  fronts.add(new THREE.Mesh(town.walls, toon({ vertexColors: true })), new THREE.Mesh(town.trim, toon({ vertexColors: true })));
+  fronts.add(new THREE.Mesh(town.glass, nightGlass()), new THREE.Mesh(town.signs, new THREE.MeshBasicMaterial({ map: signAtlas() })));
+  g.add(named(fronts, 'blocks'));
   // (a set-piece's concrete: a viaduct's deck and piers)
   const crete = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#b9ada0' }), Math.max(1, concrete.length));
   concrete.forEach((b, i) => crete.setMatrixAt(i, b.matrix));
@@ -233,8 +235,8 @@ function dressing(drive: Drive): THREE.Group {
     if (b.concrete || b.prop) return;
     const side = Math.sign(b.lateral), front = Math.abs(b.lateral) - b.d / 2;
     if (b.h > 4 && !b.bare && hash(i, 41) < 0.6) {
-      // an awning, 1.6 m out from the face toward the road, over the door
-      awn.push(boxAt(route, b.s, side * (front - 0.8), 1.6, 0.25, b.w * 0.7, 3.1));
+      // an awning, 1.6 m out from the face toward the road, over the shop's glass and under its sign (look/facades.ts)
+      awn.push(boxAt(route, b.s, side * (front - 0.8), 1.6, 0.15, b.w * 0.7, 3.0));
       awnCol.push(new THREE.Color(palette[Math.floor(hash(i, 42) * palette.length)]!));
     }
     for (let k = 0; k < 1 + Math.floor(hash(i, 43) * 3); k++) {
