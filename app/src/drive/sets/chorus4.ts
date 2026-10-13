@@ -22,8 +22,9 @@ const CAMPAIGN4 = /young and he fine/i, DRIVE = /put it in drive/i;
  *  off the road, its centre's height, turned toward the coming car (radians), its size, its words' share and scale;
  *  the camera waits ahead of it (m short, off the road's centre, up), the car driving up into the frame. */
 export const BOARD = { short: 34, lateral: 20, y: 11, turn: (33 * Math.PI) / 180, w: 30, h: 16.5, text: 0.62, scale: 1.35, d: 1.4, eye: { short: 24, lateral: -1.5, up: 2.6 } };
-/** The insert: the camera inside the car (its frame), aimed between the head unit's lyric and the shift indicator. */
-export const INSERT = { eye: new THREE.Vector3(-0.13, 1.51, -0.11), aim: new THREE.Vector3(0.07, 1.13, 0.52) };
+/** The insert: the camera inside the car (its frame), aimed between the head unit's lyric and the shift indicator —
+ *  pulled back and up enough that the wheel and gauges fill the frame's foot instead of bare door. */
+export const INSERT = { eye: new THREE.Vector3(-0.17, 1.56, -0.18), aim: new THREE.Vector3(0.06, 1.15, 0.52) };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Chorus4Plan {

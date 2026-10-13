@@ -32,7 +32,7 @@ export const FLOOR = 40;
 /** The first shot: the eye low off the car's front corner (how far from the pole, m; its bearing round it from the
  *  road's back, radians, and how far it turns, radians a second; its height and rise, m, m/s), looking up at the signs:
  *  only sky behind them. */
-export const SIGN_EYE = { r: 2.6, bearing: -0.75, turn: 0.035, y: 0.9, rise: 0.025 };
+export const SIGN_EYE = { r: 2.6, bearing: -0.75, turn: 0.055, y: 0.9, rise: 0.032 }; // (the long hold circles visibly: dead-still signs read as a freeze)
 /** The wide shot: from up the road past the corner (m along, off the road's centre, up; drifting back toward the car,
  *  m/s), back down the street at the car waiting at the line, the shops behind it, the motel. */
 export const WIDE = { s: 36, lateral: -1.2, y: 6.5, drift: 0.7 };

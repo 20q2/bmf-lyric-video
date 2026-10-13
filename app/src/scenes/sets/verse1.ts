@@ -163,6 +163,14 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     slab.matrix.makeBasis(along, p.up, p.normal).setPosition(p.pos);
     const body = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.024, p.h + 0.05, 0.012), toon({ color: '#121016' }));
     body.position.z = -0.008; slab.add(body);
+    // her hand round it (the cast's dark): the phone reads as held, not floating in the cabin's dark
+    const hand = toon({ color: '#241f2a' });
+    const palm = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.06, 4, 10), hand);
+    palm.position.set(p.w / 2 - 0.008, -p.h / 2 + 0.01, -0.02); palm.rotation.z = 0.5; slab.add(palm);
+    const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.035, 4, 8), hand);
+    thumb.position.set(p.w / 2 - 0.012, -p.h / 2 + 0.035, 0.012); thumb.rotation.z = -0.8; slab.add(thumb);
+    const wrist = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.09, 4, 10), hand);
+    wrist.position.set(p.w / 2 + 0.03, -p.h / 2 - 0.07, -0.03); wrist.rotation.z = 0.7; slab.add(wrist);
     const readTex = canvasTex(256, 64, (c) => {
       c.fillStyle = '#8a93a6'; c.textAlign = 'right'; c.textBaseline = 'middle';
       c.font = font(F.sign(500), 40); c.fillText('Read', 246, 36);

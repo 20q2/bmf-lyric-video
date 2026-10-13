@@ -7,8 +7,9 @@ import { hash } from '../engine/util';
 import type { Lyrics } from '../engine/lyrics';
 import type { RouteFrame } from '../drive/route';
 
-/** Bills per line, how long each flies (s), its size (m), and the wind (m/s along the car's forward when parked). */
-export const MONEY = { perLine: 90, life: 7, w: 0.95, h: 0.42, wind: 3.2, fall: 0.55, drag: 1.4, nearest: 3 };
+/** Bills per line, how long each flies (s), its size (m), and the wind (m/s along the car's forward when parked).
+ *  (Sized and spread so the parked outro reads as a flurry, not one green clump chasing the car.) */
+export const MONEY = { perLine: 90, life: 7, w: 0.72, h: 0.32, wind: 3.2, fall: 0.55, drag: 1.4, nearest: 3 };
 
 function billTexture(): THREE.Texture {
   const c = document.createElement('canvas'); c.width = 256; c.height = 112;
@@ -52,7 +53,7 @@ export class Money {
       // out of the front seats, up and to the sides (parked, flung forward: away from the back-seat camera, off the
       // overlook); then the air takes it: it keeps a fifth of the car's speed, slowing, and drifts on the wind (forward
       // off the overlook when the car is parked), falling slowly, fluttering
-      const out = new THREE.Vector3().addScaledVector(f.right, 2.2 * r(1)).addScaledVector(f.up, 2.5 + 1.5 * hash(b.seed, 2)).addScaledVector(f.fwd, 0.6 * r(3) + (v < 1 ? 2.2 : 0));
+      const out = new THREE.Vector3().addScaledVector(f.right, 4.6 * r(1)).addScaledVector(f.up, 2.5 + 2.4 * hash(b.seed, 2)).addScaledVector(f.fwd, 1.4 * r(3) + (v < 1 ? 2.2 + 2.2 * hash(b.seed, 10) : 0));
       const carry = f.fwd.clone().multiplyScalar(v * 0.2);
       const k = MONEY.drag, slow = (1 - Math.exp(-k * tau)) / k;
       const p = f.pos.clone().addScaledVector(f.up, 1.4).addScaledVector(f.fwd, 0.5) // from the front seats, her hands

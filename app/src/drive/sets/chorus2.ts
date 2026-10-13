@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { type Carrier, type Kind, layout, lineTake, lookFrom } from '../carriers';
 import { TEXT_SHARE } from '../ads';
-import { type Phrase, phrasesOf } from '../phrases';
+import { type Phrase, phraseOf, phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
 import { type Block, boxAt } from '../blocks';
 import { eyeOf } from '../camera';
@@ -85,7 +85,13 @@ export const CHORUS2: SetPiece = {
     const tailS = first.s + along(cross);
 
     // the freeway sign: three panels across the lanes and the tracks, passed half way through its line
-    const gps = phsOf(place), gantryS = carS(place.start + (place.end - place.start) * GANTRY.through);
+    // ("The boy | West side of Compton | came walking in": each panel a self-contained unit that reads top-down
+    // within itself, like a real exit sign — a phrase CONTINUING across stacked panel rows would read column-first)
+    const gw = place.words, westAt = gw.findIndex((w) => /^west/i.test(w.w)), cameAt = gw.findIndex((w) => /^came/i.test(w.w));
+    const gps = westAt > 0 && cameAt > westAt
+      ? [phraseOf(place, 0, westAt, ctx.solo), phraseOf(place, westAt, cameAt, ctx.solo), phraseOf(place, cameAt, gw.length, ctx.solo)]
+      : phsOf(place);
+    const gantryS = carS(place.start + (place.end - place.start) * GANTRY.through);
     const gf = route.frameAt(gantryS), gn = flat(gf.fwd).negate(), pw = GANTRY.panel, span = gps.length * pw + (gps.length - 1) * GANTRY.gap;
     const mid = (GANTRY.legs[0] + GANTRY.legs[1]) / 2;
     const panels: Panel[] = [];

@@ -11,7 +11,7 @@ import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, FLY, centerAt } from '../drive/carriers';
-import { daylight, skyStateAt } from '../drive/sky';
+import { COAST_T, SUN_AZ_DEG, daylight, skyStateAt } from '../drive/sky';
 import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
@@ -52,9 +52,9 @@ const PAINT_LASTS = 3;
 const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
 const FACE_WINDOW = 12;
-/** The sun sets over the sea: it stands this far (radians) left of the coast road's heading (at COAST_T) — inside
- *  the arch wide's frame, kissing the water (sets/chorus3.ts). */
-const SUN_AZ = (26 * Math.PI) / 180, COAST_T = 110;
+/** The sun sets over the sea: it stands SUN_AZ_DEG left of the coast road's heading (sky.ts) — inside the arch
+ *  wide's frame, kissing the water (sets/chorus3.ts shares the bearing for its glitter path). */
+const SUN_AZ = (SUN_AZ_DEG * Math.PI) / 180;
 /** Sunlight (low and warm, warmest as it sets), moonlight (cool, from high in the east), and the shadows' reach (m). */
 const SUN = { intensity: 2.8, high: new THREE.Color('#ffe6b8'), low: new THREE.Color('#ff8a4c') };
 const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * Math.PI) / 180 };
@@ -101,6 +101,8 @@ export default class DriveScene extends Scene {
   private sets: { group: THREE.Group; update(t: number, car: THREE.Object3D): void }[] = [];
   /** Carriers riding in the car (the radio), with their place in its frame. */
   private riding: [THREE.Object3D, THREE.Matrix4, number][] = [];
+  /** The hill sign's faces: floodlit for their line, dimming after (the outro's star-writing takes over the sky). */
+  private hillFaces: [Carrier, THREE.MeshBasicMaterial][] = [];
 
   override init() {
     const { audio, lyrics, renderer } = this.ctx;
@@ -120,6 +122,7 @@ export default class DriveScene extends Scene {
       this.arts.push(art);
       const o = buildCarrier(c, art.texture, wallColor(c), this.drive.route);
       if (c.vel) this.flying.push([c, o]);
+      if (c.kind === 'hill') { const f = o.getObjectByName('face') as THREE.Mesh | null; if (f) this.hillFaces.push([c, f.material as THREE.MeshBasicMaterial]); }
       this.placed.push([c, o]);
       this.world.add(o);
     }
@@ -243,6 +246,8 @@ export default class DriveScene extends Scene {
       up.addScaledVector(a, -up.dot(a)).normalize();
       this.writer.matrix.makeBasis(a, up, a.clone().cross(up)).scale(new THREE.Vector3(k, k, k)).setPosition(at);
     }
+    // the hill sign dims once its line is read: the eye moves on to the star-writing it hands off to
+    for (const [c, m] of this.hillFaces) m.color.setScalar(1.5 - 0.95 * smooth(c.phrase.end + 1.2, c.phrase.end + 3.4, t));
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
     placeCamera(this.cam, d.camera(t));
@@ -287,8 +292,11 @@ export default class DriveScene extends Scene {
     this.fogColor.lerp(TUNNEL_DARK, inside);
     const fog = this.world.fog as THREE.Fog;
     fog.color.copy(this.fogColor);
+    // (by night the fog pulls in: the far world melts into the dark — the climbing switchback's embankment would
+    // otherwise loom behind the Strip as an unlit wall)
+    const far = 1100 - 500 * NIGHT.value;
     fog.near = 140 - 130 * inside;
-    fog.far = 1100 - 960 * inside;
+    fog.far = far - (far - 140) * inside;
 
     this.city.update(t, this.cam.position, this.rt.width / W);
     // the lyrics showing now, for the bills to keep out of

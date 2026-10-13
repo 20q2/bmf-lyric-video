@@ -34,8 +34,16 @@ import { BRAND, TEXT_SHARE } from './ads';
 import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 
 const CANVAS_W = 1024;
-/** Boards that show their ad's copy until their lyric flips in (tri-vision: FLIP.slats slats, turning in a wave). */
-const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'storefront', 'street', 'gantry']);
+/** Boards that show their ad's copy — or their own in-world copy (OWN_COPY) — until their lyric flips in (tri-vision:
+ *  FLIP.slats slats, turning in a wave). A lit board that is simply blank reads as a bug, not anticipation. */
+const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'storefront', 'street', 'gantry', 'freeway', 'marquee', 'roofsign', 'vinyl']);
+/** What a set-piece's board says before its lyric comes (its own words, in the signs' face: never the song's). */
+const OWN_COPY: Partial<Record<Carrier['kind'], [string, string]>> = {
+  freeway: ['NORTH', '5'],
+  marquee: ['OPEN LATE', ''],
+  roofsign: ['CHICKEN', 'DINNERS'],
+  vinyl: ['GRAND OPENING', ''],
+};
 export const FLIP = { slats: 10, stagger: 0.6, steps: 12 };
 /** The word of emphasis's row takes this many shares of its face's height (the others one each). */
 const SOLO_ROW = 1.45;
@@ -86,7 +94,8 @@ function styleOf(c: Carrier): Style {
       // (a heavy italic sans: smoke letters, sturdy at a distance where a Didone's hairlines drop out); by day its shade
       // laid twice, by night a glow — and at full night (the outro) the words are written in stars, a constellation
       const light = daylight(c.phrase.start), day = light > 0.6;
-      return { family: F.archivoItalic(100, 800), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 2 : 1, stars: light < 0.35 };
+      // (by day a hard plum drop shadow besides the shade: white script on a pale sky needs an edge to read on a phone)
+      return { family: F.archivoItalic(100, 800), caps: false, colors: ['#ffffff', '#ffffff', '#ffffff'], alpha: [0, 0.97], glow: day ? 'rgba(54,20,60,0.9)' : 'rgba(255,255,255,0.9)', glowPasses: day ? 3 : 1, shadow: day ? 'rgba(46,16,52,0.75)' : undefined, stars: light < 0.35 };
     }
     case 'billboard': case 'poster': { // an ad (look/adart.ts draws it), the lyric its headline in its colours
       // (the word being sung: warm yellow on a dark ad, red on a light one — one rule across the film)
@@ -102,7 +111,10 @@ function styleOf(c: Carrier): Style {
       : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)', tubes: true };
     case 'barber': return { family: F.archivo(100, 900), caps: true, colors: ['#e9c46a', '#ffd76a', '#fff6d8'], alpha: [0.8, 1], outline: '#3a2408', shadow: '#120b04' }; // gold leaf on the glass
     case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffb000', '#ffb000', '#fff3c4'], alpha: [0.5, 1], glow: 'rgba(255,170,0,0.85)' };
-    case 'bus': { const a = AD_STYLE[c.ad ?? 'phone']; return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, '#d81e2c'], alpha: [0.72, 1] }; }
+    case 'bus': { // (the word being sung by the ad's own lightness, like the billboards: red drowns on a dark ad)
+      const a = AD_STYLE[c.ad ?? 'phone'], dark = new THREE.Color(a.bg).getHSL({ h: 0, s: 0, l: 0 }).l < 0.4;
+      return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, dark ? '#ffd65a' : '#d81e2c'], alpha: [0.72, 1] };
+    }
     case 'sticker': { // (each its own: cream, black, yellow or red)
       const [bg, ink, now] = STICKERS[Math.floor(hash(c.phrase.start, 21) * STICKERS.length)]!;
       return { bg, border: ink, family: F.archivo(75, 900), caps: true, colors: [ink, ink, now], alpha: [0.75, 1] };
@@ -110,7 +122,7 @@ function styleOf(c: Carrier): Style {
     case 'plate': return { bg: '#f2f1ea', border: '#1b2a6b', family: F.archivo(62, 700), caps: true, colors: ['#1b2a6b', '#1b2a6b', '#d81e2c'], alpha: [0.8, 1] };
     case 'radio': return { bg: '#04080a', family: F.mono(600), caps: true, colors: ['#5fd8ff', '#5fd8ff', '#ffffff'], alpha: [0.55, 1], glow: 'rgba(80,220,255,0.7)' };
     case 'menu': return { bg: '#1b1714', family: F.archivo(75, 900), caps: true, colors: ['#fff1d0', '#fff1d0', '#ffd65a'], alpha: [0.75, 1] };
-    case 'mirror': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#b0102a', '#b0102a', '#e8173a'], alpha: [0.6, 1], shadow: 'rgba(90,0,20,0.35)' }; // (on the glass: the mirror is the visor's)
+    case 'mirror': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#e8173a', '#e8173a', '#ff3054'], alpha: [0.78, 1], shadow: 'rgba(90,0,20,0.5)' }; // (lipstick on the glass: bright enough to read over the reflection)
     case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
     case 'polesign': return { bg: '#fbf7ee', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
@@ -118,7 +130,7 @@ function styleOf(c: Carrier): Style {
     case 'window': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.82, 1], outline: '#c8102e', shadow: '#5a0614' }; // painted on the glass
     case 'vinyl': return { bg: '#c8202e', border: '#ffffff', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'roofsign': return { bg: '#ffd65a', border: '#c8202e', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
-    case 'carwash': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1], outline: '#0b3a66', align: 'left' }; // (on the prop's board)
+    case 'carwash': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ff3043'], alpha: [0.75, 1], outline: '#0b3a66', align: 'left' }; // (on the prop's board; the hero word red: yellow sinks into the pale blue)
     case 'visor': return { bg: '#0e0d10', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.7, 1] };
     case 'hood': return { family: F.archivoItalic(100, 800), caps: true, colors: ['#ffd65a', '#ffd65a', '#ffffff'], alpha: [0.75, 1], outline: '#5a0614', shadow: '#2a0309' };
     case 'giant': return { family: F.archivo(62, 900), caps: true, colors: [AD_STYLE.him.ink, AD_STYLE.him.ink, '#c8102e'], alpha: [0.72, 1] };
@@ -170,7 +182,8 @@ export class CarrierArt {
     // (a bus's ad is the bus's: its rows are the headline over it)
     if (carrier.ad && carrier.kind !== 'bus' && carrier.kind !== 'giant') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1]);
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
-    else if (carrier.kind === 'menu') this.drawPrices(c, share);
+    // (a price only once its item's words are coming in: a price beside a blank line reads as a bug)
+    else if (carrier.kind === 'menu' && revealAt(carrier, t) > 0) this.drawPrices(c, share);
     else if (carrier.kind === 'plate') { c.fillStyle = '#c8102e'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.17); c.fillText('California', W / 2, H * 0.15); c.textAlign = 'left'; }
     const TW = W * share; // the lyric's width
     const shown = Math.round(revealAt(carrier, t) * FLIP.steps) / FLIP.steps;
@@ -206,11 +219,26 @@ export class CarrierArt {
     return l;
   }
 
-  /** The ad's own copy where its headline will go: its maker in capitals, its line under it (a route sign has none: its
-   *  shield and arrow, and the blade blank till its words come). */
+  /** The ad's own copy where its headline will go: its maker in capitals, its line under it; a set-piece's board its
+   *  own in-world words (OWN_COPY: a gantry's control city, a marquee's OPEN LATE); a route sign has none beyond its
+   *  shield and arrow. */
   private drawCopy(c: CanvasRenderingContext2D, TW: number) {
     const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height;
     c.clearRect(0, 0, W, H);
+    let own = OWN_COPY[carrier.kind];
+    // (the freeway's three panels are a real gantry until the words come: control cities, not one sign thrice; a
+    // stacked board's copy goes on its top row only, or OPEN LATE repeats down the box)
+    if (carrier.kind === 'freeway') own = ([['LOS ANGELES', ''], ['SLAUSON AV', '1 MILE'], ['NORTH', '5']] as [string, string][])[+(carrier.id.split('.')[1] ?? 0) % 3];
+    else if (own && !carrier.id.endsWith('.0')) own = undefined;
+    if (own && !carrier.ad) {
+      const [top, under] = own;
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = style.colors[1];
+      const big = Math.min(H * (under ? 0.3 : 0.4), (TW * 0.8) / Math.max(4, top.length * 0.58));
+      c.font = font(F.sign(600), big); c.fillText(top, TW / 2, under ? H * 0.38 : H * 0.5, TW * 0.88);
+      if (under) { c.font = font(F.sign(600), big * 0.9); c.fillText(under, TW / 2, H * 0.72, TW * 0.88); }
+      c.textAlign = 'left';
+      return;
+    }
     if (!carrier.ad) return;
     const [brand, line] = BRAND[carrier.ad];
     c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = style.colors[1];
@@ -317,11 +345,20 @@ export class CarrierArt {
     c.shadowBlur = 0;
   }
 
-  /** A word written in stars: the word is rasterised small, its strokes sampled on a grid, and a four-point star
-   *  drawn at each sample (seeded sizes, the current fillStyle and alpha). Returns the word's advance (px). */
+  /** A word written in stars: a faint ghost of the letterform (star dust, so the word reads), then the word's strokes
+   *  sampled on a grid with a four-point star at each sample (seeded sizes, the current fillStyle and alpha).
+   *  Returns the word's advance (px). */
   private drawConstellation(c: CanvasRenderingContext2D, word: string, fx: number, fy: number, em: number, now: boolean): number {
     c.font = font(this.style.family, em);
     const wd = c.measureText(word).width;
+    const ink = c.fillStyle as string, alpha = c.globalAlpha;
+    // the ghost: the letterform itself, dim — without it the stars are sparkle clumps, not words
+    c.save();
+    c.globalAlpha = alpha * 0.26;
+    c.shadowColor = 'rgba(255,255,255,0.5)'; c.shadowBlur = em * 0.12;
+    c.fillStyle = ink;
+    c.fillText(word, fx, fy);
+    c.restore();
     // rasterise the word on a scratch layer, downsampled for cheap reads
     const K = 4, raster = this.layer('stars'), rc = raster.getContext('2d')!;
     const rw = Math.max(2, Math.ceil(wd / K)), rh = Math.max(2, Math.ceil(em * 1.4 / K));
@@ -331,16 +368,15 @@ export class CarrierArt {
     rc.fillStyle = '#fff';
     rc.fillText(word, 0, rh / 2);
     const img = rc.getImageData(0, 0, rw, rh).data;
-    const ink = c.fillStyle as string, alpha = c.globalAlpha;
     c.save();
     c.shadowColor = 'rgba(255,255,255,0.9)';
-    const step = Math.max(1, Math.round(em * 0.14 / K));
+    const step = Math.max(1, Math.round(em * 0.095 / K));
     for (let gy = 0; gy < rh; gy += step) for (let gx = 0; gx < rw; gx += step) {
       if (img[(gy * rw + gx) * 4 + 3]! < 128) continue;
       const seed = gx * 131 + gy * 29 + word.length;
-      const px = fx + gx * K + (hash(seed, 1) - 0.5) * em * 0.05, py = fy - em * 0.7 + gy * K + (hash(seed, 2) - 0.5) * em * 0.05;
-      const r = em * (0.03 + 0.05 * hash(seed, 3)) * (now ? 1.35 : 1);
-      c.globalAlpha = alpha * (0.65 + 0.35 * hash(seed, 4));
+      const px = fx + gx * K + (hash(seed, 1) - 0.5) * em * 0.04, py = fy - em * 0.7 + gy * K + (hash(seed, 2) - 0.5) * em * 0.04;
+      const r = em * (0.04 + 0.06 * hash(seed, 3)) * (now ? 1.35 : 1);
+      c.globalAlpha = alpha * (0.7 + 0.3 * hash(seed, 4));
       c.fillStyle = ink;
       c.shadowBlur = r * 2.2;
       c.beginPath();
@@ -364,12 +400,12 @@ export class CarrierArt {
       const tilt = (hash(seed, 2) - 0.5) * 0.26, lift = (hash(seed, 3) - 0.5) * em * 0.18;
       c.save();
       c.font = font(faces[Math.floor(hash(seed, 4) * faces.length)]!, size);
-      const wd = c.measureText(word[i]!).width;
+      const wd = c.measureText(word[i]!).width, scrapW = Math.max(wd + size * 0.2, size * 0.5); // (an I's scrap stays a scrap)
       c.translate(x + dx + wd / 2, y + lift);
       c.rotate(tilt);
       c.globalAlpha = alpha;
       c.fillStyle = scraps[Math.floor(hash(seed, 5) * scraps.length)]!;
-      c.fillRect(-wd / 2 - size * 0.1, -size * 0.62, wd + size * 0.2, size * 1.22);
+      c.fillRect(-scrapW / 2, -size * 0.62, scrapW, size * 1.22);
       c.fillStyle = ink;
       c.textAlign = 'center'; c.textBaseline = 'middle';
       c.fillText(word[i]!, 0, size * 0.02);

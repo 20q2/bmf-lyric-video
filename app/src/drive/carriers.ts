@@ -129,7 +129,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   billboard: { rowH: 2.6, w: 17, advance: 0.52, emOfRow: 0.72 },
   storefront: { rowH: 2.3, w: 14, advance: 0.62, emOfRow: 0.68 },
   neon: { rowH: 2.4, w: 11, advance: 0.42, emOfRow: 0.7 },
-  sign: { rowH: 1.3, w: 5.4, advance: 0.42, emOfRow: 0.62 },
+  sign: { rowH: 1.3, w: 5.4, advance: 0.42, emOfRow: 0.55 }, // (Bodoni's descenders stay inside the board's border)
   street: { rowH: 1, w: 5.2, advance: 0.55, emOfRow: 0.66 },
   gantry: { rowH: 2, w: 9.5, advance: 0.55, emOfRow: 0.62 },
   tunnel: { rowH: 2, w: 10, advance: 0.62, emOfRow: 0.7 },
@@ -138,7 +138,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   barber: { rowH: 1, w: 5.6, advance: 0.6, emOfRow: 0.7, wrap: 10 },
   speed: { rowH: 0.4, w: 1.8, advance: 0.6, emOfRow: 0.66, wrap: 15 },
   bus: { rowH: 0.36, w: 2.4, advance: 0.55, emOfRow: 0.72, wrap: 17 },
-  mirror: { rowH: 0.06, w: 0.3, advance: 0.5, emOfRow: 0.7, wrap: 18 },
+  mirror: { rowH: 0.068, w: 0.32, advance: 0.5, emOfRow: 0.72, wrap: 18 },
   sticker: { rowH: 0.26, w: 1.6, advance: 0.55, emOfRow: 0.66, wrap: 16 },
   plate: { rowH: 0.3, w: 0.62, advance: 0.6, emOfRow: 0.62, wrap: 10 },
   phone: { rowH: 0.042, w: 0.18, advance: 0.55, emOfRow: 0.62, wrap: 16 },
@@ -189,7 +189,7 @@ export const SKY = { ahead: 75, up: 27, side: 17, lift: 7 };
 /** Banners fly this far ahead of the car as their line starts, this high, this far to its side (left: clear of the
  *  sky-writing still dissolving on the right), drifting this fast (m, m/s); the plane flies `tow` ahead of its banner,
  *  and a formation's banners stand `gap` apart; a banner seen from further off than `view` is made bigger to match. */
-export const BANNER = { ahead: 60, up: 42, side: -12, speed: 6, tow: 9, gap: 6.5, view: 58, finale: { ahead: 42, up: 15 } };
+export const BANNER = { ahead: 60, up: 42, side: -12, speed: 6, tow: 9, gap: 6.5, view: 58, under: 4, finale: { ahead: 42, up: 15 } };
 /** A banner holds one row up to this many characters. */
 export const BANNER_ROW = 22;
 /** The faces on the left stand this far off the road's centre (m). Per kind: how high a lone face's centre stands, and
@@ -516,6 +516,9 @@ export function framing(c: Carrier, car: (t: number) => RouteFrame, carS: (t: nu
       const cabin = CABIN.stretches.has(c.stretch);
       return (t) => {
         const f = car(t), at = centerAt(c, t).add(c.aim ?? ZERO);
+        // (towed banners: aimed a little under the formation, so the horizon anchors the frame's foot — a banner on
+        // nothing but sky flatlines)
+        if (c.kind === 'banner') at.addScaledVector(WORLD_UP, -BANNER.under);
         if (!cabin) return lookFrom(f.pos.clone().addScaledVector(flat(f.fwd), -8).addScaledVector(f.right, 2.5 * jitter(3)).add(new THREE.Vector3(0, 1.6, 0)), at);
         const eye = f.pos.clone().addScaledVector(f.fwd, -CABIN.back).addScaledVector(f.up, CABIN.up).addScaledVector(f.right, 0.25 * jitter(3));
         return lookFrom(eye, at.addScaledVector(WORLD_UP, -eye.distanceTo(at) * Math.tan(CABIN.under)));

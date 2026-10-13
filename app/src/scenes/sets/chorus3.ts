@@ -5,10 +5,11 @@
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { ARCH, type Chorus3Plan, TOWER } from '../../drive/sets/chorus3';
+import { SUN_AZ_DEG, COAST_T } from '../../drive/sky';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { F } from '../../engine/type';
-import { box, onPanel, pic, plane, roadFrame, signFace } from './kit';
+import { box, canvasTex, onPanel, pic, plane, roadFrame, signFace } from './kit';
 
 export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.chorus3 as Chorus3Plan | undefined;
@@ -57,6 +58,33 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     n.rotation.y = -Math.PI / 2;
   });
 
+  // ---- the sun's glitter path on the water: a streak of broken highlights lying along the sun's bearing — the one
+  // prop that makes the sea read as sea while the sun goes down into it ----
+  let glitter!: THREE.Mesh;
+  {
+    const tex = canvasTex(256, 1024, (c) => {
+      for (let k = 0; k < 150; k++) {
+        const u = (k * 0.618) % 1, v = (k * 0.382) % 1;
+        const w = 10 + 50 * ((k * 0.27) % 1) * (1 - v * 0.6); // (narrower streaks far out)
+        c.fillStyle = `rgba(255, 220, 170, ${0.14 + 0.3 * ((k * 0.73) % 1)})`;
+        c.fillRect(128 + (u - 0.5) * (170 - 110 * v) - w / 2, v * 1024, w, 3.5 + 3 * ((k * 0.41) % 1));
+      }
+    });
+    const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, color: new THREE.Color(2.2, 2.2, 2.2) });
+    glitter = new THREE.Mesh(new THREE.PlaneGeometry(26, 190), m);
+    // lying on the water along the sun's bearing FROM the arch wide's eye (a glitter path runs viewer-to-sun: it is
+    // tuned for the one shot that holds the sea)
+    const cf = route.frameAt(drive.motion.distanceAt(COAST_T)), fwd = new THREE.Vector3(cf.fwd.x, 0, cf.fwd.z).normalize(), right = new THREE.Vector3(cf.right.x, 0, cf.right.z).normalize();
+    const az = (SUN_AZ_DEG * Math.PI) / 180;
+    const dir = fwd.clone().multiplyScalar(Math.cos(az)).addScaledVector(right, -Math.sin(az)).normalize();
+    const start = route.frameAt(plan.archS - 40).pos.clone().addScaledVector(right, -11);
+    const mid = start.clone().addScaledVector(dir, 95);
+    // (flat on the water, its long axis along the bearing: x across, y out along dir, z up)
+    glitter.matrixAutoUpdate = false;
+    glitter.matrix.makeBasis(new THREE.Vector3(0, 1, 0).clone().cross(dir).normalize(), dir, new THREE.Vector3(0, 1, 0)).setPosition(mid.x, 0.03, mid.z); // (a hair over the sea strip, or it drowns)
+    root.add(glitter);
+  }
+
   // ---- the gulls, crossing under the fly line's sky-writing (flat dark Vs, flapping) ----
   const gulls: { g: THREE.Group; wings: THREE.Mesh[]; k: number }[] = [];
   if (plan.fly) {
@@ -74,9 +102,14 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
   }
 
   const UP = new THREE.Vector3(0, 1, 0);
+  const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
   return {
     group: root,
     update(t) {
+      // the glitter burns while the sun is low on the water, and goes with it
+      const gm = glitter.material as THREE.MeshBasicMaterial;
+      gm.opacity = smooth(99, 104, t) * (1 - smooth(112.5, 117, t));
+      glitter.visible = gm.opacity > 0.01;
       if (!plan.fly) return;
       const F0 = plan.fly, on = t > F0.start - 0.8 && t < F0.end + 2;
       for (const { g, wings, k } of gulls) {

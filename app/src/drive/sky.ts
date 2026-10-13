@@ -19,6 +19,10 @@ export const SKY_KEYS: readonly [number, string, string, number][] = Object.free
 ]);
 const LIN = SKY_KEYS.map(([t, z, h, e]) => [t, new THREE.Color(z), new THREE.Color(h), e] as const); // linear
 
+/** Where the sun sets: this far (degrees) left of the coast road's heading at COAST_T (scenes/drive.ts aims the light,
+ *  sets/chorus3's glitter path lies along it). */
+export const SUN_AZ_DEG = 26, COAST_T = 110;
+
 export interface SkyState {
   zenith: THREE.Color;
   horizon: THREE.Color;

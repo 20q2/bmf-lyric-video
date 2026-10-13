@@ -295,3 +295,50 @@ And the back half is built, completing the section-by-section pass:
 - KNOWN_SHORT shrank from three to one (L36.1 and L43.1 fixed by their set-pieces; L42.1 remains).
 - The SOUTH DETROIT place-sign beat the plan called "built" lives in world.ts's placeSigns as a deliberate callback
   (after the line, never ahead): verified intended, no change.
+
+**Stranger check (2026-10-13): two cold-eyed reviews — one of all ten scenes from contact sheets, one of all 46 edits
+from before/after frame pairs — triaged against the model, the worthwhile findings applied.**
+
+Applied:
+
+- **Blank-sign disease (systemic, both reviews).** A lit carrier that is empty before its lyric reads as a bug, not
+  anticipation. Boards now show their own in-world copy until the words flip in (carrierart.ts OWN_COPY): the freeway's
+  three panels are a real gantry first (LOS ANGELES · SLAUSON AV · NORTH 5), the marquees say OPEN LATE, the roof sign
+  CHICKEN DINNERS, the vinyl GRAND OPENING — top row of a stack only — and a menu price only appears once its item's
+  words are coming in.
+- **The chorus-2 gantry read column-first** (a reading-order breach: phrases continued across the three panels' stacked
+  rows). Re-split "The boy | West side of Compton | came walking in" so each panel is a self-contained unit that reads
+  top-down within itself, like a real exit sign.
+- **The outro's star-writing was illegible** (sparkle clumps on a starfield). Each word now draws a faint ghost of its
+  letterform under denser, larger stars: the words read, and still read as constellations.
+- **The phone floated in the dark** with no anchor or scale. Her hand now holds it (palm, thumb, wrist in the cast's
+  silhouette dark), and the Read receipt rides under the last bubble.
+- **The lipstick mirror was ambiguous and dim.** The lettering is brighter lipstick red with a harder shadow, the face
+  a touch bigger, and her lipstick tube lies against the visor's edge — the prop explains the medium.
+- **Day sky-writing lacked contrast on the pale sky** (the tenets' own warning): a hard plum drop shadow and a third
+  shade pass. The towed banners also aim a little lower, so the horizon anchors the frame.
+- **The coast never read as coast.** The sun's glitter path now lies on the water along the sun's bearing from the arch
+  wide's eye (the one shot that holds the sea), burning 99–117 s and going down with the sun.
+- **Chorus 4's switchback loomed behind the Strip** as an unlit embankment wall with floating streetlights ("a
+  cable-stayed pylon", said the cold eye). The fog now pulls in at night (far 1100 → 600), melting the far world into
+  the dark; it also softens the outro.
+- **The hill sign outshone everything after its line**: it dims to ambient once read, handing the sky to the stars.
+- Smaller: the bus ad's sung word follows its ad's lightness (yellow on dark, like the boards); the car wash's hero
+  word is red (yellow sank into the pale blue); plate and stickers get plate-lamp brightness for the dusk rear shot;
+  the ransom letters sit smaller inside their panel with real scraps behind thin letters; verse 3's neon headers burn
+  cooler so the bloom stops blotting their script, and TARZAN & JANE is bigger; the chorus-4 insert frames the wheel
+  and gauges instead of bare door; the intro's long first hold circles visibly; the sign face's em leaves room for
+  Bodoni's descenders; the outro's money is smaller and thrown wider (a flurry, not a clump chasing the car).
+
+Rejected or deferred, with reasons:
+
+- The train "occluding" the posters at the chorus-2 cut is the Metro wipe, by design and beloved. The "from dropping"
+  payoff exists (the word falls off its board, the car squats) — it lives between the sheets' sample frames. The
+  "chevrons by the streetlamp" at the chorus-3 edit are the gulls. His face on every campaign board is the story, not
+  a repeated-prop bug — though chorus 2 and 3 staging similarity is noted for M5 set dressing.
+- Known and kept: the intro's long first hold (the user's design; now with more orbit), the two cuts inside chorus 1's
+  dropping line (the car travels too far during the line for one take to hold board and paint readable; the paint
+  version of this line in chorus 2 glides), the bridge's four same-wall cuts (the tunnel is the user's favourite
+  section), whips living only in the verses, and the NO VACANCY end beat.
+- Deferred to M5 (fidelity): the riders' blob heads in over-shoulder shots, palm crowns reading as discs, billboard
+  void dressing, floodlights under the chorus-4 board, curbs and corners for verse 2's lot.

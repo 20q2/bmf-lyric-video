@@ -125,10 +125,20 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
     const dc = dcv.getContext('2d')!;
     dc.fillStyle = '#ffb000'; dc.textAlign = 'center'; dc.textBaseline = 'middle'; dc.font = `64px "${F.sign(700)}"`; dc.fillText('D', 48, 52);
     const dtex = new THREE.CanvasTexture(dcv); dtex.colorSpace = THREE.SRGBColorSpace;
-    const dLamp = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.05), new THREE.MeshBasicMaterial({ map: dtex, transparent: true, color: new THREE.Color(0.35, 0.35, 0.35), depthWrite: false }));
+    const dLamp = new THREE.Mesh(new THREE.PlaneGeometry(0.062, 0.062), new THREE.MeshBasicMaterial({ map: dtex, transparent: true, color: new THREE.Color(0.35, 0.35, 0.35), depthWrite: false }));
     dLamp.name = 'shiftD';
     dLamp.position.set((0.68 - 0.5) * 0.26, 0.001, 0.002); g.add(dLamp);
     body.add(g);
+  }
+  // her lipstick, lying against the visor's edge (the mirror verse writes with it: the prop explains the medium)
+  {
+    const tube = new THREE.Group();
+    tube.position.set(-VISOR.x + VISOR.mirror.w / 2 + 0.06, VISOR.mirror.pos.y - VISOR.mirror.h / 2 + 0.012, VISOR.mirror.pos.z + 0.012);
+    tube.rotation.z = 1.35; tube.rotation.y = 0.3;
+    const caseM = toon({ color: '#15121a' }), red = toon({ color: '#e8173a' });
+    const body2 = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.05, 10), caseM); tube.add(body2);
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.009, 0.022, 10), red); tip.position.y = 0.034; tube.add(tip);
+    body.add(tube);
   }
   // the visors: hinged on the top rail over each seat, folded back flat; hers (on the car's right: −x) has a mirror
   const M = VISOR.mirror, flaps: THREE.Group[] = [];

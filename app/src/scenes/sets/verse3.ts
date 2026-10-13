@@ -18,7 +18,8 @@ function neonTex(w: number, h: number, glow: string, draw: (c: CanvasRenderingCo
     draw(c); draw(c); // (two passes: the glow builds)
   });
 }
-/** A neon plane: its material's brightness is the flicker's (update sets it). */
+/** A neon plane: its material's brightness is the flicker's (update sets it; `peak`: headers burn cooler than the
+ *  lyric tubes, or the bloom blots their script). */
 function neonPlane(g: THREE.Object3D, w: number, h: number, x: number, y: number, z: number, tex: THREE.Texture): THREE.Mesh {
   const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, color: new THREE.Color(GLOW.neon, GLOW.neon, GLOW.neon), depthWrite: false });
   return plane(g, w, h, x, y, z, m);
@@ -45,11 +46,12 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   const { route } = drive, root = new THREE.Group();
   const dark = toon({ color: '#15121a' }), chrome = toon({ color: WORLD.chrome }), bamboo = toon({ color: '#9e7a42' });
   const gold = toon({ color: '#d7a62e' });
-  /** Every flickering material, with its line's start (and a rate scale: torches dance faster). */
-  const flicker: { m: THREE.MeshBasicMaterial; start: number; dance?: boolean }[] = [];
-  const neon = (g: THREE.Object3D, w: number, h: number, x: number, y: number, z: number, tex: THREE.Texture, start: number, dance = false) => {
+  /** Every flickering material, with its line's start, its lit brightness (headers cooler than tubes: the bloom would
+   *  blot their script) and whether it dances (torches). */
+  const flicker: { m: THREE.MeshBasicMaterial; start: number; peak: number; dance?: boolean }[] = [];
+  const neon = (g: THREE.Object3D, w: number, h: number, x: number, y: number, z: number, tex: THREE.Texture, start: number, opts: { peak?: number; dance?: boolean } = {}) => {
     const p = neonPlane(g, w, h, x, y, z, tex);
-    flicker.push({ m: p.material as THREE.MeshBasicMaterial, start, dance });
+    flicker.push({ m: p.material as THREE.MeshBasicMaterial, start, peak: opts.peak ?? 2.1, dance: opts.dance });
     return p;
   };
   let coin: THREE.Mesh | null = null, coinStart = 0;
@@ -67,7 +69,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           c.beginPath(); c.moveTo(0, -62); c.lineTo(0, 62); c.stroke(); c.restore();
         });
         neon(g, 3.2, 1.9, -W / 2 - 2.1, 0.4, 0.1, cap, start);
-        neon(g, 6.4, 1.15, 0, H / 2 + 1.0, 0.1, neonText('PHARMACY', '#4dff9e', 110, false), start);
+        neon(g, 6.4, 1.15, 0, H / 2 + 1.0, 0.1, neonText('PHARMACY', '#4dff9e', 110, false), start, { peak: 1.55 });
         break;
       }
       case 'pop': {
@@ -80,7 +82,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           for (const [bx, by, r] of [[160, 46, 10], [210, 24, 13], [258, 52, 9]] as const) { c.beginPath(); c.arc(bx, by, r, 0, Math.PI * 2); c.fill(); }
         });
         neon(g, 2.1, 2.5, -W / 2 - 1.7, 0.3, 0.1, glass, start);
-        neon(g, 5.2, 1.15, 0, H / 2 + 1.0, 0.1, neonText('LIQUOR', '#ffd65a', 110, false), start);
+        neon(g, 5.2, 1.15, 0, H / 2 + 1.0, 0.1, neonText('LIQUOR', '#ffd65a', 110, false), start, { peak: 1.55 });
         break;
       }
       case 'marquee': {
@@ -104,25 +106,25 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           c.fillStyle = '#ff8a2a';
           c.beginPath(); c.moveTo(110, 20); c.quadraticCurveTo(190, 130, 110, 270); c.quadraticCurveTo(30, 130, 110, 20); c.fill();
         });
-        neon(g, 0.9, 1.25, pole, foot - 1 + groundY + 0.75, 0.15, flame, start - 2, true); // (torches burn before the line)
+        neon(g, 0.9, 1.25, pole, foot - 1 + groundY + 0.75, 0.15, flame, start - 2, { peak: 2.6, dance: true }); // (torches burn before the line)
         break;
       }
       case 'tiki2': {
         // the bar's own name over the face, and the second torch
         for (const x of [-W / 2 - 0.35, W / 2 + 0.35]) cyl(g, 0.14, H + 1.6, x, 0, 0.05, bamboo);
-        neon(g, 8.6, 1.5, 0, H / 2 + 1.1, 0.1, neonText('Tarzan & Jane', '#4de0c0', 128), start);
+        neon(g, 10, 1.75, 0, H / 2 + 1.2, 0.1, neonText('Tarzan & Jane', '#4de0c0', 128), start, { peak: 1.55 });
         const pole = W / 2 + 1.6;
         cyl(g, 0.1, foot - 1, pole, groundY + (foot - 1) / 2, 0.15, bamboo);
         const flame = neonTex(220, 300, '#ff8a2a', (c) => {
           c.fillStyle = '#ff8a2a';
           c.beginPath(); c.moveTo(110, 20); c.quadraticCurveTo(190, 130, 110, 270); c.quadraticCurveTo(30, 130, 110, 20); c.fill();
         });
-        neon(g, 0.9, 1.25, pole, foot - 1 + groundY + 0.75, 0.15, flame, start - 4, true);
+        neon(g, 0.9, 1.25, pole, foot - 1 + groundY + 0.75, 0.15, flame, start - 4, { peak: 2.6, dance: true });
         break;
       }
       case 'phone': {
         // the payphones at the kerb under the words: two hooded boxes on a post, PHONE in blue, the coin light
-        neon(g, 5.4, 1.15, 0, H / 2 + 1.0, 0.1, neonText('PHONE', '#5fd8ff', 110, false), start);
+        neon(g, 5.4, 1.15, 0, H / 2 + 1.0, 0.1, neonText('PHONE', '#5fd8ff', 110, false), start, { peak: 1.55 });
         const kerb = new THREE.Group(); kerb.position.set(0, groundY, 1.2); g.add(kerb);
         box(kerb, 0.22, 2.6, 0.22, 0, 1.3, 0, dark);
         for (const x of [-0.55, 0.55]) {
@@ -153,8 +155,8 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           c.beginPath(); c.moveTo(340, 140); c.lineTo(300, 142); c.moveTo(340, 140); c.lineTo(330, 176); c.stroke();
         });
         neon(g, 2.6, 2.6, W / 2 + 2.0, 0.3, 0.1, heart, start);
-        neon(g, 8.2, 1.3, 0, H / 2 + 1.1, 0.1, neonText('Wedding Chapel', '#f4f4f0', 120), start);
-        neon(g, 3.6, 0.8, 0, -H / 2 - 0.7, 0.1, neonText('ALWAYS OPEN', '#ff4fa3', 72, false), start);
+        neon(g, 8.2, 1.3, 0, H / 2 + 1.1, 0.1, neonText('Wedding Chapel', '#f4f4f0', 120), start, { peak: 1.5 });
+        neon(g, 3.6, 0.8, 0, -H / 2 - 0.7, 0.1, neonText('ALWAYS OPEN', '#ff4fa3', 72, false), start, { peak: 1.45 });
         break;
       }
     }
@@ -164,9 +166,9 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   return {
     group: root,
     update(t) {
-      for (const { m, start, dance } of flicker) {
+      for (const { m, start, peak, dance } of flicker) {
         const lit = dance ? 0.75 + 0.25 * Math.sin(t * 11 + start * 7) * Math.sin(t * 17) : flickAt(t, start);
-        m.color.setScalar(0.18 + (GLOW.neon - 0.18) * Math.max(0.04, lit));
+        m.color.setScalar(0.18 + (peak - 0.18) * Math.max(0.04, lit));
       }
       if (coin) { // the coin light blinks while they're told to call
         const on = t >= coinStart && (t * 2.2) % 1 < 0.5;
