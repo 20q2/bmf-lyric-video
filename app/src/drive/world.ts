@@ -82,14 +82,24 @@ function strip(route: Route, a: number | ((s: number) => number), b: number | ((
 }
 
 /** An embankment along one side of the road (side: -1 left, +1 right): from the verge's edge (`edge` m out) down to
- *  the plain at SLOPE, wherever the road stands above it. */
+ *  the plain at SLOPE, wherever the road stands above it; steeper on a bend's inside, where it may reach no further
+ *  out than the bend's radius (past it, the hairpin up into the hills folded it into tall sheets across the sky). */
 function skirt(route: Route, side: number, edge: (s: number) => number, end = route.length): THREE.BufferGeometry {
   const n = Math.ceil((end - ROAD_START) / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
   const c = new THREE.Color(WORLD.ground).multiplyScalar(0.8);
+  // each sample's bend radius on this side (Infinity where the road runs straight or bends the other way)
+  const inside = Array.from({ length: n }, (_, i) => {
+    const s = Math.min(end, ROAD_START + i * STEP), a = route.frameAt(s), b = route.frameAt(s + STEP);
+    const turn = Math.acos(Math.min(1, a.fwd.dot(b.fwd)));
+    return turn > 1e-6 && Math.sign(b.fwd.dot(a.right)) === side ? STEP / turn : Infinity;
+  });
   for (let i = 0; i < n; i++) {
     const s = Math.min(end, ROAD_START + i * STEP), f = route.frameAt(s), h = Math.max(0, f.pos.y + 0.4), e = edge(s);
+    let run = e + SLOPE * h;
+    for (let j = Math.max(0, i - Math.ceil(run / STEP)); j < Math.min(n, i + Math.ceil(run / STEP) + 1); j++) run = Math.min(run, 0.85 * inside[j]!);
+    run = Math.max(e, run);
     const p = f.pos.clone().addScaledVector(f.right, side * e).addScaledVector(f.up, -0.05);
-    const q = f.pos.clone().addScaledVector(f.right, side * (e + SLOPE * h)); q.y = -0.4;
+    const q = f.pos.clone().addScaledVector(f.right, side * run); q.y = -0.4;
     pos.set([p.x, p.y, p.z, q.x, q.y, q.z], i * 6);
     col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
     if (i > 0) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
