@@ -130,7 +130,7 @@ export function buildIntro(drive: Drive): { group: THREE.Group; update(t: number
     const open = canvasTex(256, 96, (c) => { c.strokeStyle = '#ff4f6d'; c.lineWidth = 6; c.strokeRect(8, 8, 240, 80); c.fillStyle = '#ff6f8a'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(600), 58); c.fillText('OPEN', 128, 52); });
     flat(g, 1.2, 0.45, w / 2 - 2.2, 2.4, 0.04, new THREE.MeshBasicMaterial({ map: open, transparent: true, color: new THREE.Color(2.2, 2.2, 2.2), toneMapped: false }));
     // the roof sign on its posts
-    for (const px of [-2.4, 2.4]) box(g, 0.14, 1.4, 0.14, px, L.h + 0.7, -1.5, dark);
+    for (const px of [-2.4, 2.4]) box(g, 0.14, 1.4, 0.14, px, L.h + 0.7, -1.78, dark); // (its posts behind it)
     box(g, 6.6, 1.5, 0.16, 0, L.h + 1.9, -1.6, toon({ color: '#f4f0e6' }));
     flat(g, 6.3, 1.25, 0, L.h + 1.9, -1.51, pic(signFace('LIQUOR', 1024, 200, '#c8202e', '#f4f0e6', F.sign(700), 0.7, 0.22)));
   }

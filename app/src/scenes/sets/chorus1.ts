@@ -33,7 +33,7 @@ export function buildChorus1(drive: Drive): { group: THREE.Group; update(t: numb
     plane(g, Wn.w, Wn.h, x(s), Wn.y, 0.015, glass);
     for (const dy of [-1, 1]) box(g, Wn.w + 0.24, 0.12, 0.1, x(s), Wn.y + (dy * (Wn.h + 0.12)) / 2, 0.04, trim);
     for (const dx of [-1, 1]) box(g, 0.12, Wn.h, 0.1, x(s) + (dx * (Wn.w + 0.12)) / 2, Wn.y, 0.04, trim);
-    const awning = plane(g, Wn.w + 0.4, 1.1, x(s), Wn.y + Wn.h / 2 + 0.75, 0.5, toon({ map: stripes, side: THREE.DoubleSide }));
+    const awning = plane(g, Wn.w + 0.4, 1.1, x(s), Wn.y + Wn.h / 2 + 0.6, 0.5, toon({ map: stripes, side: THREE.DoubleSide }));
     awning.rotation.x = -1.05; // (sloping down and out over the sidewalk)
   }
   // the doors between; the barber pole at the shop's near end (out from the front: anywhere else it'd stand over a window)
@@ -56,7 +56,8 @@ export function buildChorus1(drive: Drive): { group: THREE.Group; update(t: numb
     box(g, 0.08, 0.08, 0.3, px, 2.3, 0.15, toon({ color: WORLD.chrome }));
   }
   // its name across the top, in the signs' face
-  plane(g, Math.min(w - 1, 9), 0.8, 0, B.h - 0.85, 0.05, pic(signFace('BARBER SHOP', 1024, 92, '#f8f4ea', '#1d2026', F.sign(500), 0.6, 0.18)));
+  // (over the awnings, clear of them seen from the street: they slope out under it)
+  plane(g, Math.min(w - 1, 9), 0.8, 0, B.h - 0.6, 0.05, pic(signFace('BARBER SHOP', 1024, 92, '#f8f4ea', '#1d2026', F.sign(500), 0.6, 0.18)));
   return {
     group: root,
     update(t) { for (const p of poles) p.offset.y = (t * 0.6) % 1; }, // (the stripes climb)

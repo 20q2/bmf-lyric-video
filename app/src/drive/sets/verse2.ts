@@ -43,7 +43,7 @@ export const PACE = { slow: 5.5, cruise: 10, upBefore: 1.6, up: 1.2 };
  *           its start, its middle's height); the sign on its roof (centre from its start, over the roof) */
 export const SHACK = {
   pole: { lateral: -(ROAD_HALF + 1.6), y: 5.8, turn: 0.55, before: 5 },
-  corner: { w: 9, blade: -1.2, lateral: -(ROAD_HALF + 1.2) },
+  corner: { w: 9, blade: -2.4, lateral: -(ROAD_HALF + 1.2) }, // (the blade and the A-frame under it clear of the crosswalk)
   aframes: { first: 6.5, second: 1, lateral: -(ROAD_HALF + 2.4), y: 0.95, turn: 0.5 },
   shop: { from: 3, len: 34, face: -(ROAD_HALF + 5), d: 14, h: 5.6, windows: [5.5, 13.5], window: { w: 6.2, h: 2.7, y: 2.3 }, banner: { at: 24, y: 3.0 }, sign: { at: 26.5, over: 1.2 } },
 };
@@ -61,7 +61,7 @@ export const SHOTS = {
 /** The car wash on the right: its sign (off the road, its centre's height; passed this far through its line), its
  *  board round the words (its width; header over them, footer under, the margin on the left; the suds right of them;
  *  m), the camera upstream on the sidewalk; its building. */
-export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 1.8, y: 3.6, through: 0.5, board: { w: 5.8, head: 0.8, foot: 0.55, pad: 0.25 }, eye: { back: 5.6, lateral: ROAD_HALF + 0.3, y: 1.4, toRoad: 0.6, down: 0.3 } };
+export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 1.8, y: 3.6, through: 0.5, board: { w: 5.8, head: 0.8, gap: 0.15, foot: 0.55, pad: 0.25 }, eye: { back: 5.6, lateral: ROAD_HALF + 0.3, y: 1.4, toRoad: 0.6, down: 0.3 } };
 /** On their car (its frame: x its left, y up, z forward): the windshield banner, the hood's lettering; their plate
  *  between the tail lights, the bumper stickers on the rear bumper either side (sized from the van's: `scale`); the
  *  camera high in front, and low behind. */
@@ -217,9 +217,9 @@ export const VERSE2: SetPiece = {
 
     // ---- the car wash on the right: its sign an ad facing the traffic, the words flush left, the car rolling past ----
     const W = WASH, wl = lines[5]!, ws = carS(wl.start + (wl.end - wl.start) * W.through), wn = fwd(ws).negate(), wAlong = UP.clone().cross(wn).normalize();
-    const wH = phs[5]!.reduce((a, ph) => a + layout('carwash', ph.text, ph.solo).h, 0), boardH = W.board.head + wH + W.board.foot, boardP = atRoad(ws, W.lateral, W.y);
+    const wH = phs[5]!.reduce((a, ph) => a + layout('carwash', ph.text, ph.solo).h, 0), boardH = W.board.head + W.board.gap + wH + W.board.foot, boardP = atRoad(ws, W.lateral, W.y);
     // (the words' column: the board's left, under its header)
-    const textP = boardP.clone().addScaledVector(wAlong, -W.board.w / 2 + W.board.pad + LAYOUT.carwash.w / 2).addScaledVector(UP, boardH / 2 - W.board.head - wH / 2);
+    const textP = boardP.clone().addScaledVector(wAlong, -W.board.w / 2 + W.board.pad + LAYOUT.carwash.w / 2).addScaledVector(UP, boardH / 2 - W.board.head - W.board.gap - wH / 2);
     const wash = stack('carwash', phs[5]!, textP, wn).items.map(({ ph, lay, center }) => add('carwash', ph, ws, center, wn, UP.clone(), lay));
     const WE = W.eye, washShot = lookFrom(atRoad(ws - WE.back, WE.lateral, WE.y), boardP.clone().addScaledVector(right(ws), -WE.toRoad).addScaledVector(UP, -WE.down));
     hold(wash, () => washShot, 'cut');

@@ -98,8 +98,8 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
   body.add(screen);
   // the gauges in front of him, tipped back like the screen: a needle each
   const needles: THREE.Object3D[] = [];
-  for (const [x, label] of [[0.3, 'MPH'], [0.58, 'RPM']] as const) {
-    const g = faceFrame(new THREE.Vector3(x, 1.15, 0.54), HEAD_UNIT.normal);
+  for (const [x, label] of [[0.36, 'MPH'], [0.6, 'RPM']] as const) { // (clear of the head unit's screen, x < 0.26)
+    const g = faceFrame(new THREE.Vector3(x, 1.12, 0.54), HEAD_UNIT.normal);
     const face = new THREE.Mesh(new THREE.CircleGeometry(0.075, 32), new THREE.MeshBasicMaterial({ map: gauge(label), color: new THREE.Color(1.3, 1.3, 1.3) }));
     g.add(face);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.008, 6, 32), chrome); g.add(ring);

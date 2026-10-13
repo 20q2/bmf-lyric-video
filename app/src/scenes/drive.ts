@@ -135,6 +135,8 @@ export default class DriveScene extends Scene {
       this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
     }
     for (const set of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive), buildChorus3(this.drive), buildBridge1(this.drive), buildVerse3(this.drive), buildChorus4(this.drive)]) if (set) { this.sets.push(set); this.world.add(set.group); }
+    // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
+    this.hidden = typeof location === 'undefined' ? [] : (new URLSearchParams(location.search).get('hide') ?? '').split(',').filter(Boolean);
     if (this.hidden.length) this.world.traverse((o) => { if (this.hidden.includes(o.name)) o.visible = false; });
     // everything solid casts and takes shadows; the lettering (unlit) and the sky don't
     this.world.traverse((o) => {
@@ -156,9 +158,6 @@ export default class DriveScene extends Scene {
     this.dome.setMountains(hills);
     this.env.setMountains(hills);
     this.world.fog = new THREE.Fog(0xffffff, 140, 1100);
-    // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
-    const hide = typeof location === 'undefined' ? [] : (new URLSearchParams(location.search).get('hide') ?? '').split(',').filter(Boolean);
-    this.hidden = hide;
     // the city below the overlook, ahead of where the car parks; its lights go out block by block on the outro's
     // "we might crash" — sung after the song has faded out of hearing, so the beat is the scene's own
     const end = this.drive.carFrame(this.ctx.audio.duration);

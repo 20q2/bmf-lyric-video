@@ -128,8 +128,8 @@ function styleOf(c: Carrier): Style {
     case 'polesign': return { bg: '#fbf7ee', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
     case 'aframe': return { bg: '#1f2b26', border: '#3c4a43', family: F.archivo(87, 800), caps: true, colors: ['#f3efe6', '#f3efe6', '#ffd65a'], alpha: [0.7, 0.95], roughen: true }; // chalk
     case 'window': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.82, 1], outline: '#c8102e', shadow: '#5a0614' }; // painted on the glass
-    case 'vinyl': return { bg: '#c8202e', border: '#ffffff', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
-    case 'roofsign': return { bg: '#ffd65a', border: '#c8202e', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
+    case 'vinyl': return { bg: '#c8202e', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
+    case 'roofsign': return { bg: '#ffd65a', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
     case 'carwash': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ff3043'], alpha: [0.75, 1], outline: '#0b3a66', align: 'left' }; // (on the prop's board; the hero word red: yellow sinks into the pale blue)
     case 'visor': return { bg: '#0e0d10', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.7, 1] };
     case 'hood': return { family: F.archivoItalic(100, 800), caps: true, colors: ['#ffd65a', '#ffd65a', '#ffffff'], alpha: [0.75, 1], outline: '#5a0614', shadow: '#2a0309' };
@@ -156,7 +156,7 @@ export class CarrierArt {
     this.style = styleOf(carrier);
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.anisotropy = 8;
+    this.texture.anisotropy = 16;
     this.update(-Infinity); // blank until its reveal
   }
 

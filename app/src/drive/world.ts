@@ -138,7 +138,8 @@ export function buildWorld(drive: Drive): THREE.Group {
   // flat: a flat box's normals are NaN, and the bloom spreads a NaN into a white dot)
   const paint = drive.carriers.filter((c) => c.kind === 'road');
   const dashAt: number[] = [];
-  for (let s = ROAD_START; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2)) dashAt.push(s);
+  // (nor across a cross street's mouth: its crosswalks)
+  for (let s = ROAD_START; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2) && !drive.openings.some((o) => s > o.a - 4 && s < o.b + 4)) dashAt.push(s);
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
   dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
   g.add(named(dashes, 'dashes'));
@@ -536,7 +537,7 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   const building = PAIRABLE.has(c.kind) && c.kind !== 'billboard';
   // (a face's building a shade darker than the face, with windows: against a sunset sky it reads as a building; neon's
   // wall plain dark brick, nothing lit behind its tubes)
-  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? (c.kind === 'neon' ? toon({ color: wall }) : withWindows(toon({ color: wall.clone().multiplyScalar(0.78) }))) : grey(WORLD.backing)).name = building ? 'facade' : 'backing';
+  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? (c.kind === 'neon' ? toon({ color: wall }) : toon({ color: wall.clone().multiplyScalar(0.78) })) : grey(WORLD.backing)).name = building ? 'facade' : 'backing';
   switch (c.kind) {
     case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
     case 'billboard': {

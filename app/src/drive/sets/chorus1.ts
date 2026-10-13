@@ -17,7 +17,7 @@ const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math
 /** The barbershop on the far left corner (m along the road from where the car waited: where it starts; its front off
  *  the road's centre, its depth and height); a window a phrase (width, height, their middles' height, the wall either
  *  end), a door between each. */
-export const BARBER = { s0: 17, face: -(ROAD_HALF + 3), d: 11, h: 5.6, window: { w: 5.8, h: 2.5, y: 2.45, inset: 0.5 }, door: 1.3 };
+export const BARBER = { s0: 17, face: -(ROAD_HALF + 3), d: 11, h: 6.2, window: { w: 5.8, h: 2.5, y: 2.45, inset: 0.5 }, door: 1.3 };
 /** The take: the eye at the mouth of the cross street on the right, drifting along (m along the road, from and to:
  *  short of the signal's mast, which would stand in the frame), off the road's centre, up (over the two of them as the car passes between: they never hide the windows); the aim swings from the
  *  first window to the second this long either side of the second phrase's first word (s). */

@@ -151,7 +151,6 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
   {
     const paint = toon({ color: '#d9d4c7' }), chrome = toon({ color: WORLD.chrome }), H = VAN.half;
     box(van, 2.0, 2.0, 2 * H, 0, 0.35 + 1.0, 0, paint);
-    box(van, 0.02, VAN.doors[1] - VAN.doors[0], 0.02, 0, (VAN.doors[0] + VAN.doors[1]) / 2, -H - 0.01, black); // the doors' seam
     box(van, 2.06, 0.16, 0.14, 0, 0.36, -H - 0.04, chrome);
     for (const x of [-0.9, 0.9]) plane(van, 0.14, 0.3, x, 1.0, -H - 0.01, tail).rotation.y = Math.PI;
     for (const z of [-H + 0.8, H - 0.9]) for (const x of [-0.9, 0.9]) wheel(van, 0.36, x, z, black);
@@ -223,7 +222,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       c.font = font(F.sign(700), 170); c.fillText('BURGERS', 512, 136);
     });
     plane(bldg, 7, 1.75, 2.2, 4.6, 0, new THREE.MeshBasicMaterial({ map: sign })).rotation.y = Math.PI / 2;
-    box(bldg, 0.12, 1.2, 0.12, 2.2, 3.6, -2.8, dark); box(bldg, 0.12, 1.2, 0.12, 2.2, 3.6, 2.8, dark);
+    box(bldg, 0.12, 1.2, 0.12, 2.06, 3.6, -2.8, dark); box(bldg, 0.12, 1.2, 0.12, 2.06, 3.6, 2.8, dark); // (its posts behind it)
     root.add(bldg);
     // the menu board: dark, framed, on two posts, MENU over it
     const m = onPanel(P.menu), { w, h } = P.menu, drop = P.menu.center.y - P.menu.ground;
@@ -280,7 +279,9 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
       // the Read receipt, under the last sent bubble of the thread on screen
       const thread = plan.phone.held.findIndex(([a, b]) => t >= a && t < b), sent = plan.read.bubbles.filter((b) => b.thread === thread && t >= b.start);
-      receipt.visible = thread >= 0 && t >= plan.read.at[thread]! && sent.length > 0;
+      // (not while her next text is up but not yet sent: it would sit between them)
+      const drafting = drive.carriers.some((c) => c.kind === 'phone' && t >= c.reveal && t < c.phrase.start && t >= (c.from ?? -Infinity) && t < (c.until ?? Infinity));
+      receipt.visible = thread >= 0 && t >= plan.read.at[thread]! && sent.length > 0 && !drafting;
       if (receipt.visible) receipt.position.y = sent[sent.length - 1]!.dy - P_GAP;
       // their real speed, blinking with SLOW DOWN in turn on the trailer's readout
       const phase = Math.floor(t / 0.55) % 2;

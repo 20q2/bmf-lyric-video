@@ -92,6 +92,10 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     // the banner's grommets (its words and red are the carriers')
     const bn = onPanel(plan.banner), chrome = toon({ color: WORLD.chrome });
     for (const [px, py] of [[-1, 1], [1, 1], [-1, -1], [1, -1]] as const) ball(bn, 0.05, (px * plan.banner.w) / 2 - px * 0.12, (py * plan.banner.h) / 2 - py * 0.1, 0.01, chrome);
+    // (one white hem round the whole banner: its phrases are one banner, not three)
+    const hem = toon({ color: '#ffffff' }), bw = plan.banner.w, bh = plan.banner.h;
+    for (const y of [bh / 2, -bh / 2]) box(bn, bw + 0.08, 0.06, 0.02, 0, y, 0.005, hem);
+    for (const x of [bw / 2, -bw / 2]) box(bn, 0.06, bh, 0.02, x, 0, 0.005, hem);
     root.add(bn);
     // the roof sign: its red frame, bulbs round it (chasing), legs down to the roof, the chicken standing on it
     const R = plan.sign, rg = onPanel(R), legs = R.center.y - R.h / 2 - (route.frameAt(B.s).pos.y + Sh.h);
