@@ -4,7 +4,7 @@
 import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
 import { CHASE, type Pose, chase, lerpPose } from './camera';
-import { type Carrier, type Kind, PAIRABLE, framing, glideTake, isFast, lineTake, lookFrom, pairFraming, placeCarriers, takeable } from './carriers';
+import { type Carrier, type Kind, PAIRABLE, framing, glideTake, isFast, lineTake, lookFrom, pairFraming, placeCarriers, takeable, roadTake } from './carriers';
 import type { Motion } from './motion';
 import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor, emphasisOf } from './phrases';
@@ -158,7 +158,8 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     // (elsewhere, a line on one kind of sign: from its framing to the next's)
     if (j === i + 1 && GLIDES.has(carriers[i]!.kind)) while (j < carriers.length && !own_(j) && carriers[j]!.phrase.line === carriers[i]!.phrase.line && carriers[j]!.kind === carriers[i]!.kind) j++;
     const run = carriers.slice(i, j);
-    const take = run.length < 2 ? undefined : PAIRABLE.has(run[0]!.kind) ? lineTake(run, run.map((_, k) => fastAt(i + k))) : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t))));
+    const take = run.length < 2 ? undefined : PAIRABLE.has(run[0]!.kind) ? lineTake(run, run.map((_, k) => fastAt(i + k)))
+      : run[0]!.kind === 'road' ? roadTake(run, route) : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t))));
     for (let k = i; k < j; k++) takes[k] = take;
     i = j;
   }

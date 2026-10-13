@@ -48,8 +48,20 @@ export interface Chorus2Plan {
   traffic: { s0: number; t0: number; v: number; lat: number }[];
 }
 
+/** The pace (m/s): the freeway's; easing off for "…panties from dropping" (its road paint, read in one take high ahead
+ *  of the car: at freeway speed its phrases lie too far apart to hold), from this long before it, back up after it. */
+export const PACE = { freeway: 26, easy: 15, off: 0.9, offRamp: 0.7, on: 0.1, onRamp: 1.2 };
+
 export const CHORUS2: SetPiece = {
   owns: (line) => CAMPAIGN.test(line.text) || PLACE.test(line.text),
+
+  speed(st, audio) {
+    const bar = 240 / audio.bpm, drop = st.lines.find((l) => /dropping/i.test(l.text));
+    return [
+      { t: st.start, v: PACE.freeway, ramp: bar },
+      ...(drop ? [{ t: drop.start - PACE.off, v: PACE.easy, ramp: PACE.offRamp }, { t: drop.end + PACE.on, v: PACE.freeway, ramp: PACE.onRamp }] : []),
+    ];
+  },
 
   place(ctx: SetContext): Placed {
     const { st, route, motion } = ctx;

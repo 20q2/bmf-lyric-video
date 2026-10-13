@@ -32,7 +32,7 @@ export const STRETCHES: readonly StretchSpec[] = Object.freeze([
   { id: 'intro', section: null, place: 'a red light on the corner by the pink motel', pace: { kind: 'set' }, turn: 0, rise: 0, chase: 'front3q' },
   { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'hero' },
   { id: 'verse1', section: 'verse1', place: 'city streets at speed, never stopping', pace: { kind: 'set' }, turn: 90, rise: 0, chase: 'front3q' },
-  { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'cruise', v: 26 }, turn: -20, rise: 6, chase: 'high' },
+  { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'set' }, turn: -20, rise: 6, chase: 'high' },
   { id: 'verse2', section: 'verse2', place: 'Slauson, the neighbourhood', pace: { kind: 'set' }, turn: -90, rise: -6, chase: 'side' },
   { id: 'chorus3', section: 'chorus3', place: 'the coast road', pace: { kind: 'cruise', v: 18 }, turn: 30, rise: 0, chase: 'hero' },
   { id: 'bridge1', section: 'bridge1', place: 'the tunnel through the headland', pace: { kind: 'cruise', v: 24 }, turn: 10, rise: 0, chase: 'behind', tunnel: true },
