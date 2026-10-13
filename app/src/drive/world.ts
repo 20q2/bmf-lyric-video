@@ -212,9 +212,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   g.add(named(buildStreetlights(drive), 'streetlights'));
 
   // the motel on the corner, behind the car waiting at the light
-  const motel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), withWindows(toon({ color: WORLD.motel })));
-  motel.matrixAutoUpdate = false;
-  { const M = { s: -17, lateral: 20, w: 30, h: 9, d: 14 }; motel.matrix.copy(boxAt(route, M.s, M.lateral, M.w, M.h, M.d)); }
+  const motel = buildMotel(route);
   const sign = buildMotelSign(route);
   g.add(motel, sign);
   g.userData.sign = sign.userData;
@@ -408,6 +406,37 @@ function buildStreetlights(drive: Drive): THREE.Group {
   return g;
 }
 
+/** The motel on the corner (the intro's, the end's): a two-storey pink wing running back from the road, its rooms'
+ *  doors and windows facing its lot (toward the corner), the upper walkway with its railing and posts, the stair at its
+ *  far end, a white parapet. Its box: s −17, 20 m right of the road, 30 m deep from the road, 14 m along it, 9 m high. */
+function buildMotel(route: Route): THREE.Group {
+  const M = { s: -17, lateral: 20, w: 30, h: 9, d: 14 }, f = route.frameAt(M.s), g = new THREE.Group();
+  g.matrixAutoUpdate = false;
+  g.matrix.makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize()).setPosition(f.pos.clone().addScaledVector(f.right, M.lateral));
+  const pink = withWindows(toon({ color: WORLD.motel })), white = toon({ color: '#f8f4ea' }), teal = toon({ color: '#1f6f78' }), glass = toon({ color: '#28323c' });
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); };
+  const H = 6.6, front = M.d / 2 - 1.8; // (its rooms' face, the walkway in front of it to the box's edge)
+  box(M.w, H, M.d - 1.8, 0, H / 2, -0.9, pink);
+  box(M.w + 0.3, 0.5, M.d - 1.5, 0, H + 0.25, -0.9, white); // the parapet
+  for (const [y0, fl] of [[0, 0], [3.3, 1]] as const) {
+    for (let k = 0; k < 9; k++) {
+      const x = -M.w / 2 + 2 + k * 3.2;
+      box(1.0, 2.1, 0.06, x, y0 + 1.05, front + 0.03, teal); // its door
+      box(1.3, 1.0, 0.04, x + 1.35, y0 + 1.5, front + 0.02, glass); // its window
+      box(1.5, 0.1, 0.16, x + 1.35, y0 + 0.95, front + 0.08, white); // its sill
+    }
+    if (fl) { // the upper walkway: its slab, its railing, the posts holding it
+      box(M.w, 0.22, 1.8, 0, y0 - 0.11, front + 0.9, white);
+      box(M.w, 0.08, 0.08, 0, y0 + 1.0, M.d / 2 - 0.05, white);
+      for (let x = -M.w / 2; x <= M.w / 2; x += 1.5) box(0.05, 1.0, 0.05, x, y0 + 0.5, M.d / 2 - 0.05, white);
+      for (let x = -M.w / 2 + 0.2; x <= M.w / 2; x += 6) box(0.2, y0, 0.2, x, y0 / 2, M.d / 2 - 0.15, white);
+    }
+  }
+  const stair = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.2, 4.6), white); // the stair up to the walkway, at its far end
+  stair.position.set(M.w / 2 - 1, 1.65, front + 0.5 - 2.2); stair.rotation.x = Math.atan2(3.3, 4.2); g.add(stair);
+  return g;
+}
+
 /** The motel's roadside sign (landmarks.ts), the video's title in the world: SZA over BMF in pink neon, NO VACANCY
  *  lit below. Two faces — with the NO, and without (VACANCY, the end) — the scene picks one and lights it (userData). */
 function signFace(no: boolean): THREE.CanvasTexture {
@@ -505,7 +534,24 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? (c.kind === 'neon' ? toon({ color: wall }) : withWindows(toon({ color: wall.clone().multiplyScalar(0.78) }))) : grey(WORLD.backing)).name = building ? 'facade' : 'backing';
   switch (c.kind) {
     case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
-    case 'billboard': if (c.stack !== 'bottom') legs([-(c.w / 2 - 2), c.w / 2 - 2]); if (c.stack !== 'top') box(c.w, 0.12, 1.2, 0, -c.h / 2 - 0.3, 0.4, grey(WORLD.post)); break;
+    case 'billboard': {
+      // a steel structure: two I-beam legs, the catwalk under the board with its railing, gooseneck lamps over its top
+      const steel = grey('#4a4450');
+      if (c.stack !== 'bottom') for (const x of [-(c.w / 2 - 2), c.w / 2 - 2]) {
+        const drop = y0 + c.h / 2;
+        box(0.36, drop, 0.12, x, c.h / 2 - drop / 2, -0.35, steel); box(0.12, drop, 0.5, x, c.h / 2 - drop / 2, -0.35, steel);
+      }
+      if (c.stack !== 'top') {
+        box(c.w, 0.08, 1.1, 0, -c.h / 2 - 0.35, 0.45, steel);
+        box(c.w, 0.05, 0.05, 0, -c.h / 2 + 0.6, 0.98, steel);
+        for (let x = -c.w / 2; x <= c.w / 2; x += 1.8) box(0.05, 0.95, 0.05, x, -c.h / 2 + 0.12, 0.98, steel);
+      }
+      if (c.stack !== 'bottom') for (const x of [-c.w / 3, 0, c.w / 3]) {
+        box(0.06, 0.06, 1.2, x, c.h / 2 + 0.35, 0.45, steel);
+        box(0.5, 0.14, 0.3, x, c.h / 2 + 0.3, 1.05, steel);
+      }
+      break;
+    }
     case 'street': legs([-c.w / 2 - 0.15], y0 + c.h / 2 + 0.4); break;
     case 'banner': {
       // the plane ahead of it (to its right, nose that way: it flies the way the words run), a high-wing tug on a tow
