@@ -45,6 +45,23 @@ The world keeps `look/toon.ts` and `look/print.ts` as its base. On top:
 
 Lyric faces are untouched: their materials, colours and the guard's checks stay as they are.
 
+**Built (M5a, 2026-10-13):**
+- the hero mark and print exemption (`look/hero.ts`, `look/print.ts`);
+- the sky environment (`look/envsky.ts`, remade every `QUALITY.envStep` s, with dark ground under its horizon so
+  chrome shows a horizon line);
+- candy paint and chrome on the car and the dash trim;
+- the haze (engine post `haze`);
+- the air graded per section (`drive/sky.ts` AIR_KEYS);
+- printed clouds and rays (`cloudsAt`, `raysAt`);
+- the contact shade (print pass `ao`).
+
+Tuned on stills, the hero materials:
+- take only reflections from the sky map: lit by it as well as by the world's lights, the car washed out pale;
+- keep the paint's own sheen faint: the low sun's broad highlight smeared it beige;
+- tint the paint's clear coat red, a candy coat.
+
+Wet streets wait for the night sections' rollout. The 4-frame cost check went from 4.3 s to 6.1 s, boot included.
+
 ## 3. The world kit
 
 Everything generates from the plans the guard already checks: a block's footprint (blocks.ts) stays the box the guard
