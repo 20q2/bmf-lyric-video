@@ -182,6 +182,8 @@ export default class DriveScene extends Scene {
       const top = 0.18 + st.lift, bottom = CAR.wheelR;
       strut.scale.y = Math.max(0.01, top - bottom); strut.position.y = (top + bottom) / 2;
     }
+    // the wire wheels roll with the road (their spokes turning: they'd read as hubcaps standing still)
+    for (const w of (this.car.userData.wheels as THREE.Object3D[] | undefined) ?? []) w.rotation.x = d.motion.distanceAt(t) / CAR.wheelR;
     // the two of them: her arm up (it swings out and over), her look to him, his nod — and at the end her head onto
     // his shoulder, his tilting to meet it
     const cast = this.cast(t);

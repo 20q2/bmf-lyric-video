@@ -8,6 +8,7 @@ import { F } from '../engine/type';
 import { GLOW, glowMaterial, lampMaterial, nightGlass, withWindows } from '../look/night';
 import { facades, signAtlas } from '../look/facades';
 import { PALM, palmVariant } from '../look/palms';
+import { IMPALA, impalaHull, wireWheel } from '../look/impala';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
@@ -17,6 +18,8 @@ import { BLOCKS, boxAt } from './blocks';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
 import { buildDash } from '../look/dash';
+import { CAR } from './cabin';
+export { CAR };
 import { candyPaint, chrome as heroChrome } from '../look/hero';
 
 export { ROAD_HALF }; // (route.ts: the road's own measure)
@@ -545,7 +548,6 @@ function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh
  *  width, wheel arches cut), a chrome spear down the side, chrome bumpers, whitewalls with chrome caps, quad headlights
  *  and the triple round tail lights (they glow at night, the headlights throw beams); the two of them as flat
  *  silhouettes: him at the wheel (on its left) in a cap, her riding, her hair down her back. */
-export const CAR = { length: 5.4, width: 1.96, belt: 0.98, wheelZ: 1.55, wheelR: 0.36 };
 export function buildCar(): THREE.Group {
   // the body (and the two of them) on its hydraulics (hydraulics.ts moves it, by name); the wheels on the road
   const g = new THREE.Group(), body = new THREE.Group(), { length: L, width: Wd, belt, wheelZ, wheelR } = CAR, hl = L / 2;
@@ -557,19 +559,16 @@ export function buildCar(): THREE.Group {
   const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, to: THREE.Object3D = body) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); to.add(o); return o; };
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => add(new THREE.BoxGeometry(w, h, d), m, x, y, z);
 
-  // the body: its side profile (z along, y up), wheel arches cut from the sill
-  const side = new THREE.Shape();
-  side.moveTo(-hl, 0.3);
-  side.lineTo(-wheelZ - 0.5, 0.3); side.absarc(-wheelZ, 0.3, 0.5, Math.PI, 0, true);
-  side.lineTo(wheelZ - 0.5, 0.3); side.absarc(wheelZ, 0.3, 0.5, Math.PI, 0, true);
-  side.lineTo(hl, 0.3); side.lineTo(hl + 0.06, 0.55); side.lineTo(hl - 0.05, 0.84);
-  side.lineTo(hl - 0.35, 0.9); side.lineTo(0.95, belt); // the long hood
-  side.lineTo(-1.25, belt); // the open cockpit's beltline
-  side.lineTo(-hl + 0.2, belt - 0.02); side.lineTo(-hl, 0.86); side.lineTo(-hl - 0.05, 0.55); // the deck, the tail
-  side.closePath();
-  const shell = new THREE.ExtrudeGeometry(side, { depth: Wd - 0.08, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 2, curveSegments: 10 });
-  shell.rotateY(-Math.PI / 2); shell.translate((Wd - 0.08) / 2, 0, 0);
-  add(shell, paint, 0, 0, 0);
+  // the body: the lofted hull (look/impala.ts), the cockpit's sides up to the beltline either side of its tub, a
+  // chrome strip along their tops, its floor dark
+  add(impalaHull(), paint, 0, 0, 0);
+  const [cz0, cz1] = IMPALA.cockpit.z, cl = cz1 - cz0, cm = (cz0 + cz1) / 2;
+  for (const x of [1, -1]) {
+    box(0.07, belt - IMPALA.cockpit.floor, cl, x * (IMPALA.halfWidth(cm) - 0.035), (belt + IMPALA.cockpit.floor) / 2, cm, paint);
+    box(0.09, 0.025, cl, x * (IMPALA.halfWidth(cm) - 0.04), belt + 0.012, cm, chrome);
+  }
+  box(Wd - 0.2, 0.02, cl - 0.05, 0, IMPALA.cockpit.floor + 0.012, cm, seat); // the floor's carpet
+  box(Wd - 0.2, belt - IMPALA.cockpit.floor, 0.05, 0, (belt + IMPALA.cockpit.floor) / 2, cz1 - 0.03, dark); // the firewall under the dash
   // the cockpit: seats and the windshield
   box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
   box(Wd - 0.12, 0.05, 0.05, 0, belt + 0.48, 0.92, chrome); // the windshield's top rail
@@ -578,27 +577,33 @@ export function buildCar(): THREE.Group {
   g.userData.dash = buildDash(body);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.06, depthWrite: false }));
   glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);
-  // chrome: the spear down each side, the bumpers
-  for (const x of [Wd / 2, -Wd / 2]) box(0.03, 0.05, L - 0.9, x, 0.74, 0.05, chrome);
-  box(Wd + 0.06, 0.13, 0.14, 0, 0.42, hl + 0.06, chrome);
-  box(Wd + 0.06, 0.13, 0.14, 0, 0.42, -hl - 0.06, chrome);
-  box(Wd - 0.5, 0.2, 0.04, 0, 0.66, hl + 0.06, dark); // the grille
+  // chrome: the spear along each side's crease, the bumpers wrapping the ends, the grille's bars over its dark mouth,
+  // bezels round the quad headlights and the triple tail lights
+  for (const sx of [1, -1]) {
+    const pts: THREE.Vector3[] = [];
+    for (let z = -2.2; z <= 2.25; z += 0.15) pts.push(new THREE.Vector3(sx * (IMPALA.sideAt(z, 0.74) + 0.006), 0.74, z));
+    add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.018, 6), chrome, 0, 0, 0);
+  }
+  for (const zEnd of [hl + 0.065, -hl - 0.065]) { const bumper = add(new THREE.CapsuleGeometry(0.065, Wd - 0.1, 6, 12), chrome, 0, 0.42, zEnd); bumper.rotation.z = Math.PI / 2; }
+  box(Wd - 0.5, 0.24, 0.04, 0, 0.64, hl + 0.005, dark); // the grille's mouth
+  for (let k = 0; k < 4; k++) box(Wd - 0.52, 0.018, 0.03, 0, 0.55 + k * 0.06, hl + 0.025, chrome);
+  for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.TorusGeometry(0.1, 0.014, 6, 18), chrome, x, 0.68, hl + 0.03);
+  for (const x of [0.78, 0.55, 0.32, -0.32, -0.55, -0.78]) add(new THREE.TorusGeometry(0.085, 0.012, 6, 18), chrome, x, 0.68, -hl - 0.03);
   // under it: the chassis (it rides with the body), and a strut down to each wheel's hub (the scene stretches them as
   // the hydraulics lift it: named 'struts')
   box(Wd - 0.5, 0.16, L - 1.6, 0, 0.22, 0, dark);
   const struts = new THREE.Group(); struts.name = 'struts'; g.add(struts);
   for (const z of [wheelZ, -wheelZ]) for (const x of [Wd / 2 - 0.35, -Wd / 2 + 0.35]) add(new THREE.CylinderGeometry(0.05, 0.05, 1, 8), chrome, x, 0.5, z, struts);
-  // wheels: tyre, whitewall, chrome cap
+  // wire wheels on whitewalls (look/impala.ts), each on a pivot at its hub: the scene rolls them (userData.wheels)
+  const wheels: THREE.Object3D[] = [];
   for (const z of [wheelZ, -wheelZ]) for (const x of [Wd / 2 - 0.13, -Wd / 2 + 0.13]) {
-    const sgn = Math.sign(x);
-    const tyre = add(new THREE.CylinderGeometry(wheelR, wheelR, 0.24, 20), dark, x, wheelR, z, g); tyre.rotation.z = Math.PI / 2;
-    const wall = add(new THREE.RingGeometry(wheelR * 0.55, wheelR * 0.8, 24), white, x + sgn * 0.125, wheelR, z, g); wall.rotation.y = (sgn * Math.PI) / 2;
-    const cap = add(new THREE.CircleGeometry(wheelR * 0.5, 16), chrome, x + sgn * 0.127, wheelR, z, g); cap.rotation.y = (sgn * Math.PI) / 2;
+    const w = wireWheel(wheelR, Math.sign(x), dark, white, chrome); w.position.set(x, wheelR, z); g.add(w); wheels.push(w);
   }
+  g.userData.wheels = wheels;
   // lights: quad headlights, triple round tail lights; the beams ahead on the road
   const head = lampMaterial('#fff2d8', GLOW.head, 0.9), tail = lampMaterial('#ff2a24', GLOW.tail, 1.1);
-  for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.CircleGeometry(0.09, 14), head, x, 0.68, hl + 0.07);
-  for (const x of [0.78, 0.55, 0.32, -0.32, -0.55, -0.78]) { const t = add(new THREE.CircleGeometry(0.075, 14), tail, x, 0.68, -hl - 0.07); t.rotation.y = Math.PI; }
+  for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.CircleGeometry(0.09, 14), head, x, 0.68, hl + 0.035);
+  for (const x of [0.78, 0.55, 0.32, -0.32, -0.55, -0.78]) { const t = add(new THREE.CircleGeometry(0.075, 14), tail, x, 0.68, -hl - 0.035); t.rotation.y = Math.PI; }
   // the headlights' throw: light on the road ahead, widening and fading
   const throwGeo = new THREE.PlaneGeometry(1, 1, 1, 1);
   throwGeo.rotateX(-Math.PI / 2);

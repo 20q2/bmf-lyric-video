@@ -10,3 +10,7 @@ export const VISOR = { x: 0.44, hinge: { y: 1.46, z: 0.9 }, mirror: { pos: new T
  *  (tipped back toward them); the screen's size, and how far right of its middle the lyric's panel sits (m: left, the art
  *  on its right, clear of the wheel). */
 export const HEAD_UNIT = { pos: new THREE.Vector3(-0.02, 1.12, 0.52), normal: new THREE.Vector3(0, 0.3, -0.954).normalize(), w: 0.7, h: 0.27, lyricAt: -0.07 };
+
+/** The car's body (m): its length, width, beltline height, its wheels' distance from its middle and their radius
+ *  (world.ts buildCar, look/impala.ts). */
+export const CAR = { length: 5.4, width: 1.96, belt: 0.98, wheelZ: 1.55, wheelR: 0.36 };
