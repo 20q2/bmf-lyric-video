@@ -36,6 +36,26 @@ export const ROAD_START = -160;
 /** Each section's ground (sRGB; others the golden fields). */
 const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
 const PALMS = new Set(['intro', 'chorus1', 'verse3']); // (none in verse 2: its take's camera rides where they'd stand) // (none on the coast road: they'd stand in the hook's sky)
+/** Kerbs and sidewalks along the town's streets (not the freeway, the coast, the tunnel or the hills): the kerb's
+ *  height, the sidewalk's width (m) and its concrete; broken where a cross street opens (the set-pieces' openings). */
+const SIDEWALKS = { stretches: new Set(['intro', 'chorus1', 'verse1', 'verse2', 'verse3']), kerb: 0.15, width: 3, colour: '#cbbba7' };
+
+/** A ribbon along the road from s0 to s1: at each sample, from (lateral a, height ya) to (lateral b, height yb) over the
+ *  road's level; uv in metres (along, across). */
+function ribbon(route: Route, s0: number, s1: number, a: number, ya: number, b: number, yb: number): THREE.BufferGeometry {
+  const n = Math.max(2, Math.ceil((s1 - s0) / STEP) + 1), pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const s = s0 + ((s1 - s0) * i) / (n - 1), f = route.frameAt(s);
+    const p = f.pos.clone().addScaledVector(f.right, a), q = f.pos.clone().addScaledVector(f.right, b);
+    pos.push(p.x, p.y + ya, p.z, q.x, q.y + yb, q.z);
+    uv.push(s, 0, s, Math.hypot(b - a, yb - ya));
+    if (i) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
 
 /** A strip along the road from `a` to `b` metres off its centre line (negative: left; numbers, or functions of s),
  *  coloured per sample. */
@@ -118,6 +138,27 @@ export function buildWorld(drive: Drive): THREE.Group {
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
   dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
   g.add(named(dashes, 'dashes'));
+  // the kerbs and the sidewalks, along the town's stretches, broken at the cross streets
+  {
+    const tex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d')!; c.fillStyle = SIDEWALKS.colour; c.fillRect(0, 0, 128, 128); c.fillStyle = 'rgba(60,40,50,0.35)'; c.fillRect(0, 0, 3, 128); c.fillRect(0, 0, 128, 2); const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 1.5, 1 / 1.5); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    const walk = toon({ map: tex, side: THREE.DoubleSide }), kerb = toon({ color: '#b8a894', side: THREE.DoubleSide }), K = SIDEWALKS;
+    const spans: [number, number][] = [];
+    for (const st of drive.stretches) if (K.stretches.has(st.id)) spans.push([st.k === 0 ? ROAD_START : motion.distanceAt(st.start), motion.distanceAt(st.end)]);
+    for (const side of [-1, 1]) {
+      const cuts = drive.openings.filter((o) => o.side === side).sort((x, y) => x.a - y.a);
+      for (const [a0, b0] of spans) {
+        let a = a0;
+        for (const o of [...cuts.filter((o) => o.b > a0 && o.a < b0), { a: b0, b: b0 }]) {
+          if (o.a - a > 1) {
+            const r0 = side * ROAD_HALF, r1 = side * (ROAD_HALF + K.width);
+            g.add(named(new THREE.Mesh(ribbon(route, a, o.a, r0, K.kerb, r1, K.kerb), walk), 'sidewalks'));
+            g.add(named(new THREE.Mesh(ribbon(route, a, o.a, r0, 0, r0, K.kerb), kerb), 'sidewalks'));
+          }
+          a = Math.max(a, o.b);
+        }
+      }
+    }
+  }
 
   // the town's buildings (blocks.ts: the guard checks them too)
   const towns = drive.blocks.filter((b) => !b.concrete && !b.prop), concrete = drive.blocks.filter((b) => b.concrete && !b.prop);

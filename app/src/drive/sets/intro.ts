@@ -104,6 +104,6 @@ export const INTRO: SetPiece = {
     // shot; from the road's right toward its left (screen left to right in the wide, which looks back down the road)
     const crossV = -12, crossFrom = 45, crossMid = (bars[2]! + bars[3]!) / 2;
     const cross = { s: (C.cross[0] + C.cross[1]) / 2, t0: crossMid - crossFrom / -crossV, v: crossV, from: crossFrom };
-    return { carriers: [], frames: new Map(), clear, blocks, shots, floor: FLOOR, plan: { green, countdown, liquor, walker, cross } satisfies IntroPlan };
+    return { carriers: [], frames: new Map(), clear, blocks, shots, floor: FLOOR, openings: [-1, 1].map((side) => ({ side, a: C.cross[0], b: C.cross[1] })), plan: { green, countdown, liquor, walker, cross } satisfies IntroPlan };
   },
 };

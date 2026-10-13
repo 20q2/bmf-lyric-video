@@ -88,6 +88,8 @@ export interface Drive {
   tunnels: Tunnel[];
   /** The town's buildings. */
   blocks: Block[];
+  /** Where cross streets open the kerb (the set-pieces'). */
+  openings: { side: number; a: number; b: number }[];
   /** The song's beats (s). */
   beats: readonly number[];
   /** The car in its lane at t (or a vehicle `ahead` m in front of it, in its lane). */
@@ -109,7 +111,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const carFrame = (t: number, ahead = 0) => { const f = route.frameAt(motion.distanceAt(t) + ahead); return { ...f, pos: f.pos.clone().addScaledVector(f.right, LANE) }; };
   // the lyrics on their carriers: the set-pieces' stretches on their own surfaces (sets/), framed as they say
   const solo = emphasisOf(lyrics.lines), nextStart = (i: number) => lyrics.lines[i + 1]?.words[0]?.start ?? Infinity;
-  const setFrames = new Map<string, SetFrame>(), clears: Placed['clear'] = [], setBlocks: Block[] = [], plans: Record<string, unknown> = {}, ofSets: Carrier[] = [];
+  const setFrames = new Map<string, SetFrame>(), clears: Placed['clear'] = [], setBlocks: Block[] = [], plans: Record<string, unknown> = {}, ofSets: Carrier[] = [], openings: { side: number; a: number; b: number }[] = [];
   // (the faces on the left after a set-piece stand past its ground: its own blocks' far end, and their clear zone)
   const floor: Record<string, number> = {}, setShots: Shot[] = [];
   for (const st of stretches) {
@@ -119,6 +121,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     if (next && p.blocks.length && p.floor === undefined) floor[next.id] = Math.max(...p.blocks.map((b) => b.s + b.w / 2)) + SET_FLOOR;
     p.frames.forEach((f, id) => setFrames.set(id, f));
     clears.push(...p.clear); setBlocks.push(...p.blocks);
+    if (p.openings) openings.push(...p.openings);
     if (p.shots) setShots.push(...p.shots);
     if (next && p.floor !== undefined) floor[next.id] = p.floor;
     plans[st.id] = p.plan;
@@ -235,5 +238,5 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const camera = director(audio, kept, chaseOf(stretches[0]!));
   const blocks = blocksOf(route, motion, stretches, carriers, tunnels, clears, setBlocks);
   const lastShot = phraseShots[phraseShots.length - 1], lastCut = lastShot ? resolveAt(lastShot.at) : null;
-  return { stretches, motion, route, carriers, tunnels, blocks, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans };
+  return { stretches, motion, route, carriers, tunnels, blocks, openings, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans };
 }

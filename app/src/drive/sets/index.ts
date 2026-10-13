@@ -53,6 +53,8 @@ export interface Placed {
   /** The next stretch's faces on the left stand at least this far along the road (their centres, m); by default past
    *  its own blocks. */
   floor?: number;
+  /** Where its cross streets open the kerb: [s from, s to] on a side (−1 left, +1 right). */
+  openings?: { side: number; a: number; b: number }[];
 }
 export interface SetPiece {
   /** The car's speed keys through the stretch (its pace `set`; else the stretch's own pace). */

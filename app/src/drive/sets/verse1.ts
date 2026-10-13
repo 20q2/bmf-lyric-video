@@ -259,6 +259,6 @@ export const VERSE1: SetPiece = {
       phone: { pos: AT.phone.clone(), normal: phoneN, up: texts.up, w: LAYOUT.phone.w, h: Math.max(texts.H, reply.H) + 0.04, held },
       read, oncoming,
     };
-    return { carriers, frames, clear, blocks, plan };
+    return { carriers, frames, clear, blocks, plan, openings: [-1, 1].map((side) => ({ side, a: crossS - 4.25, b: crossS + 4.25 })) };
   },
 };

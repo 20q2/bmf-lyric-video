@@ -276,6 +276,6 @@ export const VERSE2: SetPiece = {
       chickens: wordAt(4, /^chickens/i),
     };
     // (chorus 3's faces stand past his mural, and past where their own clear zone would take his building)
-    return { carriers, frames, clear, blocks, plan, floor: gs + G.w + 45 };
+    return { carriers, frames, clear, blocks, plan, floor: gs + G.w + 45, openings: [{ side: -1, a: cornerS - S.corner.w / 2, b: cornerS + S.corner.w / 2 }] };
   },
 };
