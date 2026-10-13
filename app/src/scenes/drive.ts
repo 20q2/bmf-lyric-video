@@ -148,9 +148,12 @@ export default class DriveScene extends Scene {
     // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
     const hide = typeof location === 'undefined' ? [] : (new URLSearchParams(location.search).get('hide') ?? '').split(',').filter(Boolean);
     this.hidden = hide;
-    // the city below the overlook, ahead of where the car parks
+    // the city below the overlook, ahead of where the car parks; its lights go out block by block on the outro's
+    // "we might crash" — sung after the song has faded out of hearing, so the beat is the scene's own
     const end = this.drive.carFrame(this.ctx.audio.duration);
-    this.city = buildCity(end.pos, end.fwd, end.right, -0.4);
+    const crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w)).map((w) => w.start));
+    const lastCrash = crashes.length ? Math.max(...crashes) : undefined;
+    this.city = buildCity(end.pos, end.fwd, end.right, -0.4, lastCrash);
     this.world.add(this.city.points);
     this.money = new Money(lyrics, (t) => this.drive.carFrame(t), (t) => this.drive.motion.speedAt(t));
     this.world.add(this.money.mesh);
