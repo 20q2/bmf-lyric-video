@@ -3,6 +3,7 @@
 //            every silhouette is drawn; fading with distance, as the fog does
 //   halftone a dot screen in the shadows (45°, `cell` logical px), dots growing as the tone darkens
 //   tint     shadows pulled toward violet, highlights left warm: the sunset's complementary
+//   hero     a hero surface (its alpha low: look/hero.ts) keeps its light: no halftone or tint, its ink kept
 //   register the red and blue plates a pixel out of register; paper fibre under it all
 // Reads the scene's colour and depth; writes linear HDR (the engine's post adds bloom and grain after). Browser only.
 import * as THREE from 'three';
@@ -32,6 +33,9 @@ void main() {
   // the plates a touch out of register: red pulled one way, blue the other (as a screen print's layers drift)
   vec2 mis = texel * misreg * PX_SCALE * vec2(1.0, 0.6);
   vec3 c = vec3(texture(src, vUv + mis).r, texture(src, vUv).g, texture(src, vUv - mis).b);
+  // the hero (the car's paint and chrome, look/hero.ts): its alpha is low; it keeps its own light — no halftone, no
+  // violet shade (its ink outline stays)
+  float hero = 1.0 - smoothstep(0.6, 0.9, texture(src, vUv).a);
   float z0 = lin(texture(depth, vUv).r);
   // ink: on a flat surface 1/depth runs linearly across the screen, however steeply it's seen, so it bends only at an
   // edge; ink where it peaks here (this pixel the near side of a silhouette, or a corner standing out)
@@ -50,13 +54,13 @@ void main() {
   float sh = 1.0 - smoothstep(lo, hi * 1.5, L);
   float mx = max(c.r, max(c.g, c.b)), chroma = (mx - min(c.r, min(c.g, c.b))) / max(mx, 1e-4);
   float keep = smoothstep(0.55, 0.9, chroma); // strong colours (the car's red, neon) keep their hue
-  sh *= 1.0 - 0.85 * keep;
+  sh *= (1.0 - 0.85 * keep) * (1.0 - hero);
   c = mix(c, shadeN * L, sh * tint);
   // halftone dots in the shadows
   vec2 q = rot2(PI / 4.0) * FRAG_PX / cell, f = fract(q) - 0.5;
   float r = 0.5 * sqrt(1.0 - smoothstep(lo, hi, L)) * 1.1, d = length(f), aa = fwidth(d) * 1.2;
   float dots = smoothstep(r + aa, r - aa, d) * step(0.001, r);
-  c = mix(c, mix(shadeN * L, c, keep) * 0.55, dots * halftone * step(z0, far * 0.99));
+  c = mix(c, mix(shadeN * L, c, keep) * 0.55, dots * halftone * step(z0, far * 0.99) * (1.0 - hero));
   c = mix(c, inkColor, e * ink);
   // the paper: a soft fibre, lighter and darker by a percent or two
   float fib = snoise(FRAG_PX * vec2(0.012, 0.05)) * 0.6 + snoise(FRAG_PX * 0.09) * 0.4;
