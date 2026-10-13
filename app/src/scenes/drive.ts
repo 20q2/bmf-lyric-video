@@ -151,6 +151,10 @@ export default class DriveScene extends Scene {
     const coast = this.drive.route.frameAt(this.drive.motion.distanceAt(COAST_T));
     this.sunAz.set(coast.fwd.x, 0, coast.fwd.z).normalize().multiplyScalar(Math.cos(SUN_AZ))
       .addScaledVector(new THREE.Vector3(coast.right.x, 0, coast.right.z).normalize(), -Math.sin(SUN_AZ)).normalize();
+    // the mountains: on the far side from the sea, where the sun sets
+    const hills = this.sunAz.clone().negate();
+    this.dome.setMountains(hills);
+    this.env.setMountains(hills);
     this.world.fog = new THREE.Fog(0xffffff, 140, 1100);
     // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
     const hide = typeof location === 'undefined' ? [] : (new URLSearchParams(location.search).get('hide') ?? '').split(',').filter(Boolean);

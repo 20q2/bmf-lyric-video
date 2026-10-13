@@ -36,5 +36,8 @@ export class SkyEnv {
     return this.rt.texture;
   }
 
+  /** The mountains' direction (as the main dome's). */
+  setMountains(dir: THREE.Vector3) { this.dome.setMountains(dir); this.key = NaN; }
+
   dispose() { this.rt?.dispose(); this.pmrem.dispose(); }
 }

@@ -1,6 +1,6 @@
 // The sky as a poster would print it: the gradient from horizon to zenith in flat bands, a glow where the sun is, the
 // sun itself (HDR, so it blooms) until it sets, printed clouds drifting in the low sky and the low sun's rays fanning out
-// round it (drive/sky.ts: cloudsAt, raysAt), and stars coming out after. Follows drive/sky.ts. Centred on the
+// round it (drive/sky.ts: cloudsAt, raysAt), two printed mountain ranges on the horizon away from the sea, and stars coming out after. Follows drive/sky.ts. Centred on the
 // camera every frame; drawn behind everything, unfogged. Browser only.
 import * as THREE from 'three';
 import type { SkyState } from '../drive/sky';
@@ -17,8 +17,8 @@ void main() {
 }`;
 
 const FRAG = /* glsl */ `
-uniform vec3 zenith, horizon, sunDir, sunColor;
-uniform float stars, bands, sunR, sunHDR, time, groundMix, clouds, rays;
+uniform vec3 zenith, horizon, sunDir, sunColor, mountainDir;
+uniform float stars, bands, sunR, sunHDR, time, groundMix, clouds, rays, mountains;
 varying vec3 vDir;
 const float PI_ = 3.14159265;
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -42,6 +42,16 @@ void main() {
   float toSun = max(dot(d, sunDir), 0.0), glow = pow(toSun, 6.0) * (1.0 - g) ;
   float gq = floor(glow * 4.0 + 0.5) / 4.0;
   c += gq * sunColor * 0.35;
+  // the mountains: two printed ranges on the horizon on the far side from the sea (the far one hazed toward the sky,
+  // the near one darker); their ridges noise round the compass (sampled on a circle: no seam)
+  if (mountains > 0.0 && d.y > -0.02) {
+    vec2 fd2 = normalize(d.xz + 1e-5), md = normalize(mountainDir.xz + 1e-5);
+    float face = smoothstep(-0.35, 0.15, dot(fd2, md)), pa = fwidth(d.y) * 1.2;
+    float far1 = (0.02 + 0.1 * fbm(fd2 * 2.5 + vec2(2.7))) * face, near1 = (0.008 + 0.06 * fbm(fd2 * 5.5 + vec2(8.3, 3.1))) * face;
+    vec3 farC = mix(horizon, zenith, 0.45) * 0.92, nearC = mix(horizon, zenith, 0.7) * 0.62;
+    c = mix(c, farC, smoothstep(far1 + pa, far1 - pa, d.y) * step(0.001, far1) * mountains);
+    c = mix(c, nearC, smoothstep(near1 + pa, near1 - pa, d.y) * step(0.001, near1) * mountains);
+  }
   // the low sun's rays: printed wedges fanning out round it, turning slowly
   if (rays > 0.0 && d.y > 0.0) {
     vec3 s = normalize(sunDir), d0 = normalize(d - s * dot(d, s) + 1e-5);
@@ -88,6 +98,7 @@ export class SkyDome {
       sunDir: { value: new THREE.Vector3(0, 0.2, -1).normalize() }, sunColor: { value: new THREE.Color('#ffd9a0') },
       stars: { value: 0 }, bands: { value: SKYDOME.bands }, sunR: { value: (SKYDOME.sunDeg * Math.PI) / 180 },
       sunHDR: { value: SKYDOME.sunHDR }, time: { value: 0 }, groundMix: { value: 0 }, clouds: { value: 0 }, rays: { value: 0 },
+      mountainDir: { value: new THREE.Vector3(1, 0, 0) }, mountains: { value: 0 },
     };
     const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: this.u, side: THREE.BackSide, depthWrite: false, fog: false });
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(SKYDOME.radius, 48, 24), mat);
@@ -97,6 +108,8 @@ export class SkyDome {
 
   /** Draws the ground under the horizon (the hero's environment: look/envsky.ts). */
   withGround() { this.u.groundMix!.value = 1; }
+  /** The mountains stand round this direction (flat), away from the sea. */
+  setMountains(dir: THREE.Vector3) { this.u.mountainDir!.value.copy(dir); this.u.mountains!.value = 1; }
 
   update(s: SkyState, sunDir: THREE.Vector3, sunColor: THREE.Color, camera: THREE.Object3D, t: number, clouds = 0, rays = 0) {
     this.u.clouds!.value = clouds;
