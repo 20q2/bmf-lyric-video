@@ -146,6 +146,19 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         const arm = box(g, 0.16, 1.6, 0.16, 0, H / 2 + 1.2, -0.2, dark); void arm;
         for (const [dx, dy] of [[-0.75, 0.6], [0.75, 0.6], [0, -0.1]] as const) ball(g, 0.42, dx, H / 2 + 1.1 + dy, 0.15, gold);
         plane(g, 4.4, 0.7, 0, -H / 2 - 0.65, 0.1, pic(signFace('PAWN · LOANS · JEWELRY', 1024, 128, '#ffd65a', '#241f2a', F.sign(600), 0.52, 0.12), { color: new THREE.Color(1.5, 1.5, 1.5) }));
+        // a neon tube round the fascia and PAWN down a blade beside it (a dark slate alone, it was the one unlit sign
+        // on the strip)
+        const fw = W + 0.8, fh = H + 0.8, px = Math.round((1024 * fh) / fw);
+        neon(g, fw, fh, 0, 0, 0.08, neonTex(1024, px, '#4de0c0', (c) => {
+          c.strokeStyle = '#4de0c0'; c.lineWidth = 9;
+          c.beginPath(); c.roundRect(22, 22, 1024 - 44, px - 44, 18); c.stroke();
+        }), start, { peak: 1.6 });
+        box(g, 1.25, 4.6, 0.25, W / 2 + 1.1, 0, -0.1, dark);
+        neon(g, 1.1, 4.4, W / 2 + 1.1, 0, 0.06, neonTex(256, 1024, '#ffd65a', (c) => {
+          c.strokeStyle = '#ffd65a'; c.lineWidth = 9;
+          c.font = font(F.archivo(100, 800), 200); c.textAlign = 'center'; c.textBaseline = 'middle';
+          'PAWN'.split('').forEach((ch, i) => c.strokeText(ch, 128, 140 + i * 248));
+        }), start - 1.5, { peak: 1.8 });
         break;
       }
       case 'chapel': {
