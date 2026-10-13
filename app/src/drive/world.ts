@@ -9,6 +9,7 @@ import { GLOW, glowMaterial, lampMaterial, nightGlass, withWindows } from '../lo
 import { facades, signAtlas } from '../look/facades';
 import { PALM, palmVariant } from '../look/palms';
 import { IMPALA, impalaHull, wireWheel } from '../look/impala';
+import { printedGround } from '../look/ground';
 import type { Drive } from './drive';
 import { ROAD_HALF, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
@@ -118,8 +119,8 @@ export function buildWorld(drive: Drive): THREE.Group {
   const named = <T extends THREE.Object3D>(o: T, name: string) => { o.name = name; return o; };
   // each section its own ground: the city's paving, the freeway's concrete, the neighbourhood's lawns, the coast's sand
   const groundOf = (s: number) => { const g0 = GROUND[stretchAtS(s).id]; return g0 ? new THREE.Color(g0) : grass; };
-  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : groundOf(s)), end), lambert()), 'verges'));
-  g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), lambert()), 'verges'));
+  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : groundOf(s)), end), printedGround(lambert())), 'verges'));
+  g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
   const fe = route.frameAt(end), cliff = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.rock }));
   cliff.matrixAutoUpdate = false;
   cliff.matrix.copy(boxAt(route, end + 1, 0, 2 * SHOULDER, fe.pos.y + 0.4, 2, -(fe.pos.y + 0.4))); // (the verges' width: any wider and its edge cuts across the town seen from the Strip)
@@ -128,7 +129,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? SEA : SHOULDER), end), lambert()), 'skirts'));
   const box3 = new THREE.Box3();
   for (let s = 0; s < route.length; s += 50) box3.expandByPoint(route.frameAt(s).pos);
-  const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), toon({ color: grass.clone().multiplyScalar(0.85) }));
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), printedGround(toon({ color: grass.clone().multiplyScalar(0.85) })));
   base.rotation.x = -Math.PI / 2;
   base.position.set((box3.min.x + box3.max.x) / 2, -0.4, (box3.min.z + box3.max.z) / 2);
   g.add(named(base, 'base'));
