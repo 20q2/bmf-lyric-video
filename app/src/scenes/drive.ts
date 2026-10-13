@@ -11,7 +11,7 @@ import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, FLY, centerAt } from '../drive/carriers';
-import { COAST_T, SUN_AZ_DEG, airAt, daylight, skyStateAt } from '../drive/sky';
+import { COAST_T, SUN_AZ_DEG, airAt, cloudsAt, daylight, raysAt, skyStateAt } from '../drive/sky';
 import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
@@ -262,7 +262,7 @@ export default class DriveScene extends Scene {
     const { sky, sunDir, sunColor } = this.skyAt(t), day = daylight(t), e = sky.sunElev;
     // (the hero's reflections: the sky of this moment, remade on steps of song time)
     this.world.environment = this.env.update(t, (tau) => this.skyAt(tau));
-    this.dome.update(sky, sunDir, sunColor, this.cam, t);
+    this.dome.update(sky, sunDir, sunColor, this.cam, t, cloudsAt(t), raysAt(t));
     // the sun lights from no lower than 4° (its shadows stay finite), fading out as it sets
     const lightDir = this.sunAz.clone().multiplyScalar(Math.cos(Math.max(e, 4 * DEG))).add(new THREE.Vector3(0, Math.sin(Math.max(e, 4 * DEG)), 0));
     this.sun.position.copy(cf.pos).addScaledVector(lightDir, 500);

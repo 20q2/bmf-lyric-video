@@ -1,5 +1,6 @@
 // The sky as a poster would print it: the gradient from horizon to zenith in flat bands, a glow where the sun is, the
-// sun itself (HDR, so it blooms) until it sets, and stars coming out after. Follows drive/sky.ts. Centred on the
+// sun itself (HDR, so it blooms) until it sets, printed clouds drifting in the low sky and the low sun's rays fanning out
+// round it (drive/sky.ts: cloudsAt, raysAt), and stars coming out after. Follows drive/sky.ts. Centred on the
 // camera every frame; drawn behind everything, unfogged. Browser only.
 import * as THREE from 'three';
 import type { SkyState } from '../drive/sky';
@@ -17,9 +18,15 @@ void main() {
 
 const FRAG = /* glsl */ `
 uniform vec3 zenith, horizon, sunDir, sunColor;
-uniform float stars, bands, sunR, sunHDR, time, groundMix;
+uniform float stars, bands, sunR, sunHDR, time, groundMix, clouds, rays;
 varying vec3 vDir;
+const float PI_ = 3.14159265;
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s; }
 void main() {
   vec3 d = normalize(vDir);
   float h = max(d.y, 0.0);
@@ -35,9 +42,28 @@ void main() {
   float toSun = max(dot(d, sunDir), 0.0), glow = pow(toSun, 6.0) * (1.0 - g) ;
   float gq = floor(glow * 4.0 + 0.5) / 4.0;
   c += gq * sunColor * 0.35;
+  // the low sun's rays: printed wedges fanning out round it, turning slowly
+  if (rays > 0.0 && d.y > 0.0) {
+    vec3 s = normalize(sunDir), d0 = normalize(d - s * dot(d, s) + 1e-5);
+    vec3 ax = normalize(cross(s, vec3(0.0, 1.0, 0.0)) + 1e-5), ay = cross(ax, s);
+    float phi = atan(dot(d0, ay), dot(d0, ax));
+    float wedge = step(0.5, fract(phi * 9.0 / PI_ + time * 0.01));
+    float reach = smoothstep(0.55, 0.995, dot(d, s));
+    c += sunColor * 0.09 * wedge * reach * rays;
+  }
   // the sun (above the horizon)
   float ang = acos(clamp(dot(d, sunDir), -1.0, 1.0)), px = fwidth(ang);
   c = mix(c, sunColor * sunHDR, smoothstep(sunR + px, sunR - px, ang) * step(0.0, d.y));
+  // clouds: flat printed shapes in the low sky, drifting, two tones (lit on the sun's side), passing over the sun
+  if (clouds > 0.0 && d.y > 0.0) {
+    vec2 cp = d.xz / (d.y + 0.1) * 0.55 + vec2(time * 0.006, 0.0);
+    float n = fbm(cp), na = fwidth(n) * 1.5;
+    float cover = smoothstep(0.56 - na, 0.56 + na, n) * smoothstep(0.01, 0.06, d.y) * (1.0 - smoothstep(0.3, 0.6, d.y));
+    vec3 fd = normalize(vec3(d.x, 0.0, d.z) + 1e-4), fs = normalize(vec3(sunDir.x, 0.0, sunDir.z) + 1e-4);
+    float lit = step(0.5, dot(fd, fs) * 0.5 + 0.5 + (n - 0.62) * 1.5);
+    vec3 shadeC = mix(zenith, horizon, 0.35) * 0.82, litC = mix(horizon, sunColor, 0.55) * 1.05;
+    c = mix(c, mix(shadeC, litC, lit), cover * clouds);
+  }
   // stars: one in some cells of a grid over the sky, twinkling
   if (stars > 0.0 && d.y > 0.02) {
     vec2 sp = vec2(atan(d.z, d.x), asin(d.y)) * 120.0;
@@ -61,7 +87,7 @@ export class SkyDome {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
       sunDir: { value: new THREE.Vector3(0, 0.2, -1).normalize() }, sunColor: { value: new THREE.Color('#ffd9a0') },
       stars: { value: 0 }, bands: { value: SKYDOME.bands }, sunR: { value: (SKYDOME.sunDeg * Math.PI) / 180 },
-      sunHDR: { value: SKYDOME.sunHDR }, time: { value: 0 }, groundMix: { value: 0 },
+      sunHDR: { value: SKYDOME.sunHDR }, time: { value: 0 }, groundMix: { value: 0 }, clouds: { value: 0 }, rays: { value: 0 },
     };
     const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: this.u, side: THREE.BackSide, depthWrite: false, fog: false });
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(SKYDOME.radius, 48, 24), mat);
@@ -72,7 +98,9 @@ export class SkyDome {
   /** Draws the ground under the horizon (the hero's environment: look/envsky.ts). */
   withGround() { this.u.groundMix!.value = 1; }
 
-  update(s: SkyState, sunDir: THREE.Vector3, sunColor: THREE.Color, camera: THREE.Object3D, t: number) {
+  update(s: SkyState, sunDir: THREE.Vector3, sunColor: THREE.Color, camera: THREE.Object3D, t: number, clouds = 0, rays = 0) {
+    this.u.clouds!.value = clouds;
+    this.u.rays!.value = rays;
     this.u.zenith!.value.copy(s.zenith);
     this.u.horizon!.value.copy(s.horizon);
     this.u.sunDir!.value.copy(sunDir);

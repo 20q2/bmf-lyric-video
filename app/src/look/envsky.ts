@@ -4,7 +4,7 @@
 // frame's motion blur) in a step gets the same map, so the export is deterministic. Browser only (WebGL).
 import * as THREE from 'three';
 import { SkyDome } from './skydome';
-import type { SkyState } from '../drive/sky';
+import { type SkyState, cloudsAt, raysAt } from '../drive/sky';
 
 /** The sky at a song time: its state, the sun's direction (unit) and colour. */
 export type SkyAt = (t: number) => { sky: SkyState; sunDir: THREE.Vector3; sunColor: THREE.Color };
@@ -29,7 +29,7 @@ export class SkyEnv {
     if (key !== this.key || !this.rt) {
       this.key = key;
       const tk = key * this.step, s = at(tk);
-      this.dome.update(s.sky, s.sunDir, s.sunColor, this.origin, tk);
+      this.dome.update(s.sky, s.sunDir, s.sunColor, this.origin, tk, cloudsAt(tk), raysAt(tk));
       this.rt?.dispose();
       this.rt = this.pmrem.fromScene(this.scene, 0, 0.1, 6000);
     }

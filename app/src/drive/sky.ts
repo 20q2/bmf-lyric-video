@@ -87,3 +87,10 @@ export function airAt(t: number, out: Air = { near: 0, far: 0, tint: new THREE.C
   out.mix = m0 + (m1 - m0) * u;
   return out;
 }
+
+const ramp = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+/** How strong the sun's printed rays are at t (0..1): they come as it sinks below ~26°, full under 16°, gone once it
+ *  has set. */
+export const raysAt = (t: number) => { const e = (skyStateAt(t).sunElev * 180) / Math.PI; return ramp(26, 16, e) * ramp(-1, 2, e); };
+/** How much of the low sky the printed clouds cover at t (0..1): full by day, thinning to dark wisps by night. */
+export const cloudsAt = (t: number) => 0.85 - 0.6 * skyStateAt(t).stars;
