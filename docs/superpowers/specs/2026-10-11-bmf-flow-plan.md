@@ -63,7 +63,9 @@ The ritual, first and smallest:
   the line on the road ahead.
 - **"…panties from dropping"**: the car squats on "dropping" (built) as the word drops.
 - **"He's so fly, fly"**: a *crane* up from the car to the sky-writing (built).
-- **Out**: *crane* back down from the sky, through the open top into the car: verse 1 starts inside.
+- ~~**Out**: *crane* back down from the sky, through the open top into the car: verse 1 starts inside.~~
+  *(Superseded by the verse 1 rebuild, 2026-10-11: the car never stops and verse 1 opens on the speed trailer's cut;
+  the fly line is shot from the back seat, so the hand-off is already from inside.)*
 
 ### 2 · Verse 1 — 0:31–1:01 · city streets, stop-and-go · L — **built 2026-10-11, in review**
 **The grammar: inside the car at the lights.** At each red light, a held shot through the windshield,
@@ -240,3 +242,56 @@ the road paint and "fly" on the towed banners stay as the drive places them.
   suds and a shining car beside them, the price under. "Trickin'" is on their vanity plate and the rest is on bumper
   stickers, shot low from behind. His giant mural is painted on the end wall of a real building, which chorus 3's first
   billboard had been clearing away.
+
+**Review round (2026-10-13): the review applied in full (docs/superpowers/plans/2026-10-12-m4-review-round-apply.md).**
+
+The built half got its life:
+
+- **Intro.** A pedestrian crosses the main road on the near crosswalk while the countdown ticks — it finally counts
+  for someone — and one car crosses the intersection on its green during the wide. Waiting at the light, he bobs
+  gently to the guitar and she turns once to look round the corner, both fading out as the first word comes.
+- **Verse 1.** A Read receipt rides under her last sent bubble (he's seen them and said nothing — then "but"). The
+  speed trailer blinks their real speed and SLOW DOWN on a second readout under the lyric's display. One car passes
+  the other way during the radio insert.
+- **Chorus 2.** Three slower cars in the outside lane are overtaken through the chorus (relative motion sells the
+  speed the high chase can't); the catenary poles keep their rhythm through the posters' run, standing at the boards'
+  gaps.
+- **Verse 2.** The roof sign's bulbs chase on the half-beat; the chicken hops on the word "chickens"; two lowriders
+  park at the left curb (one nose-down); soap bubbles drift up from the wash's bays.
+
+And the back half is built, completing the section-by-section pass:
+
+- **Chorus 3** (`sets/chorus3.ts`). The beach town's welcome arch stands just before his first board: WELCOME TO in
+  the signs' face, the lyric band THE BOY FROM / SOUTH OF SOMEWHERE / CAME WALKING IN as the town's name. The film's
+  first true wide holds the whole chorus through it — sea left, the sun kissing the water (the sky key crosses the
+  horizon at 112 s, inside the shot; the sun azimuth narrowed 35° → 26° to sit in frame) — and the car passes under
+  early in the line and shrinks beyond. "…panties from dropping" hops down three numbered lifeguard towers on the
+  sand, a phrase each, the take gliding tower to tower. Gulls cross under the fly line's sky-writing. The campaign
+  boards stay the drive's own, standing in the surf.
+- **Verse 3** (`sets/verse3.ts`). Every line on its own shaped sign down the strip's left — the pharmacy's pill, the
+  champagne glass, the marquee for "say my name", TARZAN & JANE's two tiki faces with torches, PHONE over the
+  payphones (their coin light blinking on "call me up"), the pawn shop's fascia under three gold balls, the chapel's
+  heart — in one slow take that cuts in while the car is still in the tunnel: the burst-out is the time-skip. Each
+  sign's shapes and headers flicker on with its line; the lyric faces keep the reveal rules. The night skywriter the
+  pattern used to put here is gone.
+- **Chorus 4** (`sets/chorus4.ts`). "Put it in drive" is an insert inside the car: the line across the head unit and
+  a PRND2 shift indicator now on the dash for the whole film, its D flaring on the word "drive". "…hold it for
+  ransom" keeps its gantries, hijacked: the route shield stays and the words paste over it in seeded ransom-note
+  scraps. The campaign line is his biggest campaign — a giant painted board on the uphill side, verse 2's mural
+  outgrown.
+- **Outro.** Both lines are sky-writing drawn as constellations (no banner planes at night): the words in stars, star
+  by star as sung. On the last "we might crash" (176.5 s, after the song has faded out of hearing: the end is the
+  scene's own) the city below goes out block by block, the freeways last, until their tail lights are the only thing
+  lit — then the motel's NO goes out.
+
+**Fixes found on the way.**
+
+- A fast line in a tunnel stretch stays on the tunnel wall (the FAST_LEFT fallback would have stood its lyric past
+  the far mouth while it was sung inside).
+- A fourth HOOK.campaign entry through the generic left-row machinery fails on the switchback (the terrain hides the
+  third board and the pushed gantries blind the sky shot): the biggest campaign is a set-piece's single board instead.
+- The arch amid the boards blocks their take; it stands before them, and the wide gains the through-the-arch frame.
+- Verse 3's sign stacks stand clear of the car's roof: the take looks across the road past it.
+- KNOWN_SHORT shrank from three to one (L36.1 and L43.1 fixed by their set-pieces; L42.1 remains).
+- The SOUTH DETROIT place-sign beat the plan called "built" lives in world.ts's placeSigns as a deliberate callback
+  (after the line, never ahead): verified intended, no change.

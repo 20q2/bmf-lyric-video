@@ -61,9 +61,14 @@ to the user. Only the final export renders video (M5).
   one line). `verse1.ts`: the city at speed (the bus, her mirror and phone, the van, the head unit, the burger stand).
   `chorus2.ts`: the freeway (his posters wiped into view by the Metro, the big sign; it owns two lines). `verse2.ts`:
   Slauson at a crawl (the chicken spot's pole sign, A-frames, windows, banner and roof sign; the car wash's ad; their
-  car's banner, hood, plate and bumper stickers; his giant mural on its building). A set-piece's own buildings can be
-  its props' (Block.prop: world.ts leaves them out, the guard still sees them). The car's cabin fittings (visors, gauges,
-  head unit) are `look/dash.ts`, placed by `drive/cabin.ts`.
+  car's banner, hood, plate and bumper stickers; his giant mural on its building). `chorus3.ts`: the coast (the beach
+  town's welcome arch before his boards — the wide looks down the chorus through it, the sun on the water at 112 s —
+  and the dropping line on three numbered lifeguard towers; it owns two lines). `verse3.ts`: the Strip (every line on
+  its own shaped sign — neon, the marquee, the pawn fascia — one slow take, each sign flickering on with its line).
+  `chorus4.ts`: his biggest board on the climb and the "Put it in drive" insert (the head unit's line, the shift
+  indicator's D flaring); the ransom line keeps its gantries, restyled (carrierart.ts). A set-piece's own buildings can
+  be its props' (Block.prop: world.ts leaves them out, the guard still sees them). The car's cabin fittings (visors,
+  gauges, head unit, the shift indicator) are `look/dash.ts`, placed by `drive/cabin.ts`.
 - `tunnel.ts`: a stretch marked `tunnel` (the bridge) runs through a headland — its mouths, a lamp over the car on
   every beat; world.ts builds the bore, headland and lamps, the scene darkens and lights it by where the camera is.
 - `dissolve.ts`: when text shows — blank until the camera first comes for it (`reveal`: never more than one phrase,
@@ -74,7 +79,8 @@ to the user. Only the final export renders video (M5).
 - `world.ts`, `sky.ts`, `scenes/drive.ts`: the world, the sky over time, the scene.
 - `look/` (M3, Sunset Print; docs/superpowers/plans/2026-10-10-m3-look.md): `skydome.ts` (banded sky, sun, stars),
   `toon.ts` (three-tone materials, the palette), `print.ts` (ink, halftone, violet shade), `night.ts` (windows,
-  streetlights, glows; the NIGHT uniform), `city.ts` (the finale's lights), `money.ts` (the bills).
+  streetlights, glows; the NIGHT uniform), `city.ts` (the finale's lights, out block by block on the last "crash"),
+  `money.ts` (the bills). Night sky-writing draws as constellations (carrierart.ts: the outro's lines in stars).
 
 Keys: space play/pause, ←/→ ±1 s (shift ±5 s), `,`/`.` ±1 frame, PageDown/PageUp next/previous stretch, `l` loop the
 stretch, `h` hide the UI. `?card=testcard` forces the karaoke test card (the drive is the default scene).
