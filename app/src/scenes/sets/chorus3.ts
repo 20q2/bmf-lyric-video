@@ -44,17 +44,16 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     }
   }
 
-  // ---- the lifeguard towers: a hut behind each board, a pitched roof, its number on the hut ----
+  // ---- the lifeguard towers: a hut on stilts behind each board, its roof, its number on the hut ----
   plan.towers.forEach(({ s }, i) => {
     const T = TOWER.hut, g = onRoad(s, TOWER.lateral + T.back);
-    const topY = TOWER.y + T.h / 2 - 1.2; // (the hut's top: the drive's block)
-    box(g, T.w, T.h, T.d, 0, topY - T.h / 2, 0, cream);
-    box(g, T.w + 0.7, 0.18, T.d + 0.7, 0, topY + 0.09, 0, blue); // its roof
+    box(g, T.w, T.h, T.d, 0, T.top - T.h / 2, 0, cream);
+    box(g, T.w + 0.7, 0.18, T.d + 0.7, 0, T.top + 0.09, 0, blue); // its roof
     for (const x of [-T.w / 2 + 0.2, T.w / 2 - 0.2]) for (const z of [-T.d / 2 + 0.2, T.d / 2 - 0.2]) {
-      box(g, 0.16, topY - T.h, 0.16, x, (topY - T.h) / 2, z, wood); // its stilts
+      box(g, 0.16, T.top - T.h, 0.16, x, (T.top - T.h) / 2, z, wood); // its stilts, down to the sand
     }
     // its number, on the hut's road side (the frame's -x is the road)
-    const n = plane(g, 0.8, 0.8, -T.w / 2 - 0.01, topY - T.h / 2 + 0.2, 0, pic(signFace(String(7 + i), 128, 128, '#2b4a66', '#f6edd6', F.sign(700), 0.7, 0)));
+    const n = plane(g, 0.8, 0.8, -T.w / 2 - 0.01, T.top - T.h / 2, 0, pic(signFace(String(7 + i), 128, 128, '#2b4a66', '#f6edd6', F.sign(700), 0.7, 0)));
     n.rotation.y = -Math.PI / 2;
   });
 

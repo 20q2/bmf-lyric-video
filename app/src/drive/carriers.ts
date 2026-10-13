@@ -159,8 +159,9 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   visor: { rowH: 0.26, w: 1.7, advance: 0.6, emOfRow: 0.72, wrap: 16 },
   hood: { rowH: 0.38, w: 1.6, advance: 0.6, emOfRow: 0.7, wrap: 12 },
   giant: { rowH: 2.8, w: 13.6, advance: 0.55, emOfRow: 0.72, wrap: 20 },
-  // (the beach town's welcome arch over the coast road: its lettering band, a phrase a row)
-  arch: { rowH: 2.3, w: 26, advance: 0.55, emOfRow: 0.78, wrap: 20 },
+  // (the beach town's welcome arch over the coast road: its lettering band, a phrase a row; the face fits between
+  // the pylons, so no letter stands behind one)
+  arch: { rowH: 2.3, w: 19.5, advance: 0.55, emOfRow: 0.78, wrap: 20 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;

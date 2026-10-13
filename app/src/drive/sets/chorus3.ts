@@ -22,10 +22,11 @@ const PLACE = /south of somewhere/i, DROP = /panties from dropping/i;
 /** The arch: this far before his first campaign board (m: clear of its take's rays); its band's underside over the
  *  road, its pylons (off the road's centre, their plan size), and the wide's eye (m back from the arch, off the road's
  *  centre, up). */
-export const ARCH = { before: 15, bottom: 6.2, pylon: { lateral: 11, w: 2.4 }, eye: { back: 50, lateral: 1, y: 4.2 } };
+export const ARCH = { before: 15, bottom: 6.2, pylon: { lateral: 12, w: 2.4 }, eye: { back: 50, lateral: 1, y: 4.2 } };
 /** The lifeguard towers: off the road's centre on the sand, their board's centre height, the hut behind it (its size,
- *  how far past the board), and the board's toe toward the road (radians, like the roadside signs'). */
-export const TOWER = { lateral: 19, y: 4.0, hut: { w: 3.4, d: 3, h: 3.1, back: 1.9 }, toe: (25 * Math.PI) / 180 };
+ *  its roof's height over the sand, how far past the board), and the board's toe toward the road (radians, like the
+ *  roadside signs'). */
+export const TOWER = { lateral: 19, y: 4.0, hut: { w: 3.4, d: 3, h: 1.9, top: 3.3, back: 1.9 }, toe: (25 * Math.PI) / 180 };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Chorus3Plan {
@@ -96,7 +97,7 @@ export const CHORUS3: SetPiece = {
       ...[-1, 1].map((side): Block => ({ s: archS, lateral: side * A.pylon.lateral, w: A.pylon.w, h: A.bottom + H + 1, d: A.pylon.w, color: 0.8, bare: true, prop: true, matrix: boxAt(route, archS, side * A.pylon.lateral, A.pylon.w, A.bottom + H + 1, A.pylon.w) })),
       ...towers.map(({ s }): Block => {
         const T = TOWER.hut, lat = TOWER.lateral + T.back;
-        return { s, lateral: lat, w: T.w, h: TOWER.y + T.h / 2 - 1.2, d: T.d, color: 0.7, bare: true, prop: true, matrix: boxAt(route, s, lat, T.d, TOWER.y + T.h / 2 - 1.2, T.w) };
+        return { s, lateral: lat, w: T.w, h: T.top, d: T.d, color: 0.7, bare: true, prop: true, matrix: boxAt(route, s, lat, T.d, T.top, T.w) };
       }),
     ];
     const clear = [

@@ -282,7 +282,7 @@ export class CarrierArt {
         c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];
         c.globalAlpha = (solo ? 1 : style.alpha[sung ? 1 : 0]) * (1 - gone) * alpha;
         if (style.ransom) { // each letter its own pasted scrap (the word being sung tilts a touch more)
-          x += this.drawRansom(c, label(w), x, y, em, now) + space;
+          x += this.drawRansom(c, label(w), x, y, em * 0.74, now) + space * 1.5;
           continue;
         }
         // dissolving: the letters drift apart and up, a little more each word along
