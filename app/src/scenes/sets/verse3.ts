@@ -59,9 +59,69 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   };
   let coin: THREE.Mesh | null = null, coinStart = 0;
 
+  /** The ground floor under a sign, in its trade (the user, 2026-10-13: "a box that says pharmacy" — the buildings
+   *  should be real storefronts): a lit glass front with its door and a fascia, and the trade's own things in and
+   *  over the window; the chapel a white front with an arched door and a steeple. In the sign's frame: x along the
+   *  wall, y up from the sign's centre (`groundY` the sidewalk), z out toward the road. */
+  const storefront = (g: THREE.Object3D, W: number, H: number, groundY: number, theme: Theme, roofY: number) => {
+    // (its fascia's top under the sign panel's foot: over it, the fascia cut the words' bottom row)
+    const w = W + 2.6, top = Math.min(groundY + 3.0, -H / 2 - 0.9), glassTop = top - 0.25, frame = toon({ color: '#1d1a22' });
+    const trades: Record<Theme, { fascia: string; shelf: string; wares: string[]; sign: string }> = {
+      pill: { fascia: '#2f8a5a', shelf: '#e8f4ee', wares: ['#4dff9e', '#ffffff', '#5fd8ff'], sign: 'RX · VITAMINS · FILM' },
+      pop: { fascia: '#6b1d2a', shelf: '#f2e0c8', wares: ['#ffd65a', '#c8102e', '#2b78a6', '#4dff9e'], sign: 'LIQUOR · BEER · WINE · ICE' },
+      marquee: { fascia: '#c8202e', shelf: '#1d1a22', wares: ['#ffd65a'], sign: 'NOW PLAYING' },
+      tiki1: { fascia: '#7a4a22', shelf: '#3a2a1a', wares: ['#ff8a2a', '#4de0c0'], sign: 'MAI TAIS · ZOMBIES' },
+      tiki2: { fascia: '#7a4a22', shelf: '#3a2a1a', wares: ['#ff8a2a', '#4de0c0'], sign: 'HAPPY HOUR 4-7' },
+      phone: { fascia: '#1f6b86', shelf: '#dfe8ee', wares: ['#5fd8ff', '#ffffff'], sign: 'PHONE CARDS · PAGERS' },
+      pawn: { fascia: '#2a2430', shelf: '#f6dd8f', wares: ['#ffd65a', '#aaa498'], sign: 'WE BUY GOLD · LOANS' },
+      chapel: { fascia: '#f4f4f0', shelf: '#ffffff', wares: ['#ff4fa3'], sign: 'WEDDINGS · NO WAITING' },
+    };
+    const T = trades[theme];
+    // the lit interior behind the glass: shelves with the trade's wares, a warm light
+    const interior = canvasTex(1024, 384, (c) => {
+      c.fillStyle = theme === 'marquee' ? '#2a1016' : '#fff1d8'; c.fillRect(0, 0, 1024, 384);
+      for (let y = 90; y < 384; y += 90) {
+        c.fillStyle = T.shelf; c.fillRect(20, y, 984, 10);
+        for (let x = 40; x < 1000; x += 36 + ((x * 7) % 23)) { c.fillStyle = T.wares[Math.floor(((x * 13) / 7) % T.wares.length)]!; const h = 36 + ((x * 11) % 40); c.fillRect(x, y - h, 22, h); }
+      }
+      c.fillStyle = 'rgba(255,230,180,0.35)'; c.fillRect(0, 0, 1024, 60); // the ceiling's light
+    });
+    const panes = Math.max(2, Math.round(w / 2.4)), pw = w / panes, glassH = glassTop - groundY - 0.3;
+    for (let i = 0; i < panes; i++) {
+      const x = -w / 2 + pw * (i + 0.5);
+      if (Math.abs(x) < pw * 0.5) { // the door, in the middle pane
+        box(g, pw - 0.2, glassH + 0.2, 0.08, x, groundY + (glassH + 0.2) / 2 + 0.05, 0.1, frame);
+        plane(g, pw - 0.5, glassH - 0.3, x, groundY + glassH / 2 + 0.15, 0.15, pic(interior, { color: new THREE.Color(1.3, 1.3, 1.3) }));
+        box(g, 0.05, 0.6, 0.05, x + pw / 2 - 0.45, groundY + 1.1, 0.16, toon({ color: WORLD.chrome })); // the handle
+        continue;
+      }
+      plane(g, pw - 0.1, glassH, x, groundY + 0.3 + glassH / 2, 0.08, pic(interior, { color: new THREE.Color(1.35, 1.35, 1.35) }));
+      box(g, pw, 0.3, 0.25, x, groundY + 0.15, 0.1, toon({ color: '#3a3540' })); // the base course
+    }
+    for (let i = 0; i <= panes; i++) box(g, 0.1, glassTop - groundY, 0.12, -w / 2 + pw * i, groundY + (glassTop - groundY) / 2, 0.1, frame); // the mullions
+    box(g, w + 0.2, 0.1, 0.3, 0, glassTop, 0.1, frame);
+    // the fascia over the glass with the trade's small words, and an awning out over the sidewalk
+    box(g, w + 0.3, 0.7, 0.3, 0, top + 0.1, 0.1, toon({ color: T.fascia }));
+    plane(g, Math.min(w, 7), 0.42, 0, top + 0.1, 0.26, pic(signFace(T.sign, 1024, 64, theme === 'chapel' ? '#ff4fa3' : '#fff6e0', null, F.sign(600), 0.6, 0.18)));
+    if (theme !== 'chapel' && theme !== 'marquee') { const awn = box(g, w * 0.9, 0.08, 1.6, 0, top - 0.3, 0.9, toon({ color: T.fascia })); awn.rotation.x = 0.18; }
+    // the trade's things
+    if (theme === 'pill') { box(g, 0.9, 0.9, 0.2, w / 2 - 1.2, top + 1.3, 0.5, toon({ color: '#1d1a22' })); plane(g, 0.7, 0.7, w / 2 - 1.2, top + 1.3, 0.61, new THREE.MeshBasicMaterial({ map: canvasTex(128, 128, (c) => { c.fillStyle = '#4dff9e'; c.fillRect(44, 10, 40, 108); c.fillRect(10, 44, 108, 40); }), transparent: true, color: new THREE.Color(2.2, 2.2, 2.2) })); }
+    if (theme === 'marquee') { for (const x of [-w / 2 + 1.2, w / 2 - 1.2]) { box(g, 1.3, 1.9, 0.08, x, groundY + 1.6, 0.14, toon({ color: '#c8202e' })); plane(g, 1.05, 1.6, x, groundY + 1.6, 0.19, pic(canvasTex(128, 192, (c) => { c.fillStyle = ['#2b1b4e', '#7a3a7e'][x > 0 ? 1 : 0]!; c.fillRect(0, 0, 128, 192); c.fillStyle = '#ffd65a'; c.beginPath(); c.arc(64, 70, 36, 0, Math.PI * 2); c.fill(); c.fillStyle = '#16131a'; c.fillRect(20, 130, 88, 10); c.fillRect(30, 150, 68, 8); }))); } box(g, 2.2, 2.6, 0.6, 0, groundY + 1.3, 0.5, toon({ color: '#c8202e' })); plane(g, 1.4, 1.0, 0, groundY + 1.7, 0.81, pic(interior, { color: new THREE.Color(1.4, 1.4, 1.4) })); } // poster cases, the ticket booth
+    if (theme === 'pawn') for (let i = 0; i <= panes; i++) for (let k = 1; k < 4; k++) box(g, 0.04, glassH, 0.04, -w / 2 + pw * i + (pw * k) / 4, groundY + 0.3 + glassH / 2, 0.2, toon({ color: '#3a3540' })); // the bars
+    if (theme === 'chapel') { // a white front, an arched door, a steeple
+      plane(g, w + 0.4, roofY - groundY, 0, (groundY + roofY) / 2, -0.03, toon({ color: '#f4f4f0' }));
+      box(g, 1.6, 2.6, 0.2, 0, groundY + 1.3, 0.08, toon({ color: '#7a3a7e' }));
+      const arch = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.2, 16, 1, false, 0, Math.PI), toon({ color: '#7a3a7e' })); arch.rotation.x = Math.PI / 2; arch.rotation.z = Math.PI / 2; arch.position.set(0, groundY + 2.6, 0.08); g.add(arch);
+      box(g, 2.2, 3.4, 2.2, 0, roofY + 1.7, -2.5, toon({ color: '#f4f4f0' }));
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(1.5, 2.6, 4), toon({ color: '#7a3a7e' })); spire.position.set(0, roofY + 4.7, -2.5); spire.rotation.y = Math.PI / 4; g.add(spire);
+      box(g, 0.12, 1.2, 0.12, 0, roofY + 6.5, -2.5, toon({ color: '#f4f4f0' })); box(g, 0.6, 0.12, 0.12, 0, roofY + 6.7, -2.5, toon({ color: '#f4f4f0' }));
+    }
+  };
+
   for (const sign of plan.signs) {
     const { face, theme, start } = sign, g = onPanel(face), foot = face.center.y - route.frameAt(sign.s).pos.y;
     const groundY = -foot, W = face.w, H = face.h;
+    storefront(g, W, H, groundY, theme as Theme, Math.max(12, foot + H / 2 + 1.5) - foot);
     switch (theme as Theme) {
       case 'pill': {
         // the capsule, tilted beside the words; PHARMACY over them
@@ -71,7 +131,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           c.beginPath(); c.roundRect(-150, -62, 300, 124, 62); c.stroke();
           c.beginPath(); c.moveTo(0, -62); c.lineTo(0, 62); c.stroke(); c.restore();
         });
-        neon(g, 3.2, 1.9, -W / 2 - 2.1, 0.4, 0.1, cap, start);
+        neon(g, 2.2, 1.3, -W / 2 - 0.6, 0.6, 0.1, cap, start); // (on the panel's edge: past it, it hung off the building)
         neon(g, 6.4, 1.15, 0, H / 2 + 1.0, 0.1, neonText('PHARMACY', '#4dff9e', 110, false), start, { peak: 1.55 });
         break;
       }
@@ -172,7 +232,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           c.beginPath(); c.moveTo(60, 300); c.lineTo(340, 140); c.stroke();
           c.beginPath(); c.moveTo(340, 140); c.lineTo(300, 142); c.moveTo(340, 140); c.lineTo(330, 176); c.stroke();
         });
-        neon(g, 2.6, 2.6, W / 2 + 2.0, 0.3, 0.1, heart, start);
+        neon(g, 2.0, 2.0, W / 2 + 0.6, 0.5, 0.1, heart, start); // (on the panel's edge)
         neon(g, 8.2, 1.3, 0, H / 2 + 1.1, 0.1, neonText('Wedding Chapel', '#f4f4f0', 120), start, { peak: 1.5 });
         neon(g, 3.6, 0.8, 0, -H / 2 - 0.7, 0.1, neonText('ALWAYS OPEN', '#ff4fa3', 72, false), start, { peak: 1.45 });
         break;

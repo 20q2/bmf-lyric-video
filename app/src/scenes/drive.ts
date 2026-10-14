@@ -53,6 +53,9 @@ const SKYWRITER = { after: 1.4, speed: 30, climb: 8, size: 0.7 };
  *  this long (s), this far clear of the word (shares of its row's height), starting this far round (radians) before
  *  the bottom of the loop. */
 const LOOP = { over: 1.8, clear: [0.3, 0.32] as [number, number], before: 0.5 };
+/** The dive into the loop starts this far through the word before it (a share of its length): in the gap between the
+ *  words it was a flicker down (the user, 2026-10-13). The third hook's plane comes in along the words' underside. */
+const DIVE = { from: 0.35, underFrom: 2 };
 /** Road paint stays this long after its phrase (s). */
 const PAINT_LASTS = 3;
 /** Carriers further along the road than this from the car (m) are put away. */
@@ -128,9 +131,9 @@ export default class DriveScene extends Scene {
     const world = buildWorld(this.drive);
     this.sign = world.userData.sign;
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
+    this.heft = heftOf(this.drive.stretches, this.drive.reading);
     this.cast = castOf(audio, lyrics);
     this.skies = this.drive.carriers.filter((c) => c.kind === 'sky');
-    this.heft = heftOf(this.drive.stretches, this.drive.reading);
     this.writer.matrixAutoUpdate = false;
     this.world.add(world, this.writer, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
     for (const c of this.drive.carriers) {
@@ -247,10 +250,12 @@ export default class DriveScene extends Scene {
     this.writer.visible = !!w && t < (next ? Infinity : done + SKYWRITER.after);
     if (w) {
       // (over the top of phrase c, a share u along it: sized by a row of its writing, never across the words)
-      const over = (c: Carrier, u: number) => {
+      const over = (c: Carrier, u: number, below = false) => {
         const a = c.up.clone().cross(c.normal).normalize(), k = SKYWRITER.size * (c.h / c.rows.length / 9);
-        return { a, k, at: centerAt(c, t).addScaledVector(a, -c.w / 2 + u * c.w).addScaledVector(c.up, c.h / 2 + 1.2 * k), up: c.up.clone() };
+        return { a, k, at: centerAt(c, t).addScaledVector(a, -c.w / 2 + u * c.w).addScaledVector(c.up, (below ? -1 : 1) * (c.h / 2 + 1.2 * k)), up: c.up.clone() };
       };
+      // (which hook this is: the third's plane flies under the words instead of over them, a different approach)
+      const hookIndex = this.ctx.lyrics.lines.filter((l) => FLY.test(l.text)).map((l) => l.i).indexOf(w.phrase.line), below = hookIndex >= DIVE.underFrom;
       // (round phrase c, a share u of the way: an inside loop, anticlockwise on screen, from below its left end, under
       // it heading right, up its right side, over the top upside down, down its left side and out along the bottom;
       // its wings level to the loop, its top toward the word; placed by its middle)
@@ -264,19 +269,21 @@ export default class DriveScene extends Scene {
         return { a: head, k, at: p.addScaledVector(head, -3 * k), up: top };
       };
       const dur = Math.max(0.3, w.phrase.end - w.phrase.start), u = Math.min(1, Math.max(0, (t - w.phrase.start) / dur));
-      let { a, k, at, up } = loops(w) ? round(w, Math.min(1, Math.max(0, (t - w.phrase.start) / LOOP.over))) : over(w, u);
-      const past = Math.max(0, t - done);
-      if (past > 0 && next) { // on across the gap to the next phrase's start
+      let { a, k, at, up } = loops(w) ? round(w, Math.min(1, Math.max(0, (t - w.phrase.start) / LOOP.over))) : over(w, u, below);
+      const past = Math.max(0, t - done), diveFrom = next && loops(next) && !loops(w) ? w.phrase.start + dur * DIVE.from : Infinity;
+      if (next && loops(next) && t > diveFrom) {
+        // diving to loop it: one smooth curve from level flight along the phrase (from part-way along it: the whole of
+        // the rest of the word is the descent) down and round into the loop's entry under the next word, the plane's
+        // nose along it — a Hermite curve, its ends' tangents the two headings
+        const g = Math.min(1, (t - diveFrom) / Math.max(1e-3, next.phrase.start - diveFrom));
+        const from = over(w, DIVE.from, below), to = round(next, 0), P0 = from.at.clone(), a0 = from.a, L = P0.distanceTo(to.at) * 1.3, h00 = 2 * g ** 3 - 3 * g * g + 1, h10 = g ** 3 - 2 * g * g + g, h01 = -2 * g ** 3 + 3 * g * g, h11 = g ** 3 - g * g;
+        at = P0.clone().multiplyScalar(h00).addScaledVector(a0, L * h10).addScaledVector(to.at, h01).addScaledVector(to.a, L * h11);
+        const d00 = 6 * g * g - 6 * g, d10 = 3 * g * g - 4 * g + 1, d01 = -6 * g * g + 6 * g, d11 = 3 * g * g - 2 * g;
+        const head = P0.clone().multiplyScalar(d00).addScaledVector(a0, L * d10).addScaledVector(to.at, d01).addScaledVector(to.a, L * d11).normalize();
+        k = from.k + (to.k - from.k) * g; up = from.up.clone().lerp(to.up, g).normalize(); a = head;
+      } else if (past > 0 && next) { // on across the gap to the next phrase's start
         const g = Math.min(1, past / Math.max(1e-3, next.phrase.start - w.phrase.end));
-        if (loops(next)) {
-          // (diving to loop it: one smooth curve from level flight along the phrase's top down and round into the loop's
-          // entry under the next word, the plane's nose along it — a Hermite curve, its ends' tangents the two headings)
-          const to = round(next, 0), P0 = at.clone(), L = P0.distanceTo(to.at) * 1.3, h00 = 2 * g ** 3 - 3 * g * g + 1, h10 = g ** 3 - 2 * g * g + g, h01 = -2 * g ** 3 + 3 * g * g, h11 = g ** 3 - g * g;
-          at = P0.clone().multiplyScalar(h00).addScaledVector(a, L * h10).addScaledVector(to.at, h01).addScaledVector(to.a, L * h11);
-          const d00 = 6 * g * g - 6 * g, d10 = 3 * g * g - 4 * g + 1, d01 = -6 * g * g + 6 * g, d11 = 3 * g * g - 2 * g;
-          const head = P0.clone().multiplyScalar(d00).addScaledVector(a, L * d10).addScaledVector(to.at, d01).addScaledVector(to.a, L * d11).normalize();
-          k += (to.k - k) * g; up = up.clone().lerp(to.up, g).normalize(); a = head;
-        } else {
+        {
           const e = g * g * (3 - 2 * g), to = over(next, 0);
           at = at.lerp(to.at, e); k += (to.k - k) * e;
           a = a.clone().lerp(to.a, e).normalize(); up = up.clone().lerp(to.up, e).normalize();
@@ -333,9 +340,9 @@ export default class DriveScene extends Scene {
       });
     } else this.sodium.forEach((l) => (l.intensity = 0));
     this.sun.intensity *= 1 - inside;
+    PRINT_SHADE.value = smooth(-1 * DEG, 4 * DEG, e) * (1 - inside); // the printed shadows (look/toon.ts): the sun's
     this.moon.intensity *= 1 - inside;
     this.hemi.intensity *= 1 - 0.85 * inside;
-    PRINT_SHADE.value = smooth(-1 * DEG, 4 * DEG, e) * (1 - inside); // the printed shadows (look/toon.ts): the sun's
     this.fogColor.lerp(TUNNEL_DARK, inside);
     const fog = this.world.fog as THREE.Fog;
     fog.color.copy(this.fogColor);

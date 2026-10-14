@@ -958,10 +958,12 @@ export function buildCar(): THREE.Group {
   // his wheel: the rim, two spokes to a chrome hub inside a horn ring, on its column down into the dash
   const wheel = new THREE.Group(); wheel.position.set(0.44, belt + 0.38, 0.42); wheel.rotation.x = -0.9; body.add(wheel);
   add(new THREE.TorusGeometry(0.19, 0.022, 8, 28), dark, 0, 0, 0, wheel);
-  add(new THREE.TorusGeometry(0.1, 0.007, 6, 24), trim, 0, 0, 0.012, wheel);
+  // (the horn ring and hub toward the driver, the column away into the dash: the other way round the wheel faced the
+  // windshield — the user, 2026-10-13)
+  add(new THREE.TorusGeometry(0.1, 0.007, 6, 24), trim, 0, 0, -0.012, wheel);
   for (const a of [0.35, -0.35, Math.PI / 2 + 0.0]) { const spoke = add(new THREE.BoxGeometry(0.36, 0.02, 0.014), dark, 0, 0, 0, wheel); spoke.rotation.z = a; if (a > 1) spoke.scale.x = 0.5, spoke.position.y = -0.09; }
-  { const hub = add(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14), trim, 0, 0, 0.01, wheel); hub.rotation.x = Math.PI / 2; }
-  { const column = add(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 10), cabin, 0, 0, -0.16, wheel); column.rotation.x = Math.PI / 2; }
+  { const hub = add(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14), trim, 0, 0, -0.01, wheel); hub.rotation.x = Math.PI / 2; }
+  { const column = add(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 10), cabin, 0, 0, 0.16, wheel); column.rotation.x = Math.PI / 2; }
   for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
     add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);
     const head = new THREE.Group(); head.name = him ? 'hisHead' : 'herHead'; head.position.set(x, belt + 0.66, -0.22); body.add(head);
