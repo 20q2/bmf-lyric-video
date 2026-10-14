@@ -45,3 +45,11 @@ Each batch is one commit, judged on full-frame before/after sheets at playback s
 
 Not in this plan: traffic and pedestrians (time-dependent: the guard would have to check them per frame), the breaks
 and the sync layer (M5 §4–5, next).
+
+## Built (2026-10-13)
+
+All six batches, one commit each (fb7d829, 9feb731, 2fe1336, 997e51e, f820a5b, 7e036c2). Found on the way: the
+Impala's chrome spear ran down the middle of the cabin (the hull's side is nothing along the cockpit), the bright
+post under the head unit in every in-car shot. Left out: the palms (the fronds already arch; their leaflets read as
+spikes only at the corner), the phone's hand (it has one: the cast's dark on the cabin's dark; the cabin's new
+colours lift it). The "DROPPIN" cut at 0:26 is the board's flip reveal in progress, not the catwalk.
