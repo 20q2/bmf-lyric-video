@@ -1,15 +1,15 @@
 // The lowrider dances: the Impala's body on its hydraulics, a function of song time. It hops on the choruses' downbeats (every other bar), nose and tail in turn; it squats low on
-// "dropping"; on "crip walkin'" it lifts a front corner and rolls onto three wheels; on "backwards" it lays back, nose
-// up, tail down; and on the tunnel's "crash" it fishtails — a damped swerve, caught. The wheels stay on the road; the
-// body (and the two of them) moves. Pure.
+// "dropping"; on "crip walkin'" it lifts a front corner and rolls onto three wheels; on "backwards" it hits a bump
+// (the user, 2026-10-13: an oomph from the road, not a rewind); and on the tunnel's "crash" it fishtails — a damped
+// swerve, caught. The wheels stay on the road; the body (and the two of them) moves. Pure.
 import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
 import type { Stretch } from './stretches';
 
 /** The hops (m, s); the squat (m, how long it holds, s); the three-wheel (m of lift at the front corner, radians of
- *  roll); the lay-back (radians, how long it holds, s); the fishtail on the tunnel's "crash" (radians of yaw, caught
- *  over `catchS` s). */
-export const HYDRAULICS = { hop: 0.24, hopS: 0.42, squat: 0.14, squatHold: 1.3, threeLift: 0.22, threeRoll: 0.09, layBack: 0.13, layHold: 0.8, swerve: 0.1, catchS: 1.3 };
+ *  roll); the bump on "backwards" (m, over s: the nose then the tail); the fishtail on the tunnel's "crash" (radians
+ *  of yaw, caught over `catchS` s). */
+export const HYDRAULICS = { hop: 0.24, hopS: 0.42, squat: 0.14, squatHold: 1.3, threeLift: 0.22, threeRoll: 0.09, bump: 0.09, bumpS: 0.12, swerve: 0.1, catchS: 1.3 };
 
 export interface Stance { lift: number; pitch: number; roll: number; swerve: number }
 
@@ -47,11 +47,12 @@ export function hydraulics(audio: AudioData, lyrics: Lyrics, stretches: readonly
       const k = Math.min(1, tau / 0.15) * (t > end ? Math.max(0, 1 - (t - end) / 0.5) : 1);
       lift += H.threeLift * 0.5 * k; pitch -= 0.06 * k; roll += H.threeRoll * k;
     }
-    for (const b of back) { // laid back: nose up (pitch below 0), the tail down
+    for (const b of back) { // a bump in the road: the nose kicks up, then the tail, and it settles
       const tau = t - b;
-      if (tau < 0 || tau > H.layHold + 0.5) continue;
-      const k = Math.min(1, tau / 0.2) * (tau > H.layHold ? 1 - (tau - H.layHold) / 0.5 : 1);
-      pitch -= H.layBack * k; lift -= 0.06 * k;
+      if (tau < 0 || tau > 1.2) continue;
+      const nose = tau < H.bumpS ? Math.sin((Math.PI * tau) / H.bumpS) : 0.3 * settle(tau - H.bumpS);
+      const tail = tau < H.bumpS ? 0 : tau < 2 * H.bumpS ? Math.sin((Math.PI * (tau - H.bumpS)) / H.bumpS) : 0.3 * settle(tau - 2 * H.bumpS);
+      lift += H.bump * 0.5 * (nose + tail); pitch -= 0.6 * H.bump * (nose - tail);
     }
     for (const c of crashes) { // the fishtail: the tail steps out, snaps back, settles — caught
       const tau = t - c;
