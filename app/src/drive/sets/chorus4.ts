@@ -21,7 +21,10 @@ const CAMPAIGN4 = /young and he fine/i, DRIVE = /put it in drive/i;
 /** His biggest board: on the uphill (right) side, where the car is this long before its line ends (m short of it),
  *  off the road, its centre's height, turned toward the coming car (radians), its size, its words' share and scale;
  *  the camera waits ahead of it (m short, off the road's centre, up), the car driving up into the frame. */
-export const BOARD = { short: 34, lateral: 20, y: 11, turn: (33 * Math.PI) / 180, w: 30, h: 16.5, text: 0.62, scale: 1.35, d: 1.4, eye: { short: 24, lateral: -1.5, up: 2.6 } };
+export const BOARD = { short: 34, lateral: 20, y: 11, turn: (33 * Math.PI) / 180, w: 30, h: 16.5, text: 0.62, scale: 1.35, d: 1.4, eye: { short: 24, lateral: -1.5, up: 2.6 }, rise: { short: 11, lateral: -4, up: 7.5 } };
+/** The board's take runs from this long before its line to this long after (s): the eye climbs with the car from
+ *  `eye` to `rise`, the board growing over it (a fixed eye read as a still — the user, 2026-10-13: "we could do more"). */
+export const BOARD_TAKE = { before: 0.6, after: 0.6 };
 /** The insert: the camera inside the car (its frame), aimed between the head unit's lyric and the shift indicator —
  *  pulled back and up enough that the wheel and gauges fill the frame's foot instead of bare door. */
 export const INSERT = { eye: new THREE.Vector3(-0.17, 1.56, -0.18), aim: new THREE.Vector3(0.06, 1.15, 0.52) };
@@ -64,8 +67,13 @@ export const CHORUS4: SetPiece = {
       btop -= L.h;
       add('giant', ph, `L${camp.i}.${i}`, bs, c, bn.clone(), bUp.clone(), L, { ad: 'him' });
     });
-    const boardShot = lookFrom(atRoad(bs - B.eye.short, B.eye.lateral, B.eye.up), bP.clone().addScaledVector(bAlong, -2.5));
-    carriers.forEach((c, i) => frames.set(c.id, { to: () => boardShot, move: i ? 'snap' : 'cut' }));
+    const aim = bP.clone().addScaledVector(bAlong, -2.5), t0 = camp.words[0]!.start - BOARD_TAKE.before, t1 = camp.end + BOARD_TAKE.after;
+    const smooth = (x: number) => { const u = Math.min(1, Math.max(0, x)); return u * u * (3 - 2 * u); };
+    const boardTake = (t: number) => {
+      const u = smooth((t - t0) / (t1 - t0)), E = B.eye, R = B.rise;
+      return lookFrom(atRoad(bs - (E.short + (R.short - E.short) * u), E.lateral + (R.lateral - E.lateral) * u, E.up + (R.up - E.up) * u), aim);
+    };
+    carriers.forEach((c, i) => frames.set(c.id, { to: boardTake, move: i ? 'snap' : 'cut' }));
     const bB = bP.clone().addScaledVector(bn, -B.d / 2 - 0.05), bLat = bB.clone().sub(bf.pos).dot(bf.right);
     const bh = B.y + B.h / 2 + 1;
     const boardBlock: Block = { s: bs, lateral: bLat, w: B.w + 2, h: bh, d: B.d, color: 0.5, bare: true, prop: true, matrix: new THREE.Matrix4().makeBasis(bAlong, UP, bn).scale(new THREE.Vector3(B.w + 2, bh, B.d)).setPosition(bB.x, ground(bs) + bh / 2, bB.z) };
