@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { F } from '../engine/type';
-import { toon } from './toon';
+import { WORLD, toon } from './toon';
 import { HEAD_UNIT, VISOR } from '../drive/cabin';
 import { chrome as heroChrome } from './hero';
 
@@ -88,18 +88,21 @@ function gauge(label: string): THREE.CanvasTexture {
 
 /** Fits the cabin into the car's body: returns what the scene runs each frame. */
 export function buildDash(body: THREE.Group): { update(t: number, duration: number, speed: number): void } {
-  const chrome = heroChrome(), dark = toon({ color: '#0d0b10' });
-  // the head unit, its chrome bezel round it, set into the dash
+  const chrome = heroChrome(), dark = toon({ color: '#0d0b10' }), trim = toon({ color: WORLD.chrome });
+  // the head unit in its housing, set into the dash's fascia (world.ts buildCar), a chrome rim round its screen (toon:
+  // the hero's chrome caught the sun as a bright post under the screen)
   const hu = headUnit(), screen = faceFrame(HEAD_UNIT.pos.clone().addScaledVector(HEAD_UNIT.normal, -0.004), HEAD_UNIT.normal);
   hu.mesh.position.x = -HEAD_UNIT.lyricAt; // (its middle off the lyric's panel's: the art that side)
   screen.add(hu.mesh);
-  const bezel = new THREE.Mesh(new THREE.BoxGeometry(HEAD_UNIT.w + 0.04, HEAD_UNIT.h + 0.04, 0.03), chrome);
-  bezel.position.set(-HEAD_UNIT.lyricAt, 0, -0.018); screen.add(bezel);
-  body.add(screen);
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(HEAD_UNIT.w + 0.06, HEAD_UNIT.h + 0.06, 0.09), dark);
+  housing.position.set(-HEAD_UNIT.lyricAt, 0, -0.05); screen.add(housing);
+  const bezel = new THREE.Mesh(new THREE.BoxGeometry(HEAD_UNIT.w + 0.04, HEAD_UNIT.h + 0.04, 0.012), trim);
+  bezel.position.set(-HEAD_UNIT.lyricAt, 0, -0.008); screen.add(bezel);
+  screen.name = 'screen'; body.add(screen);
   // the gauges in front of him, tipped back like the screen: a needle each
   const needles: THREE.Object3D[] = [];
   for (const [x, label] of [[0.36, 'MPH'], [0.6, 'RPM']] as const) { // (clear of the head unit's screen, x < 0.26)
-    const g = faceFrame(new THREE.Vector3(x, 1.12, 0.54), HEAD_UNIT.normal);
+    const g = faceFrame(new THREE.Vector3(x, 1.12, 0.54), HEAD_UNIT.normal); g.name = 'gauge';
     const face = new THREE.Mesh(new THREE.CircleGeometry(0.075, 32), new THREE.MeshBasicMaterial({ map: gauge(label), color: new THREE.Color(1.3, 1.3, 1.3) }));
     g.add(face);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.008, 6, 32), chrome); g.add(ring);
@@ -111,7 +114,7 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
   // the shift indicator in front of him, under the gauges: P R N D L in the signs' face, its D a lamp the last chorus
   // flares on "Put it in drive" (scenes/sets/chorus4.ts, by name)
   {
-    const g = faceFrame(new THREE.Vector3(0.44, 1.063, 0.558), HEAD_UNIT.normal);
+    const g = faceFrame(new THREE.Vector3(0.44, 1.063, 0.558), HEAD_UNIT.normal); g.name = 'shift';
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112;
     const c = cv.getContext('2d')!;
     c.fillStyle = '#0d0b10'; c.fillRect(0, 0, 512, 112);
@@ -133,7 +136,7 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
   }
   // her lipstick, lying against the visor's edge (the mirror verse writes with it: the prop explains the medium)
   {
-    const tube = new THREE.Group();
+    const tube = new THREE.Group(); tube.name = 'lipstick';
     tube.position.set(-VISOR.x + VISOR.mirror.w / 2 + 0.06, VISOR.mirror.pos.y - VISOR.mirror.h / 2 + 0.012, VISOR.mirror.pos.z + 0.012);
     tube.rotation.z = 1.35; tube.rotation.y = 0.3;
     const caseM = toon({ color: '#15121a' }), red = toon({ color: '#e8173a' });
@@ -147,7 +150,9 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
     const flap = new THREE.Group(); flap.name = side < 0 ? 'herVisor' : 'hisVisor';
     flap.position.set(side * VISOR.x, VISOR.hinge.y, VISOR.hinge.z); flap.rotation.x = Math.PI / 2;
     const board = faceFrame(new THREE.Vector3(side * VISOR.x, M.pos.y, M.pos.z).sub(flap.position), M.normal);
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(M.w + 0.08, M.h + 0.08, 0.03), toon({ color: '#d8c7a8' })); pad.position.z = -0.018; board.add(pad);
+    // (the pad in the cabin's plum with a chrome edge: in tan, folded flat, it read as a slab across the bus shot's foot)
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(M.w + 0.08, M.h + 0.08, 0.03), toon({ color: '#4a3542' })); pad.position.z = -0.018; board.add(pad);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(M.w + 0.09, M.h + 0.09, 0.006), trim); edge.position.z = -0.03; board.add(edge);
     if (side < 0) {
       // (its mirror: the cabin and the sky behind her in it; anything within clipBias of the glass — her lipstick —
       // left out of the reflection)
