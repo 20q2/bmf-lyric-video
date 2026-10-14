@@ -11,7 +11,6 @@ import { GIANT, SHACK, type Verse2Plan, WASH } from '../../drive/sets/verse2';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
-import { drawAd } from '../../look/adart';
 import { F, font } from '../../engine/type';
 import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, sedan, signFace } from './kit';
 import { glassTex } from './chorus1';
@@ -33,6 +32,31 @@ function chicken(g: THREE.Object3D, y: number, k = 1) {
 /** A row of bulbs along a line in g (from a to b): each takes a material from `ms` in turn (the chase's phases). */
 function bulbs(g: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, n: number, ms: readonly THREE.Material[], phase0 = 0) {
   for (let i = 0; i <= n; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), ms[(phase0 + i) % ms.length]!); s.position.copy(a.clone().lerp(b, i / n)); g.add(s); }
+}
+
+/** The mural on the end wall up the street: a painting, not his campaign's ad (the user: "lazy") — a sunset in flat
+ *  bands over a row of palms, a lowrider in the foreground, the sun behind; the words (the carriers') on its left,
+ *  where the sky is plain. */
+function mural(c: CanvasRenderingContext2D, W: number, H: number, text: number) {
+  const bands = ['#2b1b4e', '#7a3a7e', '#d9567a', '#f28a5a', '#f6b34a', '#ffd27a'];
+  bands.forEach((col, i) => { c.fillStyle = col; c.fillRect(0, (H * i) / bands.length - 1, W, H / bands.length + 2); });
+  const x0 = W * text, cx = x0 + (W - x0) * 0.5, horizon = H * 0.72;
+  c.fillStyle = '#fff1c8'; c.beginPath(); c.arc(cx, horizon - H * 0.02, H * 0.2, 0, Math.PI * 2); c.fill(); // the sun
+  c.fillStyle = '#5a2a4e'; c.fillRect(0, horizon, W, H - horizon); // the ground, dark
+  c.fillStyle = '#2a1830'; // the palms, from the words' edge across
+  for (let k = 0; k < 7; k++) {
+    const px = x0 + (W - x0) * (0.05 + k * 0.15), lean = (k % 2 ? 1 : -1) * 0.06, h = H * (0.45 + 0.12 * ((k * 0.37) % 1)), top = horizon - h;
+    c.beginPath(); c.moveTo(px - 8, horizon); c.lineTo(px + 8, horizon); c.lineTo(px + 6 + lean * h, top); c.lineTo(px - 6 + lean * h, top); c.closePath(); c.fill();
+    for (let f = 0; f < 7; f++) { const a = -Math.PI * 0.85 + (f / 6) * Math.PI * 0.7; c.save(); c.translate(px + lean * h, top); c.rotate(a); c.beginPath(); c.ellipse(H * 0.07, 0, H * 0.075, H * 0.016, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+  }
+  // the lowrider, low in the foreground, its candy red and whitewalls
+  const cw = (W - x0) * 0.55, ch = cw * 0.22, lx = cx - cw / 2, ly = H * 0.86;
+  c.fillStyle = '#c8102e'; c.beginPath(); c.roundRect(lx, ly - ch, cw, ch, ch * 0.3); c.fill(); c.beginPath(); c.roundRect(lx + cw * 0.28, ly - ch * 1.7, cw * 0.42, ch * 0.8, ch * 0.3); c.fill();
+  c.fillStyle = '#1d2026'; c.fillRect(lx + cw * 0.31, ly - ch * 1.6, cw * 0.36, ch * 0.55);
+  for (const wx of [lx + cw * 0.22, lx + cw * 0.78]) { c.fillStyle = '#1d2026'; c.beginPath(); c.arc(wx, ly, ch * 0.42, 0, Math.PI * 2); c.fill(); c.fillStyle = '#f4efe4'; c.beginPath(); c.arc(wx, ly, ch * 0.28, 0, Math.PI * 2); c.fill(); c.fillStyle = '#aaa498'; c.beginPath(); c.arc(wx, ly, ch * 0.14, 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = '#aaa498'; c.fillRect(lx - cw * 0.02, ly - ch * 0.35, cw * 1.04, ch * 0.1);
+  // weathering: the paint worn in patches
+  c.fillStyle = 'rgba(90,42,78,0.12)'; for (let k = 0; k < 40; k++) { const u = (k * 0.618) % 1, v = (k * 0.381) % 1; c.beginPath(); c.ellipse(u * W, v * H, W * 0.03 * (0.5 + ((k * 0.7) % 1)), H * 0.02, u * 3, 0, Math.PI * 2); c.fill(); }
 }
 
 export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
@@ -60,7 +84,8 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   // ---- the side street (Slauson): its asphalt off to the left, a crosswalk across its mouth ----
   {
     const C = plan.corner, asphalt = toon({ color: WORLD.asphalt }), paint = new THREE.MeshBasicMaterial({ color: WORLD.dash });
-    box(onRoad(C.s, 0), 60, 0.04, C.w, ROAD_HALF + 30, 0.0, 0, asphalt); // (x: the road's left)
+    box(onRoad(C.s, 0), 150, 0.04, C.w, ROAD_HALF + 75, 0.0, 0, asphalt); // (x: the road's left; on past the rows behind the street)
+    for (let x = ROAD_HALF + 8; x < 150; x += 6) box(onRoad(C.s, 0), 3, 0.02, 0.15, x, 0.03, 0, paint); // its centre dashes
     const walk = onRoad(C.s, -ROAD_HALF - 1.6);
     for (let z = -C.w / 2 + 0.6; z < C.w / 2; z += 1) box(walk, 2.4, 0.02, 0.5, 0, 0.03, z, paint);
   }
@@ -183,7 +208,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   // ---- his giant mural, painted on the end wall of its building: his portrait on the right (its words: the carriers) ----
   {
     const G = plan.giant, wall = onPanel(G), Bk = plan.giantBlock, GB = GIANT.building;
-    const art = canvasTex(2048, Math.round((2048 * G.h) / G.w), (c) => drawAd(c, 'him', c.canvas.width, c.canvas.height, GIANT.text));
+    const art = canvasTex(2048, Math.round((2048 * G.h) / G.w), (c) => mural(c, c.canvas.width, c.canvas.height, GIANT.text));
     plane(wall, G.w, G.h, 0, 0, 0, pic(art));
     // (the building: its end wall round the mural, down to the ground; a parapet along its top)
     const above = G.center.y - route.frameAt(Bk.s).pos.y;

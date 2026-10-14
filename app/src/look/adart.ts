@@ -38,10 +38,6 @@ export function drawAd(c: CanvasRenderingContext2D, ad: Ad, W: number, H: number
   c.save(); c.translate(cx, cy); c.scale(R / 100, R / 100); // the product, drawn in a 200 x 200 box round (0, 0)
   PRODUCT[ad](c);
   c.restore();
-  // the maker's mark: a star in a ring, bottom right
-  const m = H * 0.07, mx = W - m * 1.8, my = H - m * 1.8;
-  c.strokeStyle = st.ink; c.lineWidth = m * 0.18; c.beginPath(); c.arc(mx, my, m, 0, Math.PI * 2); c.stroke();
-  c.fillStyle = st.ink; star(c, mx, my, m * 0.7, m * 0.3, 5);
   // a hairline between headline and product
   c.fillStyle = st.ink; c.globalAlpha = 0.35; c.fillRect(x0 - W * 0.004, H * 0.15, W * 0.004, H * 0.7); c.globalAlpha = 1;
 }
@@ -68,13 +64,19 @@ function star(c: CanvasRenderingContext2D, x: number, y: number, r: number, r2: 
 const rr = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); };
 
 const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D) => void> = {
-  him: (c) => { // him: a profile in silhouette, cap and chain, the sun behind
+  him: (c) => { // him, by his things, no face (a profile read as someone else): a crown, his shades, a rope chain
+    c.fillStyle = '#f6c445';
+    c.beginPath(); c.moveTo(-58, -36); c.lineTo(-62, -82); c.lineTo(-34, -56); c.lineTo(0, -92); c.lineTo(34, -56); c.lineTo(62, -82); c.lineTo(58, -36); c.closePath(); c.fill(); // the crown
+    c.fillStyle = '#c8102e'; for (const x of [-34, 0, 34]) { c.beginPath(); c.arc(x, -48, 6, 0, Math.PI * 2); c.fill(); } // its jewels
+    c.fillStyle = '#16131a'; rr(c, -64, -36, 128, 12, 4); // its band
+    // the shades: two dark lenses in a thin frame, the bridge between
     c.fillStyle = '#16131a';
-    c.beginPath(); c.moveTo(-20, 95); c.lineTo(-30, 40); c.quadraticCurveTo(-48, 10, -38, -22); // the back of the neck, the head
-    c.quadraticCurveTo(-30, -62, 8, -60); c.lineTo(40, -58); c.lineTo(62, -50); c.lineTo(30, -46); // the cap, its brim forward
-    c.quadraticCurveTo(36, -30, 34, -16); c.lineTo(44, -6); c.lineTo(36, 0); c.quadraticCurveTo(38, 10, 32, 14); // brow, nose, lips
-    c.quadraticCurveTo(30, 26, 18, 32); c.lineTo(8, 50); c.quadraticCurveTo(30, 60, 70, 95); c.closePath(); c.fill(); // the jaw, the shoulder
-    c.strokeStyle = '#f6c445'; c.lineWidth = 6; c.beginPath(); c.arc(4, 58, 26, 0.2, 2.6); c.stroke(); // the chain
+    for (const x of [-38, 38]) { c.beginPath(); c.ellipse(x, 2, 34, 24, 0, 0, Math.PI * 2); c.fill(); }
+    c.fillRect(-8, -4, 16, 6); c.fillRect(-82, -6, 14, 5); c.fillRect(68, -6, 14, 5);
+    c.fillStyle = 'rgba(255,255,255,0.35)'; for (const x of [-38, 38]) { c.beginPath(); c.ellipse(x - 10, -8, 10, 6, -0.5, 0, Math.PI * 2); c.fill(); }
+    // the chain, a rope of links hanging below
+    c.strokeStyle = '#f6c445'; c.lineWidth = 7; c.setLineDash([9, 5]); c.beginPath(); c.arc(0, 30, 58, 0.25, Math.PI - 0.25); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#f6c445'; rr(c, -16, 76, 32, 22, 5); c.fillStyle = '#16131a'; c.font = 'bold 18px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('BMF', 0, 88);
   },
   bandage: (c) => { // two crossed bandages
     for (const a of [0.7, -0.7]) {

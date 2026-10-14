@@ -802,7 +802,13 @@ const NEON_WASH = 0.45;
       }
       break;
     }
-    case 'street': legs([-c.w / 2 - 0.15], y0 + c.h / 2 + 0.4); break;
+    case 'street': { // (on a pole at its left end, from the ground to the blade's top, clamps gripping its edge: the
+      // intro corner's pole; off a leg it read as floating in front of it)
+      const x = -c.w / 2 - 0.1, top = c.h / 2 + 0.25, drop = y0 + top;
+      { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, drop, 10), grey(WORLD.post)); pole.position.set(x, top - drop / 2, -0.12); g.add(pole); }
+      for (const y of [-c.h / 2, c.h / 2]) box(0.22, 0.07, 0.07, x + 0.06, y, -0.1, grey(WORLD.post));
+      break;
+    }
     case 'banner': {
       // the plane ahead of it (to its right, nose that way: it flies the way the words run), a high-wing tug on a tow
       // line from the banner's leading edge; as big as the banner was made (carriers.ts BANNER.view)
@@ -949,6 +955,15 @@ export function buildCar(): THREE.Group {
   { const column = add(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 10), cabin, 0, 0, -0.16, wheel); column.rotation.x = Math.PI / 2; }
   for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
     add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);
+  { // the plate on its tail, blank until verse 2 writes on it (the user: the plate area there all along)
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
+    const x = cv.getContext('2d')!;
+    x.fillStyle = '#f2f1ea'; x.fillRect(0, 0, 256, 128); x.strokeStyle = '#1b2a6b'; x.lineWidth = 8; x.strokeRect(4, 4, 248, 120);
+    x.fillStyle = '#d81e2c'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `italic 600 30px "${F.bodoni(700, { italic: true })}"`; x.fillText('California', 128, 30);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const plate = add(new THREE.PlaneGeometry(0.46, 0.23), new THREE.MeshBasicMaterial({ map: tex }), 0, 0.7, -hl - 0.075); plate.rotation.y = Math.PI; plate.name = 'plate';
+    box(0.5, 0.27, 0.03, 0, 0.7, -hl - 0.06, dark);
+  }
     const head = new THREE.Group(); head.name = him ? 'hisHead' : 'herHead'; head.position.set(x, belt + 0.66, -0.22); body.add(head);
     add(new THREE.SphereGeometry(0.14, 14, 10), dark, 0, 0.12, 0, head);
     if (him) {

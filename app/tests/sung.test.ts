@@ -203,12 +203,12 @@ test('every phrase is readable on screen long enough: dwellFor(words), counting 
 }, 120000);
 
 test("nothing shows the song ahead: a phrase's text appears only as the camera comes for it, at most one phrase early", () => {
-  const early = drive.carriers.filter((c) => c.phrase.start - c.reveal > REVEAL_AHEAD + 1e-9).map((c) => `${c.id} ${(c.phrase.start - c.reveal).toFixed(2)} s`);
+  const early = drive.carriers.filter((c) => !c.early && c.phrase.start - c.reveal > REVEAL_AHEAD + 1e-9).map((c) => `${c.id} ${(c.phrase.start - c.reveal).toFixed(2)} s`);
   expect(early).toEqual([]);
   // at any moment, at most two phrases are up and not yet begun (a line's first phrase in its pre-roll, and the next)
   const crowded: string[] = [];
   for (let t = 0; t < audio.duration; t += 0.1) {
-    const ahead = drive.carriers.filter((c) => revealAt(c, t) > 0 && t < c.phrase.start);
+    const ahead = drive.carriers.filter((c) => !c.early && revealAt(c, t) > 0 && t < c.phrase.start);
     if (ahead.length > 2) crowded.push(`${t.toFixed(1)}: ${ahead.map((c) => c.id).join(' ')}`);
   }
   expect(crowded).toEqual([]);

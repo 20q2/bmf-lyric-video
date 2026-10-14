@@ -88,10 +88,6 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
       out.push({ s, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, s, lateral, d, h + lift, w, -lift) }); // (w along the road, d deep)
     }
   }
-  // the rows behind the street: the town's depth (none by the sea, in a tunnel's rock, or across the valley a hill sign
-  // is seen over), never on the road where it bends back past them
-  const roadPts: [number, number][] = [];
-  for (let s = 0; s <= route.length; s += 4) { const p = route.frameAt(s).pos; roadPts.push([p.x, p.z]); }
   // cars parked along the left kerb through the town: blocks, so the guard sees them (world.ts builds them as sedans);
   // not on a set-piece's own blocks, by a cross street or a driveway, or under road paint (it fills the road). (The
   // faces' and the set-pieces' clearances are for buildings, which would stand in their shots: a car at the kerb
@@ -107,6 +103,10 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
     const len = 4.4 + 0.8 * hash(k, 91), lateral = side * PARKED.lateral;
     out.push({ s, lateral, w: len, h: 1.45, d: 1.8, color: hash(k, 92), matrix: boxAt(route, s, lateral, 1.8, 1.45, len), prop: true, car: true });
   }
+  // the rows behind the street: the town's depth (none by the sea, in a tunnel's rock, or across the valley a hill sign
+  // is seen over), never on the road where it bends back past them
+  const roadPts: [number, number][] = [];
+  for (let s = 0; s <= route.length; s += 4) { const p = route.frameAt(s).pos; roadPts.push([p.x, p.z]); }
   const offRoad = (m: THREE.Matrix4) => FOOTPRINT.every(([x, z]) => {
     const p = new THREE.Vector3(x, -0.5, z).applyMatrix4(m);
     return roadPts.every(([rx, rz]) => Math.hypot(rx - p.x, rz - p.z) >= ROAD_HALF + BACK.road);
@@ -120,6 +120,8 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
         if (hash(k, side, 20 + r) < BACK.empty) continue;
         const w = 14 + 10 * hash(k, side, 30 + r), d = 14 + 8 * hash(k, side, 40 + r), h = h0 + (h1 - h0) * hash(k, side, 50 + r);
         const at = s + (hash(k, side, 70 + r) - 0.5) * 6, lateral = side * (BACK.from + r * BACK.step + d / 2 + 6 * hash(k, side, 60 + r));
+        // (nor across a cross street: the road to Slauson ran into storefronts)
+        if (openings.some((o) => o.side === side && at + w / 2 > o.a - 3 && at - w / 2 < o.b + 3)) continue;
         const lift = route.frameAt(at).pos.y + 0.4, m = boxAt(route, at, lateral, d, h + lift, w, -lift);
         if (!offRoad(m)) continue;
         out.push({ s: at, lateral, w, h, d, color: hash(k, side, 80 + r), matrix: m });

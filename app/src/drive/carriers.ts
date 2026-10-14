@@ -94,6 +94,9 @@ export interface Carrier {
    *  her phone in her hand). */
   from?: number;
   until?: number;
+  /** Its words stand in the world before they're sung (a street's name on its blade: it's a street sign, not a lyric
+   *  revealed), so the reading-ahead guard lets it be. */
+  early?: boolean;
 }
 
 /** The car's frame as a matrix: x its left, y up, z forward, at its position on the road. */

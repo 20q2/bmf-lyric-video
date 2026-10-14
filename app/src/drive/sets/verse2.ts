@@ -71,7 +71,7 @@ export const ON_CAR = {
   plate: { pos: new THREE.Vector3(0, 0.7, -CAR.length / 2 - 0.1), scale: 0.72 },
   stickers: { y: 0.42, x: 0.52, z: -CAR.length / 2 - 0.14, scale: 0.44 },
   // (behind: room under the stickers for the tail dropping as it lays back)
-  front: new THREE.Vector3(0, 2.75, 4.4), behind: new THREE.Vector3(0, 1.0, -5), behindAim: new THREE.Vector3(0, 0.48, -2.7),
+  front: new THREE.Vector3(0, 2.6, 4.4), behind: new THREE.Vector3(0, 1.0, -5), behindAim: new THREE.Vector3(0, 0.48, -2.7),
 };
 /** The giant mural of him at the end of the street: where the car is when its line ends (m short of it), off to the
  *  left, its centre's height, turned toward the coming car, its size and its words' share of it; its building (how
@@ -188,7 +188,8 @@ export const VERSE2: SetPiece = {
       return add('aframe', ph, s, c, n, uprightFor(n), lay);
     };
     if (took) corner.push(aframe(took, ends[0]!));
-    if (toSlauson) corner.push(add('street', toSlauson, bladeS, atRoad(bladeS, S.corner.lateral, STREET.y), right(bladeS), UP.clone(), layout('street', toSlauson.text, toSlauson.solo)));
+    // (a street sign: its name stands before the lyric reaches it — the user, 2026-10-13)
+    if (toSlauson) corner.push(add('street', toSlauson, bladeS, atRoad(bladeS, S.corner.lateral, STREET.y), right(bladeS), UP.clone(), layout('street', toSlauson.text, toSlauson.solo), { reveal: st.start - 2, early: true }));
     if (slut) corner.push(aframe(slut, ends[1]!));
     // (the first held close, then the blade and the A-frame under it together: it's up while the street's named)
     const out = (cs: readonly Carrier[], E: { out: number; y: number }) => {
@@ -229,7 +230,7 @@ export const VERSE2: SetPiece = {
     const visor = trust ? [riding('visor', trust, V.pos, V.normal.clone().normalize())] : [];
     const hoodUp = new THREE.Vector3(0, 0.057, -0.998).normalize(); // (its letters stand toward the windshield: read from in front)
     const hood = good ? [riding('hood', good, Hd.pos, Hd.normal.clone().normalize(), hoodUp)] : [];
-    const frontShot = (t: number) => lookFrom(inCar(ON_CAR.front, t), inCar(new THREE.Vector3(0, 1.05, 1.1), t));
+    const frontShot = (t: number) => lookFrom(inCar(ON_CAR.front, t), inCar(new THREE.Vector3(0, 1.0, 1.35), t)); // (low over the grille: the hood reads as the hood)
     hold([...visor, ...hood], frontShot, 'cut');
 
     // ---- a whip round behind, low: TRICKIN' on their plate, the rest on bumper stickers, the car laying back ----

@@ -34,6 +34,9 @@ import { BRAND, TEXT_SHARE } from './ads';
 import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 
 const CANVAS_W = 1024;
+/** The hill sign's canvas is wider: it's the end's view, held for seconds, its letters bigger on screen than its
+ *  texels at 1024. */
+const HILL_CANVAS_W = 2048;
 /** Boards that show their ad's copy — or their own in-world copy (OWN_COPY) — until their lyric flips in (tri-vision:
  *  FLIP.slats slats, turning in a wave). A lit board that is simply blank reads as a bug, not anticipation. */
 const COPY: ReadonlySet<Carrier['kind']> = new Set(['billboard', 'poster', 'sign', 'storefront', 'street', 'gantry', 'freeway', 'marquee', 'roofsign', 'vinyl', 'tunnelsign']);
@@ -86,7 +89,7 @@ const GREEN = '#1f6b44';
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean; /** The Hollywood sign's: a letter to a panel, the panels evenly spaced across the face, each standing a little out of true. */ panels?: boolean }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
@@ -105,7 +108,8 @@ function styleOf(c: Carrier): Style {
     case 'storefront': return { bg: '#1d3b30', family: F.archivo(100, 700), caps: true, colors: ['#f3ead2', '#f3ead2', '#ffd65a'], alpha: [0.72, 1] };
     case 'neon': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#ff4fa3', '#ff4fa3', '#fff1a0'], alpha: [0.6, 1], glow: 'rgba(255,79,163,0.95)', tubes: true };
     case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
-    case 'hill': return { family: F.archivo(100, 900), caps: true, colors: ['#fbf7ee', '#fbf7ee', '#ffd65a'], alpha: [0.62, 1] };
+    // (white sheet metal, floodlit: no accent colour — the word being sung lights full white, the rest wait dimmer)
+    case 'hill': return { family: F.archivo(62, 800), caps: true, colors: ['#e6e1d8', '#fbf7ee', '#ffffff'], alpha: [0.5, 1], panels: true };
     case 'tunnel': return c.phrase.line % 2 // (the lines in turn: sodium orange, then cold cyan)
       ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)', tubes: true }
       : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)', tubes: true };
@@ -130,10 +134,10 @@ function styleOf(c: Carrier): Style {
     case 'window': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.82, 1], outline: '#c8102e', shadow: '#5a0614' }; // painted on the glass
     case 'vinyl': return { bg: '#c8202e', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'roofsign': return { bg: '#ffd65a', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
-    case 'carwash': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ff3043'], alpha: [0.75, 1], outline: '#0b3a66', align: 'left' }; // (on the prop's board; the hero word red: yellow sinks into the pale blue)
+    case 'carwash': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ff3043'], alpha: [1, 1], outline: '#0b3a66', align: 'left' }; // (on the prop's board, solid over its suds; the hero word red: yellow sinks into the pale blue)
     case 'visor': return { bg: '#0e0d10', family: F.bodoni(700, { italic: true }), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.7, 1] };
     case 'hood': return { family: F.archivoItalic(100, 800), caps: true, colors: ['#ffd65a', '#ffd65a', '#ffffff'], alpha: [0.75, 1], outline: '#5a0614', shadow: '#2a0309' };
-    case 'giant': return { family: F.archivo(62, 900), caps: true, colors: [AD_STYLE.him.ink, AD_STYLE.him.ink, '#c8102e'], alpha: [0.72, 1] };
+    case 'giant': return { family: F.archivo(62, 900), caps: true, colors: ['#fff6e0', '#fff6e0', '#ffd65a'], alpha: [0.85, 1], outline: '#3a1a2e', shadow: '#1c0f22' }; // (a muralist's lettering on the wall's painting)
     case 'arch': return { bg: '#f6edd6', border: '#2b4a66', family: F.archivo(100, 900), caps: true, colors: ['#2b4a66', '#2b4a66', '#d81e2c'], alpha: [0.75, 1] }; // the beach town's band
     case 'tunnelsign': return { bg: '#0b0d12', border: '#454b58', family: F.archivo(100, 800), caps: true, colors: ['#ffe2a8', '#ffd98a', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(255,180,80,0.85)' }; // a lit box in the bore
     case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
@@ -150,8 +154,8 @@ export class CarrierArt {
   private style: Style;
 
   constructor(private carrier: Carrier) {
-    this.canvas.width = CANVAS_W;
-    this.canvas.height = Math.round((CANVAS_W * carrier.h) / carrier.w);
+    this.canvas.width = carrier.kind === 'hill' ? HILL_CANVAS_W : CANVAS_W;
+    this.canvas.height = Math.round((this.canvas.width * carrier.h) / carrier.w);
     this.c = this.canvas.getContext('2d')!;
     this.style = styleOf(carrier);
     this.texture = new THREE.CanvasTexture(this.canvas);
@@ -258,6 +262,7 @@ export class CarrierArt {
     c.textBaseline = 'middle';
     const gone = Math.round(dissolveAt(carrier, t) * 20) / 20;
     if (gone >= 1) return;
+    if (style.panels) { this.drawPanels(c, t, TW, alpha); return; }
     if (style.glow) { c.shadowColor = style.glow; c.shadowBlur = em * (0.22 + 0.6 * gone); }
     const words = carrier.phrase.words, space = c.measureText(' ').width;
     // rows share the face's height, the word of emphasis's row a bigger share
@@ -332,6 +337,32 @@ export class CarrierArt {
     });
     c.globalAlpha = 1;
     c.shadowBlur = 0;
+  }
+
+  /** The Hollywood sign: the phrase on one row, a letter to each of a row of equal cells (a word's gap a cell), each
+   *  letter as tall as the face allows and a little tilted and stepped (each stands on its own legs on the slope). */
+  private drawPanels(c: CanvasRenderingContext2D, t: number, TW: number, alpha: number) {
+    const { canvas, carrier, style } = this, H = canvas.height;
+    const label = (w: Word) => (style.caps ? w.w.toUpperCase() : w.w);
+    const cells = carrier.phrase.words.flatMap((w, i) => [...(i ? [null] : []), ...[...label(w)].map((ch) => ({ ch, w }))]);
+    const cell = TW / cells.length;
+    c.font = font(style.family, 100);
+    const cap = c.measureText('H'), capH = cap.actualBoundingBoxAscent, widest = Math.max(...cells.map((x) => (x ? c.measureText(x.ch).width : 0)));
+    const em = Math.min((100 * H * 0.84) / capH, (100 * cell * 0.86) / widest);
+    c.font = font(style.family, em);
+    c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    cells.forEach((x, i) => {
+      if (!x) return;
+      const sung = t >= x.w.start, now = sung && t < x.w.end;
+      c.fillStyle = style.colors[now ? 2 : sung ? 1 : 0];
+      c.globalAlpha = style.alpha[sung ? 1 : 0] * alpha;
+      c.save();
+      c.translate(cell * (i + 0.5), H / 2 + (em * capH) / 200 + (hash(i, 31) - 0.5) * H * 0.05);
+      c.rotate((hash(i, 32) - 0.5) * 0.06);
+      c.fillText(x.ch, 0, 0);
+      c.restore();
+    });
+    c.globalAlpha = 1; c.textAlign = 'left';
   }
 
   dispose() { this.texture.dispose(); }
