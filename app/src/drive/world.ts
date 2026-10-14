@@ -36,6 +36,10 @@ const BASE = 12000;
 export const SLOPE = 1;
 /** The road runs on this far past where the car parks, to the overlook's edge (m). */
 const OVERLOOK_LIP = 9;
+/** The overlook: its gravel turnout's radius, the wall's radius round the car and its blocks (either way of the middle,
+ *  this far apart in radians), and how far the hillside runs down to the plain (m). */
+const LOOKOUT = { apron: 19, r: 12, blocks: 12, pitch: 0.095, fall: 190 };
+const WOOD_DARK = toon({ color: '#3a2a24' });
 const STEP = 2;
 export { ROAD_START }; // (route.ts: the road starts this far behind the light)
 
@@ -133,10 +137,54 @@ export function buildWorld(drive: Drive): THREE.Group {
   const groundOf = (s: number) => { const g0 = GROUND[stretchAtS(s).id]; return g0 ? new THREE.Color(g0) : grass; };
   g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : groundOf(s)), end), printedGround(lambert())), 'verges'));
   g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
-  const fe = route.frameAt(end), cliff = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.rock }));
-  cliff.matrixAutoUpdate = false;
-  cliff.matrix.copy(boxAt(route, end + 1, 0, 2 * SHOULDER, fe.pos.y + 0.4, 2, -(fe.pos.y + 0.4))); // (the verges' width: any wider and its edge cuts across the town seen from the Strip)
-  g.add(named(cliff, 'cliff'));
+  // the overlook (the user, 2026-10-13: they sat "at the top of a box"): the road ends on a gravel turnout at the lip;
+  // a low stone wall with a pipe rail runs along it; a coin viewer, a bench and a bin stand by the wall; pines frame
+  // the view either side; and the hillside falls away below, rolling down to the plain
+  {
+    const park = route.frameAt(end - OVERLOOK_LIP), lipF = route.frameAt(end);
+    const fwd = new THREE.Vector3(lipF.fwd.x, 0, lipF.fwd.z).normalize(), right = new THREE.Vector3(lipF.right.x, 0, lipF.right.z).normalize();
+    const look = new THREE.Group(); g.add(named(look, 'lookout'));
+    const y0 = park.pos.y, centre = park.pos.clone().addScaledVector(fwd, 2);
+    const apron = new THREE.Mesh(new THREE.CircleGeometry(LOOKOUT.apron, 48), printedGround(toon({ color: '#8a8074' })));
+    apron.rotation.x = -Math.PI / 2; apron.position.copy(centre).addScaledVector(fwd, 2).setY(y0 + 0.03); look.add(apron);
+    const stone = toon({ color: '#9a8d7e' }), cap = toon({ color: '#b3a797' }), steel = toon({ color: WORLD.post }), dark = toon({ color: '#1a2430' }), wood = toon({ color: '#5a3a2a' });
+    const put = (geo: THREE.BufferGeometry, m: THREE.Material, p: THREE.Vector3, yaw = 0) => { const o = new THREE.Mesh(geo, m); o.position.copy(p); o.rotation.y = yaw; look.add(o); return o; };
+    const onArc = (a: number, r: number) => { const d = fwd.clone().multiplyScalar(Math.cos(a)).addScaledVector(right, Math.sin(a)); return { p: centre.clone().addScaledVector(d, r), yaw: Math.atan2(d.x, d.z) }; };
+    // the wall, block by block on its arc, capped, with the rail's posts and pipes over it
+    for (let i = -LOOKOUT.blocks; i <= LOOKOUT.blocks; i++) {
+      const { p, yaw } = onArc(i * LOOKOUT.pitch, LOOKOUT.r);
+      put(new THREE.BoxGeometry(1.14, 0.55, 0.5), stone, p.clone().setY(y0 + 0.28), yaw);
+      put(new THREE.BoxGeometry(1.2, 0.08, 0.62), cap, p.clone().setY(y0 + 0.59), yaw);
+      if (i % 4 === 0) put(new THREE.CylinderGeometry(0.03, 0.03, 0.55, 8), steel, p.clone().setY(y0 + 0.9));
+      if (i % 4 === 0 && i < LOOKOUT.blocks) { // the pipe to the next post, along the chord
+        const q = onArc((i + 4) * LOOKOUT.pitch, LOOKOUT.r).p, mid = p.clone().add(q).multiplyScalar(0.5).setY(y0 + 1.16), d = q.clone().sub(p);
+        const pipe = put(new THREE.CylinderGeometry(0.025, 0.025, d.length(), 8), steel, mid, Math.atan2(d.x, d.z)); pipe.rotation.x = Math.PI / 2; pipe.rotation.order = 'YXZ';
+      }
+    }
+    // the coin viewer, left of the car's nose at the wall; a bench and a bin to the right
+    { const { p } = onArc(-0.42, LOOKOUT.r - 1.2); put(new THREE.CylinderGeometry(0.06, 0.09, 1.25, 10), steel, p.clone().setY(y0 + 0.62)); put(new THREE.BoxGeometry(0.42, 0.26, 0.5), dark, p.clone().setY(y0 + 1.4), Math.atan2(fwd.x, fwd.z)); }
+    { const { p, yaw } = onArc(0.5, LOOKOUT.r - 1.6); put(new THREE.BoxGeometry(1.8, 0.07, 0.45), wood, p.clone().setY(y0 + 0.46), yaw); put(new THREE.BoxGeometry(1.8, 0.4, 0.07), wood, p.clone().addScaledVector(fwd, -0.22).setY(y0 + 0.72), yaw); for (const dx of [-0.75, 0.75]) put(new THREE.BoxGeometry(0.06, 0.45, 0.4), steel, p.clone().addScaledVector(right, dx).setY(y0 + 0.22), yaw); }
+    { const { p } = onArc(0.8, LOOKOUT.r - 1.4); put(new THREE.CylinderGeometry(0.32, 0.3, 0.9, 12), toon({ color: '#2f5d3a' }), p.clone().setY(y0 + 0.45)); }
+    // pines either side, framing the view
+    for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) {
+      const p = centre.clone().addScaledVector(right, sx * (LOOKOUT.apron - 2 + 7 * k)).addScaledVector(fwd, 3 - 6 * k + 3 * hash(sx, k, 3)), h = 7 + 4 * hash(sx, k, 4);
+      put(new THREE.CylinderGeometry(0.18, 0.26, 2.2, 8), WOOD_DARK, p.clone().setY(y0 + 1.1));
+      put(new THREE.ConeGeometry(2.2 + 0.8 * hash(sx, k, 5), h, 10), dark, p.clone().setY(y0 + 2 + h / 2));
+    }
+    // the hillside: from the lip down to the plain, rolling
+    const across = 2 * SHOULDER + 70, along = LOOKOUT.fall, geo = new THREE.PlaneGeometry(across, along, 28, 40).rotateX(-Math.PI / 2), P = geo.attributes.position!;
+    const drop = y0 - (-0.4);
+    for (let i = 0; i < P.count; i++) {
+      const x = P.getX(i), u = (P.getZ(i) + along / 2) / along; // (u: 0 at the lip, 1 at the plain)
+      const ease = u * u * (3 - 2 * u), roll = (1.6 * Math.sin(x * 0.07 + u * 9) + 1.1 * Math.sin(x * 0.19 - u * 5)) * Math.sin(Math.PI * u);
+      P.setY(i, -0.4 + drop * (1 - ease) + roll - 0.1);
+    }
+    geo.computeVertexNormals();
+    const hill = new THREE.Mesh(geo, printedGround(toon({ color: '#5e5048' })));
+    hill.matrixAutoUpdate = false;
+    hill.matrix.makeBasis(right, new THREE.Vector3(0, 1, 0), fwd).setPosition(lipF.pos.clone().addScaledVector(fwd, along / 2 + 1).setY(0));
+    look.add(hill);
+  }
   // embankments where the road has climbed: from each verge's edge down to the plain
   for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? SEA : SHOULDER), end), lambert()), 'skirts'));
   const box3 = new THREE.Box3();

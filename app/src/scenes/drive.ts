@@ -179,7 +179,7 @@ export default class DriveScene extends Scene {
     const crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w)).map((w) => w.start));
     const lastCrash = crashes.length ? Math.max(...crashes) : undefined;
     this.city = buildCity(end.pos, end.fwd, end.right, -0.4, lastCrash);
-    this.world.add(this.city.points);
+    this.world.add(this.city.group);
   }
 
   override render(f: Frame, out: THREE.WebGLRenderTarget): PostOverrides {
@@ -295,7 +295,8 @@ export default class DriveScene extends Scene {
     const { sky, sunDir, sunColor } = this.skyAt(t), day = daylight(t), e = sky.sunElev;
     // (the hero's reflections: the sky of this moment, remade on steps of song time)
     this.world.environment = this.env.update(t, (tau) => this.skyAt(tau));
-    this.dome.update(sky, sunDir, sunColor, this.cam, t, cloudsAt(t), raysAt(t));
+    const moonDir = this.sunAz.clone().multiplyScalar(-Math.cos(MOON.elev)).add(new THREE.Vector3(0, Math.sin(MOON.elev), 0));
+    this.dome.update(sky, sunDir, sunColor, this.cam, t, cloudsAt(t), raysAt(t), moonDir, smooth(-2 * DEG, -9 * DEG, e)); // (the moon up once the sun's well down)
     // the sun lights from no lower than 4° (its shadows stay finite), fading out as it sets
     const lightDir = this.sunAz.clone().multiplyScalar(Math.cos(Math.max(e, 4 * DEG))).add(new THREE.Vector3(0, Math.sin(Math.max(e, 4 * DEG)), 0));
     // (centred ahead of the lens, snapped to the map's texels in the light's own frame: no shimmer as the camera moves)
@@ -308,7 +309,6 @@ export default class DriveScene extends Scene {
     this.sun.target.position.copy(centre);
     this.sun.color.copy(sunColor);
     this.sun.intensity = SUN.intensity * smooth(-3 * DEG, 3 * DEG, e);
-    const moonDir = this.sunAz.clone().multiplyScalar(-Math.cos(MOON.elev)).add(new THREE.Vector3(0, Math.sin(MOON.elev), 0));
     this.moon.position.copy(cf.pos).addScaledVector(moonDir, 500);
     this.moon.target.position.copy(cf.pos);
     this.moon.color.copy(MOON.color);

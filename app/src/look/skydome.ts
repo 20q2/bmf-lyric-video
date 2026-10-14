@@ -18,7 +18,8 @@ void main() {
 
 const FRAG = /* glsl */ `
 uniform vec3 zenith, horizon, sunDir, sunColor, mountainDir;
-uniform float stars, bands, sunR, sunHDR, time, groundMix, clouds, rays, mountains;
+uniform float stars, bands, sunR, sunHDR, time, groundMix, clouds, rays, mountains, moon;
+uniform vec3 moonDir;
 varying vec3 vDir;
 const float PI_ = 3.14159265;
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -76,6 +77,12 @@ void main() {
     vec3 shadeC = mix(zenith, horizon, 0.35) * 0.82, litC = mix(horizon, sunColor, 0.55) * 1.05;
     c = mix(c, mix(shadeC, litC, lit) * (1.0 - 0.22 * clamp(rim, 0.0, 1.0)), cover * clouds);
   }
+  // the moon: a pale disc in a soft halo, once the sun's down
+  if (moon > 0.0 && d.y > 0.0) {
+    float am = acos(clamp(dot(d, moonDir), -1.0, 1.0)), pm = fwidth(am);
+    c += vec3(0.7, 0.76, 0.95) * 0.3 * moon * exp(-am * 16.0);
+    c = mix(c, vec3(0.92, 0.94, 1.0) * 1.3, smoothstep(0.012 + pm, 0.012 - pm, am) * moon);
+  }
   // stars: one in some cells of a grid over the sky, twinkling
   if (stars > 0.0 && d.y > 0.02) {
     vec2 sp = vec2(atan(d.z, d.x), asin(d.y)) * 120.0;
@@ -97,7 +104,7 @@ export class SkyDome {
   constructor() {
     this.u = {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
-      sunDir: { value: new THREE.Vector3(0, 0.2, -1).normalize() }, sunColor: { value: new THREE.Color('#ffd9a0') },
+      sunDir: { value: new THREE.Vector3(0, 0.2, -1).normalize() }, sunColor: { value: new THREE.Color('#ffd9a0') }, moonDir: { value: new THREE.Vector3(0, 1, 0) }, moon: { value: 0 },
       stars: { value: 0 }, bands: { value: SKYDOME.bands }, sunR: { value: (SKYDOME.sunDeg * Math.PI) / 180 },
       sunHDR: { value: SKYDOME.sunHDR }, time: { value: 0 }, groundMix: { value: 0 }, clouds: { value: 0 }, rays: { value: 0 },
       mountainDir: { value: new THREE.Vector3(1, 0, 0) }, mountains: { value: 0 },
@@ -113,7 +120,9 @@ export class SkyDome {
   /** The mountains stand round this direction (flat), away from the sea. */
   setMountains(dir: THREE.Vector3) { this.u.mountainDir!.value.copy(dir); this.u.mountains!.value = 1; }
 
-  update(s: SkyState, sunDir: THREE.Vector3, sunColor: THREE.Color, camera: THREE.Object3D, t: number, clouds = 0, rays = 0) {
+  update(s: SkyState, sunDir: THREE.Vector3, sunColor: THREE.Color, camera: THREE.Object3D, t: number, clouds = 0, rays = 0, moonDir?: THREE.Vector3, moon = 0) {
+    if (moonDir) this.u.moonDir!.value.copy(moonDir);
+    this.u.moon!.value = moon;
     this.u.clouds!.value = clouds;
     this.u.rays!.value = rays;
     this.u.zenith!.value.copy(s.zenith);
