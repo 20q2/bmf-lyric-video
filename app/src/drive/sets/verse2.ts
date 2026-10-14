@@ -1,14 +1,15 @@
 // Verse 2, Slauson (flow plan §4; the user, 2026-10-12: the murals read as floating text — "a chicken PLACE with signs
 // in front of it would be way better"): low and slow off the freeway into the neighbourhood, lowrider pace, the lyrics
-// on the signs of a fried chicken spot on the corner of Slauson, its chicken standing on its roof. A take a line, cut
-// between lines; the car never stops:
-//   "Ooh, he bossy, ooh, he crip walkin'"      its tall pole sign's lightbox at the curb, from low across the street:
-//                                               the car three-wheels past under it
+// on the signs of a hardware store on the corner of Slauson (Mr. Handle It's) and, past it, a fried chicken spot with
+// its chicken standing on its roof — its own thing for its one line (the user, 2026-10-13: don't foreshadow the
+// chicken). A take a line, cut between lines; the car never stops:
+//   "Ooh, he bossy, ooh, he crip walkin'"      the hardware store's tall pole sign's lightbox at the curb, from low
+//                                               across the street: the car three-wheels past under it
 //   "Took me | to Slauson | and he slut me out" a chalk A-frame, the SLAUSON street blade on the corner, another A-frame
 //                                               past it, from the far lane, drifting along them
-//   "And when I got a problem, he get to packing"   painted on its front windows
-//   "He 'bout all that action, call him Mr. Handle It"  its vinyl banner under the eaves
-//   "You know I'm hella different… trickin' on"  the big sign on its roof, the chicken standing on it, from below
+//   "And when I got a problem, he get to packing"   painted on the hardware store's front windows
+//   "He 'bout all that action, call him Mr. Handle It"  its vinyl banner under the eaves, its strongman painted beside
+//   "You know I'm hella different… trickin' on"  the chicken spot's big roof sign, the chicken standing on it, from below
 //   "I can be your ride or die…"               a hand car wash's sign, an ad: the words flush left, the suds right
 //   "Trust me, boy, I'm good in every hood"     their own car, from in front: the windshield banner, the hood
 //   "Trickin', finna fall in backwards"         a whip round behind, low: TRICKIN' on their plate, the rest on bumper
@@ -38,14 +39,17 @@ export const PACE = { slow: 5.5, cruise: 10, upBefore: 1.6, up: 1.2 };
  *  corner   the side street, Slauson (where the car is as it's named; its width), its street blade on the near corner
  *  aframes  the chalk A-frames: the first short of the corner (from its near edge), the second under the blade (on
  *           from it: read together, the blade over it), off the road, their middles' height, turned
- *  shop     past the corner (its start), its length, its front off the road's centre, its depth and height; its two
- *           windows (centres from its start, width, height, middle's height); the banner under its eaves (centre from
- *           its start, its middle's height); the sign on its roof (centre from its start, over the roof) */
+ *  shop     the hardware store past the corner (its start), its length, its front off the road's centre, its depth and
+ *           height; its two windows (centres from its start, width, height, middle's height); the banner under its
+ *           eaves (centre from its start, its middle's height)
+ *  chicken  the chicken spot past it (the gap between), its length, depth and height; the sign on its roof (centre
+ *           from its start, over the roof) */
 export const SHACK = {
   pole: { lateral: -(ROAD_HALF + 1.6), y: 5.8, turn: 0.55, before: 5 },
   corner: { w: 9, blade: -2.4, lateral: -(ROAD_HALF + 1.2) }, // (the blade and the A-frame under it clear of the crosswalk)
   aframes: { first: 6.5, second: 1, lateral: -(ROAD_HALF + 2.4), y: 0.95, turn: 0.5 },
-  shop: { from: 3, len: 34, face: -(ROAD_HALF + 5), d: 14, h: 5.6, windows: [5.5, 13.5], window: { w: 6.2, h: 2.7, y: 2.3 }, banner: { at: 24, y: 3.0 }, sign: { at: 26.5, over: 1.2 } },
+  shop: { from: 3, len: 23, face: -(ROAD_HALF + 5), d: 14, h: 5.6, windows: [5.5, 13.5], window: { w: 6.2, h: 2.7, y: 2.3 }, banner: { at: 19, y: 3.0 } },
+  chicken: { gap: 5, len: 15, d: 13, h: 4.6, sign: { at: 7.5, over: 1.4 } },
 };
 /** The takes (m): the pole sign's, from the right sidewalk back up the street (back of the sign, off the road's centre,
  *  up, drifting on, m/s); the corner's, from out along their facing (how far, how high): the first A-frame close, then
@@ -85,10 +89,12 @@ export interface Verse2Plan {
   pole: Face & { s: number };
   corner: { s: number; w: number; blade: number };
   aframes: (Face & { s: number })[];
-  /** The shop: its block, its windows (centres along the road), its banner and roof sign (their faces). */
+  /** The hardware store: its block, its windows (centres along the road), its banner (its face); the chicken spot: its
+   *  block and its roof sign (its face). */
   shop: Block;
   windows: number[];
   banner: Face;
+  chicken: Block;
   sign: Face;
   wash: { s: number; board: Face };
   giant: Face;
@@ -207,14 +213,16 @@ export const VERSE2: SetPiece = {
     const bS = shop0 + Sh.banner.at, bN = right(bS), bP = atRoad(bS, Sh.face + 0.12, Sh.banner.y), banner = stack('vinyl', phs[3]!, bP, bN);
     const bannerCs = banner.items.map(({ ph, lay, center }) => add('vinyl', ph, bS, center, bN, UP.clone(), lay));
     hold(bannerCs, along(bannerCs, SHOTS.banner), 'cut');
-    // the big sign on its roof, the chicken standing on it: "You know I'm hella different | from them chickens | you
-    // been trickin' on"
-    const rS = shop0 + Sh.sign.at, rN = right(rS), rH = phs[4]!.reduce((a, ph) => a + layout('roofsign', ph.text, ph.solo).h, 0);
-    const rP = atRoad(rS, Sh.face - 1.2, Sh.h + Sh.sign.over + rH / 2), roof = stack('roofsign', phs[4]!, rP, rN);
-    const roofCs = roof.items.map(({ ph, lay, center }) => add('roofsign', ph, rS, center, rN, UP.clone(), lay));
-    hold(roofCs, along(roofCs, SHOTS.sign), 'cut');
     const shopS = shop0 + Sh.len / 2, shopLat = Sh.face - Sh.d / 2;
     const shop: Block = { s: shopS, lateral: shopLat, w: Sh.len, h: Sh.h, d: Sh.d, color: 0.4, bare: true, prop: true, matrix: boxAt(route, shopS, shopLat, Sh.d, Sh.h, Sh.len) };
+    // the chicken spot past it, the big sign on its roof with the chicken standing on it: "You know I'm hella
+    // different | from them chickens | you been trickin' on"
+    const Ck = S.chicken, chicken0 = shop0 + Sh.len + Ck.gap, rS = chicken0 + Ck.sign.at, rN = right(rS), rH = phs[4]!.reduce((a, ph) => a + layout('roofsign', ph.text, ph.solo).h, 0);
+    const rP = atRoad(rS, Sh.face - 1.2, Ck.h + Ck.sign.over + rH / 2), roof = stack('roofsign', phs[4]!, rP, rN);
+    const roofCs = roof.items.map(({ ph, lay, center }) => add('roofsign', ph, rS, center, rN, UP.clone(), lay));
+    hold(roofCs, along(roofCs, SHOTS.sign), 'cut');
+    const chickenS = chicken0 + Ck.len / 2, chickenLat = Sh.face - Ck.d / 2;
+    const chicken: Block = { s: chickenS, lateral: chickenLat, w: Ck.len, h: Ck.h, d: Ck.d, color: 0.4, bare: true, prop: true, matrix: boxAt(route, chickenS, chickenLat, Ck.d, Ck.h, Ck.len) };
 
     // ---- the car wash on the right: its sign an ad facing the traffic, the words flush left, the car rolling past ----
     const W = WASH, wl = lines[5]!, ws = carS(wl.start + (wl.end - wl.start) * W.through), wn = fwd(ws).negate(), wAlong = UP.clone().cross(wn).normalize();
@@ -260,15 +268,17 @@ export const VERSE2: SetPiece = {
 
     // the car wash's building on the right (the guard sees it); the town keeps off the chicken spot's block (and the far
     // side, where its takes stand), the car wash and his mural's
-    const blocks: Block[] = [shop, giantBlock];
+    const blocks: Block[] = [shop, chicken, giantBlock];
     const washB = { s: ws + W.building.ds, lateral: W.building.lateral, w: 18, h: 4.6, d: 10 };
     blocks.push({ ...washB, color: 0.9, matrix: boxAt(route, washB.s, washB.lateral, washB.d, washB.h, washB.w) });
-    const clear = [{ side: -1, a: poleS - 20, b: shop0 + Sh.len + 12 }, { side: 1, a: poleS - 20, b: shop0 + Sh.len + 12 }, { side: 1, a: ws - 25, b: ws + 25 }, { side: -1, a: gs - 30, b: gs + 30 }];
+    const blockEnd = chicken0 + Ck.len + 12;
+    const clear = [{ side: -1, a: poleS - 20, b: blockEnd }, { side: 1, a: poleS - 20, b: blockEnd }, { side: 1, a: ws - 25, b: ws + 25 }, { side: -1, a: gs - 30, b: gs + 30 }];
     const plan: Verse2Plan = {
       pole: { s: poleS, center: poleP, normal: poleN, up: uprightFor(poleN), w: LAYOUT.polesign.w, h: pole.H },
       corner: { s: cornerS, w: S.corner.w, blade: bladeS },
       aframes, shop, windows: winS,
       banner: { center: bP, normal: bN, up: UP.clone(), w: LAYOUT.vinyl.w, h: banner.H },
+      chicken,
       sign: { center: rP, normal: rN, up: UP.clone(), w: LAYOUT.roofsign.w, h: rH },
       wash: { s: ws, board: { center: boardP, normal: wn, up: UP.clone(), w: W.board.w, h: boardH } },
       giant: { center: gP, normal: gn, up: gUp, w: G.w, h: G.h },

@@ -67,16 +67,21 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   const dark = toon({ color: WORLD.post }), red = '#c8202e';
   // the roof sign's bulbs chase in three phases on the half-beat (classic chicken-shack energy)
   const chase = [0, 1, 2].map(() => lampMaterial('#ffe08a', GLOW.lamp, 0.9));
-  const name = (w: number, h: number) => pic(signFace('FRIED CHICKEN', 1024, Math.round((1024 * h) / w), '#fff6e0', red, F.sign(700), 0.56, 0.12));
+  const name = (text: string, w: number, h: number, ink = '#fff6e0', bg = red) => pic(signFace(text, 1024, Math.round((1024 * h) / w), ink, bg, F.sign(700), 0.56, 0.12));
+  const orange = '#d9651f';
 
   // ---- the pole sign at the curb: its name over the lightbox (the lyric's: the carriers), a chicken on top, up on a
   // pole ----
   {
     const P = plan.pole, g = onPanel(P), drop = P.center.y - route.frameAt(P.s).pos.y;
-    box(g, P.w + 0.4, P.h + 0.4, 0.5, 0, 0, -0.27, toon({ color: red }));
-    plane(g, P.w + 0.4, 1.3, 0, P.h / 2 + 0.9, 0.0, name(P.w + 0.4, 1.3));
-    box(g, P.w + 0.4, 1.3, 0.5, 0, P.h / 2 + 0.9, -0.27, toon({ color: '#9a1220' }));
-    const top = new THREE.Group(); top.position.set(0, P.h / 2 + 1.55, -0.27); g.add(top); chicken(top, 0, 0.45);
+    box(g, P.w + 0.4, P.h + 0.4, 0.5, 0, 0, -0.27, toon({ color: orange }));
+    plane(g, P.w + 0.4, 1.3, 0, P.h / 2 + 0.9, 0.0, name('HANDLE IT HARDWARE', P.w + 0.4, 1.3, '#fff6e0', orange));
+    box(g, P.w + 0.4, 1.3, 0.5, 0, P.h / 2 + 0.9, -0.27, toon({ color: '#a84e18' }));
+    { // a wrench on top, a hardware store's mark
+      const steel = toon({ color: '#c9c4b8' }), wr = new THREE.Group(); wr.position.set(0, P.h / 2 + 1.55 + 0.9, -0.27); wr.rotation.z = -0.5; g.add(wr);
+      box(wr, 0.22, 1.6, 0.12, 0, 0, 0, steel);
+      for (const dy of [-1, 1]) { const head = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.12, 12), steel); head.rotation.x = Math.PI / 2; head.position.set(0, dy * 0.95, 0); wr.add(head); box(wr, 0.26, 0.3, 0.14, 0, dy * 1.12, 0, toon({ color: orange })); }
+    }
     cyl(g, 0.2, drop - P.h / 2 - 0.2, 0, -(drop + P.h / 2 + 0.2) / 2, -0.27, dark);
     root.add(g);
   }
@@ -99,22 +104,35 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(g);
   }
 
-  // ---- the shop: white, a red fascia with its name, a red base; its windows (painted: the carriers), the door between,
-  // the banner's grommets under the eaves, the sign on its roof with the chicken standing on it ----
+  // ---- the hardware store: cream stucco, an orange fascia with its name, its windows (painted: the carriers), the
+  // door between, the banner's grommets under the eaves, its strongman painted beside the banner ----
   let roofChicken!: THREE.Group;
   {
     const B = plan.shop, Sh = SHACK.shop, g = front(B.s, Sh.face), x = (s: number) => s - B.s, w = B.w;
     box(g, w, Sh.h, Sh.d, 0, Sh.h / 2, -Sh.d / 2, wallMaterial('#f7f1e3', new THREE.Vector3(w, Sh.h, Sh.d), 0, false)); // (stucco, look/walls.ts: flat white, it read as a box)
     box(g, w + 0.3, 0.1, 0.55, 0, Sh.h - 0.85, 0.2, toon({ color: '#7a5a58' })); // the shadow under the fascia's soffit
     cyl(g, 0.06, Sh.h - 0.9, w / 2 - 0.5, (Sh.h - 0.9) / 2, 0.08, toon({ color: '#d9d0c0' })); // a drainpipe
-    // its end toward the corner: two windows, a red band; on the roof, its air units (QA: a bare box)
+    // its end toward the corner: two windows, an orange band; on the roof, its air units
     const endGlass = toon({ color: '#28323c' });
     for (const z of [-3.2, -8.8]) { const p = plane(g, 3, 1.8, -w / 2 - 0.012, 2.1, z, endGlass); p.rotation.y = -Math.PI / 2; }
-    box(g, 0.06, 0.5, Sh.d, -w / 2 - 0.03, 0.25, -Sh.d / 2, toon({ color: red }));
+    box(g, 0.06, 0.5, Sh.d, -w / 2 - 0.03, 0.25, -Sh.d / 2, toon({ color: orange }));
     for (const [x, z] of [[-w / 4, -4], [w / 5, -8], [w / 3, -3.5]]) box(g, 1.6, 0.9, 1.6, x!, Sh.h + 0.45, z!, toon({ color: '#b9ada0' }));
-    box(g, w + 0.06, 0.5, 0.06, 0, 0.25, 0.03, toon({ color: red }));
-    box(g, w + 0.3, 0.8, 0.5, 0, Sh.h - 0.4, 0.2, toon({ color: red }));
-    for (let k = 0; k < 3; k++) plane(g, 8, 0.7, -w / 2 + 6 + k * 11, Sh.h - 0.4, 0.46, name(8, 0.7));
+    box(g, w + 0.06, 0.5, 0.06, 0, 0.25, 0.03, toon({ color: orange }));
+    box(g, w + 0.3, 0.8, 0.5, 0, Sh.h - 0.4, 0.2, toon({ color: orange }));
+    for (let k = 0; k < 2; k++) plane(g, 9, 0.7, -w / 2 + 6 + k * 11, Sh.h - 0.4, 0.46, name('HANDLE IT HARDWARE', 9, 0.7, '#fff6e0', orange));
+    // his strongman, painted on the wall past the banner: bald, arms crossed, a white tee, an earring (Mr. Clean's cousin)
+    plane(g, 2.2, 3.2, x(B.s + B.w / 2) - 2.4, 2.0, 0.02, pic(canvasTex(256, 384, (c) => {
+      c.fillStyle = '#16131a'; c.lineJoin = 'round';
+      const body = () => { c.beginPath(); c.moveTo(40, 384); c.lineTo(44, 230); c.quadraticCurveTo(40, 150, 90, 130); c.lineTo(100, 118); c.quadraticCurveTo(78, 96, 86, 60); c.quadraticCurveTo(96, 14, 128, 14); c.quadraticCurveTo(160, 14, 170, 60); c.quadraticCurveTo(178, 96, 156, 118); c.lineTo(166, 130); c.quadraticCurveTo(216, 150, 212, 230); c.lineTo(216, 384); c.closePath(); };
+      body(); c.fill();
+      c.fillStyle = '#f7f1e3'; c.save(); c.beginPath(); c.moveTo(52, 376); c.lineTo(56, 236); c.quadraticCurveTo(54, 164, 96, 146); c.lineTo(160, 146); c.quadraticCurveTo(202, 164, 200, 236); c.lineTo(204, 376); c.closePath(); c.fill(); c.restore(); // the tee
+      c.fillStyle = '#e8c39e'; c.beginPath(); c.ellipse(128, 66, 36, 46, 0, 0, Math.PI * 2); c.fill(); // the head, bald
+      c.fillStyle = '#e8c39e'; c.beginPath(); c.roundRect(60, 190, 136, 44, 22); c.fill(); // the arms, crossed
+      c.fillStyle = '#16131a'; c.lineWidth = 6; c.strokeStyle = '#16131a'; c.beginPath(); c.moveTo(60, 212); c.lineTo(196, 212); c.stroke();
+      c.beginPath(); c.moveTo(112, 58); c.lineTo(122, 56); c.moveTo(134, 56); c.lineTo(144, 58); c.stroke(); // the brows
+      c.fillStyle = '#f6c445'; c.beginPath(); c.arc(93, 86, 5, 0, Math.PI * 2); c.fill(); // the earring
+      c.fillStyle = '#d9651f'; c.font = 'bold 26px sans-serif'; c.textAlign = 'center'; c.fillText('MR.', 128, 290); c.fillText('HANDLE IT', 128, 322);
+    }), { transparent: true }));
     const glass = pic(glassTex()), trim = toon({ color: '#f8f4ea' }), W = Sh.window;
     for (const s of plan.windows) {
       plane(g, W.w, W.h, x(s), W.y, 0.015, glass);
@@ -126,7 +144,38 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     box(g, 0.3, 0.12, 0.3, x(door), 2.8, 0.15, toon({ color: '#1d2026' })); // the lamp over the door
     box(g, 0.2, 0.05, 0.2, x(door), 2.72, 0.15, lampMaterial('#ffe8b0', GLOW.lamp * 0.6, 0.9));
     plane(g, 0.8, 1.3, x(door), 1.6, 0.065, glass);
+    // a rack of brooms and a stack of paint cans by the door, a hardware store's sidewalk
+    for (let k = 0; k < 4; k++) { cyl(g, 0.02, 1.4, x(door) + 1.2 + k * 0.14, 0.7, 0.3, toon({ color: '#c9a97a' })); box(g, 0.1, 0.22, 0.06, x(door) + 1.2 + k * 0.14, 1.5, 0.3, toon({ color: '#e0b060' })); }
+    for (const [dx, dy] of [[-1.5, 0.16], [-1.2, 0.16], [-1.35, 0.48]] as const) cyl(g, 0.16, 0.32, x(door) + dx, dy, 0.4, toon({ color: ['#2b78a6', '#c8102e', '#f6dd8f'][Math.round((dx + 1.5) * 3) % 3]! }));
     root.add(g);
+  }
+  // ---- the chicken spot past it: its own thing (the user: a surprise for its one line) — cream walls, a red mansard
+  // roof with white stripes, FRIED CHICKEN on it, a striped awning over its windows, a bucket on a pole ----
+  {
+    const B = plan.chicken, Ck = SHACK.chicken, Sh = SHACK.shop, g = front(B.s, Sh.face), w = B.w, h = Ck.h;
+    const cream = toon({ color: '#fff6e0' }), redM = toon({ color: red }), white = toon({ color: '#ffffff' });
+    box(g, w, h, Ck.d, 0, h / 2, -Ck.d / 2, wallMaterial('#fff6e0', new THREE.Vector3(w, h, Ck.d), 0, false));
+    // the mansard: a red band round the top, white stripes across it, a cap
+    box(g, w + 0.6, 1.5, Ck.d + 0.6, 0, h - 0.4, -Ck.d / 2, redM);
+    for (let x = -w / 2 + 0.9; x < w / 2; x += 1.8) box(g, 0.5, 1.52, 0.02, x, h - 0.4, 0.31, white);
+    box(g, w + 0.8, 0.12, Ck.d + 0.8, 0, h + 0.4, -Ck.d / 2, cream);
+    plane(g, 7, 0.9, 0, h - 0.4, 0.33, name('FRIED CHICKEN', 7, 0.9, '#fff6e0', red));
+    // its windows under a striped awning, the door, a step
+    const glass = pic(glassTex());
+    for (const wx of [-w / 2 + 3.5, w / 2 - 3.5]) { plane(g, 4.6, 2.2, wx, 2.0, 0.015, glass); box(g, 4.8, 0.1, 0.1, wx, 3.15, 0.04, cream); box(g, 4.8, 0.1, 0.1, wx, 0.85, 0.04, cream); }
+    for (let x = -w / 2 + 0.6; x < w / 2 - 0.3; x += 1.2) box(g, 1.2, 0.12, 1.3, x + 0.6, 3.35, 0.65, Math.round(x / 1.2) % 2 ? redM : white); // the awning, striped
+    box(g, 1.4, 2.6, 0.06, 0, 1.3, 0.03, toon({ color: '#1d2026' })); plane(g, 0.9, 1.4, 0, 1.6, 0.065, glass);
+    box(g, w, 0.5, 0.06, 0, 0.25, 0.03, redM); // the red base
+    // the bucket sign on a pole by the road end, turning slowly
+    const bucket = new THREE.Group(); bucket.position.set(w / 2 - 1.2, h + 2.6, 0.4); g.add(bucket);
+    cyl(g, 0.12, h + 2.0, w / 2 - 1.2, (h + 2.0) / 2, 0.4, dark);
+    { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.8, 1.6, 16), redM); bucket.add(b); for (let k = 0; k < 8; k++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.62, 0.05), white); const a = (k / 8) * Math.PI * 2; st.position.set(Math.sin(a) * 0.9, 0, Math.cos(a) * 0.9); st.rotation.y = a; bucket.add(st); } const lid = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.12, 16), white); lid.position.y = 0.85; bucket.add(lid); }
+    drifting.push(Object.assign(new THREE.Mesh(), { userData: { bucket } }) as THREE.Mesh);
+    root.add(g);
+  }
+  {
+    const B = plan.chicken, Ck = SHACK.chicken;
+    void B;
     // the banner's grommets (its words and red are the carriers')
     const bn = onPanel(plan.banner), chrome = toon({ color: WORLD.chrome });
     for (const [px, py] of [[-1, 1], [1, 1], [-1, -1], [1, -1]] as const) ball(bn, 0.05, (px * plan.banner.w) / 2 - px * 0.12, (py * plan.banner.h) / 2 - py * 0.1, 0.01, chrome);
@@ -136,7 +185,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     for (const x of [bw / 2, -bw / 2]) box(bn, 0.06, bh, 0.02, x, 0, 0.005, hem);
     root.add(bn);
     // the roof sign: its red frame, bulbs round it (chasing), legs down to the roof, the chicken standing on it
-    const R = plan.sign, rg = onPanel(R), legs = R.center.y - R.h / 2 - (route.frameAt(B.s).pos.y + Sh.h);
+    const R = plan.sign, rg = onPanel(R), legs = R.center.y - R.h / 2 - (route.frameAt(B.s).pos.y + Ck.h);
     box(rg, R.w + 0.5, R.h + 0.5, 0.35, 0, 0, -0.2, toon({ color: red }));
     const e = (R.w + 0.25) / 2, f = (R.h + 0.25) / 2;
     bulbs(rg, new THREE.Vector3(-e, f, 0.02), new THREE.Vector3(e, f, 0.02), 24, chase);
@@ -237,6 +286,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       } else { roofChicken.position.y = plan.sign.h / 2 + 0.25; roofChicken.rotation.z = 0; }
       // soap bubbles drifting up from the bays
       drifting.forEach((b, k) => {
+        if (b.userData.bucket) { (b.userData.bucket as THREE.Group).rotation.y = t * 0.6; return; } // the bucket sign turns
         const u = (t * 0.22 + k * 0.37) % 1;
         b.position.y = 0.5 + u * 2.6;
         b.position.x = 5.9 + 0.4 * Math.sin(t * 0.8 + k * 2.1);
