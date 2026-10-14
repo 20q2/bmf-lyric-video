@@ -31,6 +31,9 @@ export { ROAD_HALF }; // (route.ts: the road's own measure)
  *  wider than the road's tightest bend folds over the road there (the hairpin into the hills). */
 export const SHOULDER = 40;
 export const SEA = 200;
+/** Along the coast, the beach: sand from the road's edge this far out (m) to the water (the user, 2026-10-13: with
+ *  the sea at the road's edge, the boards and the arch stood "in the ocean"). */
+export const BEACH = 42;
 const BASE = 12000;
 /** Where the road climbs above the plain, its verges slope down to it this much out per metre down (an embankment). */
 export const SLOPE = 1;
@@ -45,7 +48,7 @@ export { ROAD_START }; // (route.ts: the road starts this far behind the light)
 
 /** Each section's ground (sRGB; others the golden fields). */
 const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
-const PALMS = new Set(['intro', 'chorus1', 'verse3']); // (none in verse 2: its take's camera rides where they'd stand) // (none on the coast road: they'd stand in the hook's sky)
+const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'verse3']); // (none in verse 2: its take's camera rides where they'd stand; on the coast, on the beach by the water)
 /** Kerbs and sidewalks along the town's streets (not the freeway, the coast, the tunnel or the hills): the kerb's
  *  height, the sidewalk's width (m) and its concrete; broken where a cross street opens (the set-pieces' openings). */
 const SIDEWALKS = { stretches: new Set(['intro', 'chorus1', 'verse1', 'verse2', 'verse3']), kerb: 0.15, width: 3, colour: '#cbbba7' };
@@ -135,8 +138,25 @@ export function buildWorld(drive: Drive): THREE.Group {
   const named = <T extends THREE.Object3D>(o: T, name: string) => { o.name = name; return o; };
   // each section its own ground: the city's paving, the freeway's concrete, the neighbourhood's lawns, the coast's sand
   const groundOf = (s: number) => { const g0 = GROUND[stretchAtS(s).id]; return g0 ? new THREE.Color(g0) : grass; };
-  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -SEA : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sea : groundOf(s)), end), printedGround(lambert())), 'verges'));
+  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -BEACH : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
   g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
+  // the sea beyond the beach, and the surf's foam along the shore: broken white lines, a second set further out
+  {
+    const water = toon({ color: WORLD.sea, side: THREE.DoubleSide }), foam: THREE.Matrix4[] = [];
+    for (const st of drive.stretches) {
+      if (!BLOCKS[st.id]!.seaLeft) continue;
+      const a = Math.max(ROAD_START, motion.distanceAt(st.start) - 60), b = Math.min(end, motion.distanceAt(st.end) + 60);
+      g.add(named(new THREE.Mesh(ribbon(route, a, b, -SEA, -0.12, -BEACH, -0.12), water), 'sea'));
+      for (let s = a; s < b; s += 7) {
+        if (hash(s, 71) < 0.3) continue;
+        foam.push(boxAt(route, s + 3 * hash(s, 72), -BEACH - 0.6 - 1.5 * hash(s, 73), 0.5 + 0.8 * hash(s, 74), 0.03, 3 + 3 * hash(s, 75), -0.1));
+        if (hash(s, 76) < 0.5) foam.push(boxAt(route, s + 2 + 3 * hash(s, 77), -BEACH - 6 - 3 * hash(s, 78), 0.4, 0.03, 2 + 3 * hash(s, 79), -0.1));
+      }
+    }
+    const fm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#f4f0e6' }), foam.length);
+    foam.forEach((m, i) => fm.setMatrixAt(i, m));
+    g.add(named(fm, 'sea'));
+  }
   // the overlook (the user, 2026-10-13: they sat "at the top of a box"): the road ends on a gravel turnout at the lip;
   // a low stone wall with a pipe rail runs along it; a coin viewer, a bench and a bin stand by the wall; pines frame
   // the view either side; and the hillside falls away below, rolling down to the plain
@@ -186,7 +206,7 @@ export function buildWorld(drive: Drive): THREE.Group {
     look.add(hill);
   }
   // embankments where the road has climbed: from each verge's edge down to the plain
-  for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? SEA : SHOULDER), end), lambert()), 'skirts'));
+  for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? BEACH : SHOULDER), end), lambert()), 'skirts'));
   const box3 = new THREE.Box3();
   for (let s = 0; s < route.length; s += 50) box3.expandByPoint(route.frameAt(s).pos);
   const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), printedGround(toon({ color: grass.clone().multiplyScalar(0.85) })));
@@ -283,7 +303,8 @@ export function buildWorld(drive: Drive): THREE.Group {
     const s = k * 30 + 5;
     if (!PALMS.has(stretchAtS(s).id) || s < CORNER.cross[1] + 15) continue; // (none on the intro's corner: the signs stand against the sky)
     for (const side of [1, -1]) {
-      if (side === -1 && BLOCKS[stretchAtS(s).id]!.seaLeft) continue;
+      const beach = BLOCKS[stretchAtS(s).id]!.seaLeft; // (on the coast only the beach side, by the water)
+      if (beach && side === 1) continue;
       if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR)) continue; // nor in the rock
       // none by a face on the left: they'd stand between it and the camera across the road (on the right too: a wide
       // pair shot stands back past them)
@@ -293,7 +314,7 @@ export function buildWorld(drive: Drive): THREE.Group {
       if (skyRoad.some(([a, b]) => s > a && s < b)) continue;
       // nor by a set-piece's sign: its own designed shots stand close to it (a palm by the lens at the chapel)
       if (drive.carriers.some((c) => SET_KINDS.has(c.kind) && !c.ride && Math.abs(c.s - s) < c.w / 2 + 20)) continue;
-      const h = 10 + 6 * hash(k, side, 8), f = route.frameAt(s), at = f.pos.clone().addScaledVector(f.right, side * 11.5);
+      const h = 10 + 6 * hash(k, side, 8), f = route.frameAt(s), at = f.pos.clone().addScaledVector(f.right, side * (beach ? BEACH - 7 - 4 * hash(k, 15) : 11.5));
       const m = new THREE.Matrix4().compose(at, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(k, side, 9) * Math.PI * 2), new THREE.Vector3().setScalar(h / PALM.h));
       placed[Math.floor(hash(k, side, 7) * VARIANTS)]!.push(m);
     }
@@ -541,7 +562,7 @@ export const PLACES: readonly [RegExp, string, string, boolean][] = [
   [/slauson/i, 'SLAUSON AV', 'NEXT RIGHT', false],
   [/south of somewhere/i, 'SOUTH OF', 'DETROIT', true],
 ];
-const PLACE_SIGN = { after: 45, lateral: 12, w: 11, h: 5.2, y: 5 };
+const PLACE_SIGN = { after: 45, coastAfter: 24, lateral: 12, w: 11, h: 5.2, y: 5 };
 function placeSigns(drive: Drive): THREE.Group {
   const g = new THREE.Group(), { route, motion } = drive;
   const lines = new Map<number, { text: string; end: number }>();
@@ -550,8 +571,10 @@ function placeSigns(drive: Drive): THREE.Group {
     const place = PLACES.find(([re]) => re.test(l.text));
     if (!place) continue;
     const [, name, sub, sprayed] = place, P = PLACE_SIGN;
-    let s = motion.distanceAt(l.end) + P.after;
-    while (drive.carriers.some((c) => Math.abs(c.s - s) < 16)) s += 6; // clear of the words' own faces
+    // (on the coast, soon after the arch and on the beach side: the arch wide sees it whole)
+    const onCoast = !!BLOCKS[drive.stretchAt(l.end).id]!.seaLeft;
+    let s = motion.distanceAt(l.end) + (onCoast ? P.coastAfter : P.after);
+    while (drive.carriers.some((c) => Math.abs(c.s - s) < (onCoast ? 10 : 16))) s += 6; // clear of the words' own faces
     const cv = document.createElement('canvas'); cv.width = 768; cv.height = Math.round((768 * P.h) / P.w);
     const x = cv.getContext('2d')!, W = cv.width, H = cv.height;
     x.fillStyle = '#1f6b44'; x.fillRect(0, 0, W, H);
@@ -566,12 +589,15 @@ function placeSigns(drive: Drive): THREE.Group {
       x.font = `${H * 0.26}px "${F.bodoni(700, { italic: true })}"`; x.fillText('somewhere', 0, 0); x.restore();
     }
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-    const f = route.frameAt(s), face = f.fwd.clone().negate().addScaledVector(f.right, -0.5).setY(0).normalize(); // toward the oncoming car and the road
+    // (on the coast the sign stands on the beach side, where the towers' take looks: on the right it never came fully
+    // into a frame)
+    const coast = !!BLOCKS[drive.stretchAt(drive.stretches.find((x) => s < motion.distanceAt(x.end))?.start ?? 0).id]!.seaLeft, side = coast ? -1 : 1;
+    const f = route.frameAt(s), face = f.fwd.clone().negate().addScaledVector(f.right, -0.5 * side).setY(0).normalize(); // toward the oncoming car and the road
     const sign = new THREE.Group();
     sign.add(new THREE.Mesh(new THREE.PlaneGeometry(P.w, P.h), new THREE.MeshBasicMaterial({ map: tex })));
     for (const px of [-P.w / 2 + 0.6, P.w / 2 - 0.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, P.y + P.h / 2, 0.2), toon({ color: WORLD.post })); leg.position.set(px, (P.h / 2 - P.y) / 2, -0.12); sign.add(leg); } // (legs: the ground to the board's top)
     sign.matrixAutoUpdate = false;
-    sign.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(f.pos.clone().addScaledVector(f.right, P.lateral).add(new THREE.Vector3(0, P.y, 0)));
+    sign.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(f.pos.clone().addScaledVector(f.right, side * (coast ? P.lateral - 3 : P.lateral)).add(new THREE.Vector3(0, P.y, 0)));
     g.add(sign);
   }
   return g;

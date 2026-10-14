@@ -3,8 +3,9 @@
 //        band the lyric (WELCOME TO is the arch's own header). It stands before his first board, so the film's first
 //        true wide looks down the whole chorus through it: sea left, the sun kissing the water (sky.ts puts it on the
 //        horizon at 112 s), the car passing under early in the line and shrinking beyond, framed by the arch
-//   "And I can't keep my panties from dropping"          three numbered lifeguard towers down the sand on the right,
-//        a phrase each, the take gliding tower to tower
+//   "And I can't keep my panties from dropping"          three numbered lifeguard towers down the beach on the left,
+//        between the road and the water, a phrase each, the take gliding tower to tower; a pier runs out to sea
+//        at the chorus's end
 // His campaign boards (standing in the surf on the left) and the "fly" sky-writing stay the drive's own (carriers.ts).
 // Pure.
 import * as THREE from 'three';
@@ -23,10 +24,11 @@ const PLACE = /south of somewhere/i, DROP = /panties from dropping/i;
  *  road, its pylons (off the road's centre, their plan size), and the wide's eye (m back from the arch, off the road's
  *  centre, up). */
 export const ARCH = { before: 15, bottom: 6.2, pylon: { lateral: 12, w: 2.4 }, eye: { back: 50, lateral: 1, y: 4.2 } };
-/** The lifeguard towers: off the road's centre on the sand, their board's centre height, the hut behind it (its size,
- *  its roof's height over the sand, how far past the board), and the board's toe toward the road (radians, like the
- *  roadside signs'). */
-export const TOWER = { lateral: 19, y: 4.0, hut: { w: 3.4, d: 3, h: 1.9, top: 3.3, back: 1.9 }, toe: (25 * Math.PI) / 180 };
+/** The lifeguard towers: off the road's centre on the beach (left: negative), their board's centre height, the hut
+ *  behind it toward the water (its size, its roof's height over the sand, how far past the board), and the board's toe
+ *  toward the car's approach (radians, like the roadside signs'). The pier: this far before the chorus's end (m). */
+export const TOWER = { lateral: -24, y: 4.0, hut: { w: 3.4, d: 3, h: 1.9, top: 3.3, back: 4.2 }, toe: (25 * Math.PI) / 180 };
+export const PIER = { before: 70 };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Chorus3Plan {
@@ -37,6 +39,8 @@ export interface Chorus3Plan {
   pylons: number;
   towers: { s: number; board: Face }[];
   fly: { start: number; end: number } | null;
+  /** The pier (m along the road), running out to sea on the left. */
+  pierS: number;
 }
 
 export const CHORUS3: SetPiece = {
@@ -80,7 +84,7 @@ export const CHORUS3: SetPiece = {
     const towers: Chorus3Plan['towers'] = [];
     const towerCs = dps.map((ph, i) => {
       const s = carS((ph.start + ph.end) / 2), f = route.frameAt(s);
-      const back = flat(f.fwd).negate(), toRoad = flat(f.right).negate();
+      const back = flat(f.fwd).negate(), toRoad = flat(f.right).multiplyScalar(-Math.sign(TOWER.lateral));
       const n = back.multiplyScalar(Math.cos(TOWER.toe)).addScaledVector(toRoad, Math.sin(TOWER.toe)).normalize();
       const lay = layout('sign', ph.text, ph.solo), c = atRoad(s, TOWER.lateral, TOWER.y);
       towers.push({ s, board: { center: c, normal: n, up: UP.clone(), w: lay.w, h: lay.h } });
@@ -95,14 +99,15 @@ export const CHORUS3: SetPiece = {
     const blocks: Block[] = [
       { s: archS, lateral: 0, w: 0.6, h: H + 0.6, d: 2 * A.pylon.lateral + A.pylon.w, color: 0.8, bare: true, prop: true, matrix: boxAt(route, archS, 0, 2 * A.pylon.lateral + A.pylon.w, H + 0.6, 0.6, A.bottom - 0.3) },
       ...[-1, 1].map((side): Block => ({ s: archS, lateral: side * A.pylon.lateral, w: A.pylon.w, h: A.bottom + H + 1, d: A.pylon.w, color: 0.8, bare: true, prop: true, matrix: boxAt(route, archS, side * A.pylon.lateral, A.pylon.w, A.bottom + H + 1, A.pylon.w) })),
-      ...towers.map(({ s }): Block => {
-        const T = TOWER.hut, lat = TOWER.lateral + T.back;
-        return { s, lateral: lat, w: T.w, h: T.top, d: T.d, color: 0.7, bare: true, prop: true, matrix: boxAt(route, s, lat, T.d, T.top, T.w) };
+      ...towers.map(({ s, board }): Block => {
+        // (the hut straight behind its board along the board's normal: the board hides it from the take's eye)
+        const T = TOWER.hut, f = route.frameAt(s), off = board.normal.clone().multiplyScalar(-T.back), hs = s + off.dot(flat(f.fwd)), lat = TOWER.lateral + off.dot(flat(f.right));
+        return { s: hs, lateral: lat, w: 4.2, h: T.top, d: 4.2, color: 0.7, bare: true, prop: true, matrix: boxAt(route, hs, lat, 4.2, T.top, 4.2) };
       }),
     ];
     const clear = [
       ...[-1, 1].map((side) => ({ side, a: archS - 10, b: archS + 10 })),
-      { side: 1, a: towers[0]!.s - 15, b: towers[towers.length - 1]!.s + 15 },
+      { side: Math.sign(TOWER.lateral), a: towers[0]!.s - 15, b: towers[towers.length - 1]!.s + 15 },
     ];
     const flyLine = st.lines.find((l) => /\bfly\b/i.test(l.text));
     const plan: Chorus3Plan = {
@@ -111,6 +116,7 @@ export const CHORUS3: SetPiece = {
       pylons: ARCH.pylon.lateral,
       towers,
       fly: flyLine ? { start: flyLine.words[0]!.start, end: flyLine.end } : null,
+      pierS: carS(st.end) - PIER.before,
     };
     return { carriers, frames, clear, blocks, plan };
   },
