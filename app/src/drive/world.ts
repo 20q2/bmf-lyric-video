@@ -290,11 +290,17 @@ function tiles(): THREE.Texture {
   x.fillStyle = '#ddd3bc'; x.fillRect(0, 0, 256, 256);
   x.fillStyle = '#9a907c';
   for (let k = 0; k < 4; k++) { x.fillRect(k * 64, 0, 5, 256); x.fillRect(0, k * 64, 256, 5); } // big tiles, heavy grout: no shimmer
+  // (grime: a few tiles darker, and streaks run down them — glazed clean, the bore read as a test room)
+  for (let i = 0; i < 16; i++) if (hash(i, 7) < 0.3) { x.fillStyle = `rgba(90,70,60,${(0.1 + 0.15 * hash(i, 8)).toFixed(2)})`; x.fillRect((i % 4) * 64 + 5, Math.floor(i / 4) * 64 + 5, 59, 59); }
+  for (let i = 0; i < 9; i++) { const u = hash(i, 9) * 256, w = 3 + 6 * hash(i, 10); const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(70,50,45,0.35)'); gr.addColorStop(1, 'rgba(70,50,45,0)'); x.fillStyle = gr; x.fillRect(u, 0, w, 256); }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
 
+/** A tunnel's portal (m): how far its concrete frame stands proud of the headland's face, the lintel's height over
+ *  the bore, a jamb's width; the walkway along each wall inside (its width, its step up). */
+const PORTAL = { proud: 0.8, lintel: 1.4, jamb: 1.2, walk: { w: 0.7, h: 0.3 } };
 /** A tunnel (tunnel.ts): the tiled bore, the headland over it with a mouth at each end, and its lamps. */
 function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   const g = new THREE.Group(), { halfW: W, h: H, hill, hillHalfW } = TUNNEL;
@@ -312,10 +318,38 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
     mouth.matrix.makeBasis(f.right, f.up, f.fwd).setPosition(f.pos);
     g.add(mouth);
   }
-  // a sodium lamp over the car on every beat
+  // a raised walkway along each wall (a kerb's step: the bore read as a box with a floor)
+  const crete = toon({ color: '#a39a8c' });
+  for (const side of [-1, 1]) g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, [[side * W, PORTAL.walk.h], [side * (W - PORTAL.walk.w), PORTAL.walk.h], [side * (W - PORTAL.walk.w), 0]], 2), toon({ color: '#a39a8c', side: THREE.DoubleSide })));
+  // a sodium lamp over the car on every beat, in its housing
   const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffb347' }), tn.lamps.length);
   tn.lamps.forEach((s, i) => lamps.setMatrixAt(i, boxAt(route, s, 0, 1.6, 0.15, 0.6, H - 0.15)));
-  g.add(lamps);
+  const housings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#2a2430' }), tn.lamps.length);
+  tn.lamps.forEach((s, i) => housings.setMatrixAt(i, boxAt(route, s, 0, 1.9, 0.22, 0.9, H - 0.17)));
+  g.add(lamps, housings);
+  // the portals: a concrete frame round each mouth (a lintel over the bore, a jamb each side with chevrons), standing
+  // proud of the headland's face
+  const chevrons = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 512;
+    const x = c.getContext('2d')!;
+    x.fillStyle = '#f2c230'; x.fillRect(0, 0, 64, 512);
+    x.fillStyle = '#1d1a1e';
+    for (let k = 0; k < 8; k++) { x.beginPath(); x.moveTo(0, k * 64); x.lineTo(64, k * 64 + 32); x.lineTo(64, k * 64 + 64); x.lineTo(0, k * 64 + 32); x.closePath(); x.fill(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  for (const [s, dir] of [[tn.s0, -1], [tn.s1, 1]] as const) {
+    const f = route.frameAt(s), frame = new THREE.Group();
+    frame.matrixAutoUpdate = false;
+    frame.matrix.makeBasis(f.right, f.up, f.fwd).setPosition(f.pos.clone().addScaledVector(f.fwd, dir * PORTAL.proud / 2));
+    const put = (w: number, h: number, x: number, y: number, m: THREE.Material) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, PORTAL.proud), m); b.position.set(x, y, 0); frame.add(b); return b; };
+    put(2 * W + 2 * PORTAL.jamb + 0.4, PORTAL.lintel, 0, H + PORTAL.lintel / 2, crete);
+    for (const side of [-1, 1]) {
+      put(PORTAL.jamb, H, side * (W + PORTAL.jamb / 2), H / 2, crete);
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(PORTAL.jamb - 0.1, 3.2), new THREE.MeshBasicMaterial({ map: chevrons, color: new THREE.Color(1.3, 1.3, 1.3) }));
+      band.position.set(side * (W + PORTAL.jamb / 2), 1.7, dir * (PORTAL.proud / 2 + 0.005)); if (dir < 0) band.rotation.y = Math.PI; frame.add(band);
+    }
+    g.add(frame);
+  }
   return g;
 }
 
