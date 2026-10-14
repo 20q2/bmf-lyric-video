@@ -7,7 +7,10 @@ import * as THREE from 'three';
 import { PRINT_SHADE } from '../look/toon';
 import { Scene, type Frame } from '../engine/scene';
 import type { PostOverrides } from '../engine/scene';
-import { H, W, makeRT } from '../engine/gl';
+import { H, W, makeRT, rtScale } from '../engine/gl';
+import { BreaksPass } from '../look/breaks';
+import { type Break, LOOP, breakAt, breaksOf, worldTime } from '../drive/breaks';
+import { heftOf } from '../drive/heft';
 import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
@@ -19,7 +22,7 @@ import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
 import { QUALITY } from '../look/quality';
 import { SkyEnv } from '../look/envsky';
-import { GLOW, NIGHT } from '../look/night';
+import { GLOW, NIGHT, PULSE } from '../look/night';
 import { buildCity } from '../look/city';
 import { type Stance, hydraulics } from '../drive/hydraulics';
 import { neonAt } from '../drive/landmarks';
@@ -48,13 +51,15 @@ const SKYWRITER = { after: 1.4, speed: 30, climb: 8, size: 0.7 };
 /** On the hook's last word (the second "fly": the user, 2026-10-12) it dips below the word and loops round it as it's
  *  written: in this long (s), this far clear of the word (shares of its row's height), starting this far round
  *  (radians) before the bottom of the loop. */
-const LOOP = { over: 1.8, clear: [0.3, 0.32] as [number, number], before: 0.5 };
 /** Road paint stays this long after its phrase (s). */
 const PAINT_LASTS = 3;
 /** Carriers further along the road than this from the car (m) are put away. */
 const FAR_CARRIER = 320;
 /** Carriers whose phrase is within this many seconds of t keep their faces current. */
 const FACE_WINDOW = 12;
+/** The sync layer (drive/heft.ts): the kick's punch-in (at dial 0, and what the dial adds), its jolt (px at dial 1),
+ *  the car's bounce on it (m), the lights' pulse with the bass and the bulbs' twinkle on the hats (shares). */
+const SYNC = { punch: [0.004, 0.012] as [number, number], jolt: 3, bounce: 0.05, pulse: 0.22, twinkle: 0.15 };
 /** The sun sets over the sea: it stands SUN_AZ_DEG left of the coast road's heading (sky.ts) — inside the arch
  *  wide's frame, kissing the water (sets/chorus3.ts shares the bearing for its glitter path). */
 const SUN_AZ = (SUN_AZ_DEG * Math.PI) / 180;
@@ -84,6 +89,13 @@ export default class DriveScene extends Scene {
   private print = new PrintPass();
   private fogColor = new THREE.Color();
   private city!: ReturnType<typeof buildCity>;
+  /** The style breaks (drive/breaks.ts), their pass on the printed frame, and the target the print renders to while
+   *  one runs. */
+  private breaks: Break[] = [];
+  /** The sync layer's dial (drive/heft.ts). */
+  private heft!: (t: number) => number;
+  private breaksPass = new BreaksPass();
+  private mid: THREE.WebGLRenderTarget | null = null;
   /** (debugging: the named parts hidden, ?hide=) */
   private hidden: string[] = [];
   /** The motel sign's neon (its material and its two faces), and the car's body on its hydraulics. */
@@ -123,6 +135,8 @@ export default class DriveScene extends Scene {
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
     this.cast = castOf(audio, lyrics);
     this.skies = this.drive.carriers.filter((c) => c.kind === 'sky');
+    this.breaks = breaksOf(audio, lyrics);
+    this.heft = heftOf(this.drive.stretches, this.drive.reading);
     this.writer.matrixAutoUpdate = false;
     this.world.add(world, this.writer, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
     for (const c of this.drive.carriers) {
@@ -177,15 +191,21 @@ export default class DriveScene extends Scene {
   }
 
   override render(f: Frame, out: THREE.WebGLRenderTarget): PostOverrides {
-    const { renderer } = this.ctx, t = f.t, d = this.drive;
+    // (the world at the break's time: frozen through the comic panel, scrubbed back through the rewind; the song and
+    // its treatment at the song's)
+    const { renderer } = this.ctx, tSong = f.t, t = worldTime(this.breaks, tSong), d = this.drive, brk = breakAt(this.breaks, tSong);
     // the car on the road
     const cf = d.carFrame(t);
     this.car.matrixAutoUpdate = false;
     this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
     const st = this.stance(t), body = this.car.getObjectByName('body')!;
-    body.position.y = st.lift; body.rotation.set(st.pitch, st.swerve, st.roll);
+    // (the sync layer: the car bounces on the kick, harder as the dial rises; the lights pulse with the bass, and
+    // the bulbs twinkle on the hats at night)
+    const heft = this.heft(tSong), drums = smooth(0.12, 0.3, f.a.drums), lift = st.lift + SYNC.bounce * heft * f.a.kick * drums;
+    PULSE.value = heft * (SYNC.pulse * f.a.bass + SYNC.twinkle * f.a.hat * NIGHT.value);
+    body.position.y = lift; body.rotation.set(st.pitch, st.swerve, st.roll);
     for (const strut of this.car.getObjectByName('struts')!.children) { // from the hub up to the chassis
-      const top = 0.18 + st.lift, bottom = CAR.wheelR;
+      const top = 0.18 + lift, bottom = CAR.wheelR;
       strut.scale.y = Math.max(0.01, top - bottom); strut.position.y = (top + bottom) / 2;
     }
     // the wire wheels roll with the road (their spokes turning: they'd read as hubcaps standing still)
@@ -211,7 +231,7 @@ export default class DriveScene extends Scene {
     for (const [c, o] of this.placed) if (!c.vel) o.visible = Math.abs(c.s - carS) < FAR_CARRIER && c.phrase.end > cleared && (c.kind !== 'road' || t < c.phrase.end + PAINT_LASTS) && t < (c.until ?? Infinity) && t >= (c.from ?? -Infinity);
     // the radio, in the car; the set-pieces' props, where they've moved to
     // (in the car, on its body: lifted, pitched and rolled with it on its hydraulics)
-    const bodyM = new THREE.Matrix4().compose(new THREE.Vector3(0, st.lift, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(st.pitch, 0, st.roll)), new THREE.Vector3(1, 1, 1));
+    const bodyM = new THREE.Matrix4().compose(new THREE.Vector3(0, lift, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(st.pitch, 0, st.roll)), new THREE.Vector3(1, 1, 1));
     for (const [o, local, ahead] of this.riding) o.matrix.multiplyMatrices(ahead ? carMatrix(d.carFrame(t, ahead)) : carMatrix(cf).multiply(bodyM), local);
     for (const set of this.sets) set.update(t, this.car);
     (this.car.userData.dash as ReturnType<typeof buildDash> | undefined)?.update(t, this.ctx.audio.duration, d.motion.speedAt(t));
@@ -340,18 +360,23 @@ export default class DriveScene extends Scene {
     renderer.clear(true, true, true); // the engine leaves autoClear off; the dome draws the sky, so nothing else clears
     renderer.render(this.world, this.cam);
     // screen-printed: halftone fades out at night (neon noir is clean), its tones following the light
-    this.print.render(renderer, this.rt, this.cam, out, { halftone: 0.55 * day * (1 - inside), lo: 0.004 + 0.02 * day, hi: 0.04 + 0.18 * day });
+    const printP = { halftone: 0.55 * day * (1 - inside), lo: 0.004 + 0.02 * day, hi: 0.04 + 0.18 * day };
+    if (brk) { // a style break: its treatment on the printed frame (look/breaks.ts)
+      if (!this.mid || this.mid.width !== out.width || this.mid.height !== out.height) { this.mid?.dispose(); this.mid = makeRT(W, H, { pxScale: rtScale(out), depthBuffer: false }); }
+      this.print.render(renderer, this.rt, this.cam, this.mid, printP);
+      this.breaksPass.render(renderer, this.mid, out, brk, tSong);
+    } else this.print.render(renderer, this.rt, this.cam, out, printP);
     // the beat: while the drums play, the frame punches in a touch on each kick; "crash" jolts it, with a flash
-    const drums = smooth(0.12, 0.3, f.a.drums), hit = this.crashes.reduce((m, c) => (t >= c && t < c + 0.6 ? Math.max(m, Math.exp(-(t - c) * 7)) : m), 0);
-    const jolt = 14 * hit;
+    const hit = this.crashes.reduce((m, c) => (t >= c && t < c + 0.6 ? Math.max(m, Math.exp(-(t - c) * 7)) : m), 0);
+    const jolt = 14 * hit, kickJolt = SYNC.jolt * heft * f.a.kick * drums;
     // the end: the motel fades away
     const [f0, f1] = FINALE.fade, gone = Math.min(1, Math.max(0, (t - f0) / (f1 - f0)));
     return {
       bloom: 0.32, bloomThreshold: 1.15, bloomKnee: 0.45, halation: 0.06,
       haze: 0.06 + 0.32 * NIGHT.value, // (a breath of it round the sun by day; neon in damp air by night)
       grain: 0.072, vignette: 0.22,
-      zoom: 1 + 0.007 * f.a.kick * drums + 0.03 * hit,
-      shake: [jolt * Math.sin(t * 91), jolt * Math.cos(t * 77)],
+      zoom: (1 + (SYNC.punch[0] + SYNC.punch[1] * heft) * f.a.kick * drums + 0.03 * hit) * (brk?.b.kind === 'launch' ? 1 + 0.08 * (1 - brk.k) ** 2 : 1), // (the launch: a punch in)
+      shake: [jolt * Math.sin(t * 91) + kickJolt * Math.sin(tSong * 131), jolt * Math.cos(t * 77) + kickJolt * Math.cos(tSong * 97)],
       flash: 0.08 * hit,
       exposure: 1 - gone * gone,
     };

@@ -8,6 +8,9 @@ import * as THREE from 'three';
 import { printShadows, toon } from './toon';
 
 export const NIGHT: THREE.IUniform<number> = { value: 0 };
+/** The lights' pulse with the beat (the sync layer, drive/heft.ts: the scene sets it): lamps and glows shine this
+ *  much brighter, 0 at rest. */
+export const PULSE: THREE.IUniform<number> = { value: 0 };
 /** How bright the lights shine (HDR multiples). */
 export const GLOW = { window: 1.6, lamp: 6, beam: 0.55, pool: 0.5, neon: 2.6, tail: 4, head: 8 };
 
@@ -69,9 +72,9 @@ void main() {
 /** A lamp's bulb: dim by day, GLOW.lamp x its colour by night (unlit, so it blooms). */
 export function lampMaterial(color: THREE.ColorRepresentation, strength = GLOW.lamp, day = 0.25): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { night: NIGHT, color: { value: new THREE.Color(color) }, strength: { value: strength }, day: { value: day } },
+    uniforms: { night: NIGHT, pulse: PULSE, color: { value: new THREE.Color(color) }, strength: { value: strength }, day: { value: day } },
     vertexShader: VERT,
-    fragmentShader: `uniform float night, strength, day; uniform vec3 color; void main() { gl_FragColor = vec4(color * mix(day, strength, night), 1.0); }`,
+    fragmentShader: `uniform float night, strength, day, pulse; uniform vec3 color; void main() { gl_FragColor = vec4(color * mix(day, strength * (1.0 + pulse), night), 1.0); }`,
   });
 }
 
@@ -80,9 +83,9 @@ export function lampMaterial(color: THREE.ColorRepresentation, strength = GLOW.l
  *  with NIGHT. */
 export function glowMaterial(color: THREE.ColorRepresentation, strength: number, radial = false, throwOnRoad = false): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { night: NIGHT, color: { value: new THREE.Color(color) }, strength: { value: strength } },
+    uniforms: { night: NIGHT, pulse: PULSE, color: { value: new THREE.Color(color) }, strength: { value: strength } },
     vertexShader: VERT,
-    fragmentShader: `uniform float night, strength; uniform vec3 color; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+    fragmentShader: `uniform float night, strength, pulse; uniform vec3 color; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
 void main() {
   // (multisampling can sample just past an edge, where uv runs outside 0..1: pow of a negative is NaN, which the bloom
   // spreads into a white bar)
@@ -91,7 +94,7 @@ void main() {
   float a = ${radial ? 'pow(max(0.0, 1.0 - length(uv - 0.5) * 2.0), 1.6)'
     : throwOnRoad ? 'pow(uv.y, 1.6) * smoothstep(0.0, 0.45, 1.0 - uv.y) * pow(max(0.0, 1.0 - abs(uv.x - 0.5) * 2.0), 2.2) * smoothstep(0.05, 0.5, abs(dot(normalize(vN), normalize(vV))))'
     : 'pow(1.0 - uv.y, 2.2) * smoothstep(0.0, 0.12, uv.y) * pow(abs(dot(normalize(vN), normalize(vV))), 1.5)'};
-  gl_FragColor = vec4(color * a * strength * night, 1.0);
+  gl_FragColor = vec4(color * a * strength * (1.0 + pulse) * night, 1.0);
 }`,
     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
   });

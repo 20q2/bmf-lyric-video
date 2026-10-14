@@ -97,6 +97,9 @@ export interface Drive {
   /** The cut to the last line (s): every word sung before it goes, so the end starts clean. */
   lastCut: number | null;
   stretchAt(t: number): Stretch;
+  /** Each phrase's reading window (s: from its shot until it has been up its dwell) and its length in words (the sync
+   *  layer ducks under long ones: heft.ts). */
+  reading: { a: number; b: number; words: number }[];
   camera(t: number): Pose;
   shots: Shot[];
   /** Each set-piece's plan for its props (sets/; scenes/sets/ builds them), by stretch. */
@@ -239,5 +242,5 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const camera = director(audio, kept, chaseOf(stretches[0]!));
   const blocks = blocksOf(route, motion, stretches, carriers, tunnels, clears, setBlocks, openings);
   const lastShot = phraseShots[phraseShots.length - 1], lastCut = lastShot ? resolveAt(lastShot.at) : null;
-  return { stretches, motion, route, carriers, tunnels, blocks, openings, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans };
+  return { stretches, motion, route, carriers, tunnels, blocks, openings, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans, reading: reading.map(([a, b], i) => ({ a, b, words: carriers[i]!.phrase.words.length })) };
 }
