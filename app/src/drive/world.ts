@@ -191,6 +191,30 @@ export function buildWorld(drive: Drive): THREE.Group {
       put(new THREE.CylinderGeometry(0.18, 0.26, 2.2, 8), WOOD_DARK, p.clone().setY(y0 + 1.1));
       put(new THREE.ConeGeometry(2.2 + 0.8 * hash(sx, k, 5), h, 10), dark, p.clone().setY(y0 + 2 + h / 2));
     }
+    // chaparral: dark scrub round the turnout's edge and down the hillside, and a VISTA POINT sign where the road meets
+    // the apron (the turnout read as a flat grey disc)
+    {
+      const scrubM: THREE.Matrix4[] = [];
+      for (let i = 0; i < 90; i++) {
+        const a = hash(i, 11) * Math.PI * 2, r = LOOKOUT.apron + 1 + 10 * hash(i, 12) ** 1.5, p = centre.clone().addScaledVector(fwd, r * Math.cos(a) + 2).addScaledVector(right, r * Math.sin(a));
+        if (Math.cos(a) > 0.25) continue; // (none ahead, past the wall: there it stood across the view)
+        if (Math.abs(p.clone().sub(park.pos).dot(right)) < ROAD_HALF + 2 && p.clone().sub(park.pos).dot(fwd) < 2) continue; // (not on the road in)
+        const sz = 0.5 + 0.9 * hash(i, 13);
+        scrubM.push(new THREE.Matrix4().compose(p.setY(y0 - 0.1 - 0.4 * hash(i, 14)), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(i, 15) * 6), new THREE.Vector3(sz * 1.3, sz * 0.7, sz)));
+      }
+      for (let i = 0; i < 160; i++) { // down the slope, thinning
+        const u = 0.2 + 0.78 * hash(i, 21) ** 0.7, x = (hash(i, 22) - 0.5) * (2 * SHOULDER + 60), sz = 0.6 + 1.2 * hash(i, 23);
+        const drop = y0 - (-0.4), ease = u * u * (3 - 2 * u), p = lipF.pos.clone().addScaledVector(fwd, 1 + u * LOOKOUT.fall).addScaledVector(right, x).setY(-0.4 + drop * (1 - ease) + 0.1);
+        scrubM.push(new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(i, 24) * 6), new THREE.Vector3(sz * 1.3, sz * 0.8, sz)));
+      }
+      const scrub = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), toon({ color: '#1e2a24' }), scrubM.length);
+      scrubM.forEach((m, i) => scrub.setMatrixAt(i, m));
+      look.add(scrub);
+      const sp = park.pos.clone().addScaledVector(fwd, -8).addScaledVector(right, ROAD_HALF + 1.6);
+      put(new THREE.BoxGeometry(0.12, 2.4, 0.12), steel, sp.clone().setY(y0 + 1.2));
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.6), new THREE.MeshBasicMaterial({ map: (() => { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 192; const c = cv.getContext('2d')!; c.fillStyle = '#6b4a2a'; c.fillRect(0, 0, 512, 192); c.strokeStyle = '#f4f0e6'; c.lineWidth = 8; c.strokeRect(10, 10, 492, 172); c.fillStyle = '#f4f0e6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `700 70px "${F.sign(700)}"`; c.fillText('VISTA POINT', 256, 96); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t; })() }));
+      face.position.copy(sp).setY(y0 + 2.2); face.lookAt(face.position.clone().addScaledVector(fwd, -1)); look.add(face);
+    }
     // the hillside: from the lip down to the plain, rolling
     const across = 2 * SHOULDER + 70, along = LOOKOUT.fall, geo = new THREE.PlaneGeometry(across, along, 28, 40).rotateX(-Math.PI / 2), P = geo.attributes.position!;
     const drop = y0 - (-0.4);

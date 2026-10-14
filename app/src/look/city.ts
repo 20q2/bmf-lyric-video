@@ -17,10 +17,10 @@ import { toon } from './toon';
 /** Where the city spreads (m ahead of the parked car, and either side), its streets' spacing, the wave (when it
  *  starts, how fast it rolls out), how bright its lights shine (HDR), and the blackout (each block's lights die within
  *  `spread` s of the crash, over `die` s; the freeways this much later). */
-export const CITY = { near: 320, far: 3800, half: 2800, street: 85, step: 16, waveAt: 165.6, wave: 1500, glow: 3.0, freeways: 5, spread: 1.5, die: 0.3, freewayLag: 1.5 };
+export const CITY = { near: 300, far: 5200, half: 3800, street: 85, step: 14, waveAt: 165.6, wave: 1800, glow: 3.6, freeways: 7, spread: 1.5, die: 0.3, freewayLag: 1.5 };
 /** Downtown: how far ahead and to the right (m), its towers (how many, within this radius, their heights) and the glow
  *  over it; the boulevards (how many each way). */
-export const DOWNTOWN = { ahead: 1650, right: 420, towers: 16, radius: 260, h: [55, 170] as [number, number], glow: 0.34, boulevards: [7, 4] as [number, number] };
+export const DOWNTOWN = { ahead: 1700, right: 520, towers: 22, radius: 320, h: [55, 190] as [number, number], glow: 0.4, boulevards: [11, 7] as [number, number] };
 
 const VERT = /* glsl */ `
 attribute vec3 color; attribute float size; attribute float wake; attribute float sleep; attribute float blink;
@@ -33,12 +33,12 @@ void main() {
   if (move.z > 0.0) p += dir * mod(move.x + t * move.y, move.z);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = length(mv.xyz);
-  gl_PointSize = clamp(size * 1150.0 / dist, 1.6, 6.0) * scale;
+  gl_PointSize = clamp(size * 1400.0 / dist, 1.8, 7.0) * scale;
   gl_Position = projectionMatrix * mv;
   float tw = 0.75 + 0.25 * sin(t * (1.5 + fract(position.x * 0.013) * 3.0) + position.z);
   // (a beacon blinks: on a third of its second)
   if (blink > 0.0) tw = step(0.66, fract(t * 0.8 + blink));
-  vA = smoothstep(wake, wake + 0.5, on) * tw * (1.0 - smoothstep(3400.0, 5000.0, dist));
+  vA = smoothstep(wake, wake + 0.5, on) * tw * (1.0 - smoothstep(4800.0, 6800.0, dist));
   // the blackout: this light's block goes dark 'sleep' s after the crash
   vA *= 1.0 - smoothstep(offAt + sleep, offAt + sleep + die, t);
   vColor = color;
@@ -71,12 +71,12 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   const inside = (p: THREE.Vector3) => { const v = p.clone().sub(at), a = v.dot(F), x = v.dot(R); return a > CITY.near && a < CITY.far && Math.abs(x) < CITY.half * (0.4 + a / CITY.far); };
   // how built-up a spot is: densest round downtown, thinning to the edges; and whether its block is dark (a park, a
   // yard, a hill)
-  const density = (p: THREE.Vector3) => { const dd = p.distanceTo(D); return 0.72 + 0.28 * Math.exp(-dd / 1400); };
+  const density = (p: THREE.Vector3) => { const dd = p.distanceTo(D); return 0.8 + 0.2 * Math.exp(-dd / 1600); };
   const dark = (bk: number, bj: number) => { const h = hash(bk, bj, 21); return h < 0.11 || (h > 0.5 && h < 0.53); };
   // the street grid: lights along every street both ways, thinner far out, whole blocks dark here and there
   for (const [along, across] of [[gF, gR], [gR, gF]] as const) {
-    for (let k = -64; k <= 64; k++) {
-      for (let j = -280; j <= 280; j++) {
+    for (let k = -80; k <= 80; k++) {
+      for (let j = -380; j <= 380; j++) {
         const p = at.clone().addScaledVector(across, k * CITY.street).addScaledVector(along, j * CITY.step + 4 * (hash(k, j, 1) - 0.5));
         if (!inside(p)) continue;
         const bj = Math.floor((j * CITY.step) / CITY.street);
@@ -91,7 +91,7 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   for (const [n, along, across] of [[DOWNTOWN.boulevards[0], gF, gR], [DOWNTOWN.boulevards[1], gR, gF]] as const) {
     for (let b = 0; b < n; b++) {
       const off = (hash(b, along === gF ? 31 : 32) - 0.5) * 2 * CITY.half * 0.8;
-      for (let j = -400; j <= 400; j++) {
+      for (let j = -540; j <= 540; j++) {
         const p = at.clone().addScaledVector(across, off).addScaledVector(along, j * 10);
         if (!inside(p)) continue;
         put(p, j % 2 ? sodium : amber, 2 + 0.5 * hash(b, j, 33), undefined, undefined, CITY.spread * hash(b, Math.floor(j / 8), 34));
@@ -120,8 +120,8 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
     if (h > 110) put(c, [1, 0.12, 0.08], 2.2, undefined, undefined, CITY.spread, 0.2 + 0.6 * hash(i, 48), ground + h + 2);
   }
   // the dome of light over downtown: a warm glow standing behind it, facing the lookout
-  const dome = new THREE.Mesh(new THREE.PlaneGeometry(2200, 620), glowMaterial('#ff9a4c', DOWNTOWN.glow, true));
-  dome.position.copy(D).addScaledVector(F, 500).setY(ground + 60);
+  const dome = new THREE.Mesh(new THREE.PlaneGeometry(3000, 760), glowMaterial('#ff9a4c', DOWNTOWN.glow, true));
+  dome.position.copy(D).addScaledVector(F, 500).setY(ground + 70);
   dome.lookAt(at.x, ground + 120, at.z);
   group.add(dome);
   // freeways: long runs across the plain, white coming, red going
