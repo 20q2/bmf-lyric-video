@@ -7,7 +7,8 @@ import { WORLD, toon } from '../look/toon';
 import { F } from '../engine/type';
 import { GLOW, glowMaterial, lampMaterial, nightGlass, withWindows } from '../look/night';
 import { wallMaterial } from '../look/walls';
-import { facades, signAtlas } from '../look/facades';
+import { SHOPS, facades, signAtlas } from '../look/facades';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALM, palmVariant } from '../look/palms';
 import { IMPALA, impalaHull, wireWheel } from '../look/impala';
 import { printedGround } from '../look/ground';
@@ -371,6 +372,41 @@ function dressing(drive: Drive): THREE.Group {
   const roofs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#b9ada0' }), roof.length);
   roof.forEach((m, i) => roofs.setMatrixAt(i, m));
   g.add(awnings, roofs);
+  // the skyline (the stranger test: flat-topped boxes): water towers on legs over the tall blocks, masts, and on the
+  // rows behind the street, rooftop signs (the shops' names, look/facades.ts signAtlas) facing the road
+  {
+    const tank: THREE.Matrix4[] = [], cap: THREE.Matrix4[] = [], leg: THREE.Matrix4[] = [], mast: THREE.Matrix4[] = [], signs: THREE.BufferGeometry[] = [];
+    const rows = Math.ceil(SHOPS.length / 4);
+    drive.blocks.forEach((b, i) => {
+      if (b.concrete || b.prop) return;
+      const side = Math.sign(b.lateral), back = Math.abs(b.lateral) > 30;
+      if (b.h >= 12 && hash(i, 70) < 0.24) {
+        const s = b.s + (hash(i, 71) - 0.5) * b.w * 0.5, lat = b.lateral + (hash(i, 72) - 0.5) * b.d * 0.5;
+        tank.push(boxAt(route, s, lat, 2.6, 2.8, 2.6, b.h + 2.2));
+        cap.push(boxAt(route, s, lat, 3, 0.9, 3, b.h + 5));
+        for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) leg.push(boxAt(route, s + dz * 0.9, lat + dx * 0.9, 0.16, 2.3, 0.16, b.h));
+      } else if (b.h >= 7 && hash(i, 73) < 0.14) {
+        mast.push(boxAt(route, b.s + (hash(i, 74) - 0.5) * b.w * 0.5, b.lateral + (hash(i, 75) - 0.5) * b.d * 0.5, 0.12, 5 + 3 * hash(i, 76), 0.12, b.h));
+      }
+      if (back && b.h >= 8 && b.w >= 8 && hash(i, 77) < 0.2) {
+        const front = Math.abs(b.lateral) - b.d / 2, lat = side * (front + 0.4), w = Math.min(7, b.w - 1), h = 2.6, y = b.h + 2.4;
+        leg.push(boxAt(route, b.s - w / 2 + 0.5, lat, 0.15, 2.4, 0.15, b.h), boxAt(route, b.s + w / 2 - 0.5, lat, 0.15, 2.4, 0.15, b.h));
+        // (its face toward the road: on the right, facing −x in the road's frame, boxAt's x being −right)
+        const geo = new THREE.PlaneGeometry(w, h).rotateY(side > 0 ? Math.PI / 2 : -Math.PI / 2), uv = geo.getAttribute('uv'), k = Math.floor(hash(i, 78) * SHOPS.length), cx = k % 4, cy = Math.floor(k / 4);
+        for (let j = 0; j < uv.count; j++) uv.setXY(j, (cx + uv.getX(j)) / 4, 1 - (cy + 1 - uv.getY(j)) / rows);
+        geo.applyMatrix4(boxAt(route, b.s, lat, 1, 1, 1, y - 0.5)); // (a unit scale: the plane's already its size)
+        signs.push(geo);
+        const back_ = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#2a2430' })); back_.matrixAutoUpdate = false; back_.matrix.copy(boxAt(route, b.s, lat - side * 0.08, 0.1, h, w, y - h / 2)); g.add(back_);
+      }
+    });
+    const wood = toon({ color: '#6b5a4a' });
+    const tanks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 14), wood, tank.length); tank.forEach((m, i) => tanks.setMatrixAt(i, m));
+    const caps = new THREE.InstancedMesh(new THREE.ConeGeometry(0.5, 1, 14), toon({ color: '#8a7a68' }), cap.length); cap.forEach((m, i) => caps.setMatrixAt(i, m));
+    const legs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.post }), leg.length); leg.forEach((m, i) => legs.setMatrixAt(i, m));
+    const masts = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.post }), mast.length); mast.forEach((m, i) => masts.setMatrixAt(i, m));
+    g.add(tanks, caps, legs, masts);
+    if (signs.length) g.add(new THREE.Mesh(mergeGeometries(signs), new THREE.MeshBasicMaterial({ map: signAtlas(), side: THREE.DoubleSide })));
+  }
   // power lines: poles, and three wires sagging between each pair
   const at: number[] = [];
   for (let s = 0; s < route.length; s += POWER.every) {
