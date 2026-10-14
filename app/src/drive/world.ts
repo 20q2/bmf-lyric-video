@@ -6,6 +6,7 @@ import { hash } from '../engine/util';
 import { WORLD, toon } from '../look/toon';
 import { F } from '../engine/type';
 import { GLOW, glowMaterial, lampMaterial, nightGlass, withWindows } from '../look/night';
+import { wallMaterial } from '../look/walls';
 import { facades, signAtlas } from '../look/facades';
 import { PALM, palmVariant } from '../look/palms';
 import { IMPALA, impalaHull, wireWheel } from '../look/impala';
@@ -582,6 +583,8 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   if (c.kind === 'speed' || c.kind === 'radio' || c.kind === 'phone') mat.color.setScalar(1.6); // (lit displays: they bloom a little)
   if (c.kind === 'polesign' || c.kind === 'roofsign') mat.color.setScalar(1.25); // (lightboxes)
+/** How bright a neon sign's wash on its wall is (HDR; by night). */
+const NEON_WASH = 0.45;
   if (c.kind === 'tunnelsign') mat.color.setScalar(1.7); // (a lit box in the dark bore)
   if (c.kind === 'plate' || c.kind === 'sticker') mat.color.setScalar(1.25); // (plate lamps: the rear reads at dusk)
   if (SET_KINDS.has(c.kind)) { // a set-piece's surface: just the face; its props stand round it (scenes/sets/)
@@ -603,9 +606,25 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
   const legs = (xs: number[], drop = y0 + c.h / 2) => { for (const x of xs) box(0.2, drop, 0.2, x, c.h / 2 - drop / 2, -0.2, grey(WORLD.post)); };
   // its backing board or its building (carriers.ts solidsOf: what the guard checks for hiding other faces)
   const building = PAIRABLE.has(c.kind) && c.kind !== 'billboard';
-  // (a face's building a shade darker than the face, with windows: against a sunset sky it reads as a building; neon's
-  // wall plain dark brick, nothing lit behind its tubes)
-  for (const { at, size } of solidsOf(c)) box(size.x, size.y, size.z, at.x, at.y, at.z, building ? (c.kind === 'neon' ? toon({ color: wall }) : toon({ color: wall.clone().multiplyScalar(0.78) })) : grey(WORLD.backing)).name = building ? 'facade' : 'backing';
+  // (a face's building printed as a wall, look/walls.ts: stucco, a base band, windows off the sign's column, a cornice
+  // and roof units; one plain box read as a blank slab. A storefront's a shade darker than its face.)
+  for (const { at, size } of solidsOf(c)) {
+    if (!building) { box(size.x, size.y, size.z, at.x, at.y, at.z, grey(WORLD.backing)).name = 'backing'; continue; }
+    const colour = c.kind === 'neon' ? wall : wall.clone().multiplyScalar(0.78);
+    box(size.x, size.y, size.z, at.x, at.y, at.z, wallMaterial(colour, size, c.w / 2 + 0.6)).name = 'facade';
+    const trim = toon({ color: colour.clone().multiplyScalar(1.18) });
+    box(size.x + 0.3, 0.42, size.z + 0.3, at.x, at.y + size.y / 2 - 0.21, at.z, trim).name = 'cornice';
+    for (let k = 0; k < 2; k++) { // (an AC unit, a tank, on the roof)
+      const u = hash(c.s, k, 61), tank = hash(c.s, k, 62) < 0.4;
+      box(tank ? 2 : 1.5, tank ? 2.4 : 1, tank ? 2 : 1.3, at.x + (u - 0.5) * size.x * 0.7, at.y + size.y / 2 + (tank ? 1.2 : 0.5), at.z - 1 - 2 * hash(c.s, k, 63), toon({ color: '#b9ada0' })).name = 'roof';
+    }
+  }
+  if (building && c.kind === 'neon') {
+    // the neon's mounting panel on the wall (dark, the tubes stand off it), and its wash of light on the wall round it
+    box(c.w + 0.5, c.h, 0.06, 0, 0, -0.035, grey('#1a1420')).name = 'panel';
+    const wash = new THREE.Mesh(new THREE.PlaneGeometry(c.w + 5, c.h + 4), glowMaterial('#ff4fa3', NEON_WASH, true));
+    wash.position.z = -0.002; g.add(wash);
+  }
   switch (c.kind) {
     case 'sign': legs([-(c.w / 2 - 0.5), c.w / 2 - 0.5]); break;
     case 'billboard': {
