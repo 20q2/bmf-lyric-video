@@ -164,6 +164,19 @@ export function buildWorld(drive: Drive): THREE.Group {
       g.add(named(new THREE.Mesh(ribbon(route, a, b, side * (ROAD_HALF - 0.38), 0.015, side * (ROAD_HALF - 0.22), 0.015), line), 'dashes'));
     }
   }
+  // a guardrail along the sea side of the coast road (the road's edge dropped straight into the water): posts and a rail
+  {
+    const post: THREE.Matrix4[] = [], rail = toon({ color: '#c9c4b8', side: THREE.DoubleSide }), lat = -(ROAD_HALF + 0.9);
+    for (const st of drive.stretches) {
+      if (!BLOCKS[st.id]!.seaLeft || st.tunnel) continue;
+      const a = motion.distanceAt(st.start), b = Math.min(end, motion.distanceAt(st.end));
+      g.add(named(new THREE.Mesh(ribbon(route, a, b, lat, 0.55, lat, 0.75), rail), 'guardrail'));
+      for (let s = a + 2; s < b; s += 4) post.push(boxAt(route, s, lat, 0.12, 0.75, 0.12));
+    }
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.post }), post.length);
+    post.forEach((m, i) => posts.setMatrixAt(i, m));
+    g.add(named(posts, 'guardrail'));
+  }
   // the cars parked at the left kerb (blocks.ts PARKED: the guard sees them as blocks)
   {
     const cars = new THREE.Group(), colours = ['#e8e2d2', '#5a6a7d', '#b0532e', '#2b4a6b', '#8a8f8a', '#d9b24a', '#3a3a40', '#7a9a6a'];
@@ -704,10 +717,10 @@ const NEON_WASH = 0.45;
         const drop = y0 + c.h / 2;
         box(0.36, drop, 0.12, x, c.h / 2 - drop / 2, -0.35, steel); box(0.12, drop, 0.5, x, c.h / 2 - drop / 2, -0.35, steel);
       }
-      if (c.stack !== 'top') {
-        box(c.w, 0.08, 1.1, 0, -c.h / 2 - 0.35, 0.45, steel);
-        box(c.w, 0.05, 0.05, 0, -c.h / 2 + 0.6, 0.98, steel);
-        for (let x = -c.w / 2; x <= c.w / 2; x += 1.8) box(0.05, 0.95, 0.05, x, -c.h / 2 + 0.12, 0.98, steel);
+      if (c.stack !== 'top') { // (the catwalk and its rail wholly under the board: the rail cut its bottom row of words)
+        box(c.w, 0.08, 1.1, 0, -c.h / 2 - 1.2, 0.45, steel);
+        box(c.w, 0.05, 0.05, 0, -c.h / 2 - 0.22, 0.98, steel);
+        for (let x = -c.w / 2; x <= c.w / 2; x += 1.8) box(0.05, 0.95, 0.05, x, -c.h / 2 - 0.7, 0.98, steel);
       }
       if (c.stack !== 'bottom') for (const x of [-c.w / 3, 0, c.w / 3]) {
         box(0.06, 0.06, 1.2, x, c.h / 2 + 0.35, 0.45, steel);

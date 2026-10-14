@@ -67,12 +67,14 @@ void main() {
   // clouds: flat printed shapes in the low sky, drifting, two tones (lit on the sun's side), passing over the sun
   if (clouds > 0.0 && d.y > 0.0) {
     vec2 cp = d.xz / (d.y + 0.1) * 0.55 + vec2(time * 0.006, 0.0);
-    float n = fbm(cp), na = fwidth(n) * 1.5;
+    // (lobed: a finer noise carves the edges into puffs, and a darker rim lines them — plain fbm read as soft smears)
+    float n = fbm(cp) + 0.16 * (fbm(cp * 2.7 + 5.0) - 0.5), na = fwidth(n) * 1.5;
     float cover = smoothstep(0.56 - na, 0.56 + na, n) * smoothstep(0.01, 0.06, d.y) * (1.0 - smoothstep(0.3, 0.6, d.y));
+    float rim = cover - smoothstep(0.585 - na, 0.585 + na, n);
     vec3 fd = normalize(vec3(d.x, 0.0, d.z) + 1e-4), fs = normalize(vec3(sunDir.x, 0.0, sunDir.z) + 1e-4);
     float lit = step(0.5, dot(fd, fs) * 0.5 + 0.5 + (n - 0.62) * 1.5);
     vec3 shadeC = mix(zenith, horizon, 0.35) * 0.82, litC = mix(horizon, sunColor, 0.55) * 1.05;
-    c = mix(c, mix(shadeC, litC, lit), cover * clouds);
+    c = mix(c, mix(shadeC, litC, lit) * (1.0 - 0.22 * clamp(rim, 0.0, 1.0)), cover * clouds);
   }
   // stars: one in some cells of a grid over the sky, twinkling
   if (stars > 0.0 && d.y > 0.02) {

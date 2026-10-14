@@ -12,13 +12,13 @@ export const WALL = { cell: 3.0, floor: 3.2, ground: 3.4 };
 
 /** A wall material for a box of `size` (its local frame: x along the road, y up, z toward it), its sign hanging on its
  *  front within `maskX` of its middle. */
-export function wallMaterial(color: THREE.ColorRepresentation, size: THREE.Vector3, maskX: number): THREE.MeshToonMaterial {
+export function wallMaterial(color: THREE.ColorRepresentation, size: THREE.Vector3, maskX: number, windows = true): THREE.MeshToonMaterial {
   const m = toon({ color });
   m.onBeforeCompile = (sh) => {
     printShadows(sh);
     sh.uniforms.night = NIGHT;
     sh.uniforms.wallFloor = { value: -size.y / 2 };
-    sh.uniforms.wallMaskX = { value: maskX };
+    sh.uniforms.wallMaskX = { value: windows ? maskX : 1e6 }; // (no windows: the whole front is the sign's column, the ends go dark)
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
 varying vec3 vWallPos; varying vec3 vWallN;`)
@@ -38,7 +38,7 @@ float wallHash(vec3 p) { p = fract(p * .1031); p += dot(p, p.zyx + 31.32); retur
     if (vWallPos.y < wallFloor + 0.7) diffuseColor.rgb *= 0.8;
     // the windows: above the ground floor, off the sign's column on the front
     bool front = abs(vWallN.z) > 0.5 && abs(vWallPos.x) < wallMaskX;
-    if (!front && vWallPos.y > wallFloor + ${WALL.ground.toFixed(1)}) {
+    if (!front && wallMaskX < 1e5 && vWallPos.y > wallFloor + ${WALL.ground.toFixed(1)}) {
       vec2 g = vec2(q.x / ${WALL.cell.toFixed(1)}, (vWallPos.y - wallFloor - ${WALL.ground.toFixed(1)}) / ${WALL.floor.toFixed(1)}), cell = floor(g), f = fract(g);
       wMask = step(0.24, f.x) * step(f.x, 0.76) * step(0.22, f.y) * step(f.y, 0.72);
       // (lit on the front only: the ends' lit cells, seen edge-on past the sign, split into bright stripes)
@@ -50,6 +50,6 @@ float wallHash(vec3 p) { p = fract(p * .1031); p += dot(p, p.zyx + 31.32); retur
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   totalEmissiveRadiance += wWarm * wMask * wLit * night * ${GLOW.window.toFixed(2)};`);
   };
-  m.customProgramCacheKey = () => 'wall';
+  m.customProgramCacheKey = () => (windows ? 'wall' : 'wallPlain');
   return m;
 }

@@ -5,6 +5,7 @@
 // words, suds and a shining car right of them, the price under; its bays); his giant mural on the end wall of its
 // building. The lyrics are the carriers. Browser only (canvas).
 import * as THREE from 'three';
+import { wallMaterial } from '../../look/walls';
 import type { Drive } from '../../drive/drive';
 import { GIANT, SHACK, type Verse2Plan, WASH } from '../../drive/sets/verse2';
 import { ROAD_HALF } from '../../drive/route';
@@ -78,7 +79,9 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   let roofChicken!: THREE.Group;
   {
     const B = plan.shop, Sh = SHACK.shop, g = front(B.s, Sh.face), x = (s: number) => s - B.s, w = B.w;
-    box(g, w, Sh.h, Sh.d, 0, Sh.h / 2, -Sh.d / 2, toon({ color: '#f7f1e3' }));
+    box(g, w, Sh.h, Sh.d, 0, Sh.h / 2, -Sh.d / 2, wallMaterial('#f7f1e3', new THREE.Vector3(w, Sh.h, Sh.d), 0, false)); // (stucco, look/walls.ts: flat white, it read as a box)
+    box(g, w + 0.3, 0.1, 0.55, 0, Sh.h - 0.85, 0.2, toon({ color: '#7a5a58' })); // the shadow under the fascia's soffit
+    cyl(g, 0.06, Sh.h - 0.9, w / 2 - 0.5, (Sh.h - 0.9) / 2, 0.08, toon({ color: '#d9d0c0' })); // a drainpipe
     // its end toward the corner: two windows, a red band; on the roof, its air units (QA: a bare box)
     const endGlass = toon({ color: '#28323c' });
     for (const z of [-3.2, -8.8]) { const p = plane(g, 3, 1.8, -w / 2 - 0.012, 2.1, z, endGlass); p.rotation.y = -Math.PI / 2; }
@@ -95,6 +98,8 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     }
     const door = (plan.windows[0]! + plan.windows[1]!) / 2;
     box(g, 1.3, 2.5, 0.06, x(door), 1.25, 0.03, toon({ color: '#1d2026' }));
+    box(g, 0.3, 0.12, 0.3, x(door), 2.8, 0.15, toon({ color: '#1d2026' })); // the lamp over the door
+    box(g, 0.2, 0.05, 0.2, x(door), 2.72, 0.15, lampMaterial('#ffe8b0', GLOW.lamp * 0.6, 0.9));
     plane(g, 0.8, 1.3, x(door), 1.6, 0.065, glass);
     root.add(g);
     // the banner's grommets (its words and red are the carriers')
