@@ -104,6 +104,15 @@ tests; the kit fills it with detail that never sticks out past it toward the roa
 
 Street furniture, parked cars, traffic and pedestrians wait for a later plan.
 
+**Built (M5c, 2026-10-13, after a stranger test; docs/superpowers/plans/2026-10-13-m5c-stranger-test.md):** printed
+shadows, parked cars and kerb furniture, edge lines; the cabin; the signs' buildings as printed walls; the skyline's
+towers and rooftop signs; the tunnel's walkway, housings and portals; printed clouds, the coast's guardrail. Traffic
+and pedestrians still wait.
+
+**Built (M5d, 2026-10-13; docs/superpowers/plans/2026-10-13-m5d-breaks-and-sync.md):** the six breaks of §4
+(`drive/breaks.ts`, `look/breaks.ts`) and the sync layer of §5 (`drive/heft.ts`), with their guard checks; cuts on
+the beat are reported, not enforced. The reserve breaks wait on the user's call.
+
 ## 4. The style breaks
 
 A break is a small, self-contained effect pinned to its word's timing (or its hit's), composed from up to three tools:
