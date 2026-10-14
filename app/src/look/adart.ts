@@ -24,19 +24,20 @@ export const AD_STYLE: Record<Ad, { bg: string; ink: string; now: string; spot: 
   record: { bg: '#e3907a', ink: '#16131a', now: '#ffffff', spot: '#eeaa96' },
   suitcase: { bg: '#a9d8c6', ink: '#16131a', now: '#c8102e', spot: '#c4e6d8' },
   crown: { bg: '#7a1432', ink: '#f6dd8f', now: '#ffffff', spot: '#9a2246' },
+  sale: { bg: '#fff8e6', ink: '#16131a', now: '#c8102e', spot: '#ffd65a' },
 };
 
 /** Draw the ad's product and its mark (not its headline) on a canvas W x H, the headline taking the left `text` share
  *  of the width; on its own colour field (a billboard), or on the face's own ground (`ink`: the face's type colour —
  *  a roadside sign, a painted wall, a shop's fascia). */
-export function drawAd(c: CanvasRenderingContext2D, ad: Ad, W: number, H: number, text: number, ink?: string) {
+export function drawAd(c: CanvasRenderingContext2D, ad: Ad, W: number, H: number, text: number, ink?: string, seed = 0) {
   const st = ink ? { ...AD_STYLE[ad], ink } : AD_STYLE[ad];
   if (!ink) { c.fillStyle = st.bg; c.fillRect(0, 0, W, H); }
   const x0 = W * text, iw = W - x0, cx = x0 + iw / 2, cy = H * 0.5, R = Math.min(iw, H) * 0.42;
   // the spotlight
   c.fillStyle = st.spot; c.beginPath(); c.arc(cx, cy, R * 1.05, 0, Math.PI * 2); c.fill();
   c.save(); c.translate(cx, cy); c.scale(R / 100, R / 100); // the product, drawn in a 200 x 200 box round (0, 0)
-  PRODUCT[ad](c);
+  PRODUCT[ad](c, seed);
   c.restore();
   // a hairline between headline and product
   c.fillStyle = st.ink; c.globalAlpha = 0.35; c.fillRect(x0 - W * 0.004, H * 0.15, W * 0.004, H * 0.7); c.globalAlpha = 1;
@@ -63,20 +64,37 @@ function star(c: CanvasRenderingContext2D, x: number, y: number, r: number, r2: 
 }
 const rr = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); };
 
-const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D) => void> = {
-  him: (c) => { // him, by his things, no face (a profile read as someone else): a crown, his shades, a rope chain
-    c.fillStyle = '#f6c445';
-    c.beginPath(); c.moveTo(-58, -36); c.lineTo(-62, -82); c.lineTo(-34, -56); c.lineTo(0, -92); c.lineTo(34, -56); c.lineTo(62, -82); c.lineTo(58, -36); c.closePath(); c.fill(); // the crown
-    c.fillStyle = '#c8102e'; for (const x of [-34, 0, 34]) { c.beginPath(); c.arc(x, -48, 6, 0, Math.PI * 2); c.fill(); } // its jewels
-    c.fillStyle = '#16131a'; rr(c, -64, -36, 128, 12, 4); // its band
-    // the shades: two dark lenses in a thin frame, the bridge between
-    c.fillStyle = '#16131a';
-    for (const x of [-38, 38]) { c.beginPath(); c.ellipse(x, 2, 34, 24, 0, 0, Math.PI * 2); c.fill(); }
-    c.fillRect(-8, -4, 16, 6); c.fillRect(-82, -6, 14, 5); c.fillRect(68, -6, 14, 5);
-    c.fillStyle = 'rgba(255,255,255,0.35)'; for (const x of [-38, 38]) { c.beginPath(); c.ellipse(x - 10, -8, 10, 6, -0.5, 0, Math.PI * 2); c.fill(); }
-    // the chain, a rope of links hanging below
-    c.strokeStyle = '#f6c445'; c.lineWidth = 7; c.setLineDash([9, 5]); c.beginPath(); c.arc(0, 30, 58, 0.25, Math.PI - 0.25); c.stroke(); c.setLineDash([]);
-    c.fillStyle = '#f6c445'; rr(c, -16, 76, 32, 22, 5); c.fillStyle = '#16131a'; c.font = 'bold 18px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('BMF', 0, 88);
+/** Each ad's product in a 200 x 200 box round (0, 0); `seed` (an integer: the board's place in its line) varies the
+ *  ones that have variants (his bust's pose), neighbours differing. */
+const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D, seed: number) => void> = {
+  him: (c, seed) => { // him: a campaign bust, posterised — his silhouette (the cast's: the cap, the chain) cut in two
+    // tones with a lit edge, his shades the only thing in his face; no drawn face (one read as someone else), no mark
+    // (the crown-and-shades badge "wasn't doing it" — the user, 2026-10-14); turned left or right, close or not, per poster
+    const v = Math.floor(seed), dir = v % 2 ? -1 : 1, close = v % 3 === 2;
+    c.save(); if (close) { c.translate(0, 22); c.scale(1.3, 1.3); }
+    const bust = () => {
+      c.beginPath(); c.moveTo(-98, 104); c.lineTo(-98, 72); c.quadraticCurveTo(-92, 44, -58, 36); c.lineTo(-26, 28); c.lineTo(-18, 6); // the shoulders, the neck
+      c.lineTo(-18, -8); c.quadraticCurveTo(-40, -22, -38, -48); c.quadraticCurveTo(-36, -84, 0, -86); c.quadraticCurveTo(36, -84, 38, -48); c.quadraticCurveTo(40, -22, 18, -8); // the head
+      c.lineTo(18, 6); c.lineTo(26, 28); c.lineTo(58, 36); c.quadraticCurveTo(92, 44, 98, 72); c.lineTo(98, 104); c.closePath();
+    };
+    const cap = () => { c.beginPath(); c.ellipse(0, -68, 42, 24, 0, Math.PI, 0); c.lineTo(dir * 70, -62); c.quadraticCurveTo(dir * 72, -54, dir * 60, -52); c.lineTo(dir * 36, -56); c.closePath(); }; // its crown and brim, forward
+    c.fillStyle = '#16131a'; bust(); c.fill(); cap(); c.fill();
+    c.save(); bust(); c.clip(); c.fillStyle = '#5a1c3c'; c.fillRect(dir > 0 ? 8 : -100, -100, 92, 210); c.fillStyle = '#c8102e'; c.fillRect(dir > 0 ? 30 : -38, -100, 8, 210); c.restore(); // the lit side, its edge
+    c.save(); cap(); c.clip(); c.fillStyle = '#5a1c3c'; c.fillRect(dir > 0 ? 8 : -100, -100, 92, 210); c.restore();
+    // his shades: two lenses in a thin gold frame, a glint
+    c.fillStyle = '#16131a'; for (const x of [-16, 16]) { c.beginPath(); c.ellipse(x + dir * 4, -46, 15, 10, 0, 0, Math.PI * 2); c.fill(); }
+    c.strokeStyle = '#f6c445'; c.lineWidth = 2.5; for (const x of [-16, 16]) { c.beginPath(); c.ellipse(x + dir * 4, -46, 15, 10, 0, 0, Math.PI * 2); c.stroke(); }
+    c.beginPath(); c.moveTo(-2 + dir * 4, -48); c.lineTo(2 + dir * 4, -48); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.55)'; for (const x of [-16, 16]) { c.beginPath(); c.ellipse(x + dir * 4 - 5, -50, 5, 3, -0.5, 0, Math.PI * 2); c.fill(); }
+    // a rope chain on his chest, a plate on it
+    c.strokeStyle = '#f6c445'; c.lineWidth = 6; c.setLineDash([7, 4]); c.beginPath(); c.moveTo(-30, 30); c.quadraticCurveTo(0, 86, 30, 30); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#f6c445'; rr(c, -13, 62, 26, 16, 4); c.fillStyle = '#16131a'; c.font = 'bold 12px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('BMF', 0, 70);
+    c.restore();
+  },
+  sale: (c) => { // a shop's promotional poster: a SALE burst, the deal under it
+    c.fillStyle = '#c8102e'; star(c, 0, -22, 76, 60, 14);
+    c.fillStyle = '#fff8e6'; c.font = 'bold 52px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('SALE', 0, -22);
+    c.fillStyle = '#16131a'; rr(c, -66, 50, 132, 34, 6); c.fillStyle = '#ffd65a'; c.font = 'bold 22px sans-serif'; c.fillText('50% OFF TOOLS', 0, 67);
   },
   bandage: (c) => { // two crossed bandages
     for (const a of [0.7, -0.7]) {

@@ -6,7 +6,8 @@
 import { hash } from '../engine/util';
 import type { Kind } from './carriers';
 
-export type Ad = 'him' | 'phone' | 'cash' | 'car' | 'lipstick' | 'perfume' | 'shades' | 'diamond' | 'cocktail' | 'heels' | 'roses' | 'chain' | 'record' | 'suitcase' | 'crown' | 'bandage' | 'tape' | 'keys' | 'heart';
+export type Ad = 'him' | 'phone' | 'cash' | 'car' | 'lipstick' | 'perfume' | 'shades' | 'diamond' | 'cocktail' | 'heels' | 'roses' | 'chain' | 'record' | 'suitcase' | 'crown' | 'bandage' | 'tape' | 'keys' | 'heart' | 'sale';
+/** (`sale` is a shop's own promotional poster, never a billboard's: set-pieces set it.) */
 export const ADS: readonly Ad[] = ['him', 'phone', 'cash', 'car', 'lipstick', 'perfume', 'shades', 'diamond', 'cocktail', 'heels', 'roses', 'chain', 'record', 'suitcase', 'crown', 'bandage', 'tape', 'keys', 'heart'];
 /** Each ad's maker and its line: the board's copy until its lyric flips in (never a lyric: nothing of the song shows
  *  ahead). */
@@ -17,6 +18,7 @@ export const BRAND: Record<Ad, [brand: string, tagline: string]> = {
   heels: ['STILETTO', 'walk tall'], roses: ['ROSE BOWL', 'florist'], chain: ['ROPE & GOLD', '14k • since 1964'],
   record: ['SIDE B', 'records & tapes'], suitcase: ['JETSET', 'luggage for the road'], crown: ['ROYALE', 'for the ruler'],
   bandage: ['FIRST AID', 'for what hurts'], tape: ['TRUE MEASURE', 'tools'], keys: ['CRUISE RENTALS', 'keys in an hour'], heart: ['SWEETHEART', 'candy co.'],
+  sale: ['HANDLE IT HARDWARE', 'this week only'],
 };
 
 /** A billboard's least height (m). */
@@ -24,7 +26,7 @@ export const AD = { minH: 4.4 };
 /** The share of each board's width its lyric takes; the rest, on the right, is its art: a product (ADVERTISED kinds)
  *  or, on route signs, a shield and an arrow. The art stays: it's built round the words, never fades for them. Faces
  *  not listed are all lyric. */
-export const TEXT_SHARE: Partial<Record<Kind, number>> = { billboard: 0.62, sign: 0.6, storefront: 0.72, street: 0.7, gantry: 0.72, bus: 0.8, menu: 0.76, poster: 0.62 };
+export const TEXT_SHARE: Partial<Record<Kind, number>> = { billboard: 0.62, sign: 0.6, storefront: 0.72, street: 0.7, gantry: 0.72, bus: 0.8, menu: 0.76, poster: 0.62, window: 0.72 };
 export const ADVERTISED: ReadonlySet<Kind> = new Set<Kind>(['billboard', 'sign', 'storefront']);
 
 /** Words that pick a product, checked in this order. */

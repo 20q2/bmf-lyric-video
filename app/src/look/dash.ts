@@ -94,8 +94,8 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
   const hu = headUnit(), screen = faceFrame(HEAD_UNIT.pos.clone().addScaledVector(HEAD_UNIT.normal, -0.004), HEAD_UNIT.normal);
   hu.mesh.position.x = -HEAD_UNIT.lyricAt; // (its middle off the lyric's panel's: the art that side)
   screen.add(hu.mesh);
-  const housing = new THREE.Mesh(new THREE.BoxGeometry(HEAD_UNIT.w + 0.06, HEAD_UNIT.h + 0.06, 0.09), dark);
-  housing.position.set(-HEAD_UNIT.lyricAt, 0, -0.05); screen.add(housing);
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(HEAD_UNIT.w + 0.06, HEAD_UNIT.h + 0.06, 0.14), dark); // (back into the fascia, whose face is at z 0.6: world.ts buildCar)
+  housing.position.set(-HEAD_UNIT.lyricAt, 0, -0.075); screen.add(housing);
   const bezel = new THREE.Mesh(new THREE.BoxGeometry(HEAD_UNIT.w + 0.04, HEAD_UNIT.h + 0.04, 0.012), trim);
   bezel.position.set(-HEAD_UNIT.lyricAt, 0, -0.008); screen.add(bezel);
   screen.name = 'screen'; body.add(screen);
@@ -106,6 +106,7 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
     const face = new THREE.Mesh(new THREE.CircleGeometry(0.075, 32), new THREE.MeshBasicMaterial({ map: gauge(label), color: new THREE.Color(1.3, 1.3, 1.3) }));
     g.add(face);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.008, 6, 32), chrome); g.add(ring);
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.082, 0.14, 20), dark); pod.rotation.x = Math.PI / 2; pod.position.z = -0.07; g.add(pod); // (its housing back into the fascia)
     const needle = new THREE.Group(); needle.position.z = 0.003; g.add(needle);
     const n = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.062), new THREE.MeshBasicMaterial({ color: '#ff3a24' })); n.position.y = 0.028; needle.add(n);
     needles.push(needle);
@@ -125,6 +126,7 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
     const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.057), new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.2, 1.2, 1.2) }));
     g.add(strip);
     const bez = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.075, 0.02), chrome); bez.position.z = -0.012; g.add(bez);
+    const pod = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.09, 0.14), dark); pod.position.z = -0.08; g.add(pod); // (its housing back into the fascia)
     const dcv = document.createElement('canvas'); dcv.width = dcv.height = 96;
     const dc = dcv.getContext('2d')!;
     dc.fillStyle = '#ffb000'; dc.textAlign = 'center'; dc.textBaseline = 'middle'; dc.font = `64px "${F.sign(700)}"`; dc.fillText('D', 48, 52);

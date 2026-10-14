@@ -4,7 +4,6 @@
 // only (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
-import { LANE } from '../../drive/drive';
 import { type Chorus2Plan, GANTRY, MEDIAN, TRAIN, FREEWAY_EDGE, LANES } from '../../drive/sets/chorus2';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
@@ -31,10 +30,12 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
   // (the freeway's furniture is put away as its stretch ends, before verse 2's first cut: its sound wall and catenary
   // stood in the chicken spot's frames)
   const freewayEnd = drive.stretches.find((st) => st.id === 'chorus2')?.end ?? Infinity;
-  /** The road's frame at s (x to its left, y up, z forward), `lateral` right of its centre, on its surface. */
+  /** The road's frame at s (x to its left, y its up, z forward along it, up or down its grade), `lateral` right of its
+   *  centre, on its surface. (Level pieces, on the freeway's rise, stood in steps — "train track step things", the dark
+   *  lanes sinking into the ground: the user, 2026-10-14.) */
   const frameAt = (s: number, lateral: number, m = new THREE.Matrix4()) => {
-    const f = route.frameAt(s), fwd = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize(), right = new THREE.Vector3(f.right.x, 0, f.right.z).normalize();
-    return m.makeBasis(right.negate(), UP, fwd).setPosition(f.pos.clone().addScaledVector(f.right, lateral));
+    const f = route.frameAt(s);
+    return m.makeBasis(f.right.clone().negate(), f.up.clone(), f.fwd.clone()).setPosition(f.pos.clone().addScaledVector(f.right, lateral));
   };
   const onRoad = (s: number, lateral: number) => { const g = new THREE.Group(); g.matrixAutoUpdate = false; frameAt(s, lateral, g.matrix); root.add(g); return g; };
   const dark = toon({ color: WORLD.post }), concrete = toon({ color: '#b9ada0' }), steel = toon({ color: '#6d6a72' });
@@ -50,13 +51,12 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
     root.add(mesh);
   };
   strip(MEDIAN.barrier, 0.6, MEDIAN.barrierH, 0, concrete);
-  // the right side: two more lanes of asphalt, a dashed line between them, a solid edge line, the barrier beyond
-  strip((ROAD_HALF + FREEWAY_EDGE) / 2, FREEWAY_EDGE - ROAD_HALF, 0.02, 0.0, toon({ color: WORLD.asphalt }));
-  strip(FREEWAY_EDGE - 0.25, 0.15, 0.025, 0.0, toon({ color: WORLD.dash }));
+  // the right side: the two more lanes are the road's own ribbon (world.ts, plan.lanes); here the dashed lines along
+  // them and the barrier beyond
   strip(FREEWAY_EDGE + LANES.barrier / 2 + 0.2, LANES.barrier, 1.0, 0, concrete);
-  {
-    const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil((plan.s1 - plan.s0) / 9));
-    for (let k = 0; k < dashes.count; k++) { frameAt(plan.s0 + k * 9 + 4.5, ROAD_HALF + LANES.w, piece); dashes.setMatrixAt(k, piece.multiply(new THREE.Matrix4().makeTranslation(0, 0.025, 0)).multiply(new THREE.Matrix4().makeScale(0.15, 0.02, 3))); }
+  for (const lateral of [ROAD_HALF, ROAD_HALF + LANES.w]) {
+    const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil((plan.s1 - plan.s0 - 2 * plan.lanes.merge) / 9));
+    for (let k = 0; k < dashes.count; k++) { frameAt(plan.s0 + plan.lanes.merge + k * 9 + 4.5, lateral, piece); dashes.setMatrixAt(k, piece.multiply(new THREE.Matrix4().makeTranslation(0, 0.025, 0)).multiply(new THREE.Matrix4().makeScale(0.15, 0.02, 3))); }
     root.add(dashes);
   }
   strip(MEDIAN.tracks, 4.2, 0.18, 0, toon({ color: '#7b6f68' }));
@@ -105,19 +105,20 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
     return { T, g };
   });
 
-  // the SLAUSON exit sign over their lane, on a cantilever from the right shoulder
+  // the SLAUSON exit sign on the right shoulder, on two posts (on a cantilever over their lane it crossed the planes'
+  // take: the user, 2026-10-14)
   {
-    const shoulder = FREEWAY_EDGE + 1.6, g = onRoad(plan.exitS, shoulder), tex = canvasTex(1024, 512, (c) => {
+    const g = onRoad(plan.exitS, FREEWAY_EDGE + 2.0), tex = canvasTex(1024, 512, (c) => {
       c.fillStyle = '#1f6b44'; c.fillRect(0, 0, 1024, 512); c.strokeStyle = '#f4f4f0'; c.lineWidth = 12; c.strokeRect(18, 18, 988, 476);
       c.fillStyle = '#f4f4f0'; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.font = font(F.sign(600), 140); c.fillText('Slauson Av', 512, 190);
       c.font = font(F.sign(500), 76); c.fillText('EXIT  1/4 MILE', 512, 360);
       c.fillStyle = '#ffd65a'; c.fillRect(760, 30, 230, 80); c.fillStyle = '#1f6b44'; c.font = font(F.sign(700), 50); c.fillText('EXIT 12', 875, 72);
     });
-    box(g, 0.35, 7.6, 0.35, 0, 3.8, 0, steel);
-    box(g, shoulder - LANE + 2.4, 0.3, 0.3, (shoulder - LANE + 2.4) / 2, 7.4, 0, steel); // (out over their lane: to the road's left)
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 2.3), new THREE.MeshBasicMaterial({ map: tex }));
-    sign.position.set(shoulder - LANE, 6.1, -0.2); sign.rotation.y = Math.PI; g.add(sign);
+    for (const x of [-0.4, -3.6]) box(g, 0.2, 4.0, 0.2, x, 2.0, 0, steel); // (out to the right: the frame's -x)
+    box(g, 4.1, 2.1, 0.08, -2.0, 3.0, -0.05, toon({ color: '#154d31' }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 2.0), new THREE.MeshBasicMaterial({ map: tex }));
+    sign.position.set(-2.0, 3.0, -0.12); sign.rotation.y = Math.PI; g.add(sign);
   }
 
   const T = plan.train;

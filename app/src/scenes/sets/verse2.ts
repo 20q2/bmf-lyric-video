@@ -117,7 +117,6 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     for (const z of [-3.2, -8.8]) { const p = plane(g, 3, 1.8, -w / 2 - 0.012, 2.1, z, endGlass); p.rotation.y = -Math.PI / 2; }
     box(g, 0.06, 0.5, Sh.d, -w / 2 - 0.03, 0.25, -Sh.d / 2, toon({ color: orange }));
     for (const [x, z] of [[-w / 4, -4], [w / 5, -8], [w / 3, -3.5]]) box(g, 1.6, 0.9, 1.6, x!, Sh.h + 0.45, z!, toon({ color: '#b9ada0' }));
-    box(g, w + 0.06, 0.5, 0.06, 0, 0.25, 0.03, toon({ color: orange }));
     box(g, w + 0.3, 0.8, 0.5, 0, Sh.h - 0.4, 0.2, toon({ color: orange }));
     for (let k = 0; k < 2; k++) plane(g, 9, 0.7, -w / 2 + 6 + k * 11, Sh.h - 0.4, 0.46, name('HANDLE IT HARDWARE', 9, 0.7, '#fff6e0', orange));
     // his strongman, painted on the wall past the banner: bald, arms crossed, a white tee, an earring (Mr. Clean's cousin)
@@ -140,6 +139,8 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       for (const dx of [-1, 1]) box(g, 0.12, W.h, 0.1, x(s) + (dx * (W.w + 0.12)) / 2, W.y, 0.04, trim);
     }
     const door = (plan.windows[0]! + plan.windows[1]!) / 2;
+    // (the orange base course in two runs, the door between them: it ran on through the door — the user, 2026-10-14)
+    for (const [a, b] of [[-w / 2 - 0.03, x(door) - 0.7], [x(door) + 0.7, w / 2 + 0.03]] as const) box(g, b - a, 0.5, 0.06, (a + b) / 2, 0.25, 0.03, toon({ color: orange }));
     box(g, 1.3, 2.5, 0.06, x(door), 1.25, 0.03, toon({ color: '#1d2026' }));
     box(g, 0.3, 0.12, 0.3, x(door), 2.8, 0.15, toon({ color: '#1d2026' })); // the lamp over the door
     box(g, 0.2, 0.05, 0.2, x(door), 2.72, 0.15, lampMaterial('#ffe8b0', GLOW.lamp * 0.6, 0.9));
@@ -165,7 +166,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     for (const wx of [-w / 2 + 3.5, w / 2 - 3.5]) { plane(g, 4.6, 2.2, wx, 2.0, 0.015, glass); box(g, 4.8, 0.1, 0.1, wx, 3.15, 0.04, cream); box(g, 4.8, 0.1, 0.1, wx, 0.85, 0.04, cream); }
     for (let x = -w / 2 + 0.6; x < w / 2 - 0.3; x += 1.2) box(g, 1.2, 0.12, 1.3, x + 0.6, 3.35, 0.65, Math.round(x / 1.2) % 2 ? redM : white); // the awning, striped
     box(g, 1.4, 2.6, 0.06, 0, 1.3, 0.03, toon({ color: '#1d2026' })); plane(g, 0.9, 1.4, 0, 1.6, 0.065, glass);
-    box(g, w, 0.5, 0.06, 0, 0.25, 0.03, redM); // the red base
+    for (const [a, b] of [[-w / 2, -0.75], [0.75, w / 2]] as const) box(g, b - a, 0.5, 0.06, (a + b) / 2, 0.25, 0.03, redM); // the red base, either side of the door (it ran through it: the user, 2026-10-14)
     // the bucket sign on a pole by the road end, turning slowly
     const bucket = new THREE.Group(); bucket.position.set(w / 2 - 1.2, h + 2.6, 0.4); g.add(bucket);
     cyl(g, 0.12, h + 2.0, w / 2 - 1.2, (h + 2.0) / 2, 0.4, dark);

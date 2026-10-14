@@ -143,10 +143,13 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     // its back: the rear window over the ad, an amber route sign over that, the engine's louvres under it, a bumper, a
     // plate; an air-conditioning pod on the roof (QA: a bare box filling the frame for seconds)
     const glassM = toon({ color: '#28323c' });
-    box(bus, 2.22, 0.72, 0.03, 0, 2.75, -H - 0.005, black);
-    plane(bus, 2.1, 0.6, 0, 2.75, -H - 0.025, glassM).rotation.y = Math.PI;
+    // (the window to y 3.03, the route sign's box over it from 3.05, both in front of the body: the sign's foot sat
+    // inside the window's box — the user, 2026-10-14)
+    box(bus, 2.22, 0.64, 0.03, 0, 2.71, -H - 0.005, black);
+    plane(bus, 2.1, 0.52, 0, 2.71, -H - 0.025, glassM).rotation.y = Math.PI;
     const route = canvasTex(512, 48, (c) => { c.fillStyle = '#120c06'; c.fillRect(0, 0, 512, 48); c.fillStyle = '#ffb000'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 34); c.fillText('210  CRENSHAW', 256, 26); });
-    plane(bus, 1.6, 0.15, 0, 3.14, -H - 0.012, new THREE.MeshBasicMaterial({ map: route, color: new THREE.Color(1.6, 1.6, 1.6) })).rotation.y = Math.PI;
+    box(bus, 1.7, 0.19, 0.03, 0, 3.14, -H - 0.005, black);
+    plane(bus, 1.6, 0.15, 0, 3.14, -H - 0.025, new THREE.MeshBasicMaterial({ map: route, color: new THREE.Color(1.6, 1.6, 1.6) })).rotation.y = Math.PI;
     for (let k = 0; k < 5; k++) box(bus, 1.5, 0.035, 0.03, 0, 1.0 + k * 0.08, -H - 0.01, black);
     box(bus, 2.56, 0.28, 0.16, 0, 0.48, -H - 0.06, black);
     plane(bus, 0.5, 0.25, 0, 0.75, -H - 0.012, toon({ color: '#f2f1ea' })).rotation.y = Math.PI;
@@ -188,11 +191,20 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     body.position.set(0, mid, -0.008); slab.add(body);
     const px = 512 / p.w, screen = canvasTex(512, Math.round(H * px), (c) => {
       const w = 512, h = c.canvas.height, top = P.top * px, bottom = P.bottom * px;
-      // the wallpaper: a dusk gradient with a scatter of stars (the user: a background, like some chats have)
-      const sky = c.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#1a1030'); sky.addColorStop(0.6, '#3a1c4e'); sky.addColorStop(1, '#5a2a52');
+      // the wallpaper: a photo of the sun going down over the hills, palms along the foot (the user, 2026-10-14: the
+      // first one — stars that ran in a line, a flat disc of a moon — "looks kind of weird")
+      const sky = c.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#120c24'); sky.addColorStop(0.42, '#4a1f52'); sky.addColorStop(0.7, '#b4475a'); sky.addColorStop(0.79, '#f08a5a'); sky.addColorStop(0.84, '#f6b34a');
       c.fillStyle = sky; c.fillRect(0, 0, w, h);
-      c.fillStyle = 'rgba(255,255,255,0.55)'; for (let k = 0; k < 60; k++) { const x = ((k * 0.618) % 1) * w, y = top + ((k * 0.381) % 1) * (h - top - bottom); c.beginPath(); c.arc(x, y, 1 + 1.5 * ((k * 0.73) % 1), 0, Math.PI * 2); c.fill(); }
-      c.fillStyle = '#f6b34a'; c.beginPath(); c.arc(w * 0.78, h * 0.78, w * 0.08, 0, Math.PI * 2); c.fill(); // a low moon
+      c.fillStyle = 'rgba(255,255,255,0.4)'; for (let k = 1; k <= 26; k++) { const x = ((k * 0.7548776662) % 1) * w, y = top + ((k * 0.5698402910) % 1) * h * 0.32; c.beginPath(); c.arc(x, y, 1 + ((k * 0.37) % 1), 0, Math.PI * 2); c.fill(); } // a few stars high up
+      const hz = h * 0.8;
+      c.fillStyle = '#ffe4a8'; c.beginPath(); c.arc(w * 0.62, hz, w * 0.1, Math.PI, 0); c.fill(); // the sun, half down
+      c.fillStyle = '#2a1830'; c.beginPath(); c.moveTo(0, h); c.lineTo(0, hz + h * 0.02); c.quadraticCurveTo(w * 0.2, hz - h * 0.05, w * 0.42, hz + h * 0.01); c.quadraticCurveTo(w * 0.7, hz - h * 0.06, w, hz + h * 0.015); c.lineTo(w, h); c.closePath(); c.fill(); // the hills' line
+      c.fillStyle = '#160e1c'; // the palms, over the hills
+      for (const [px, ph, lean] of [[w * 0.12, h * 0.3, 0.03], [w * 0.84, h * 0.27, -0.04], [w * 0.3, h * 0.2, 0.05]] as const) {
+        const tp = h - ph;
+        c.beginPath(); c.moveTo(px - 4, h); c.lineTo(px + 4, h); c.lineTo(px + 3 + lean * ph, tp); c.lineTo(px - 3 + lean * ph, tp); c.closePath(); c.fill();
+        for (let f = 0; f < 7; f++) { const a = -Math.PI * 0.9 + (f / 6) * Math.PI * 0.8; c.save(); c.translate(px + lean * ph, tp); c.rotate(a); c.beginPath(); c.ellipse(w * 0.07, 0, w * 0.075, w * 0.016, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+      }
       c.fillStyle = 'rgba(11,11,16,0.85)'; c.fillRect(0, 0, w, top); c.fillRect(0, h - bottom, w, bottom); // the bars, dark
       c.fillStyle = '#e8e8ee'; c.textBaseline = 'middle'; c.font = font(F.sign(600), top * 0.22); c.textAlign = 'left'; c.fillText('7:41', w * 0.08, top * 0.18);
       c.fillRect(w * 0.82, top * 0.12, w * 0.09, top * 0.12); c.fillStyle = '#0b0b10'; c.fillRect(w * 0.905, top * 0.15, w * 0.006, top * 0.06); // (the battery)

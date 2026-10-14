@@ -48,7 +48,9 @@ export const SHACK = {
   pole: { lateral: -(ROAD_HALF + 1.6), y: 5.8, turn: 0.55, before: 5 },
   corner: { w: 9, blade: -2.4, lateral: -(ROAD_HALF + 1.2) }, // (the blade and the A-frame under it clear of the crosswalk)
   aframes: { first: 6.5, second: 1, lateral: -(ROAD_HALF + 2.4), y: 0.95, turn: 0.5 },
-  shop: { from: 3, len: 23, face: -(ROAD_HALF + 5), d: 14, h: 5.6, windows: [5.5, 13.5], window: { w: 6.2, h: 2.7, y: 2.3 }, banner: { at: 19, y: 3.0 } },
+  // (the banner up under the eaves, the wall tall enough for it over the windows: at y 3 it hung across them, past the
+  // building's end — the user, 2026-10-14)
+  shop: { from: 3, len: 23, face: -(ROAD_HALF + 5), d: 14, h: 6.6, windows: [5.5, 13.5], window: { w: 6.2, h: 2.7, y: 2.15 }, banner: { at: 17, y: 4.75 } },
   chicken: { gap: 5, len: 15, d: 13, h: 4.6, sign: { at: 7.5, over: 1.4 } },
 };
 /** The takes (m): the pole sign's, from the right sidewalk back up the street (back of the sign, off the road's centre,
@@ -59,7 +61,7 @@ export const SHOTS = {
   pole: { back: 8, lateral: ROAD_HALF + 1.4, y: 1.3, drift: 0.4 },
   corner: { aframe: { out: 4.6, y: 1.7 }, pair: { out: 7, y: 2.2 } },
   windows: { back: 4, lateral: 3, y: 2.5, end: 3 },
-  banner: { back: 5, lateral: 2.5, y: 1.6, end: 2 },
+  banner: { back: 5, lateral: 2.0, y: 2.4, end: 2 }, // (up and nearer for the banner under the eaves)
   sign: { back: 12.5, lateral: ROAD_HALF + 2, y: 3, end: 3 },
 };
 /** The car wash on the right: its sign (off the road, its centre's height; passed this far through its line), its
@@ -207,7 +209,8 @@ export const VERSE2: SetPiece = {
     hold(corner, glideTake(corner, corner.map((_, i) => () => (i ? pair : first))), 'cut');
     // its windows, painted: "And when I got a problem, he get to packing"
     const Sh = S.shop, winS = Sh.windows.map((x) => shop0 + x);
-    const wins = phs[2]!.map((ph, i) => { const s = winS[Math.min(i, winS.length - 1)]!; return add('window', ph, s, atRoad(s, Sh.face + 0.05, Sh.window.y + (i >= winS.length ? -0.9 : 0)), right(s), UP.clone(), layout('window', ph.text, ph.solo)); });
+    // (its words on promotional posters taped in the glass, not floating on it: the user, 2026-10-14)
+    const wins = phs[2]!.map((ph, i) => { const s = winS[Math.min(i, winS.length - 1)]!; return add('window', ph, s, atRoad(s, Sh.face + 0.05, Sh.window.y + (i >= winS.length ? -0.9 : 0)), right(s), UP.clone(), layout('window', ph.text, ph.solo), { ad: 'sale' }); });
     hold(wins, along(wins, SHOTS.windows), 'cut');
     // its banner under the eaves: "He 'bout all that action, call him Mr. Handle It"
     const bS = shop0 + Sh.banner.at, bN = right(bS), bP = atRoad(bS, Sh.face + 0.12, Sh.banner.y), banner = stack('vinyl', phs[3]!, bP, bN);

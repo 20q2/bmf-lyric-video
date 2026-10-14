@@ -214,7 +214,7 @@ export const VERSE1: SetPiece = {
 
     // the radio, riding in the dash
     const R = AT.radio, radio = riding('radio', phs[4]!, R.pos, R.normal, 0, { until: l9.start }); // (off once the camera's away: it'd show behind her phone)
-    hold(radio.cs, (t) => lookFrom(inFrame(EYE.radio, t), inFrame(R.pos, t)), 'whip');
+    hold(radio.cs, (t) => lookFrom(inFrame(EYE.radio, t), inFrame(R.pos, t)), 'cut'); // (a whip flew in through the car's body: the user, 2026-10-14)
 
     // the burger stand: its menu board facing the traffic, the car passing it; its marquee up on its pole
     const menuP = atRoad(menuS, AT.menu.lateral, AT.menu.y), standN = fwd(menuS).negate();

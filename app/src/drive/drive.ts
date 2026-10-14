@@ -206,6 +206,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   // each phrase's text shows from its own shot, or from the shot before when that's the same line's (the next phrase
   // may be seen coming) or previews it (paired): never more than one phrase ahead, never across a pause
   carriers.forEach((c, i) => {
+    if (c.early) return; // (a street's name on its blade stands before the lyric reaches it: the set's own reveal — the user, 2026-10-14)
     c.reveal = resolveAt(phraseShots[i]!.at) - REVEAL_S; // (shown by the time its shot lands: a cut finds it finished)
     if (paired[i - 1] || carriers[i - 1]?.phrase.line === c.phrase.line) c.reveal = Math.min(c.reveal, Math.max(resolveAt(phraseShots[i - 1]!.at), c.phrase.start - REVEAL_AHEAD));
   });

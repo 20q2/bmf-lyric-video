@@ -133,7 +133,9 @@ function styleOf(c: Carrier): Style {
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
     case 'polesign': return { bg: '#fbf7ee', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
     case 'aframe': return { bg: '#1f2b26', border: '#3c4a43', family: F.archivo(87, 800), caps: true, colors: ['#f3efe6', '#f3efe6', '#ffd65a'], alpha: [0.7, 0.95], roughen: true }; // chalk
-    case 'window': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.82, 1], outline: '#c8102e', shadow: '#5a0614' }; // painted on the glass
+    case 'window': return c.ad // a promotional poster taped in the glass (the user, 2026-10-14: the words "floating in the window"), or painted on it
+      ? { bg: '#fff8e6', border: '#c8102e', family: F.archivo(100, 900), caps: true, colors: ['#16131a', '#16131a', '#c8102e'], alpha: [0.8, 1] }
+      : { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.82, 1], outline: '#c8102e', shadow: '#5a0614' };
     case 'vinyl': return { bg: '#c8202e', family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'roofsign': return { bg: '#ffd65a', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
     case 'carwash': return { family: F.archivo(100, 900), caps: true, colors: ['#ffffff', '#ffffff', '#ff3043'], alpha: [1, 1], outline: '#0b3a66', align: 'left' }; // (on the prop's board, solid over its suds; the hero word red: yellow sinks into the pale blue)
@@ -184,7 +186,9 @@ export class CarrierArt {
     // the board's art, built round its lyric (never fading for it): an ad's product, or a route sign's shield and arrow
     const share = TEXT_SHARE[carrier.kind] ?? 1;
     // (a bus's ad is the bus's: its rows are the headline over it)
-    if (carrier.ad && carrier.kind !== 'bus' && carrier.kind !== 'giant') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1]);
+    if (carrier.ad && carrier.kind !== 'bus' && carrier.kind !== 'giant') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1], Number(carrier.id.split('.')[1] ?? 0) + carrier.phrase.line);
+    // (a shop's poster, taped up in its window: tape across its corners)
+    if (carrier.kind === 'window' && carrier.ad) for (const [x, y, a] of [[0, 0, -0.785], [W, 0, 0.785], [0, H, 0.785], [W, H, -0.785]] as const) { c.save(); c.translate(x, y); c.rotate(a); c.fillStyle = 'rgba(205,205,195,0.8)'; c.fillRect(-W * 0.045, -H * 0.05, W * 0.09, H * 0.1); c.restore(); }
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
     // (a price only once its item's words are coming in: a price beside a blank line reads as a bug)
     else if (carrier.kind === 'menu' && revealAt(carrier, t) > 0) this.drawPrices(c, share);

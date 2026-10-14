@@ -47,6 +47,9 @@ export interface Chorus2Plan {
   posters: number[];
   gantryS: number; panels: Panel[];
   exitS: number;
+  /** The road widens to the right to `edge` over [a, b], merging in and out over `merge` m (world.ts builds it into the
+   *  road's own ribbon: a strip beside it shaded differently from the road). */
+  lanes: { a: number; b: number; edge: number; merge: number };
   /** Slower cars in the outside lane, overtaken through the chorus (the cheapest speed there is: relative motion):
    *  each where it is when they pass it (m along the road, s), its own speed (m/s) and its lane (m off the centre). */
   traffic: { s0: number; t0: number; v: number; lat: number }[];
@@ -123,9 +126,15 @@ export const CHORUS2: SetPiece = {
 
     // the freeway's left side: the sound wall (concrete: the guard sees it) from before the posters to the stretch's end
     const s0 = p0 - WALL.before, s1 = carS(st.end) + 20, blocks: Block[] = [];
+    /** A box on the road's surface following its grade (blocks.ts boxAt stands level: the wall's pieces stood in steps
+     *  up the freeway's rise — the user, 2026-10-14). */
+    const alongRoad = (s: number, lateral: number, across: number, h: number, along: number) => {
+      const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, lateral).addScaledVector(f.up, h / 2);
+      return new THREE.Matrix4().makeBasis(f.right.clone().negate(), f.up.clone(), f.fwd.clone()).scale(new THREE.Vector3(across, h, along)).setPosition(p.x, p.y, p.z);
+    };
     for (let s = s0; s < s1; s += WALL.seg) {
       const m = s + WALL.seg / 2;
-      blocks.push({ s: m, lateral: WALL.face - WALL.d / 2, w: WALL.seg, h: WALL.h, d: WALL.d, color: 0, concrete: true, matrix: boxAt(route, m, WALL.face - WALL.d / 2, WALL.d, WALL.h, WALL.seg + 0.05) });
+      blocks.push({ s: m, lateral: WALL.face - WALL.d / 2, w: WALL.seg, h: WALL.h, d: WALL.d, color: 0, concrete: true, matrix: alongRoad(m, WALL.face - WALL.d / 2, WALL.d, WALL.h, WALL.seg + 0.05) });
     }
     const until = at + (s1 - tailS) / TRAIN.v;
     // slower traffic in the outside lane, one overtaken in each third of the chorus
@@ -136,6 +145,7 @@ export const CHORUS2: SetPiece = {
     const plan: Chorus2Plan = {
       s0, s1, train: { tailS, at, from: Math.max(st.start - 1, at - 4), until }, posters: posters.map((c) => c.s),
       gantryS, panels, exitS: carS(st.end - EXIT.before) + 40, traffic,
+      lanes: { a: s0, b: s1, edge: FREEWAY_EDGE, merge: 45 },
     };
     return { carriers, frames, clear: [{ side: -1, a: s0, b: s1 }], blocks, plan };
   },

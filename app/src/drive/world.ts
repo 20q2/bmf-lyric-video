@@ -55,13 +55,14 @@ const SIDEWALKS = { stretches: new Set(['intro', 'chorus1', 'verse1', 'verse2', 
 
 /** A ribbon along the road from s0 to s1: at each sample, from (lateral a, height ya) to (lateral b, height yb) over the
  *  road's level; uv in metres (along, across). */
-function ribbon(route: Route, s0: number, s1: number, a: number, ya: number, b: number, yb: number): THREE.BufferGeometry {
+function ribbon(route: Route, s0: number, s1: number, a: number | ((s: number) => number), ya: number, b: number | ((s: number) => number), yb: number): THREE.BufferGeometry {
   const n = Math.max(2, Math.ceil((s1 - s0) / STEP) + 1), pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  const at = (x: number | ((s: number) => number), s: number) => (typeof x === 'number' ? x : x(s));
   for (let i = 0; i < n; i++) {
-    const s = s0 + ((s1 - s0) * i) / (n - 1), f = route.frameAt(s);
-    const p = f.pos.clone().addScaledVector(f.right, a), q = f.pos.clone().addScaledVector(f.right, b);
+    const s = s0 + ((s1 - s0) * i) / (n - 1), f = route.frameAt(s), as = at(a, s), bs = at(b, s);
+    const p = f.pos.clone().addScaledVector(f.right, as), q = f.pos.clone().addScaledVector(f.right, bs);
     pos.push(p.x, p.y + ya, p.z, q.x, q.y + yb, q.z);
-    uv.push(s, 0, s, Math.hypot(b - a, yb - ya));
+    uv.push(s, 0, s, Math.hypot(bs - as, yb - ya));
     if (i) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
   }
   const g = new THREE.BufferGeometry();
@@ -237,7 +238,12 @@ export function buildWorld(drive: Drive): THREE.Group {
   base.rotation.x = -Math.PI / 2;
   base.position.set((box3.min.x + box3.max.x) / 2, -0.4, (box3.min.z + box3.max.z) / 2);
   g.add(named(base, 'base'));
-  g.add(named(new THREE.Mesh(strip(route, -ROAD_HALF, ROAD_HALF, 0, () => asphalt, end), lambert()), 'road'));
+  // (the freeway's extra lanes: the road's own ribbon widened to the right over chorus 2's stretch, merging in and
+  // out — a strip laid beside it was shaded apart from it, the user, 2026-10-14)
+  const lanes = (drive.plans.chorus2 as { lanes?: { a: number; b: number; edge: number; merge: number } } | undefined)?.lanes;
+  const ease = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
+  const rightEdge = (s: number) => (lanes ? ROAD_HALF + (lanes.edge - ROAD_HALF) * ease((s - lanes.a) / lanes.merge) * ease((lanes.b - s) / lanes.merge) : ROAD_HALF);
+  g.add(named(new THREE.Mesh(strip(route, -ROAD_HALF, rightEdge, 0, () => asphalt, end), lambert()), 'road'));
   // the centre line's dashes, but none under road paint (they'd cut through its letters; left out, not squashed
   // flat: a flat box's normals are NaN, and the bloom spreads a NaN into a white dot)
   const paint = drive.carriers.filter((c) => c.kind === 'road');
@@ -253,7 +259,8 @@ export function buildWorld(drive: Drive): THREE.Group {
     for (const st of drive.stretches) if (!SIDEWALKS.stretches.has(st.id) && !st.tunnel) spans.push([motion.distanceAt(st.start), Math.min(end, motion.distanceAt(st.end))]);
     for (const [a, b] of spans) for (const side of [-1, 1]) {
       if (b - a < 2) continue;
-      g.add(named(new THREE.Mesh(ribbon(route, a, b, side * (ROAD_HALF - 0.38), 0.015, side * (ROAD_HALF - 0.22), 0.015), line), 'dashes'));
+      const edge = (inset: number) => (side > 0 ? (s: number) => rightEdge(s) - inset : -(ROAD_HALF - inset));
+      g.add(named(new THREE.Mesh(ribbon(route, a, b, edge(0.38), 0.015, edge(0.22), 0.015), line), 'dashes'));
     }
   }
   // a guardrail along the sea side of the coast road (the road's edge dropped straight into the water): posts and a rail
@@ -919,21 +926,22 @@ export function buildCar(): THREE.Group {
   // the dash: a padded top rolling over its front edge, the fascia under it with a brushed band and three chrome ribs
   // across, his instrument hood over the gauges, her glovebox with a chrome button, a round vent at each end; the head
   // unit, the gauges and the shift strip stand proud of the fascia (look/dash.ts)
-  // (the fascia's face at z 0.53: the head unit, the gauges and the shift strip stand proud of it — set into a fascia
-  // at 0.6 they clipped into it, and the guard's dash box (drive.ts CABIN) starts at 0.55)
-  box(1.76, 0.36, 0.34, 0, 1.03, 0.70, cabin); // the fascia
-  box(1.76, 0.06, 0.4, 0, 1.24, 0.74, cabin); // the pad (its front edge at z 0.54: further forward it cut the head unit's top)
-  { const roll = add(new THREE.CylinderGeometry(0.03, 0.03, 1.76, 10), cabin, 0, 1.24, 0.54); roll.rotation.z = Math.PI / 2; }
-  box(1.76, 0.07, 0.012, 0, 0.93, 0.525, toon({ color: '#8f877c' })); // the brushed band
-  for (const y of [0.905, 0.93, 0.955]) box(1.76, 0.004, 0.014, 0, y, 0.524, trim);
+  // (the fascia's and the pad's faces at z 0.6: the head unit's screen leans back, its top edge at z 0.56 — with the
+  // faces nearer than that its top was sunk into the dash (the user, 2026-10-14: "the music console is inside the
+  // dashboard"); the head unit, the gauges and the shift strip stand proud of it on their own housings, look/dash.ts)
+  box(1.76, 0.36, 0.34, 0, 1.03, 0.77, cabin); // the fascia
+  box(1.76, 0.06, 0.34, 0, 1.24, 0.77, cabin); // the pad
+  { const roll = add(new THREE.CylinderGeometry(0.03, 0.03, 1.76, 10), cabin, 0, 1.24, 0.6); roll.rotation.z = Math.PI / 2; }
+  box(1.76, 0.07, 0.012, 0, 0.93, 0.595, toon({ color: '#8f877c' })); // the brushed band
+  for (const y of [0.905, 0.93, 0.955]) box(1.76, 0.004, 0.014, 0, y, 0.594, trim);
   box(0.38, 0.035, 0.12, 0.48, 1.215, 0.46, cabin); // his instrument hood
   // under the dash: the kick panel down to the floor, the transmission hump along the middle (the floor read as the
   // hull's bare inside in the head-unit shot)
   { const kick = 0.85 - IMPALA.cockpit.floor; box(Wd - 0.3, kick, 0.06, 0, IMPALA.cockpit.floor + kick / 2, 0.6, cabin); } // (up to the fascia's underside, under it: higher, it stood in front of the head unit)
   box(0.46, 0.22, cl - 0.4, 0, IMPALA.cockpit.floor + 0.11, cm, seat);
-  box(0.5, 0.16, 0.012, -0.52, 1.07, 0.525, toon({ color: '#4a3542' })); // her glovebox
-  { const btn = add(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 10), trim, -0.52, 1.07, 0.518); btn.rotation.x = Math.PI / 2; }
-  for (const x of [0.8, -0.8]) { add(new THREE.TorusGeometry(0.04, 0.007, 6, 16), trim, x, 1.14, 0.52); add(new THREE.CircleGeometry(0.036, 16), dark, x, 1.14, 0.522).rotation.y = Math.PI; }
+  box(0.5, 0.16, 0.012, -0.52, 1.07, 0.595, toon({ color: '#4a3542' })); // her glovebox
+  { const btn = add(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 10), trim, -0.52, 1.07, 0.588); btn.rotation.x = Math.PI / 2; }
+  for (const x of [0.8, -0.8]) { add(new THREE.TorusGeometry(0.04, 0.007, 6, 16), trim, x, 1.14, 0.59); add(new THREE.CircleGeometry(0.036, 16), dark, x, 1.14, 0.592).rotation.y = Math.PI; }
   g.userData.dash = buildDash(body);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#dfe8f0', transparent: true, opacity: 0.08, depthWrite: false }));
   glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);
@@ -986,10 +994,11 @@ export function buildCar(): THREE.Group {
   // the two of them: him at the wheel (+x: the car's left) in a cap, a hand on it; her, her hair down her back, an arm
   // that goes up (cast.ts); their heads on pivots at the neck (hers turns to him, his nods): named for the scene
   // his wheel: the rim, two spokes to a chrome hub inside a horn ring, on its column down into the dash
-  const wheel = new THREE.Group(); wheel.position.set(0.44, belt + 0.38, 0.42); wheel.rotation.x = -0.9; body.add(wheel);
+  // (its face toward him: tipped back at the top like a car's, the hub side (local -z) up and back at him, the column
+  // (local +z) down and forward into the dash — at -0.9 the hub faced his lap and its back the windshield (the user,
+  // 2026-10-13 and 14: "facing towards the window"))
+  const wheel = new THREE.Group(); wheel.position.set(0.44, belt + 0.38, 0.42); wheel.rotation.x = 0.6; body.add(wheel);
   add(new THREE.TorusGeometry(0.19, 0.022, 8, 28), dark, 0, 0, 0, wheel);
-  // (the horn ring and hub toward the driver, the column away into the dash: the other way round the wheel faced the
-  // windshield — the user, 2026-10-13)
   add(new THREE.TorusGeometry(0.1, 0.007, 6, 24), trim, 0, 0, -0.012, wheel);
   for (const a of [0.35, -0.35, Math.PI / 2 + 0.0]) { const spoke = add(new THREE.BoxGeometry(0.36, 0.02, 0.014), dark, 0, 0, 0, wheel); spoke.rotation.z = a; if (a > 1) spoke.scale.x = 0.5, spoke.position.y = -0.09; }
   { const hub = add(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14), trim, 0, 0, -0.01, wheel); hub.rotation.x = Math.PI / 2; }

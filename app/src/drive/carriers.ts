@@ -156,7 +156,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   // the big sign on its roof)
   polesign: { rowH: 0.95, w: 5.2, advance: 0.6, emOfRow: 0.68, wrap: 15 },
   aframe: { rowH: 0.5, w: 2.5, advance: 0.6, emOfRow: 0.68, wrap: 9 },
-  window: { rowH: 0.8, w: 5.4, advance: 0.6, emOfRow: 0.68, wrap: 14 },
+  window: { rowH: 0.8, w: 6.0, advance: 0.6, emOfRow: 0.68, wrap: 14 }, // (its lyric in the left TEXT_SHARE of it: a poster's deal on the right)
   vinyl: { rowH: 0.62, w: 10, advance: 0.6, emOfRow: 0.7, wrap: 30 },
   roofsign: { rowH: 1.1, w: 10.5, advance: 0.6, emOfRow: 0.68, wrap: 22 },
   // (the car wash's ad: the words on its left, the suds on its right: the prop's)
