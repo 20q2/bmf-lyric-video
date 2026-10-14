@@ -237,7 +237,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
-  const blocks = blocksOf(route, motion, stretches, carriers, tunnels, clears, setBlocks);
+  const blocks = blocksOf(route, motion, stretches, carriers, tunnels, clears, setBlocks, openings);
   const lastShot = phraseShots[phraseShots.length - 1], lastCut = lastShot ? resolveAt(lastShot.at) : null;
   return { stretches, motion, route, carriers, tunnels, blocks, openings, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans };
 }

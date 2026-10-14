@@ -9,7 +9,34 @@ ramp.minFilter = ramp.magFilter = THREE.NearestFilter;
 ramp.generateMipmaps = false;
 ramp.needsUpdate = true;
 
-export const toon = (o: THREE.MeshToonMaterialParameters = {}) => new THREE.MeshToonMaterial({ gradientMap: ramp, ...o });
+/** How much the sun's cast shadows print (0..1): the scene sets it by the sun's height (none at night or in a tunnel). */
+export const PRINT_SHADE: THREE.IUniform<number> = { value: 0 };
+/** What a surface in the sun's shadow keeps of its light: the print's shadow tone. */
+export const SHADE_TONE = 0.5;
+
+/** Printed shadows: the sun's shadow mask darkens the whole surface to a flat tone, not just the direct light it blocks
+ *  (under a low sun the ground gets next to no direct light, so its cast shadows barely showed: poles and the car
+ *  seemed to hover). A patch for a toon material's shader: materials with their own patch call it first. */
+export function printShadows(sh: { uniforms: Record<string, THREE.IUniform>; fragmentShader: string }) {
+  sh.uniforms.printShade = PRINT_SHADE;
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+uniform float printShade;`)
+    .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>
+  float printShadow = 1.0;
+  #if defined( USE_SHADOWMAP ) && ( NUM_DIR_LIGHT_SHADOWS > 0 )
+    if (receiveShadow) printShadow = getShadow( directionalShadowMap[ 0 ], directionalLightShadows[ 0 ].shadowMapSize, directionalLightShadows[ 0 ].shadowIntensity, directionalLightShadows[ 0 ].shadowBias, directionalLightShadows[ 0 ].shadowRadius, vDirectionalShadowCoord[ 0 ] );
+  #endif`)
+    .replace('#include <opaque_fragment>', `outgoingLight *= mix(1.0, ${SHADE_TONE.toFixed(2)}, (1.0 - printShadow) * printShade);
+#include <opaque_fragment>`);
+}
+
+export const toon = (o: THREE.MeshToonMaterialParameters = {}) => {
+  const m = new THREE.MeshToonMaterial({ gradientMap: ramp, ...o });
+  m.onBeforeCompile = printShadows;
+  m.customProgramCacheKey = () => 'toon';
+  return m;
+};
 
 /** The world's colours (sRGB). */
 export const WORLD = {

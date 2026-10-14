@@ -4,6 +4,7 @@
 // moonlight), a sky printed in bands (look/skydome.ts), and the frame screen-printed (look/print.ts): ink outlines,
 // halftone shadows, violet shade; bloom and paper grain in the engine's post.
 import * as THREE from 'three';
+import { PRINT_SHADE } from '../look/toon';
 import { Scene, type Frame } from '../engine/scene';
 import type { PostOverrides } from '../engine/scene';
 import { H, W, makeRT } from '../engine/gl';
@@ -324,6 +325,7 @@ export default class DriveScene extends Scene {
     this.sun.intensity *= 1 - inside;
     this.moon.intensity *= 1 - inside;
     this.hemi.intensity *= 1 - 0.85 * inside;
+    PRINT_SHADE.value = smooth(-1 * DEG, 4 * DEG, e) * (1 - inside); // the printed shadows (look/toon.ts): the sun's
     this.fogColor.lerp(TUNNEL_DARK, inside);
     const fog = this.world.fog as THREE.Fog;
     fog.color.copy(this.fogColor);

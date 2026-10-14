@@ -2,9 +2,11 @@
 // darker scrub in flat tones, and a fine speck, over whatever colour the ground has (each section's own: the verges'
 // vertex colours). The sea along the coast (bluer than it is red) is left as it is. Browser and bun (a shader patch).
 import type * as THREE from 'three';
+import { printShadows } from './toon';
 
 export function printedGround<T extends THREE.MeshToonMaterial>(m: T): T {
   m.onBeforeCompile = (sh) => {
+    printShadows(sh);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
 varying vec3 vGroundPos;`)

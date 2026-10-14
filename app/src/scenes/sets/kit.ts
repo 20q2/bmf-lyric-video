@@ -81,8 +81,13 @@ export function sedan(opts: { color: string; length?: number; low?: boolean }): 
   box(body, W - 0.26, 0.34, L * 0.45 - 0.24, 0, 1.03, -0.25, dark); // the glasshouse
   box(body, W + 0.06, 0.1, 0.12, 0, 0.42, hl + 0.04, chrome);
   box(body, W + 0.06, 0.1, 0.12, 0, 0.42, -hl - 0.04, chrome);
+  // its lamps, a chrome strip down each flank, and the wheels on chrome hubs
+  const lamp = toon({ color: '#f4efd8' }), tail = toon({ color: '#b8161a' });
+  for (const x of [W / 2 - 0.25, -W / 2 + 0.25]) { box(body, 0.22, 0.14, 0.04, x, 0.6, hl + 0.01, lamp); box(body, 0.24, 0.1, 0.04, x, 0.62, -hl - 0.01, tail); }
+  for (const x of [W / 2 + 0.005, -W / 2 - 0.005]) box(body, 0.02, 0.05, L * 0.8, x, 0.66, 0, chrome);
   for (const z of [hl - 0.85, -hl + 0.85]) for (const x of [W / 2 - 0.1, -W / 2 + 0.1]) {
     const w = cyl(g, 0.3, 0.2, x, 0.3, z, dark, 14); w.rotation.z = Math.PI / 2;
+    const hub = cyl(g, 0.16, 0.22, x, 0.3, z, chrome, 12); hub.rotation.z = Math.PI / 2;
   }
   return g;
 }

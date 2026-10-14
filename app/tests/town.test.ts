@@ -18,7 +18,7 @@ const GRID = [-0.5, -0.25, 0, 0.25, 0.5].flatMap((x) => [-0.5, -0.25, 0, 0.25, 0
 test('no building stands on the road', () => {
   const on: string[] = [];
   drive.blocks.forEach((b, i) => {
-    if (b.concrete) return; // (a freeway's barriers and walls stand at its edge by design)
+    if (b.concrete || b.car) return; // (a freeway's barriers and walls stand at its edge by design; a parked car on it)
     // (an arch over the road stands on its pylons: its own footprint is overhead)
     const base = new THREE.Vector3(0, -0.5, 0).applyMatrix4(b.matrix).y - drive.route.frameAt(b.s).pos.y;
     if (base > 2.5) return;

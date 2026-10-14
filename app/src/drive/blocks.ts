@@ -6,21 +6,22 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import type { Carrier } from './carriers';
 import type { Motion } from './motion';
-import { ROAD_HALF, type Route } from './route';
+import { ROAD_HALF, ROAD_START, type Route } from './route';
 import type { Stretch } from './stretches';
 import { TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 
 /** Per stretch: building heights (m, min–max), how many plots stay empty, which side is the sea, how far back (m) the
- *  near row starts, and the rows behind it (how many, their heights). */
-export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number; back?: [number, number, number] }> = {
-  intro: { h: [6, 10], empty: 0.5, back: [2, 8, 16] },
-  chorus1: { h: [8, 22], empty: 0.3, back: [2, 10, 26] },
-  verse1: { h: [14, 40], empty: 0.1, back: [3, 18, 50] },
+ *  near row starts, the rows behind it (how many, their heights), and how many of the left kerb's parking spots are
+ *  taken (none: no parking). */
+export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number; back?: [number, number, number]; parked?: number }> = {
+  intro: { h: [6, 10], empty: 0.5, back: [2, 8, 16], parked: 0.55 },
+  chorus1: { h: [8, 22], empty: 0.3, back: [2, 10, 26], parked: 0.6 },
+  verse1: { h: [14, 40], empty: 0.1, back: [3, 18, 50], parked: 0.6 },
   chorus2: { h: [6, 14], empty: 0.6, far: 40, back: [1, 8, 18] },
-  verse2: { h: [4, 8], empty: 0.3, back: [1, 6, 10] },
+  verse2: { h: [4, 8], empty: 0.3, back: [1, 6, 10] }, // (its set parks its own lowriders)
   chorus3: { h: [5, 10], empty: 0.6, seaLeft: true, back: [1, 6, 12] },
   bridge1: { h: [5, 9], empty: 1, seaLeft: true }, // in the tunnel
-  verse3: { h: [8, 18], empty: 0.05, back: [2, 12, 28] },
+  verse3: { h: [8, 18], empty: 0.05, back: [2, 12, 28], parked: 0.6 },
   chorus4: { h: [3, 6], empty: 0.8 },
   outro1: { h: [0, 0], empty: 1 },
 };
@@ -38,7 +39,11 @@ const FOOTPRINT = [-0.5, -0.25, 0, 0.25, 0.5].flatMap((x) => [-0.5, -0.25, 0, 0.
 
 /** A box standing by the road: a building (the town's), or concrete (a set-piece's structure: a viaduct's deck, its
  *  piers); `lateral` and `w` across the road, `d` along it. */
-export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean; /** No awnings: its front carries murals. */ bare?: boolean; /** Built by its set-piece's props (world.ts leaves it out: the guard still sees it). */ prop?: boolean }
+export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean; /** No awnings: its front carries murals. */ bare?: boolean; /** Built by its set-piece's props, or as a parked car (world.ts leaves it out of the town: the guard still sees it). */ prop?: boolean; /** A car parked at the kerb (world.ts builds it as a sedan; it stands on the road by design). */ car?: boolean }
+
+/** Parking at the left kerb (the far lane's: the right lane is the car's own, and the road is a lane each way): a spot
+ *  every `every` m, none within `clear` m of a lyric's carrier or a set-piece's opening (a cross street, a driveway). */
+export const PARKED = { every: 7.5, clear: 7, lateral: ROAD_HALF - 1.05 };
 
 /** A box `across` x `h` x `along` the road, standing `lateral` off it at s (its foot on the road's level, or `y0` over it). */
 export function boxAt(route: Route, s: number, lateral: number, across: number, h: number, along: number, y0 = 0): THREE.Matrix4 {
@@ -49,7 +54,7 @@ export function boxAt(route: Route, s: number, lateral: number, across: number, 
   return m;
 }
 
-export function blocksOf(route: Route, motion: Motion, stretches: readonly Stretch[], carriers: readonly Carrier[], tunnels: readonly Tunnel[], keepClear: readonly { side: number; a: number; b: number }[] = [], own: readonly Block[] = []): Block[] {
+export function blocksOf(route: Route, motion: Motion, stretches: readonly Stretch[], carriers: readonly Carrier[], tunnels: readonly Tunnel[], keepClear: readonly { side: number; a: number; b: number }[] = [], own: readonly Block[] = [], openings: readonly { side: number; a: number; b: number }[] = []): Block[] {
   const stretchAtS = (s: number): Stretch => {
     for (const st of stretches) if (s < motion.distanceAt(st.end)) return st;
     return stretches[stretches.length - 1]!;
@@ -87,6 +92,21 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
   // is seen over), never on the road where it bends back past them
   const roadPts: [number, number][] = [];
   for (let s = 0; s <= route.length; s += 4) { const p = route.frameAt(s).pos; roadPts.push([p.x, p.z]); }
+  // cars parked along the left kerb through the town: blocks, so the guard sees them (world.ts builds them as sedans);
+  // not on a set-piece's own blocks, by a cross street or a driveway, or under road paint (it fills the road). (The
+  // faces' and the set-pieces' clearances are for buildings, which would stand in their shots: a car at the kerb
+  // stands under the words, and the guard checks it.)
+  // (a set-piece's block that reaches the kerb on the left, a cross street's corner or a lot: no parking along it)
+  const atKerb = own.filter((b) => b.lateral < 0 && -b.lateral - b.d / 2 < ROAD_HALF + 1).map((b) => ({ a: b.s - b.w / 2 - 3, b: b.s + b.w / 2 + 3 }));
+  for (let k = Math.ceil(ROAD_START / PARKED.every); k * PARKED.every < route.length; k++) {
+    const s = k * PARKED.every + PARKED.every / 2, b = BLOCKS[stretchAtS(s).id]!, side = -1;
+    if (!b.parked || hash(k, 90) > b.parked) continue;
+    if (nearTunnel(tunnels, s, TUNNEL_CLEAR) || atKerb.some((t) => s > t.a && s < t.b)) continue;
+    if (openings.some((o) => o.side === side && s > o.a - PARKED.clear && s < o.b + PARKED.clear)) continue;
+    if (carriers.some((c) => c.kind === 'road' && Math.abs(c.s - s) < c.h / 2 + PARKED.clear)) continue;
+    const len = 4.4 + 0.8 * hash(k, 91), lateral = side * PARKED.lateral;
+    out.push({ s, lateral, w: len, h: 1.45, d: 1.8, color: hash(k, 92), matrix: boxAt(route, s, lateral, 1.8, 1.45, len), prop: true, car: true });
+  }
   const offRoad = (m: THREE.Matrix4) => FOOTPRINT.every(([x, z]) => {
     const p = new THREE.Vector3(x, -0.5, z).applyMatrix4(m);
     return roadPts.every(([rx, rz]) => Math.hypot(rx - p.x, rz - p.z) >= ROAD_HALF + BACK.road);

@@ -5,7 +5,7 @@
 //   pools     the streetlights' circles of light on the road
 // All additive or emissive HDR, so they bloom. Browser and bun (shaders are strings).
 import * as THREE from 'three';
-import { toon } from './toon';
+import { printShadows, toon } from './toon';
 
 export const NIGHT: THREE.IUniform<number> = { value: 0 };
 /** How bright the lights shine (HDR multiples). */
@@ -15,6 +15,7 @@ export const GLOW = { window: 1.6, lamp: 6, beam: 0.55, pool: 0.5, neon: 2.6, ta
  *  by day; by night some lit, by the cell's hash, from NIGHT. */
 export function withWindows(m: THREE.MeshToonMaterial): THREE.MeshToonMaterial {
   m.onBeforeCompile = (sh) => {
+    printShadows(sh);
     sh.uniforms.night = NIGHT;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWinPos; varying vec3 vWinN;')
@@ -46,6 +47,7 @@ float winHash(vec3 p) { p = fract(p * .1031); p += dot(p, p.zyx + 31.32); return
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   totalEmissiveRadiance += winWarm * winMask * winLit * night * ${GLOW.window.toFixed(2)};`);
   };
+  m.customProgramCacheKey = () => 'withWindows';
   return m;
 }
 
@@ -99,6 +101,7 @@ void main() {
 export function nightGlass(): THREE.MeshToonMaterial {
   const m = toon({ color: '#28323c' });
   m.onBeforeCompile = (sh) => {
+    printShadows(sh);
     sh.uniforms.night = NIGHT;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
 attribute float lit; varying float vLit;`).replace('#include <begin_vertex>', `#include <begin_vertex>

@@ -11,11 +11,12 @@ import { PALM, palmVariant } from '../look/palms';
 import { IMPALA, impalaHull, wireWheel } from '../look/impala';
 import { printedGround } from '../look/ground';
 import type { Drive } from './drive';
-import { ROAD_HALF, type Route } from './route';
+import { ROAD_HALF, ROAD_START, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
 import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
+import { sedan } from '../scenes/sets/kit';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
 import { buildDash } from '../look/dash';
@@ -34,8 +35,7 @@ export const SLOPE = 1;
 /** The road runs on this far past where the car parks, to the overlook's edge (m). */
 const OVERLOOK_LIP = 9;
 const STEP = 2;
-/** The road (its verges, its dashes) starts this far behind where the car waits at the light (m). */
-export const ROAD_START = -160;
+export { ROAD_START }; // (route.ts: the road starts this far behind the light)
 
 /** Each section's ground (sRGB; others the golden fields). */
 const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
@@ -153,6 +153,28 @@ export function buildWorld(drive: Drive): THREE.Group {
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
   dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
   g.add(named(dashes, 'dashes'));
+  // the edge lines, along every road the town's kerbs don't line (the freeway, the coast, the hills); not in a tunnel
+  {
+    const line = toon({ color: WORLD.dash, side: THREE.DoubleSide }), spans: [number, number][] = [];
+    for (const st of drive.stretches) if (!SIDEWALKS.stretches.has(st.id) && !st.tunnel) spans.push([motion.distanceAt(st.start), Math.min(end, motion.distanceAt(st.end))]);
+    for (const [a, b] of spans) for (const side of [-1, 1]) {
+      if (b - a < 2) continue;
+      g.add(named(new THREE.Mesh(ribbon(route, a, b, side * (ROAD_HALF - 0.38), 0.015, side * (ROAD_HALF - 0.22), 0.015), line), 'dashes'));
+    }
+  }
+  // the cars parked at the left kerb (blocks.ts PARKED: the guard sees them as blocks)
+  {
+    const cars = new THREE.Group(), colours = ['#e8e2d2', '#5a6a7d', '#b0532e', '#2b4a6b', '#8a8f8a', '#d9b24a', '#3a3a40', '#7a9a6a'];
+    for (const b of drive.blocks) {
+      if (!b.car) continue;
+      const car = sedan({ color: colours[Math.floor(b.color * colours.length)]!, length: b.w }), f = route.frameAt(b.s);
+      car.matrixAutoUpdate = false;
+      // (facing the far lane's way: its nose back toward the start)
+      car.matrix.makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize().negate()).setPosition(f.pos.clone().addScaledVector(f.right, b.lateral));
+      cars.add(car);
+    }
+    g.add(named(cars, 'parked'));
+  }
   // the kerbs and the sidewalks, along the town's stretches, broken at the cross streets
   {
     const tex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d')!; c.fillStyle = SIDEWALKS.colour; c.fillRect(0, 0, 128, 128); c.fillStyle = 'rgba(60,40,50,0.35)'; c.fillRect(0, 0, 3, 128); c.fillRect(0, 0, 128, 2); const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 1.5, 1 / 1.5); t.colorSpace = THREE.SRGBColorSpace; return t; })();
@@ -228,6 +250,7 @@ export function buildWorld(drive: Drive): THREE.Group {
 
   for (const tn of drive.tunnels) g.add(buildTunnel(route, tn));
   g.add(named(buildStreetlights(drive), 'streetlights'));
+  g.add(named(furniture(drive), 'furniture'));
 
   // the motel on the corner, behind the car waiting at the light
   const motel = buildMotel(route);
@@ -292,6 +315,35 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   tn.lamps.forEach((s, i) => lamps.setMatrixAt(i, boxAt(route, s, 0, 1.6, 0.15, 0.6, H - 0.15)));
   g.add(lamps);
   return g;
+}
+
+/** The kerb's furniture along the town's sidewalks (SIDEWALKS): hydrants, parking meters, bins, newspaper boxes and bus
+ *  benches, seeded every `every` m on both sides, none by a cross street or a driveway (the openings) or a lyric's
+ *  face; all low (under 1.3 m: nothing stands in a shot). One instanced mesh of unit boxes, coloured. */
+const FURNITURE = { every: 9, keep: 0.6, clear: 5 };
+function furniture(drive: Drive): THREE.InstancedMesh {
+  const { route, motion } = drive, K = SIDEWALKS, at: THREE.Matrix4[] = [], col: THREE.Color[] = [];
+  const put = (s: number, lateral: number, across: number, h: number, along: number, y0: number, c: string) => { at.push(boxAt(route, s, lateral, across, h, along, K.kerb + y0)); col.push(new THREE.Color(c)); };
+  const spans: [number, number][] = [];
+  for (const st of drive.stretches) if (K.stretches.has(st.id)) spans.push([st.k === 0 ? ROAD_START : motion.distanceAt(st.start), motion.distanceAt(st.end)]);
+  const faces = drive.carriers.filter((c) => c.solid || SET_KINDS.has(c.kind)).map((c) => ({ s: c.s, w: c.w, side: Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) }));
+  for (const [a, b] of spans) for (let s = a + FURNITURE.every / 2; s < b; s += FURNITURE.every) {
+    for (const side of [-1, 1]) {
+      const k = Math.round(s / FURNITURE.every);
+      if (hash(k, side, 100) > FURNITURE.keep) continue;
+      if (drive.openings.some((o) => o.side === side && s > o.a - FURNITURE.clear && s < o.b + FURNITURE.clear)) continue;
+      if (faces.some((c) => c.side === side && Math.abs(c.s - s) < c.w / 2 + FURNITURE.clear)) continue;
+      const kerb = side * (ROAD_HALF + 0.55), u = hash(k, side, 101), sp = s + (hash(k, side, 102) - 0.5) * 4;
+      if (u < 0.22) { put(sp, kerb, 0.3, 0.75, 0.3, 0, '#c8202e'); put(sp, kerb, 0.38, 0.12, 0.38, 0.75, '#c8202e'); put(sp, kerb, 0.5, 0.16, 0.16, 0.36, '#c8202e'); } // a hydrant
+      else if (u < 0.5) { put(sp, kerb, 0.06, 1.1, 0.06, 0, '#6a6a70'); put(sp, kerb, 0.18, 0.3, 0.1, 1.1, '#2a2a30'); } // a parking meter
+      else if (u < 0.7) { put(sp, kerb + side * 0.3, 0.65, 0.95, 0.65, 0, '#2f5d3a'); put(sp, kerb + side * 0.3, 0.72, 0.08, 0.72, 0.95, '#1f3f28'); } // a bin
+      else if (u < 0.85) { put(sp, kerb + side * 0.15, 0.4, 1.1, 0.45, 0, ['#2b78a6', '#c8202e', '#f6dd8f'][Math.floor(hash(k, side, 103) * 3)]!); } // a newspaper box
+      else { const back = side * (ROAD_HALF + K.width - 0.5); put(sp, back, 0.45, 0.07, 1.8, 0.45, '#5a3a2a'); put(sp, back + side * 0.2, 0.07, 0.42, 1.8, 0.52, '#5a3a2a'); for (const dz of [-0.75, 0.75]) put(sp + dz, back, 0.4, 0.45, 0.06, 0, '#3d3540'); } // a bus bench
+    }
+  }
+  const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon(), at.length);
+  at.forEach((x, i) => { m.setMatrixAt(i, x); m.setColorAt(i, col[i]!); });
+  return m;
 }
 
 /** The town's dressing: awnings over the buildings' ground floors on the road side, rooftop clutter (AC units, water
