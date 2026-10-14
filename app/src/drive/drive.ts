@@ -74,7 +74,7 @@ export const far = (a: Pose, b: Pose) => eyeOf(a).distanceTo(eyeOf(b)) > CUT.dis
   || [0.25, 0.5, 0.75].some((u) => eyeOf(lerpPose(a, b, u)).y < Math.min(eyeOf(a).y, eyeOf(b).y) - 0.3); // it would dip
 
 /** The kinds a line glides along in one take (glideTake; the faces on the left have theirs: lineTake). */
-const GLIDES: ReadonlySet<Kind> = new Set(['road', 'sign', 'street', 'gantry', 'tunnel']);
+const GLIDES: ReadonlySet<Kind> = new Set(['road', 'sign', 'street', 'gantry', 'tunnel', 'banner']); // (banner: from one towed banner to the next the aim pans; the cut between them jarred)
 /** The road through the stretches: each stretch's segment is the distance the car covers in it. */
 export function routeFor(R: readonly Stretch[], motion: Motion): Route {
   return new Route(R.map((s) => ({ s0: motion.distanceAt(s.start), s1: motion.distanceAt(s.end), turn: s.turn * DEG, rise: s.rise })));

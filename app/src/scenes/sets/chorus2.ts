@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
-import { type Chorus2Plan, GANTRY, MEDIAN, TRAIN } from '../../drive/sets/chorus2';
+import { type Chorus2Plan, GANTRY, MEDIAN, TRAIN, FREEWAY_EDGE, LANES } from '../../drive/sets/chorus2';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -50,6 +50,15 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
     root.add(mesh);
   };
   strip(MEDIAN.barrier, 0.6, MEDIAN.barrierH, 0, concrete);
+  // the right side: two more lanes of asphalt, a dashed line between them, a solid edge line, the barrier beyond
+  strip((ROAD_HALF + FREEWAY_EDGE) / 2, FREEWAY_EDGE - ROAD_HALF, 0.02, 0.0, toon({ color: WORLD.asphalt }));
+  strip(FREEWAY_EDGE - 0.25, 0.15, 0.025, 0.0, toon({ color: WORLD.dash }));
+  strip(FREEWAY_EDGE + LANES.barrier / 2 + 0.2, LANES.barrier, 1.0, 0, concrete);
+  {
+    const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil((plan.s1 - plan.s0) / 9));
+    for (let k = 0; k < dashes.count; k++) { frameAt(plan.s0 + k * 9 + 4.5, ROAD_HALF + LANES.w, piece); dashes.setMatrixAt(k, piece.multiply(new THREE.Matrix4().makeTranslation(0, 0.025, 0)).multiply(new THREE.Matrix4().makeScale(0.15, 0.02, 3))); }
+    root.add(dashes);
+  }
   strip(MEDIAN.tracks, 4.2, 0.18, 0, toon({ color: '#7b6f68' }));
   for (const x of [-0.75, 0.75]) strip(MEDIAN.tracks + x, 0.08, 0.12, 0.18, steel);
   // the catenary: a pole every 40 m between the tracks and the wall, the wire over the tracks; through the posters'
@@ -98,7 +107,7 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
 
   // the SLAUSON exit sign over their lane, on a cantilever from the right shoulder
   {
-    const g = onRoad(plan.exitS, ROAD_HALF + 2.5), tex = canvasTex(1024, 512, (c) => {
+    const shoulder = FREEWAY_EDGE + 1.6, g = onRoad(plan.exitS, shoulder), tex = canvasTex(1024, 512, (c) => {
       c.fillStyle = '#1f6b44'; c.fillRect(0, 0, 1024, 512); c.strokeStyle = '#f4f4f0'; c.lineWidth = 12; c.strokeRect(18, 18, 988, 476);
       c.fillStyle = '#f4f4f0'; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.font = font(F.sign(600), 140); c.fillText('Slauson Av', 512, 190);
@@ -106,9 +115,9 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
       c.fillStyle = '#ffd65a'; c.fillRect(760, 30, 230, 80); c.fillStyle = '#1f6b44'; c.font = font(F.sign(700), 50); c.fillText('EXIT 12', 875, 72);
     });
     box(g, 0.35, 7.6, 0.35, 0, 3.8, 0, steel);
-    box(g, ROAD_HALF + 2.5 - LANE + 2.4, 0.3, 0.3, (ROAD_HALF + 2.5 - LANE + 2.4) / 2, 7.4, 0, steel); // (out over their lane: to the road's left)
+    box(g, shoulder - LANE + 2.4, 0.3, 0.3, (shoulder - LANE + 2.4) / 2, 7.4, 0, steel); // (out over their lane: to the road's left)
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 2.3), new THREE.MeshBasicMaterial({ map: tex }));
-    sign.position.set(ROAD_HALF + 2.5 - LANE, 6.1, -0.2); sign.rotation.y = Math.PI; g.add(sign);
+    sign.position.set(shoulder - LANE, 6.1, -0.2); sign.rotation.y = Math.PI; g.add(sign);
   }
 
   const T = plan.train;

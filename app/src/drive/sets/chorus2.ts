@@ -23,13 +23,17 @@ const CAMPAIGN = /young and (he )?fine/i, PLACE = /west side|compton/i;
  *  its cars' length and how many, its speed), the sound wall (its face off the road's centre, its height, its segments'
  *  length). */
 export const MEDIAN = { barrier: -ROAD_HALF - 0.6, barrierH: 1, tracks: -8.5 };
+/** The freeway's right side: two more lanes (their width) off the road's right edge, a barrier past them (the user,
+ *  2026-10-13: the one road with cars beside it on the dirt was "cars not driving on the actual road"). */
+export const LANES = { n: 2, w: 3.7, barrier: 0.6 };
+export const FREEWAY_EDGE = ROAD_HALF + LANES.n * LANES.w;
 export const TRAIN = { half: 1.5, h: 3.9, car: 24, cars: 3, v: 30, gap: 0.6 };
 export const WALL = { face: -12, h: 6, d: 0.6, seg: 20, before: 90 };
 /** His posters on the wall: their width, the gap between, their centres' height; how long into "Young" its wipe lands. */
 export const POSTERS = { w: 10, gap: 1, y: 3.45, wipeIn: 0.25 };
 /** The freeway sign: three panels across the lanes and the tracks (their width, their bottom's height), its legs (off
  *  the road's centre); passed when its line is half sung; the camera upstream on the shoulder (m back, off, up). */
-export const GANTRY = { panel: 6, gap: 0.3, bottom: 6.6, legs: [-13, 7.6] as [number, number], through: 0.5, eye: { back: 19, lateral: ROAD_HALF + 2.5, y: 1.8 } };
+export const GANTRY = { panel: 6, gap: 0.3, bottom: 6.6, legs: [-13, FREEWAY_EDGE + 1.6] as [number, number], through: 0.5, eye: { back: 23, lateral: 2.2, y: 3.6 } }; // (the eye back and up: the whole sign in frame — its left panel was cut — and the car passing under the view, not across the words)
 /** The SLAUSON exit sign, this long before the stretch ends (s). */
 export const EXIT = { before: 2.2 };
 
@@ -125,9 +129,9 @@ export const CHORUS2: SetPiece = {
     }
     const until = at + (s1 - tailS) / TRAIN.v;
     // slower traffic in the outside lane, one overtaken in each third of the chorus
-    const traffic = ([[0.23, 18], [0.55, 17], [0.84, 20]] as const).map(([u, v]) => {
+    const traffic = ([[0.23, 18, 0], [0.55, 17, 1], [0.84, 20, 0]] as const).map(([u, v, lane]) => {
       const t0 = st.start + (st.end - st.start) * u;
-      return { s0: carS(t0), t0, v, lat: 4.6 };
+      return { s0: carS(t0), t0, v, lat: ROAD_HALF + LANES.w * (lane + 0.5) };
     });
     const plan: Chorus2Plan = {
       s0, s1, train: { tailS, at, from: Math.max(st.start - 1, at - 4), until }, posters: posters.map((c) => c.s),
