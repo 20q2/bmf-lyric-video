@@ -188,7 +188,12 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     body.position.set(0, mid, -0.008); slab.add(body);
     const px = 512 / p.w, screen = canvasTex(512, Math.round(H * px), (c) => {
       const w = 512, h = c.canvas.height, top = P.top * px, bottom = P.bottom * px;
-      c.fillStyle = '#0b0b10'; c.fillRect(0, 0, w, h);
+      // the wallpaper: a dusk gradient with a scatter of stars (the user: a background, like some chats have)
+      const sky = c.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#1a1030'); sky.addColorStop(0.6, '#3a1c4e'); sky.addColorStop(1, '#5a2a52');
+      c.fillStyle = sky; c.fillRect(0, 0, w, h);
+      c.fillStyle = 'rgba(255,255,255,0.55)'; for (let k = 0; k < 60; k++) { const x = ((k * 0.618) % 1) * w, y = top + ((k * 0.381) % 1) * (h - top - bottom); c.beginPath(); c.arc(x, y, 1 + 1.5 * ((k * 0.73) % 1), 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#f6b34a'; c.beginPath(); c.arc(w * 0.78, h * 0.78, w * 0.08, 0, Math.PI * 2); c.fill(); // a low moon
+      c.fillStyle = 'rgba(11,11,16,0.85)'; c.fillRect(0, 0, w, top); c.fillRect(0, h - bottom, w, bottom); // the bars, dark
       c.fillStyle = '#e8e8ee'; c.textBaseline = 'middle'; c.font = font(F.sign(600), top * 0.22); c.textAlign = 'left'; c.fillText('7:41', w * 0.08, top * 0.18);
       c.fillRect(w * 0.82, top * 0.12, w * 0.09, top * 0.12); c.fillStyle = '#0b0b10'; c.fillRect(w * 0.905, top * 0.15, w * 0.006, top * 0.06); // (the battery)
       c.fillStyle = '#5a5f6e'; c.beginPath(); c.arc(w / 2, top * 0.5, top * 0.17, 0, Math.PI * 2); c.fill();
@@ -236,7 +241,15 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(bldg, 0.05, 1.2, 2.4, 2.53, 1.6, -2, black); // its window, on the road (its left)
     const sign = canvasTex(1024, 256, (c) => {
       c.fillStyle = '#d23a2a'; c.fillRect(0, 0, 1024, 256); c.fillStyle = '#fff1d0'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = font(F.sign(700), 170); c.fillText('BURGERS', 512, 136);
+      c.font = font(F.sign(700), 150); c.fillText('BURGERS', 400, 136);
+      // a burger beside the name (the user: a burger somewhere on the burger store): bun, lettuce, cheese, patty, bun
+      const bx = 870, by = 128;
+      c.fillStyle = '#e8a04a'; c.beginPath(); c.ellipse(bx, by - 46, 110, 48, 0, Math.PI, 0); c.fill(); // the top bun
+      c.fillStyle = '#fff1d0'; for (const [dx, dy] of [[-50, -70], [-10, -82], [35, -72], [70, -56]] as const) { c.beginPath(); c.ellipse(bx + dx, by + dy, 7, 4, -0.4, 0, Math.PI * 2); c.fill(); } // sesame
+      c.fillStyle = '#4caf50'; c.beginPath(); for (let i = 0; i <= 12; i++) { const x = bx - 120 + i * 20; c.lineTo(x, by - 46 + (i % 2 ? 14 : 2)); } c.lineTo(bx + 120, by - 30); c.lineTo(bx - 120, by - 30); c.closePath(); c.fill(); // lettuce
+      c.fillStyle = '#ffb21a'; c.beginPath(); c.moveTo(bx - 112, by - 32); c.lineTo(bx + 112, by - 32); c.lineTo(bx + 118, by - 10); c.lineTo(bx + 80, by - 4); c.lineTo(bx - 118, by - 10); c.closePath(); c.fill(); // cheese
+      c.fillStyle = '#5a2a1a'; c.beginPath(); c.roundRect(bx - 108, by - 18, 216, 34, 14); c.fill(); // the patty
+      c.fillStyle = '#e8a04a'; c.beginPath(); c.roundRect(bx - 112, by + 14, 224, 38, 16); c.fill(); // the bottom bun
     });
     plane(bldg, 7, 1.75, 2.2, 4.6, 0, new THREE.MeshBasicMaterial({ map: sign })).rotation.y = Math.PI / 2;
     box(bldg, 0.12, 1.2, 0.12, 2.06, 3.6, -2.8, dark); box(bldg, 0.12, 1.2, 0.12, 2.06, 3.6, 2.8, dark); // (its posts behind it)
@@ -298,7 +311,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       const thread = plan.phone.held.findIndex(([a, b]) => t >= a && t < b), sent = plan.read.bubbles.filter((b) => b.thread === thread && t >= b.start);
       // (not while her next text is up but not yet sent: it would sit between them)
       const drafting = drive.carriers.some((c) => c.kind === 'phone' && t >= c.reveal && t < c.phrase.start && t >= (c.from ?? -Infinity) && t < (c.until ?? Infinity));
-      receipt.visible = thread >= 0 && t >= plan.read.at[thread]! && sent.length > 0 && !drafting;
+      receipt.visible = thread === 0 && t >= plan.read.at[thread]! && sent.length > 0 && !drafting; // (the second thread is received: no receipt)
       if (receipt.visible) receipt.position.y = sent[sent.length - 1]!.dy - P_GAP;
       // their real speed, blinking with SLOW DOWN in turn on the trailer's readout
       const phase = Math.floor(t / 0.55) % 2;

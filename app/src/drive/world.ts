@@ -895,15 +895,21 @@ export function buildCar(): THREE.Group {
   // the dash: a padded top rolling over its front edge, the fascia under it with a brushed band and three chrome ribs
   // across, his instrument hood over the gauges, her glovebox with a chrome button, a round vent at each end; the head
   // unit, the gauges and the shift strip stand proud of the fascia (look/dash.ts)
-  box(1.76, 0.36, 0.34, 0, 1.03, 0.77, cabin); // the fascia (its face at z 0.6)
-  box(1.76, 0.06, 0.4, 0, 1.24, 0.74, cabin); // the pad
+  // (the fascia's face at z 0.53: the head unit, the gauges and the shift strip stand proud of it — set into a fascia
+  // at 0.6 they clipped into it, and the guard's dash box (drive.ts CABIN) starts at 0.55)
+  box(1.76, 0.36, 0.34, 0, 1.03, 0.70, cabin); // the fascia
+  box(1.76, 0.06, 0.4, 0, 1.24, 0.74, cabin); // the pad (its front edge at z 0.54: further forward it cut the head unit's top)
   { const roll = add(new THREE.CylinderGeometry(0.03, 0.03, 1.76, 10), cabin, 0, 1.24, 0.54); roll.rotation.z = Math.PI / 2; }
-  box(1.76, 0.07, 0.012, 0, 0.93, 0.595, toon({ color: '#8f877c' })); // the brushed band
-  for (const y of [0.905, 0.93, 0.955]) box(1.76, 0.004, 0.014, 0, y, 0.594, trim);
-  box(0.38, 0.035, 0.12, 0.48, 1.215, 0.5, cabin); // his instrument hood
-  box(0.5, 0.16, 0.012, -0.52, 1.07, 0.595, toon({ color: '#4a3542' })); // her glovebox
-  { const btn = add(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 10), trim, -0.52, 1.07, 0.588); btn.rotation.x = Math.PI / 2; }
-  for (const x of [0.8, -0.8]) { add(new THREE.TorusGeometry(0.04, 0.007, 6, 16), trim, x, 1.14, 0.59); add(new THREE.CircleGeometry(0.036, 16), dark, x, 1.14, 0.592).rotation.y = Math.PI; }
+  box(1.76, 0.07, 0.012, 0, 0.93, 0.525, toon({ color: '#8f877c' })); // the brushed band
+  for (const y of [0.905, 0.93, 0.955]) box(1.76, 0.004, 0.014, 0, y, 0.524, trim);
+  box(0.38, 0.035, 0.12, 0.48, 1.215, 0.46, cabin); // his instrument hood
+  // under the dash: the kick panel down to the floor, the transmission hump along the middle (the floor read as the
+  // hull's bare inside in the head-unit shot)
+  { const kick = 0.85 - IMPALA.cockpit.floor; box(Wd - 0.3, kick, 0.06, 0, IMPALA.cockpit.floor + kick / 2, 0.6, cabin); } // (up to the fascia's underside, under it: higher, it stood in front of the head unit)
+  box(0.46, 0.22, cl - 0.4, 0, IMPALA.cockpit.floor + 0.11, cm, seat);
+  box(0.5, 0.16, 0.012, -0.52, 1.07, 0.525, toon({ color: '#4a3542' })); // her glovebox
+  { const btn = add(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 10), trim, -0.52, 1.07, 0.518); btn.rotation.x = Math.PI / 2; }
+  for (const x of [0.8, -0.8]) { add(new THREE.TorusGeometry(0.04, 0.007, 6, 16), trim, x, 1.14, 0.52); add(new THREE.CircleGeometry(0.036, 16), dark, x, 1.14, 0.522).rotation.y = Math.PI; }
   g.userData.dash = buildDash(body);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(Wd - 0.2, 0.46), new THREE.MeshBasicMaterial({ color: '#dfe8f0', transparent: true, opacity: 0.08, depthWrite: false }));
   glass.position.set(0, belt + 0.24, 0.94); glass.rotation.x = -0.25; body.add(glass);
@@ -965,15 +971,24 @@ export function buildCar(): THREE.Group {
   { const hub = add(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14), trim, 0, 0, -0.01, wheel); hub.rotation.x = Math.PI / 2; }
   { const column = add(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 10), cabin, 0, 0, 0.16, wheel); column.rotation.x = Math.PI / 2; }
   for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
-    add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);
+    // (a silhouette with a figure's shape, not a pill: shoulders, a tapered torso, a neck — the user, 2026-10-13)
+    const torso = add(new THREE.CylinderGeometry(him ? 0.2 : 0.16, him ? 0.17 : 0.15, 0.5, 14), dark, x, belt + 0.22, -0.25);
+    torso.scale.z = 0.55;
+    const shoulders = add(new THREE.CapsuleGeometry(him ? 0.075 : 0.065, him ? 0.4 : 0.34, 4, 10), dark, x, belt + 0.47, -0.25); shoulders.rotation.z = Math.PI / 2;
+    add(new THREE.CylinderGeometry(0.05, 0.06, 0.1, 10), dark, x, belt + 0.56, -0.23);
     const head = new THREE.Group(); head.name = him ? 'hisHead' : 'herHead'; head.position.set(x, belt + 0.66, -0.22); body.add(head);
-    add(new THREE.SphereGeometry(0.14, 14, 10), dark, 0, 0.12, 0, head);
+    const skull = add(new THREE.SphereGeometry(0.125, 14, 10), dark, 0, 0.1, 0, head); skull.scale.set(0.92, 1.1, 1);
     if (him) {
-      add(new THREE.SphereGeometry(0.15, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0, 0.18, 0, head); // the cap's crown
-      const brim = add(new THREE.BoxGeometry(0.2, 0.025, 0.16), dark, 0, 0.18, 0.16, head); void brim; // its brim, forward
-      const reach = add(new THREE.CapsuleGeometry(0.055, 0.5, 4, 8), dark, x - 0.02, belt + 0.45, 0.1); reach.rotation.x = 1.1; // his arm, to the wheel
+      add(new THREE.SphereGeometry(0.135, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0, 0.17, 0, head); // the cap's crown
+      add(new THREE.BoxGeometry(0.19, 0.022, 0.15), dark, 0, 0.17, 0.15, head); // its brim, forward
+      add(new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8), dark, 0, 0.31, 0, head); // its button
+      const reach = add(new THREE.CapsuleGeometry(0.05, 0.5, 4, 8), dark, x - 0.02, belt + 0.45, 0.1); reach.rotation.x = 1.1; // his arm, to the wheel
     } else {
-      const hair = add(new THREE.SphereGeometry(0.17, 14, 10), dark, 0, -0.04, -0.12, head); hair.scale.set(1, 1.9, 0.75);
+      // her hair: a crown over the head, a fall down her back to the shoulders, a flick at its end
+      const crown = add(new THREE.SphereGeometry(0.15, 14, 10), dark, 0, 0.14, -0.03, head); crown.scale.set(1.05, 0.95, 1.05);
+      const hair = add(new THREE.CapsuleGeometry(0.12, 0.32, 4, 10), dark, 0, -0.1, -0.12, head); hair.scale.set(1.15, 1, 0.55);
+      add(new THREE.SphereGeometry(0.09, 10, 8), dark, 0.06, -0.3, -0.14, head).scale.set(1.4, 0.7, 0.7); // the flick
+      add(new THREE.SphereGeometry(0.05, 10, 8), dark, 0, 0.26, -0.02, head); // a bun on top
       const arm = new THREE.Group(); arm.name = 'herArm'; arm.position.set(x - 0.2, belt + 0.55, -0.2); body.add(arm);
       add(new THREE.CapsuleGeometry(0.055, 0.55, 4, 8), dark, 0, -0.3, 0, arm);
       add(new THREE.SphereGeometry(0.075, 10, 8), dark, 0, -0.62, 0, arm); // her hand

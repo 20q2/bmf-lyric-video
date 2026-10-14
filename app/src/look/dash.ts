@@ -102,7 +102,7 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
   // the gauges in front of him, tipped back like the screen: a needle each
   const needles: THREE.Object3D[] = [];
   for (const [x, label] of [[0.36, 'MPH'], [0.6, 'RPM']] as const) { // (clear of the head unit's screen, x < 0.26)
-    const g = faceFrame(new THREE.Vector3(x, 1.12, 0.54), HEAD_UNIT.normal); g.name = 'gauge';
+    const g = faceFrame(new THREE.Vector3(x, 1.12, 0.5), HEAD_UNIT.normal); g.name = 'gauge';
     const face = new THREE.Mesh(new THREE.CircleGeometry(0.075, 32), new THREE.MeshBasicMaterial({ map: gauge(label), color: new THREE.Color(1.3, 1.3, 1.3) }));
     g.add(face);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.008, 6, 32), chrome); g.add(ring);
@@ -114,7 +114,7 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
   // the shift indicator in front of him, under the gauges: P R N D L in the signs' face, its D a lamp the last chorus
   // flares on "Put it in drive" (scenes/sets/chorus4.ts, by name)
   {
-    const g = faceFrame(new THREE.Vector3(0.44, 1.063, 0.558), HEAD_UNIT.normal); g.name = 'shift';
+    const g = faceFrame(new THREE.Vector3(0.44, 1.063, 0.518), HEAD_UNIT.normal); g.name = 'shift';
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112;
     const c = cv.getContext('2d')!;
     c.fillStyle = '#0d0b10'; c.fillRect(0, 0, 512, 112);

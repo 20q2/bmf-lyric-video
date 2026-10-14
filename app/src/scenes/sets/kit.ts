@@ -76,14 +76,24 @@ export function sedan(opts: { color: string; length?: number; low?: boolean }): 
   const drop = opts.low ? 0.12 : 0;
   const body = new THREE.Group(); body.position.y = -drop; if (opts.low) body.rotation.x = 0.02; // (parked low, nose down)
   g.add(body);
-  box(body, W, 0.52, L, 0, 0.56, 0, paint);
-  box(body, W - 0.3, 0.46, L * 0.45, 0, 1.02, -0.25, paint);
-  box(body, W - 0.26, 0.34, L * 0.45 - 0.24, 0, 1.03, -0.25, dark); // the glasshouse
+  // (a three-box sedan — the user, 2026-10-13: the other cars "look like shit": the hood lower than the trunk, the
+  // cabin's glass in pillars, the sills tucked in, mirrors, lamps in bezels, a chrome strip, wheels on hubs)
+  const lower = 0.52, beltY = 0.3 + lower;
+  box(body, W, lower, L, 0, 0.3 + lower / 2, 0, paint); // the body to the beltline
+  box(body, W - 0.1, 0.06, L - 0.3, 0, 0.3 + 0.03, 0, dark); // the sill, tucked in
+  const cab = box(body, W - 0.34, 0.44, L * 0.44, 0, beltY + 0.22, -0.2, paint); cab.scale.set(1, 1, 1); // the cabin's roof box
+  const glass = box(body, W - 0.3, 0.36, L * 0.44 - 0.14, 0, beltY + 0.18, -0.2, dark); glass.scale.z = 1.02; // its glass
+  for (const z of [L * 0.22 - 0.2, -L * 0.22 - 0.2]) for (const x of [W / 2 - 0.19, -W / 2 + 0.19]) box(body, 0.06, 0.4, 0.07, x, beltY + 0.2, z, paint); // the pillars
+  box(body, W - 0.6, 0.02, L * 0.46, 0, beltY + 0.45, -0.2, paint); // the roof
+  box(body, W - 0.2, 0.08, L * 0.28, 0, beltY + 0.04, hl - L * 0.14 - 0.1, paint); // the hood's crown
+  box(body, W - 0.2, 0.1, L * 0.2, 0, beltY + 0.05, -hl + L * 0.1 + 0.1, paint); // the trunk's lid, a little higher
+  for (const x of [W / 2 + 0.12, -W / 2 - 0.12]) { box(body, 0.16, 0.1, 0.1, x, beltY + 0.12, L * 0.22 - 0.3, dark); } // the mirrors
   box(body, W + 0.06, 0.1, 0.12, 0, 0.42, hl + 0.04, chrome);
   box(body, W + 0.06, 0.1, 0.12, 0, 0.42, -hl - 0.04, chrome);
-  // its lamps, a chrome strip down each flank, and the wheels on chrome hubs
+  // its lamps in chrome bezels, the grille, a chrome strip down each flank, and the wheels on chrome hubs
   const lamp = toon({ color: '#f4efd8' }), tail = toon({ color: '#b8161a' });
-  for (const x of [W / 2 - 0.25, -W / 2 + 0.25]) { box(body, 0.22, 0.14, 0.04, x, 0.6, hl + 0.01, lamp); box(body, 0.24, 0.1, 0.04, x, 0.62, -hl - 0.01, tail); }
+  for (const x of [W / 2 - 0.28, -W / 2 + 0.28]) { box(body, 0.3, 0.2, 0.04, x, 0.62, hl + 0.005, chrome); box(body, 0.22, 0.14, 0.04, x, 0.62, hl + 0.02, lamp); box(body, 0.3, 0.16, 0.04, x, 0.62, -hl - 0.005, chrome); box(body, 0.24, 0.1, 0.04, x, 0.62, -hl - 0.02, tail); }
+  box(body, W - 0.9, 0.16, 0.04, 0, 0.62, hl + 0.01, dark); for (let k = 0; k < 3; k++) box(body, W - 0.92, 0.015, 0.05, 0, 0.56 + k * 0.06, hl + 0.015, chrome); // the grille
   for (const x of [W / 2 + 0.005, -W / 2 - 0.005]) box(body, 0.02, 0.05, L * 0.8, x, 0.66, 0, chrome);
   for (const z of [hl - 0.85, -hl + 0.85]) for (const x of [W / 2 - 0.1, -W / 2 + 0.1]) {
     const w = cyl(g, 0.3, 0.2, x, 0.3, z, dark, 14); w.rotation.z = Math.PI / 2;

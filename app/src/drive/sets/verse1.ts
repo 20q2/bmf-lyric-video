@@ -60,7 +60,9 @@ export const EYE = {
   back: new THREE.Vector3(0, 2, -0.7),
   phone: new THREE.Vector3(-0.06, 1.55, -0.12),
   // (her eye, just under the mirror's level, over the dash: in the mirror, the street behind them)
-  mirror: new THREE.Vector3(-0.4, 1.27, 0.3),
+  mirror: new THREE.Vector3(-0.4, 1.4, 0.18), // (up over the dash: lower, the dash filled half the frame — the user)
+  /** The bus take aims this far above its ad (m). */
+  busUp: 0.7,
   hood: new THREE.Vector3(0, 1.62, 2.3),
   radio: new THREE.Vector3(-0.12, 1.5, -0.1),
   menu: { back: 4.2, lateral: ROAD_HALF + 0.2, y: 1.35, toRoad: 0.6, down: 0.2 },
@@ -189,7 +191,7 @@ export const VERSE1: SetPiece = {
     const adPos = new THREE.Vector3(0, BUS.adY, -BUS.half - 0.03);
     const [onBus, ...inMirror] = phs[1]!;
     const bus = riding('bus', [onBus!], adPos, back, busAhead, { ad: busAd, from: joinAt, until: turnAt });
-    hold(bus.cs, (t) => lookFrom(inFrame(EYE.back, t), inFrame(adPos, t, busAhead)), 'cut', Math.max(lines[0]!.end + 0.05, onBus!.start - LEAD - 0.35));
+    hold(bus.cs, (t) => lookFrom(inFrame(EYE.back, t), inFrame(adPos.clone().add(new THREE.Vector3(0, EYE.busUp, 0)), t, busAhead)), 'cut', Math.max(lines[0]!.end + 0.05, onBus!.start - LEAD - 0.35)); // (aimed above the ad: at it, the bus's top was cut)
     // in the pause after "with": up to her visor, flipping down, the rest of the line on its mirror in her lipstick
     const Mi = AT.mirror, visorDown = (inMirror[0]?.start ?? l5.end) - Mi.before;
     // (a hair off the glass: in front of it, and left out of its reflection)
@@ -227,6 +229,7 @@ export const VERSE1: SetPiece = {
 
     // "…can you?": back on her phone
     const reply = riding('phone', phs[7]!, AT.phone, phoneN, 0, { from: held[1]![0], until: held[1]![1] });
+    reply.cs.forEach((c) => (c.received = true)); // (his reply: received, grey on the left — the user, 2026-10-13)
     hold(reply.cs, phoneShot, 'cut');
 
     // the city: blocks along the street from the trailer on (before it they'd stand in chorus 1's sky), set back behind

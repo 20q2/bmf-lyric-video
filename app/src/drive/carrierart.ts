@@ -89,7 +89,7 @@ const GREEN = '#1f6b44';
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean; /** The Hollywood sign's: a letter to a panel, the panels evenly spaced across the face, each standing a little out of true. */ panels?: boolean }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; /** The bubble on the left (received), not the right (sent). */ bubbleLeft?: boolean; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean; /** The Hollywood sign's: a letter to a panel, the panels evenly spaced across the face, each standing a little out of true. */ panels?: boolean }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
@@ -114,7 +114,7 @@ function styleOf(c: Carrier): Style {
       ? { family: F.archivo(100, 900), caps: true, colors: ['#bfefff', '#3ad6ff', '#fff6a0'], alpha: [0.9, 1], outline: '#141218', shadow: '#0b2a3a', glow: 'rgba(58,214,255,0.45)', glowPasses: 2 }
       : { family: F.archivo(100, 900), caps: true, colors: ['#ffc4e6', '#ff4fa3', '#fff6a0'], alpha: [0.9, 1], outline: '#141218', shadow: '#3a0a2a', glow: 'rgba(255,79,163,0.45)', glowPasses: 2 };
     case 'barber': return { family: F.archivo(100, 900), caps: true, colors: ['#e9c46a', '#ffd76a', '#fff6d8'], alpha: [0.8, 1], outline: '#3a2408', shadow: '#120b04' }; // gold leaf on the glass
-    case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffb000', '#ffb000', '#fff3c4'], alpha: [0.5, 1], glow: 'rgba(255,170,0,0.85)' };
+    case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffc23a', '#ffb000', '#fff3c4'], alpha: [0.9, 1], glow: 'rgba(255,170,0,0.6)' }; // (the user: its contrast wasn't great — the unsung words were half-dimmed)
     case 'bus': { // (the word being sung by the ad's own lightness, like the billboards: red drowns on a dark ad)
       const a = AD_STYLE[c.ad ?? 'phone'], dark = new THREE.Color(a.bg).getHSL({ h: 0, s: 0, l: 0 }).l < 0.4;
       return { family: F.archivo(62, 900), caps: true, colors: [a.ink, a.ink, dark ? '#ffd65a' : '#d81e2c'], alpha: [0.72, 1] };
@@ -127,7 +127,9 @@ function styleOf(c: Carrier): Style {
     case 'radio': return { bg: '#04080a', family: F.mono(600), caps: true, colors: ['#5fd8ff', '#5fd8ff', '#ffffff'], alpha: [0.55, 1], glow: 'rgba(80,220,255,0.7)' };
     case 'menu': return { bg: '#1b1714', family: F.archivo(75, 900), caps: true, colors: ['#fff1d0', '#fff1d0', '#ffd65a'], alpha: [0.75, 1] };
     case 'mirror': return { family: F.bodoni(700, { italic: true }), caps: false, colors: ['#e8173a', '#e8173a', '#ff3054'], alpha: [0.78, 1], shadow: 'rgba(90,0,20,0.5)' }; // (lipstick on the glass: bright enough to read over the reflection)
-    case 'phone': return { bg: '#0b0b10', bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
+    case 'phone': return c.received // (no panel: the bubbles sit on the screen's wallpaper, the scene's; his replies grey on the left)
+      ? { bubble: '#3a3a46', bubbleLeft: true, family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] }
+      : { bubble: '#2f7cf6', family: F.archivo(100, 500), caps: false, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.75, 1] };
     case 'marquee': return { bg: '#f8f4e8', family: F.archivo(62, 900), caps: true, colors: ['#141218', '#141218', '#d81e2c'], alpha: [0.72, 1] };
     case 'polesign': return { bg: '#fbf7ee', family: F.archivo(100, 900), caps: true, colors: ['#c8102e', '#c8102e', '#141218'], alpha: [0.72, 1] };
     case 'aframe': return { bg: '#1f2b26', border: '#3c4a43', family: F.archivo(87, 800), caps: true, colors: ['#f3efe6', '#f3efe6', '#ffd65a'], alpha: [0.7, 0.95], roughen: true }; // chalk
@@ -292,10 +294,13 @@ export class CarrierArt {
         c.font = font(style.family, soloSize(row, (H * weights[r]!) / sum, 0));
         const w = c.measureText(row).width; c.font = font(style.family, em); return w;
       });
-      const pad = em * 0.55, bw = Math.max(...widths) + 2 * pad;
-      bubbleX = TW * 0.96 - bw + pad;
+      const pad = em * 0.55, bw = Math.max(...widths) + 2 * pad, x0 = style.bubbleLeft ? TW * 0.04 : TW * 0.96 - bw;
+      bubbleX = x0 + pad;
       c.save(); c.shadowBlur = 0; c.globalAlpha = alpha; c.fillStyle = style.bubble;
-      c.beginPath(); c.roundRect(TW * 0.96 - bw, H * 0.07, bw, H * 0.86, Math.min(H * 0.43, em * 0.9)); c.fill(); c.restore();
+      c.beginPath(); c.roundRect(x0, H * 0.07, bw, H * 0.86, Math.min(H * 0.43, em * 0.9)); c.fill();
+      // its tail, at the foot of its outer corner
+      const tx = style.bubbleLeft ? x0 + em * 0.3 : x0 + bw - em * 0.3, ty = H * 0.93;
+      c.beginPath(); c.moveTo(tx, ty - em * 0.5); c.lineTo(tx + (style.bubbleLeft ? -em * 0.35 : em * 0.35), ty); c.lineTo(tx + (style.bubbleLeft ? em * 0.25 : -em * 0.25), ty - em * 0.15); c.closePath(); c.fill(); c.restore();
     }
     let wi = 0, top = 0;
     carrier.rows.forEach((row, r) => {

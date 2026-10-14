@@ -100,19 +100,35 @@ void main() {
   });
 }
 
-/** Window glass on the street fronts (look/facades.ts): dark by day; by night lit where its `lit` attribute is 1, warm. */
+/** Window glass on the street fronts (look/facades.ts): an interior seen through it — a back wall, shelves with wares
+ *  on them (the user, 2026-10-13: "all the windows are blacked out ... little things going on inside") — dim by day
+ *  under the glass's tint; by night lit where its `lit` attribute is 1, warm. */
 export function nightGlass(): THREE.MeshToonMaterial {
   const m = toon({ color: '#28323c' });
   m.onBeforeCompile = (sh) => {
     printShadows(sh);
     sh.uniforms.night = NIGHT;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-attribute float lit; varying float vLit;`).replace('#include <begin_vertex>', `#include <begin_vertex>
-vLit = lit;`);
+attribute float lit; varying float vLit; varying vec2 vGlassUv; varying vec3 vGlassPos;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+vLit = lit; vGlassUv = uv; vGlassPos = position;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform float night; varying float vLit;`)
+uniform float night; varying float vLit; varying vec2 vGlassUv; varying vec3 vGlassPos;
+float glassHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  // the interior: a warm back wall, three shelves across the pane with wares standing on them (a pane's own seed)
+  vec2 q = vGlassUv; float seed = floor(vGlassPos.x * 0.7 + vGlassPos.z * 1.3);
+  vec3 wall = mix(vec3(0.62, 0.48, 0.36), vec3(0.42, 0.52, 0.55), step(0.5, glassHash(vec2(seed, 3.0))));
+  float shelfY = fract(q.y * 3.0 + 0.15), shelf = step(0.9, shelfY);
+  float slot = floor(q.x * 9.0 + seed), item = step(0.35, glassHash(vec2(slot, floor(q.y * 3.0) + seed)));
+  float itemH = 0.35 + 0.45 * glassHash(vec2(slot, 7.0 + seed)), onShelf = step(shelfY, itemH) * step(0.15, fract(q.x * 9.0)) * step(fract(q.x * 9.0), 0.85) * item;
+  vec3 ware = mix(vec3(0.9, 0.25, 0.3), mix(vec3(0.95, 0.85, 0.4), vec3(0.3, 0.6, 0.9), step(0.5, glassHash(vec2(slot, 11.0)))), step(0.66, glassHash(vec2(slot, 5.0 + seed))));
+  vec3 interior = mix(mix(wall, vec3(0.85, 0.78, 0.68), shelf), ware, onShelf);
+  // (dim by day under the glass's tint, bright and warm by night where lit; unlit at night, the dark shop)
+  float litNow = vLit * night;
+  vec3 dayLook = mix(diffuseColor.rgb, interior * 0.55, 0.75);
+  diffuseColor.rgb = mix(dayLook, interior * 0.9, litNow) * (1.0 - 0.5 * night * (1.0 - vLit));`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-totalEmissiveRadiance += vec3(1.0, 0.66, 0.32) * vLit * night * ${GLOW.window.toFixed(2)};`);
+totalEmissiveRadiance += interior * vec3(1.0, 0.8, 0.55) * litNow * ${(GLOW.window * 0.7).toFixed(2)};`);
   };
   m.customProgramCacheKey = () => 'nightGlass';
   return m;
