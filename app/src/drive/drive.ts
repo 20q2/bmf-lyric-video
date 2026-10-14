@@ -192,8 +192,9 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
       // (where the phrase before is still up and there's no room to leave early, a cut: the densest lines)
       const t0 = resolveAt(at), lead = SWOOP_S - SNAP_S, free = Math.max(reading[i - 1]?.[1] ?? -Infinity, prev?.phrase.end ?? -Infinity);
       const room = free <= t0 - lead;
-      // (in the tunnel there's no sky to arc through: cut)
-      move = i === carriers.length - 1 || !room || c.kind === 'tunnel' || prev?.kind === 'tunnel' ? 'cut' : 'swoop';
+      // (in the tunnel there's no sky to arc through: from one wall piece to the next the eye glides along the bore;
+      // into or out of the tunnel, cut)
+      move = i === carriers.length - 1 || !room ? 'cut' : c.kind === 'tunnel' && prev?.kind === 'tunnel' ? 'glide' : c.kind === 'tunnel' || prev?.kind === 'tunnel' ? 'cut' : 'swoop';
       if (move === 'swoop') at = t0 - lead;
     }
     const shot: Shot = { at, to, move };
@@ -213,6 +214,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   carriers.forEach((c, i) => {
     const next = carriers[i + 1];
     if (!next || next.phrase.line === c.phrase.line || setFrames.has(c.id)) return; // (after the last line, the end card; a set-piece keeps its camera)
+    if (c.kind === 'tunnel' && next.kind === 'tunnel') return; // (in the tunnel the eye stays on the wall between pieces: no whip back to the car)
     const back = Math.max(c.phrase.end + 0.05, reading[i]![1]), nextAt = next ? resolveAt(phraseShots[i + 1]!.at) : Infinity;
     // a cut back to the car on the beat after (or the 'land' when the car's chase is near enough to move to)
     const beat = beatAtOrAfter(audio, back), to = chaseOf(stretchAt(beat));

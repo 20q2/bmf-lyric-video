@@ -110,9 +110,9 @@ function styleOf(c: Carrier): Style {
     case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
     // (white sheet metal, floodlit: no accent colour — the word being sung lights full white, the rest wait dimmer)
     case 'hill': return { family: F.archivo(62, 800), caps: true, colors: ['#e6e1d8', '#fbf7ee', '#ffffff'], alpha: [0.5, 1], panels: true };
-    case 'tunnel': return c.phrase.line % 2 // (the lines in turn: sodium orange, then cold cyan)
-      ? { family: F.archivo(100, 900), caps: true, colors: ['#bff4ff', '#7fe6ff', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(80,220,255,0.9)', tubes: true }
-      : { family: F.archivo(100, 900), caps: true, colors: ['#ffcf8a', '#ffb347', '#fff6e8'], alpha: [0.6, 1], glow: 'rgba(255,160,60,0.9)', tubes: true };
+    case 'tunnel': return c.phrase.line % 2 // graffiti on the tiles (the user, 2026-10-13: lit lettering "floating in a tunnel"): fat caps, a thick black outline, a drop shadow, a spray halo; the lines in turn hot pink, then electric blue
+      ? { family: F.archivo(100, 900), caps: true, colors: ['#bfefff', '#3ad6ff', '#fff6a0'], alpha: [0.9, 1], outline: '#141218', shadow: '#0b2a3a', glow: 'rgba(58,214,255,0.45)', glowPasses: 2 }
+      : { family: F.archivo(100, 900), caps: true, colors: ['#ffc4e6', '#ff4fa3', '#fff6a0'], alpha: [0.9, 1], outline: '#141218', shadow: '#3a0a2a', glow: 'rgba(255,79,163,0.45)', glowPasses: 2 };
     case 'barber': return { family: F.archivo(100, 900), caps: true, colors: ['#e9c46a', '#ffd76a', '#fff6d8'], alpha: [0.8, 1], outline: '#3a2408', shadow: '#120b04' }; // gold leaf on the glass
     case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffb000', '#ffb000', '#fff3c4'], alpha: [0.5, 1], glow: 'rgba(255,170,0,0.85)' };
     case 'bus': { // (the word being sung by the ad's own lightness, like the billboards: red drowns on a dark ad)

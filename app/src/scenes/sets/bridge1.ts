@@ -12,9 +12,9 @@ import { F, font } from '../../engine/type';
 import { box, canvasTex, pic, plane, roadFrame, signFace } from './kit';
 
 /** The exit's haze: veils this far back from the mouth (m), each adding this much of EXIT_GLOW. */
-const EXIT_HAZE: readonly [number, number][] = [[2, 0.14], [6, 0.08], [12, 0.04]];
-/** The exit's glare: its colour, and how bright (HDR multiple: it blooms). */
-const EXIT_GLOW = '#ffd2c8', EXIT_GLARE = 1.8;
+const EXIT_HAZE: readonly [number, number][] = [[2, 0.1], [6, 0.06], [12, 0.03]];
+/** The haze's colour (the night beyond shows through it: the user wants to see time has passed — no glare). */
+const EXIT_GLOW = '#d8c0e0';
 
 export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.bridge1 as Bridge1Plan | undefined;
@@ -76,11 +76,6 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
   // it, thickening toward it, the light spilling in (the sky through the mouth read as a hard cut-out, the town's ink
   // drawn over it) ----
   const veil = new THREE.PlaneGeometry(2 * TUNNEL.halfW, TUNNEL.h).translate(0, TUNNEL.h / 2, 0);
-  {
-    const g = onRoad(plan.s1 - 0.2, 0), glare = new THREE.Mesh(veil, new THREE.MeshBasicMaterial({ color: new THREE.Color(EXIT_GLOW).multiplyScalar(EXIT_GLARE), fog: false }));
-    glare.rotation.y = Math.PI; // (facing back down the bore; from outside, the bore shows through)
-    g.add(glare);
-  }
   for (const [back, k] of EXIT_HAZE) {
     const g = onRoad(plan.s1 - back, 0);
     g.add(new THREE.Mesh(veil, new THREE.MeshBasicMaterial({ color: new THREE.Color(EXIT_GLOW).multiplyScalar(k), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false })));

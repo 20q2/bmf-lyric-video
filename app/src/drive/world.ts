@@ -918,6 +918,15 @@ export function buildCar(): THREE.Group {
   }
   for (const zEnd of [hl + 0.065, -hl - 0.065]) { const bumper = add(new THREE.CapsuleGeometry(0.065, Wd - 0.1, 6, 12), chrome, 0, 0.42, zEnd); bumper.rotation.z = Math.PI / 2; bumper.name = 'bumper'; }
   box(Wd - 0.5, 0.24, 0.04, 0, 0.64, hl + 0.005, dark); // the grille's mouth
+  { // the plate on its tail, blank until verse 2 writes on it (the user: the plate area there all along)
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
+    const x = cv.getContext('2d')!;
+    x.fillStyle = '#f2f1ea'; x.fillRect(0, 0, 256, 128); x.strokeStyle = '#1b2a6b'; x.lineWidth = 8; x.strokeRect(4, 4, 248, 120);
+    x.fillStyle = '#d81e2c'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `italic 600 30px "${F.bodoni(700, { italic: true })}"`; x.fillText('California', 128, 30);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const plate = add(new THREE.PlaneGeometry(0.46, 0.23), new THREE.MeshBasicMaterial({ map: tex }), 0, 0.7, -hl - 0.075); plate.rotation.y = Math.PI; plate.name = 'plate';
+    box(0.5, 0.27, 0.03, 0, 0.7, -hl - 0.06, dark);
+  }
   for (let k = 0; k < 4; k++) box(Wd - 0.52, 0.018, 0.03, 0, 0.55 + k * 0.06, hl + 0.025, chrome).name = 'grille';
   for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.TorusGeometry(0.1, 0.014, 6, 18), chrome, x, 0.68, hl + 0.03).name = 'headBezel';
   for (const x of [0.78, 0.55, 0.32, -0.32, -0.55, -0.78]) add(new THREE.TorusGeometry(0.085, 0.012, 6, 18), chrome, x, 0.68, -hl - 0.03);
@@ -955,15 +964,6 @@ export function buildCar(): THREE.Group {
   { const column = add(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 10), cabin, 0, 0, -0.16, wheel); column.rotation.x = Math.PI / 2; }
   for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
     add(new THREE.CapsuleGeometry(0.21, 0.4, 4, 10), dark, x, belt + 0.3, -0.25);
-  { // the plate on its tail, blank until verse 2 writes on it (the user: the plate area there all along)
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
-    const x = cv.getContext('2d')!;
-    x.fillStyle = '#f2f1ea'; x.fillRect(0, 0, 256, 128); x.strokeStyle = '#1b2a6b'; x.lineWidth = 8; x.strokeRect(4, 4, 248, 120);
-    x.fillStyle = '#d81e2c'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `italic 600 30px "${F.bodoni(700, { italic: true })}"`; x.fillText('California', 128, 30);
-    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-    const plate = add(new THREE.PlaneGeometry(0.46, 0.23), new THREE.MeshBasicMaterial({ map: tex }), 0, 0.7, -hl - 0.075); plate.rotation.y = Math.PI; plate.name = 'plate';
-    box(0.5, 0.27, 0.03, 0, 0.7, -hl - 0.06, dark);
-  }
     const head = new THREE.Group(); head.name = him ? 'hisHead' : 'herHead'; head.position.set(x, belt + 0.66, -0.22); body.add(head);
     add(new THREE.SphereGeometry(0.14, 14, 10), dark, 0, 0.12, 0, head);
     if (him) {
