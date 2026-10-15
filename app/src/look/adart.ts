@@ -2,6 +2,7 @@
 // in a spotlight, a small maker's mark, and the lyric as its headline on the left (carrierart.ts sets it). The product
 // is all shape, no words. Browser only (canvas).
 import type { Ad } from '../drive/ads';
+import { F, font } from '../engine/type';
 
 /** Per ad: its colour field, its headline's colours (sung, the word being sung), and the spotlight behind the product. */
 export const AD_STYLE: Record<Ad, { bg: string; ink: string; now: string; spot: string }> = {
@@ -91,10 +92,16 @@ const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D, seed: number) => void> =
     c.fillStyle = '#f6c445'; rr(c, -13, 62, 26, 16, 4); c.fillStyle = '#16131a'; c.font = 'bold 12px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('BMF', 0, 70);
     c.restore();
   },
-  sale: (c) => { // a shop's promotional poster: a SALE burst, the deal under it
-    c.fillStyle = '#c8102e'; star(c, 0, -22, 76, 60, 14);
-    c.fillStyle = '#fff8e6'; c.font = 'bold 52px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('SALE', 0, -22);
-    c.fillStyle = '#16131a'; rr(c, -66, 50, 132, 34, 6); c.fillStyle = '#ffd65a'; c.font = 'bold 22px sans-serif'; c.fillText('50% OFF TOOLS', 0, 67);
+  sale: (c) => { // a hardware store's poster: a hammer and a wrench crossed behind a SALE burst, the deal on a tag under it
+    // (each word fitted inside its shape, in the signs' face: SALE ran off its burst and the deal off its tag — the
+    // user, 2026-10-14: "not passing the vibe check")
+    c.fillStyle = '#1f2a44';
+    for (const a of [-0.65, 0.65]) { c.save(); c.rotate(a); rr(c, -9, -92, 18, 150, 6); c.restore(); }
+    c.save(); c.rotate(-0.65); rr(c, -34, -100, 68, 22, 5); c.restore(); // the hammer's head
+    c.save(); c.rotate(0.65); c.beginPath(); c.arc(0, -86, 24, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffd65a'; c.fillRect(-9, -116, 18, 32); c.restore(); // the wrench's jaw
+    c.fillStyle = '#c8102e'; star(c, 0, -14, 70, 54, 16);
+    c.fillStyle = '#fff8e6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 40); c.fillText('SALE', 0, -12, 92);
+    c.fillStyle = '#16131a'; rr(c, -80, 56, 160, 36, 8); c.fillStyle = '#ffd65a'; c.font = font(F.sign(700), 22); c.fillText('TOOLS ½ OFF', 0, 75, 146);
   },
   bandage: (c) => { // two crossed bandages
     for (const a of [0.7, -0.7]) {

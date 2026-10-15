@@ -7,8 +7,9 @@
 //                                               across the street: the car three-wheels past under it
 //   "Took me | to Slauson | and he slut me out" a chalk A-frame, the SLAUSON street blade on the corner, another A-frame
 //                                               past it, from the far lane, drifting along them
-//   "And when I got a problem, he get to packing"   painted on the hardware store's front windows
-//   "He 'bout all that action, call him Mr. Handle It"  its vinyl banner under the eaves, its strongman painted beside
+//   "And when I got a problem, he get to packing"   posters taped in the hardware store's front windows
+//   "He 'bout all that action, call him Mr. Handle It"  its vinyl banner under its sign board, the man himself beside
+//                                               it: a fibreglass giant on the sidewalk, a wrench over his shoulder
 //   "You know I'm hella different… trickin' on"  the chicken spot's big roof sign, the chicken standing on it, from below
 //   "I can be your ride or die…"               a hand car wash's sign, an ad: the words flush left, the suds right
 //   "Trust me, boy, I'm good in every hood"     their own car, from in front: the windshield banner, the hood
@@ -41,16 +42,18 @@ export const PACE = { slow: 5.5, cruise: 10, upBefore: 1.6, up: 1.2 };
  *           from it: read together, the blade over it), off the road, their middles' height, turned
  *  shop     the hardware store past the corner (its start), its length, its front off the road's centre, its depth and
  *           height; its two windows (centres from its start, width, height, middle's height); the banner under its
- *           eaves (centre from its start, its middle's height)
+ *           sign board (centre from its start, its middle's height); Mr. Handle It himself, a fibreglass giant on the
+ *           sidewalk past the banner (from its start, out from its front)
  *  chicken  the chicken spot past it (the gap between), its length, depth and height; the sign on its roof (centre
  *           from its start, over the roof) */
 export const SHACK = {
   pole: { lateral: -(ROAD_HALF + 1.6), y: 5.8, turn: 0.55, before: 5 },
   corner: { w: 9, blade: -2.4, lateral: -(ROAD_HALF + 1.2) }, // (the blade and the A-frame under it clear of the crosswalk)
   aframes: { first: 6.5, second: 1, lateral: -(ROAD_HALF + 2.4), y: 0.95, turn: 0.5 },
-  // (the banner up under the eaves, the wall tall enough for it over the windows: at y 3 it hung across them, past the
-  // building's end — the user, 2026-10-14)
-  shop: { from: 3, len: 23, face: -(ROAD_HALF + 5), d: 14, h: 6.6, windows: [5.5, 13.5], window: { w: 6.2, h: 2.7, y: 2.15 }, banner: { at: 17, y: 4.75 } },
+  // (the banner between the awnings and the sign board, the front tall enough for its four rows: under a 6.6 m eave its
+  // top ran behind the fascia and its foot through the window's head — "the grand opening thing's clipping into other
+  // stuff", the user, 2026-10-14; the windows wide enough to show the shop round their posters)
+  shop: { from: 3, len: 23, face: -(ROAD_HALF + 5), d: 14, h: 7.9, windows: [4.4, 13.6], window: { w: 7, h: 2.5, y: 2.05 }, banner: { at: 11.5, y: 5.25 }, statue: { at: 17.9, out: 1.9 } },
   chicken: { gap: 5, len: 15, d: 13, h: 4.6, sign: { at: 7.5, over: 1.4 } },
 };
 /** The takes (m): the pole sign's, from the right sidewalk back up the street (back of the sign, off the road's centre,
@@ -61,7 +64,9 @@ export const SHOTS = {
   pole: { back: 8, lateral: ROAD_HALF + 1.4, y: 1.3, drift: 0.4 },
   corner: { aframe: { out: 4.6, y: 1.7 }, pair: { out: 7, y: 2.2 } },
   windows: { back: 4, lateral: 3, y: 2.5, end: 3 },
-  banner: { back: 5, lateral: 2.0, y: 2.4, end: 2 }, // (up and nearer for the banner under the eaves)
+  // (up and nearer for the banner under the sign board; from far enough back that the man himself, past it, is in the
+  // frame as he's named)
+  banner: { back: 5.5, lateral: 2.0, y: 2.4, end: 2 },
   sign: { back: 12.5, lateral: ROAD_HALF + 2, y: 3, end: 3 },
 };
 /** The car wash on the right: its sign (off the road, its centre's height; passed this far through its line), its
@@ -208,15 +213,19 @@ export const VERSE2: SetPiece = {
     const first = out(corner.slice(0, 1), SHOTS.corner.aframe), pair = out(corner.slice(1), SHOTS.corner.pair);
     hold(corner, glideTake(corner, corner.map((_, i) => () => (i ? pair : first))), 'cut');
     // its windows, painted: "And when I got a problem, he get to packing"
-    const Sh = S.shop, winS = Sh.windows.map((x) => shop0 + x);
+    const Sh = S.shop, winS = Sh.windows.map((x) => shop0 + x), shopS = shop0 + Sh.len / 2, shopLat = Sh.face - Sh.d / 2;
+    /** A point on the shop's front in its own straight frame (x from its start, y over its ground, out from its face),
+     *  as the prop builds it: placed at their own s round the road's bend, the posters stood 0.3 m off their windows
+     *  (the user, 2026-10-14: "the signs on the window are like offset"). */
+    const sf = route.frameAt(shopS), sFwd = fwd(shopS), sRight = right(shopS);
+    const onShop = (x: number, y: number, out: number) => sf.pos.clone().addScaledVector(sf.right, Sh.face).addScaledVector(sFwd, x - Sh.len / 2).addScaledVector(UP, y).addScaledVector(sRight, out);
     // (its words on promotional posters taped in the glass, not floating on it: the user, 2026-10-14)
-    const wins = phs[2]!.map((ph, i) => { const s = winS[Math.min(i, winS.length - 1)]!; return add('window', ph, s, atRoad(s, Sh.face + 0.05, Sh.window.y + (i >= winS.length ? -0.9 : 0)), right(s), UP.clone(), layout('window', ph.text, ph.solo), { ad: 'sale' }); });
+    const wins = phs[2]!.map((ph, i) => { const k = Math.min(i, winS.length - 1); return add('window', ph, winS[k]!, onShop(Sh.windows[k]!, Sh.window.y + (i >= winS.length ? -0.9 : 0), 0.05), sRight.clone(), UP.clone(), layout('window', ph.text, ph.solo), { ad: 'sale' }); });
     hold(wins, along(wins, SHOTS.windows), 'cut');
-    // its banner under the eaves: "He 'bout all that action, call him Mr. Handle It"
-    const bS = shop0 + Sh.banner.at, bN = right(bS), bP = atRoad(bS, Sh.face + 0.12, Sh.banner.y), banner = stack('vinyl', phs[3]!, bP, bN);
+    // its banner under its sign board: "He 'bout all that action, call him Mr. Handle It"
+    const bS = shop0 + Sh.banner.at, bN = sRight.clone(), bP = onShop(Sh.banner.at, Sh.banner.y, 0.12), banner = stack('vinyl', phs[3]!, bP, bN);
     const bannerCs = banner.items.map(({ ph, lay, center }) => add('vinyl', ph, bS, center, bN, UP.clone(), lay));
     hold(bannerCs, along(bannerCs, SHOTS.banner), 'cut');
-    const shopS = shop0 + Sh.len / 2, shopLat = Sh.face - Sh.d / 2;
     const shop: Block = { s: shopS, lateral: shopLat, w: Sh.len, h: Sh.h, d: Sh.d, color: 0.4, bare: true, prop: true, matrix: boxAt(route, shopS, shopLat, Sh.d, Sh.h, Sh.len) };
     // the chicken spot past it, the big sign on its roof with the chicken standing on it: "You know I'm hella
     // different | from them chickens | you been trickin' on"

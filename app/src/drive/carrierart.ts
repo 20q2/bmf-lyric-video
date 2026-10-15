@@ -45,7 +45,7 @@ const OWN_COPY: Partial<Record<Carrier['kind'], [string, string]>> = {
   freeway: ['NORTH', '5'],
   marquee: ['OPEN LATE', ''],
   roofsign: ['CHICKEN', 'DINNERS'],
-  vinyl: ['GRAND OPENING', ''],
+  vinyl: ['GRAND RE-OPENING', ''],
   tunnelsign: ['THE STRIP', 'AHEAD'],
 };
 export const FLIP = { slats: 10, stagger: 0.6, steps: 12 };
@@ -237,11 +237,14 @@ export class CarrierArt {
     // (the freeway's three panels are a real gantry until the words come: control cities, not one sign thrice; a
     // stacked board's copy goes on its top row only, or OPEN LATE repeats down the box)
     if (carrier.kind === 'freeway') own = ([['LOS ANGELES', ''], ['SLAUSON AV', '1 MILE'], ['NORTH', '5']] as [string, string][])[+(carrier.id.split('.')[1] ?? 0) % 3];
+    // (the hardware store's banner a row of its own words to each of its phrases' panels: GRAND OPENING alone on the top
+    // one left the rest a blank red sheet — the user, 2026-10-14; the store's new man is the boss its lyric names)
+    else if (carrier.kind === 'vinyl') own = ([['GRAND RE-OPENING', ''], ['UNDER NEW MANAGEMENT', ''], ['COME MEET', 'THE BOSS']] as [string, string][])[+(carrier.id.split('.')[1] ?? 0) % 3];
     else if (own && !carrier.id.endsWith('.0')) own = undefined;
     if (own && !carrier.ad) {
       const [top, under] = own;
       c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = style.colors[1];
-      const big = Math.min(H * (under ? 0.3 : 0.4), (TW * 0.8) / Math.max(4, top.length * 0.58));
+      const big = Math.min(H * (under ? 0.3 : carrier.kind === 'vinyl' ? 0.6 : 0.4), (TW * 0.8) / Math.max(4, top.length * 0.58)); // (a banner's one row printed as big as it takes)
       c.font = font(F.sign(600), big); c.fillText(top, TW / 2, under ? H * 0.38 : H * 0.5, TW * 0.88);
       if (under) { c.font = font(F.sign(600), big * 0.9); c.fillText(under, TW / 2, H * 0.72, TW * 0.88); }
       c.textAlign = 'left';

@@ -128,7 +128,9 @@ export const CHORUS2: SetPiece = {
     carriers.filter((c) => c.kind === 'freeway').forEach((c, i) => frames.set(c.id, { to: () => sign, move: i ? 'snap' : 'cut' }));
 
     // the freeway's left side: the sound wall (concrete: the guard sees it) from before the posters to the stretch's end
-    const s0 = p0 - WALL.before, s1 = carS(st.end) + 20, blocks: Block[] = [];
+    // (ending short of where the freeway does: on past it, the wall stood blank behind verse 2's pole sign and corner —
+    // the user, 2026-10-14)
+    const s0 = p0 - WALL.before, s1 = carS(st.end) - 10, blocks: Block[] = [];
     /** A box on the road's surface following its grade (blocks.ts boxAt stands level: the wall's pieces stood in steps
      *  up the freeway's rise — the user, 2026-10-14). */
     const alongRoad = (s: number, lateral: number, across: number, h: number, along: number) => {
