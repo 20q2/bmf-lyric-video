@@ -13,7 +13,7 @@ import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { F, font } from '../../engine/type';
-import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, sedan, signFace, walker } from './kit';
+import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, sedan, signFace, stride, walker } from './kit';
 import { glassTex } from './chorus1';
 
 /** Slauson, the side street (m, along it from the main road's edge): its fronts from `from` to `len` (out into the
@@ -644,7 +644,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
         roofChicken.rotation.z = 0.1 * up;
       } else { roofChicken.position.y = plan.sign.h / 2 + 0.25; roofChicken.rotation.z = 0; }
       // the shopper walking up the hardware store's sidewalk toward the corner, legs scissoring with their stride
-      { const walked = Math.max(0, t - SHOPPER.t0) * SHOPPER.v; shopper.position.set(shopperAt(walked), 0, SHOPPER.z); const swing = 0.5 * Math.sin(walked * 4.8); shopper.getObjectByName('legL')!.rotation.x = swing; shopper.getObjectByName('legR')!.rotation.x = -swing; }
+      { const walked = Math.max(0, t - SHOPPER.t0) * SHOPPER.v; shopper.position.set(shopperAt(walked), 0, SHOPPER.z); const swing = 0.5 * Math.sin(walked * 4.8); stride(shopper, swing); }
       // soap bubbles drifting up from the bays
       drifting.forEach((b, k) => {
         if (b.userData.bucket) { (b.userData.bucket as THREE.Group).rotation.y = t * 0.6; return; } // the bucket sign turns

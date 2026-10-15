@@ -19,7 +19,7 @@ import { GLOW, lampMaterial } from '../../look/night';
 import { PALM, palmVariant } from '../../look/palms';
 import { F } from '../../engine/type';
 import { hash } from '../../engine/util';
-import { box, canvasTex, cyl, onPanel, pic, plane, roadFrame, sedan, signFace, walker } from './kit';
+import { box, canvasTex, cyl, onPanel, pic, plane, roadFrame, sedan, signFace, stride, walker } from './kit';
 
 /** The coast's furniture: the boardwalk's inner and outer edges (m off the road's centre, left negative), the stalls'
  *  fronts along its sea side, the umbrellas' band of sand, the lifeguard towers' line by the water, and how many of
@@ -640,7 +640,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       for (const w of strollers) {
         const s = lo + ((((w.s - lo + w.dir * w.v * t) % span) + span) % span), swing = 0.45 * Math.sin(t * 5.2 * w.v + w.k);
         w.holder.matrix.copy(frameM(s, w.lat, 0.05, w.dir > 0 ? 0 : Math.PI));
-        w.p.getObjectByName('legL')!.rotation.x = swing; w.p.getObjectByName('legR')!.rotation.x = -swing;
+        stride(w.p, swing);
       }
       if (!plan.fly) return;
       const F0 = plan.fly, flying = t > F0.start - 0.8 && t < F0.end + 2;

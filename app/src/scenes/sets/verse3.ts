@@ -29,7 +29,7 @@ import { facadeOf } from '../../look/facades';
 import { F, font } from '../../engine/type';
 import { hash } from '../../engine/util';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, rightFront, roadFrame, sedan, signFace, walker } from './kit';
+import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, rightFront, roadFrame, sedan, signFace, stride, walker } from './kit';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -904,7 +904,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         if (!p.stand) {
           const sw = 0.5 * Math.sin((s - p.s0) * 4.8);
           const w = p.g.children[0]!;
-          w.getObjectByName('legL')!.rotation.x = sw; w.getObjectByName('legR')!.rotation.x = -sw;
+          stride(w, sw);
         }
       }
       for (const c of traffic) {

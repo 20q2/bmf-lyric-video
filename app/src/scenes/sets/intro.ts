@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
 import { CORNER, COUNTDOWN, type IntroPlan, LIQUOR, MAST, SIGNS } from '../../drive/sets/intro';
-import { pic, plane as flat, rightFront, sedan, signFace, walker } from './kit';
+import { pic, plane as flat, rightFront, sedan, signFace, stride, walker } from './kit';
 import { glassTex } from './chorus1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
@@ -162,8 +162,7 @@ export function buildIntro(drive: Drive): { group: THREE.Group; update(t: number
       if (ped.visible) {
         ped.position.x = -Wk.from + walked; // (lateral right is the frame's -x)
         const swing = 0.5 * Math.sin(walked * 4.8);
-        (ped.getObjectByName('legL')!).rotation.x = swing;
-        (ped.getObjectByName('legR')!).rotation.x = -swing;
+        stride(ped, swing);
       }
       // the cross street's car, through while its light is green
       const lat = Cr.from + Cr.v * (t - Cr.t0);
