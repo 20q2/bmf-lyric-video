@@ -79,7 +79,13 @@ export function sedan(opts: { color: string; length?: number; low?: boolean }): 
   // (a three-box sedan — the user, 2026-10-13: the other cars "look like shit": the hood lower than the trunk, the
   // cabin's glass in pillars, the sills tucked in, mirrors, lamps in bezels, a chrome strip, wheels on hubs)
   const lower = 0.52, beltY = 0.3 + lower;
-  box(body, W, lower, L, 0, 0.3 + lower / 2, 0, paint); // the body to the beltline
+  // the body to the beltline, its wheel arches cut (one box down to the hubs ran through the wheels' tops — the user,
+  // 2026-10-15): the band over the arches the whole length, the panels under it between and beyond the wheels, a dark
+  // well inside each arch
+  const wz = hl - 0.85, R = 0.3, arch = R + 0.07, top = 2 * R + 0.07;
+  box(body, W, beltY - top, L, 0, (top + beltY) / 2, 0, paint);
+  for (const [z0, z1] of [[-hl, -wz - arch], [-wz + arch, wz - arch], [wz + arch, hl]] as const) box(body, W, top - 0.3, z1 - z0, 0, (0.3 + top) / 2, (z0 + z1) / 2, paint);
+  for (const z of [wz, -wz]) box(body, W - 0.36, top - 0.2, 2 * arch, 0, (0.2 + top) / 2, z, dark);
   box(body, W - 0.1, 0.06, L - 0.3, 0, 0.3 + 0.03, 0, dark); // the sill, tucked in
   const cab = box(body, W - 0.34, 0.44, L * 0.44, 0, beltY + 0.22, -0.2, paint); cab.scale.set(1, 1, 1); // the cabin's roof box
   const glass = box(body, W - 0.3, 0.36, L * 0.44 - 0.14, 0, beltY + 0.18, -0.2, dark); glass.scale.z = 1.02; // its glass
@@ -95,11 +101,34 @@ export function sedan(opts: { color: string; length?: number; low?: boolean }): 
   for (const x of [W / 2 - 0.28, -W / 2 + 0.28]) { box(body, 0.3, 0.2, 0.04, x, 0.62, hl + 0.005, chrome); box(body, 0.22, 0.14, 0.04, x, 0.62, hl + 0.02, lamp); box(body, 0.3, 0.16, 0.04, x, 0.62, -hl - 0.005, chrome); box(body, 0.24, 0.1, 0.04, x, 0.62, -hl - 0.02, tail); }
   box(body, W - 0.9, 0.16, 0.04, 0, 0.62, hl + 0.01, dark); for (let k = 0; k < 3; k++) box(body, W - 0.92, 0.015, 0.05, 0, 0.56 + k * 0.06, hl + 0.015, chrome); // the grille
   for (const x of [W / 2 + 0.005, -W / 2 - 0.005]) box(body, 0.02, 0.05, L * 0.8, x, 0.66, 0, chrome);
-  for (const z of [hl - 0.85, -hl + 0.85]) for (const x of [W / 2 - 0.1, -W / 2 + 0.1]) {
-    const w = cyl(g, 0.3, 0.2, x, 0.3, z, dark, 14); w.rotation.z = Math.PI / 2;
-    const hub = cyl(g, 0.16, 0.22, x, 0.3, z, chrome, 12); hub.rotation.z = Math.PI / 2;
+  // the wheels in their arches, standing a little proud of the flanks; each on a pivot at its hub with a five-spoke cap
+  // (a plain disc turning reads as standing still), rolled by how far the car has moved (rollSedans)
+  const wheels: THREE.Object3D[] = [];
+  for (const z of [wz, -wz]) for (const s of [1, -1]) {
+    const piv = new THREE.Group(); piv.position.set(s * (W / 2 - 0.07), R, z); g.add(piv); wheels.push(piv);
+    cyl(piv, R, 0.2, 0, 0, 0, dark, 16).rotation.z = Math.PI / 2;
+    cyl(piv, 0.17, 0.22, 0, 0, 0, chrome, 12).rotation.z = Math.PI / 2;
+    for (let k = 0; k < 5; k++) { const sp = box(piv, 0.03, 0.28, 0.05, s * 0.115, 0, 0, dark); sp.rotation.x = (k * 2 * Math.PI) / 5; }
   }
+  g.userData.roll = { wheels, r: R, last: null as THREE.Vector3 | null, angle: 0 };
+  ROLLING.push(g);
   return g;
+}
+
+/** The sedans built (sedan()): rolled each frame by rollSedans. */
+const ROLLING: THREE.Group[] = [];
+/** Turn every sedan's wheels by how far it moved since the last frame, along its own heading (parked ones stay still);
+ *  a jump of more than `seek` m (a seek, a cut to a new place) doesn't count. */
+export function rollSedans(seek = 4) {
+  const p = new THREE.Vector3(), fwd = new THREE.Vector3();
+  for (const g of ROLLING) {
+    const R = g.userData.roll as { wheels: THREE.Object3D[]; r: number; last: THREE.Vector3 | null; angle: number };
+    g.updateWorldMatrix(true, false);
+    p.setFromMatrixPosition(g.matrixWorld); fwd.setFromMatrixColumn(g.matrixWorld, 2).normalize();
+    if (R.last) { const d = p.clone().sub(R.last).dot(fwd); if (Math.abs(d) < seek) R.angle += d / R.r; }
+    (R.last ??= new THREE.Vector3()).copy(p);
+    for (const w of R.wheels) w.rotation.x = R.angle;
+  }
 }
 
 /** A pedestrian as a flat silhouette (the cast's dark): a body, a head, two legs hinged at the hip (named 'legL',
