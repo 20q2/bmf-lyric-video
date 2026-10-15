@@ -34,7 +34,8 @@ const smooth = (a: number, b: number, x: number) => { const u = clamp01((x - a) 
 export function castOf(audio: AudioData, lyrics: Lyrics): (t: number) => Cast {
   const leanAt = audio.beats.find((b) => b >= LEAN.at) ?? LEAN.at;
   // (once she's leaning on him, her arm stays down: the outro's second "blowin' money fast" waved it over his head)
-  const arm = lyrics.lines.filter((l) => ARM_UP.test(l.text) && l.words[0]!.start < leanAt).map((l) => [l.words[0]!.start, l.end] as const);
+  // (and a wave still up as she leans is down by then: lowering through the lean, it swept across the frame at 172 s)
+  const arm = lyrics.lines.filter((l) => ARM_UP.test(l.text) && l.words[0]!.start < leanAt).map((l) => [l.words[0]!.start, Math.min(l.end, leanAt - CAST.linger - 0.1)] as const);
   const look = lyrics.lines.filter((l) => LOOK.test(l.text.replace(/[’]/g, "'"))).map((l) => [l.words[0]!.start, l.end] as const);
   const first = lyrics.lines[0]?.words[0]?.start ?? 0;
   return (t) => {

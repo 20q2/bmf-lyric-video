@@ -7,10 +7,13 @@
 //   him  at the wheel (the car's left, +x), a jacket's collar, a gold chain, shades: his left arm straight out to the
 //        wheel low on its rim, the lowrider's lean-back grip; his right along the bench's top behind her, and at the
 //        end round her shoulders (on pivots, reached by poseCast)
-//   her  beside him, her hair down her back, her right arm on a pivot at the shoulder (the scene swings it out and up,
-//        cast.ts), its elbow straightening as it rises; her left hand in her lap
+//   her  beside him, her braids up in a bun on her crown, their length over her right shoulder and down her front
+//        (bending between her head and her body as she turns: skinned), gold hoops, bangles, a fitted wine top; her
+//        right arm on a pivot at the shoulder (the scene swings it out and up, cast.ts), its elbow straightening as it
+//        rises; her left on pivots at the shoulder and elbow, its hand in her lap, or on her phone (holdPhone)
 // The heads turn on pivots at the neck ('hisHead', 'herHead'), her arm on 'herArm', his right on 'hisArm': poseCast
-// moves them by name (and her whole figure, 'her', as she leans into him at the end).
+// moves them by name (and her whole figure, 'her', as she leans into him at the end); verse 1 moves her left
+// ('herLeftArm') to her phone.
 // His campaign poster is drawn from this same model (`bustTriangles`, look/adart.ts): the same cap, the same profile.
 // Browser and bun (no DOM).
 import * as THREE from 'three';
@@ -48,8 +51,9 @@ function skin(rings: THREE.Vector3[][]): THREE.BufferGeometry {
   return g;
 }
 
-/** A form lofted through level cross-sections, smoothed between them (Catmull-Rom, `sub` rings a span). */
-function loft(secs: Sec[], ring = 40, sub = 4): THREE.BufferGeometry {
+/** A form lofted through level cross-sections, smoothed between them (Catmull-Rom, `sub` rings a span); `shape`
+ *  moves each point after (a surface made from another's: her hair's cap from her head). */
+function loft(secs: Sec[], ring = 40, sub = 4, shape?: (p: THREE.Vector3) => void): THREE.BufferGeometry {
   ring *= detail; sub *= detail;
   const n = secs.length, get = (i: number) => { const s = secs[Math.max(0, Math.min(n - 1, i))]!; return [s[0], s[1], s[2], s[3], s[4], s[5] ?? 1, s[6] ?? 2]; };
   const rows: number[][] = [];
@@ -63,6 +67,7 @@ function loft(secs: Sec[], ring = 40, sub = 4): THREE.BufferGeometry {
     for (let j = 0; j < ring; j++) {
       const th = (2 * Math.PI * j) / ring, c = Math.cos(th), s = Math.sin(th);
       r.push(new THREE.Vector3(x! + w * spow(c, e) * (s > 0 ? 1 + (tf! - 1) * s : 1), y!, zm + zh * spow(s, e)));
+      if (shape) shape(r[j]!);
     }
     return r;
   });
@@ -102,7 +107,8 @@ function tube(pts: THREE.Vector3[], radii: number[], up = new THREE.Vector3(0, 1
 /** The cast's dark with a rim: a lighter edge where the surface turns away from the eye, strongest on what faces the
  *  sky (shoulders, the head's top, the cap), dimmed by night (the scene's NIGHT). Toon-lit underneath, its shadows
  *  printed like the world's. */
-function castMaterial(color: THREE.ColorRepresentation = '#140d18', rim: THREE.ColorRepresentation = '#5a2a4e'): THREE.MeshToonMaterial {
+const CAST_INK = '#140d18';
+function castMaterial(color: THREE.ColorRepresentation = CAST_INK, rim: THREE.ColorRepresentation = '#5a2a4e'): THREE.MeshToonMaterial {
   const m = toon({ color }), r = new THREE.Color(rim);
   m.onBeforeCompile = (sh) => {
     printShadows(sh);
@@ -123,7 +129,7 @@ uniform float castNight;`)
 
 /** What each part is, for the poster (adart.ts): his skin and clothes, gold, or a lens. */
 export type Tone = 'body' | 'gold' | 'lens';
-interface Mats { body: THREE.Material; gold: THREE.Material; lens: THREE.Material; plain?: THREE.Material }
+interface Mats { body: THREE.Material; gold: THREE.Material; lens: THREE.Material; plain?: THREE.Material; top?: THREE.Material }
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const part = (to: THREE.Object3D, geo: THREE.BufferGeometry, mats: Mats, tone: Tone = 'body') => { const o = new THREE.Mesh(geo, mats[tone]); o.userData.tone = tone; to.add(o); return o; };
 const blob = (to: THREE.Object3D, mats: Mats, at: THREE.Vector3, r: [number, number, number], tone: Tone = 'body') => { const o = part(to, new THREE.SphereGeometry(1, 20, 14), mats, tone); o.position.copy(at); o.scale.set(...r); return o; };
@@ -146,52 +152,96 @@ const CAP: Sec[] = [
   [0.096, 0, -0.123, 0.104, 0.086, 0.9, 2.4], [0.125, 0, -0.121, 0.102, 0.086, 0.9, 2.3], [0.153, 0, -0.111, 0.09, 0.08, 0.92, 2.2],
   [0.176, 0, -0.089, 0.064, 0.065, 0.95, 2.1], [0.193, 0, -0.058, 0.032, 0.04, 1, 2], [0.201, 0, -0.026, 0.002, 0.012],
 ];
-/** Her head: finer — a smaller nose, fuller lips, a softer jaw. */
+/** Her head: finer than his, and a woman's in profile — the forehead's curve, a small brow, a nose with a lift at its
+ *  tip, full lips (the upper's a touch forward of the lower), a small, defined chin, the jaw angling back to the neck. */
 const HER_HEAD: Sec[] = [
-  [-0.082, 0, 0.046, 0.064, 0.01], [-0.073, 0, 0.012, 0.079, 0.026, 0.8, 2.2], [-0.058, 0, -0.03, 0.087, 0.042, 0.66, 2.3],
-  [-0.042, 0, -0.058, 0.09, 0.05, 0.62, 2.3], [-0.026, 0, -0.076, 0.088, 0.055, 0.62, 2.3], [-0.011, 0, -0.088, 0.1, 0.059, 0.62, 2.3],
-  [0.004, 0, -0.096, 0.094, 0.064, 0.68, 2.4], [0.028, 0, -0.102, 0.09, 0.069, 0.74, 2.4], [0.052, 0, -0.106, 0.085, 0.072, 0.8, 2.4],
-  [0.075, 0, -0.108, 0.091, 0.073, 0.84, 2.3], [0.104, 0, -0.106, 0.086, 0.072, 0.88, 2.2], [0.132, 0, -0.096, 0.07, 0.066, 0.9, 2.2],
-  [0.153, 0, -0.077, 0.046, 0.051, 0.95, 2.1], [0.167, 0, -0.048, 0.015, 0.03, 1, 2], [0.173, 0, -0.021, -0.006, 0.008],
+  [-0.088, 0, 0.034, 0.058, 0.011], [-0.08, 0, -0.002, 0.075, 0.027, 0.8, 2.2], [-0.068, 0, -0.035, 0.083, 0.039, 0.62, 2.3],
+  [-0.055, 0, -0.06, 0.078, 0.047, 0.58, 2.3], [-0.042, 0, -0.075, 0.092, 0.052, 0.56, 2.3], [-0.031, 0, -0.084, 0.086, 0.055, 0.58, 2.3],
+  [-0.02, 0, -0.09, 0.097, 0.058, 0.6, 2.3], [-0.007, 0, -0.095, 0.091, 0.062, 0.66, 2.4], [0.012, 0, -0.1, 0.09, 0.066, 0.7, 2.4],
+  [0.034, 0, -0.104, 0.087, 0.069, 0.76, 2.4], [0.055, 0, -0.107, 0.082, 0.071, 0.8, 2.4], [0.072, 0, -0.108, 0.091, 0.072, 0.84, 2.3],
+  [0.1, 0, -0.106, 0.088, 0.071, 0.88, 2.2], [0.128, 0, -0.097, 0.074, 0.066, 0.9, 2.2], [0.15, 0, -0.08, 0.051, 0.052, 0.95, 2.1],
+  [0.165, 0, -0.052, 0.02, 0.032, 1, 2], [0.171, 0, -0.024, -0.004, 0.008],
 ];
 const HER_NOSE: Sec[] = [
-  [0.064, 0, 0.07, 0.086, 0.006], [0.046, 0, 0.07, 0.096, 0.008], [0.026, 0, 0.07, 0.106, 0.011], [0.013, 0, 0.07, 0.111, 0.015],
-  [0.004, 0, 0.074, 0.105, 0.017], [-0.002, 0, 0.08, 0.096, 0.01],
+  [0.062, 0, 0.068, 0.083, 0.006], [0.044, 0, 0.068, 0.093, 0.008], [0.026, 0, 0.068, 0.103, 0.011], [0.014, 0, 0.068, 0.109, 0.015],
+  [0.005, 0, 0.072, 0.105, 0.017], [-0.003, 0, 0.078, 0.095, 0.01],
 ];
-/** Her hair: a full shell over the crown and out past her cheeks (her face clear in front of it), closing at the nape;
- *  its length in locs (`locs`). */
-const HAIR: Sec[] = [
-  [0.218, 0, -0.07, 0.0, 0.03], [0.203, 0, -0.122, 0.045, 0.088, 0.9, 2.2], [0.172, 0, -0.148, 0.077, 0.115, 0.85, 2.3],
-  [0.12, 0, -0.16, 0.079, 0.124, 0.8, 2.4], [0.06, 0, -0.163, 0.036, 0.126, 0.7, 2.4], [0.0, 0, -0.162, 0.016, 0.122, 0.72, 2.4],
-  [-0.05, 0, -0.15, -0.01, 0.105, 0.8, 2.3], [-0.08, 0, -0.13, -0.04, 0.07], [-0.09, 0, -0.11, -0.06, 0.03],
-];
-/** Her locs: rooted in rows from the crown down (their angles round her head from straight behind, radians), each lying
- *  over the shell down to her ears (the higher rows' over the lower's), then falling — the sides' swept back past her
- *  jaw and behind her shoulders, all of them down her back to the bench's top and over it, their ends uneven. */
-const LOCS = { rows: [{ y: 0.2, spread: 1.5, n: 9 }, { y: 0.15, spread: 1.75, n: 13 }, { y: 0.085, spread: 1.95, n: 19 }], r: 0.0135 };
-/** The hair's shell at height y, round at `phi` from straight behind (an ellipse through its section there). */
-function shellAt(phi: number, y: number, out: number) {
-  let i = 0; while (i < HAIR.length - 2 && HAIR[i + 1]![0] > y) i++;
-  const a = HAIR[i]!, b = HAIR[i + 1]!, u = Math.min(1, Math.max(0, (a[0] - y) / (a[0] - b[0]))), at = (k: number) => a[k]! + (b[k]! - a[k]!) * u;
-  const zm = (at(2) + at(3)) / 2, zh = (at(3) - at(2)) / 2;
-  return V(at(4) * Math.sin(phi) * out, y, zm - zh * Math.cos(phi) * out);
+/** Her hair (the user, 2026-10-15: "our main girls here need some work"; from behind, her head and its 41 locs read as a
+ *  ribbed barrel): her braids pulled back off her face — close over her skull, so her head's shape, her neck and her
+ *  shoulders read from behind — and up into a bun high on her crown, coiled; their length falls from under it over her
+ *  right shoulder (the door's) and down her front. The cap of it: the head's sections, `over` out from them, cut back
+ *  from her face at the hairline (each level's front no further than `line`: the forehead's top, the temples, behind
+ *  her ears, the nape). */
+const HAIR = {
+  over: 0.007, squat: 0.9,
+  line: [[0.2, 1], [0.126, 0.072], [0.095, 0.035], [0.06, -0.022], [0.0, -0.04], [-0.04, -0.056], [-0.07, -0.06]] as [number, number][],
+  /** The bun: its base's middle on her crown (her head's frame), the way it stands (tipped back), its coil's radius at
+   *  the foot and the top, its turns, its rise, the braid's thickness. */
+  bun: { at: V(0, 0.15, -0.078), axis: V(0, 0.75, -0.66), r0: 0.05, r1: 0.011, turns: 2.5, rise: 0.072, thick: 0.02 },
+  /** The fall: braids from under the bun, behind her right ear, round her neck, over her shoulder and down her front
+   *  (her frame), each `r` thick; the head carries them down to `from`, her body from `to` (between, they bend: skinned). */
+  fall: { n: 11, r: 0.0105, from: 1.64, to: 1.53 },
+};
+/** The hairline: how far forward her hair comes at height y (her head's frame). */
+function hairline(y: number) {
+  const L = HAIR.line; let i = 0; while (i < L.length - 2 && L[i + 1]![0] > y) i++;
+  const [ya, za] = L[i]!, [yb, zb] = L[i + 1]!, u = Math.min(1, Math.max(0, (ya - y) / (ya - yb)));
+  return za + (zb - za) * u;
 }
-function locs(head: THREE.Object3D, mats: Mats) {
-  let k = 0;
-  LOCS.rows.forEach((row, ri) => {
-    const lift = 1.03 + 0.022 * (LOCS.rows.length - 1 - ri);
-    for (let i = 0; i < row.n; i++, k++) {
-      const phi = -row.spread + (2 * row.spread * i) / (row.n - 1), j = Math.sin(k * 12.9898) * 43758.5453, jit = j - Math.floor(j), sx = Math.sin(phi);
-      const pts = [shellAt(phi, row.y + 0.008, 0.97)];
-      for (let y = row.y - 0.03; y > 0.0; y -= 0.035) pts.push(shellAt(phi, y, lift));
-      // (down past her jaw, swept behind the face; behind her shoulders; down her back, over the bench's top)
-      const last = pts[pts.length - 1]!, x2 = Math.sign(sx) * Math.min(Math.abs(last.x) * 1.05, 0.135), z2 = Math.min(last.z, -0.07 - 0.03 * Math.abs(sx));
-      const x3 = x2 * 0.92, x4 = x3 * (0.8 + 0.1 * jit), end = -0.29 - 0.1 * jit;
-      pts.push(V(x2, -0.07, z2), V(x3, -0.19, -0.17 - 0.01 * jit), V(x4, end, -0.185));
-      const r = pts.map((_, n) => LOCS.r * (n < pts.length - 3 ? 1 : [0.95, 0.82, 0.6][n - (pts.length - 3)]!));
-      part(head, tube(pts, r, V(0, 0, 1), 1, 9, 40), mats);
-    }
+function hairCap(): THREE.BufferGeometry {
+  // (her head's own surface, blown out from its middle by `over`; where her face is, sunk back inside it)
+  const O = V(0, 0.03, -0.012), v = new THREE.Vector3();
+  return loft(HER_HEAD, 44, 4, (p) => {
+    const inside = p.z > hairline(p.y);
+    v.subVectors(p, O); const L = v.length();
+    p.copy(O).addScaledVector(v, inside ? 0.86 : 1 + HAIR.over / L);
   });
+}
+/** The bun: one thick braid coiled from its foot up into its top, the turns stacked into a dome. */
+function bunGeo(): THREE.BufferGeometry {
+  const B = HAIR.bun, ax = B.axis.clone().normalize(), e1 = V(1, 0, 0), e2 = ax.clone().cross(e1).normalize(), pts: THREE.Vector3[] = [], radii: number[] = [];
+  const n = Math.round(B.turns * 14);
+  for (let k = 0; k <= n; k++) {
+    const s = k / n, th = 2 * Math.PI * B.turns * s + 0.6, R = B.r0 + (B.r1 - B.r0) * s, h = B.rise * Math.sin((Math.PI / 2) * Math.min(1, s * 1.15));
+    pts.push(B.at.clone().addScaledVector(e1, R * Math.cos(th)).addScaledVector(e2, R * Math.sin(th)).addScaledVector(ax, h));
+    radii.push(B.thick * (1 - 0.35 * s * s));
+  }
+  return tube(pts, radii, ax, 1, 14, n * 3);
+}
+/** The braids' fall (her frame): each from under the bun's right side to its end on her front, fanned across the
+ *  bundle and uneven at the ends. Returns each braid's points (the cuffs go on some of them). */
+function fallPaths(): THREE.Vector3[][] {
+  const F = FIGURE.her, H = (x: number, y: number, z: number) => V(x, y, z).add(F.head), out: THREE.Vector3[][] = [];
+  // (the bundle's middle, and how far it opens at each point: tight from the bun, loosening down her front)
+  const mid = [H(-0.03, 0.135, -0.11), H(-0.066, 0.072, -0.104), H(-0.08, 0.0, -0.084), V(-0.088, 1.53, -0.36), V(-0.094, 1.49, -0.3), V(-0.098, 1.44, -0.218), V(-0.102, 1.33, -0.168), V(-0.106, 1.215, -0.175)];
+  const open = [0.008, 0.012, 0.016, 0.018, 0.019, 0.02, 0.026, 0.036];
+  for (let i = 0; i < HAIR.fall.n; i++) {
+    // (each braid's place across the bundle: one in the middle, the rest in a ring round it)
+    const ring = i === 0 ? 0 : i < 5 ? 0.5 : 1, ang = i * 2.4, j = Math.sin(i * 91.7) * 43758.5453, jit = j - Math.floor(j);
+    out.push(mid.map((m, k) => {
+      const w = open[k]! * ring, last = k === mid.length - 1;
+      // (lying on her: across her shoulder and down her front the bundle flattens against her, never into her)
+      const flat = k >= 4 ? 0.45 : 1;
+      return m.clone().add(V(w * Math.cos(ang) + 0.003 * Math.sin(k * 1.9 + i), last ? -0.05 * jit : 0, w * Math.sin(ang) * flat + (k >= 4 ? w * flat : 0)));
+    }));
+  }
+  return out;
+}
+/** A mesh bending between her body and her head: each corner the head's by its height (her frame: all of it above
+ *  `from`, none below `to`), the rest her body's (her group itself and 'herHead' as the bones). */
+function skinned(g: THREE.Object3D, head: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material, from: number, to: number) {
+  const p = geo.attributes.position!, idx = new Uint16Array(p.count * 4), w = new Float32Array(p.count * 4);
+  for (let i = 0; i < p.count; i++) {
+    const u = Math.min(1, Math.max(0, (p.getY(i) - to) / (from - to))), h = u * u * (3 - 2 * u);
+    idx[i * 4 + 1] = 1; w[i * 4] = 1 - h; w[i * 4 + 1] = h;
+  }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(w, 4));
+  const m = new THREE.SkinnedMesh(geo, mat); m.frustumCulled = false; m.userData.tone = 'body';
+  g.add(m);
+  g.updateMatrixWorld(true);
+  m.bind(new THREE.Skeleton([g, head] as unknown as THREE.Bone[]));
+  return m;
 }
 
 // ---- the bodies (in the figure's frame: x from its middle, y and z the car body's; m) ----
@@ -204,13 +254,13 @@ const HIS_TORSO: Sec[] = [
 const HER_TORSO: Sec[] = [
   [0.95, 0, -0.43, -0.2, 0.1], [0.98, 0, -0.445, -0.185, 0.17, 1, 2.4], [1.06, 0, -0.45, -0.205, 0.158, 1, 2.4],
   [1.15, 0, -0.45, -0.235, 0.128, 1, 2.3], [1.25, 0, -0.45, -0.225, 0.138, 1, 2.3], [1.32, 0, -0.448, -0.19, 0.152, 0.85, 2.3],
-  [1.38, 0, -0.442, -0.205, 0.158, 1, 2.5], [1.425, 0, -0.43, -0.23, 0.162, 1, 2.8], [1.465, 0, -0.415, -0.25, 0.128, 1, 2.4],
-  [1.49, 0, -0.395, -0.27, 0.078], [1.505, 0, -0.38, -0.285, 0.032],
+  [1.38, 0, -0.442, -0.205, 0.158, 1, 2.5], [1.425, 0, -0.43, -0.23, 0.162, 1, 2.8], [1.465, 0, -0.415, -0.25, 0.13, 1, 2.4],
+  [1.492, 0, -0.397, -0.272, 0.094, 1, 2.2], [1.512, 0, -0.38, -0.29, 0.048],
 ];
 /** Where things are (the figure's frame): the heads' pivots, the shoulders' joints, the hips. */
 export const FIGURE = {
   him: { x: 0.44, head: V(0, 1.64, -0.29), shoulder: V(0.188, 1.445, -0.322), hip: V(0.095, 1.04, -0.3) },
-  her: { x: -0.44, head: V(0, 1.61, -0.3), shoulder: V(0.155, 1.425, -0.325), hip: V(0.085, 1.03, -0.3) },
+  her: { x: -0.44, head: V(0, 1.625, -0.302), shoulder: V(0.155, 1.425, -0.325), hip: V(0.085, 1.03, -0.3) },
 };
 /** His grip on the wheel: low on its rim at about half seven, his arm straight to it (the car body's frame; the
  *  wheel's place is drive/cabin.ts WHEEL, shared with world.ts buildCar). */
@@ -235,16 +285,16 @@ function boneQ(along: THREE.Vector3, face: THREE.Vector3, out = new THREE.Quater
   x.normalize();
   return out.setFromRotationMatrix(_m4.makeBasis(x, y, x.clone().cross(y)));
 }
-/** Reaches his right arm (its shoulder's group, its forearm's inside) for wrist `W` (his frame): the elbow bent out
- *  toward `pole`, the palm facing `palm`. */
-function reach(upper: THREE.Object3D, W: THREE.Vector3, pole: THREE.Vector3, palm: THREE.Vector3) {
-  const S = upper.position, U = ARM.upper, F = ARM.fore, sw = W.clone().sub(S);
+/** Reaches an arm (its shoulder's group, its forearm's inside, named `forearm`; its bones `U` and `F` long) for wrist `W`
+ *  (the figure's frame): the elbow bent out toward `pole`, the palm facing `palm`. */
+function reach(upper: THREE.Object3D, W: THREE.Vector3, pole: THREE.Vector3, palm: THREE.Vector3, U = ARM.upper, F = ARM.fore, forearm = 'hisForearm') {
+  const S = upper.position, sw = W.clone().sub(S);
   const d = Math.min(U + F - 1e-3, Math.max(Math.abs(U - F) + 1e-3, sw.length())), n = sw.normalize();
   const cosA = (U * U + d * d - F * F) / (2 * U * d), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
   const m = pole.clone().addScaledVector(n, -pole.dot(n)).normalize();
   const E = S.clone().addScaledVector(n, U * cosA).addScaledVector(m, U * sinA), Wd = S.clone().addScaledVector(n, d);
   boneQ(E.clone().sub(S), m, upper.quaternion);
-  const fore = upper.getObjectByName('hisForearm')!;
+  const fore = upper.getObjectByName(forearm)!;
   fore.quaternion.copy(upper.quaternion).invert().multiply(boneQ(Wd.sub(E), palm, _q));
 }
 
@@ -278,7 +328,7 @@ function legs(g: THREE.Object3D, mats: Mats, hip: THREE.Vector3, her: boolean) {
 
 /** A hand from the wrist on along `dir`: a palm flat across `palm` (the way it faces), four fingers curling toward
  *  where it faces by `curl` (0 open, 1.5 a fist) and fanned by `spread`, a thumb off to `side`. */
-function hand(g: THREE.Object3D, mats: Mats, wrist: THREE.Vector3, dir: THREE.Vector3, palm: THREE.Vector3, side: THREE.Vector3, size: number, curl = 0.4, spread = 0.1) {
+function hand(g: THREE.Object3D, mats: Mats, wrist: THREE.Vector3, dir: THREE.Vector3, palm: THREE.Vector3, side: THREE.Vector3, size: number, curl = 0.4, spread = 0.1, thumb = true) {
   const d = dir.clone().normalize(), p = palm.clone().addScaledVector(d, -palm.dot(d)).normalize(), a = side.clone().addScaledVector(d, -side.dot(d)).addScaledVector(p, -side.dot(p)).normalize();
   const knuckle = wrist.clone().addScaledVector(d, 0.085 * size), k = size;
   part(g, tube([wrist.clone().addScaledVector(d, -0.01 * k), wrist.clone().addScaledVector(d, 0.04 * k), knuckle], [0.024 * k, 0.037 * k, 0.036 * k], p, 0.42), mats);
@@ -290,6 +340,7 @@ function hand(g: THREE.Object3D, mats: Mats, wrist: THREE.Vector3, dir: THREE.Ve
     for (const share of [0.45, 0.32, 0.23]) { dirn = dirn.clone().multiplyScalar(Math.cos(curl * 0.6)).addScaledVector(p, Math.sin(curl * 0.6)).normalize(); at = at.clone().addScaledVector(dirn, len! * share * k); pts.push(at); }
     part(g, tube(pts, [0.0105 * k, 0.0105 * k, 0.0095 * k, 0.0085 * k, 0.0075 * k], p, 0.85, 8, 14), mats);
   });
+  if (!thumb) return;
   const base = wrist.clone().addScaledVector(d, 0.022 * k).addScaledVector(a, 0.02 * k);
   const mid = base.clone().addScaledVector(d, 0.03 * k).addScaledVector(a, 0.03 * k).addScaledVector(p, 0.012 * k);
   const tip = mid.clone().addScaledVector(d, 0.04 * k).addScaledVector(a, 0.01 * k).addScaledVector(p, 0.015 * k * (1 + curl));
@@ -361,42 +412,117 @@ export function buildHim(mats: Mats, pose: 'drive' | 'bust' = 'drive'): THREE.Gr
   return g;
 }
 
-/** Her: her head's group named 'herHead', her right arm on its pivot at the shoulder 'herArm'. */
+/** Her arms: their bones (m); her left's rest, its hand in her lap (the wrist, which way the elbow points, the palm),
+ *  and its hold on her phone (verse 1: holdPhone) — the wrist this far under the phone's foot and behind its back, the
+ *  elbow down at her side. */
+const HER_ARM = { upper: 0.28, fore: 0.24, lap: V(0.12, 1.115, -0.06), lapPole: V(1, 0.1, -0.5), lapPalm: V(0, -1, 0), under: 0.026, behind: 0.03, phonePole: V(0.5, -1, -0.3) };
+/** Her top: fitted, scoop-necked, on straps (her frame: the neckline's middle in front, how it rises toward the straps,
+ *  its line at the back, the straps' span either side), its colour against her skin's dark (the cast's). */
+const TOP = { color: '#4a1238', neck: 1.34, scoop: 3.5, back: 1.41, strap: [0.07, 0.104] as [number, number] };
+const isTop = (x: number, y: number, z: number) => {
+  const ax = Math.abs(x), edge = z > -0.33 ? TOP.neck + TOP.scoop * x * x : TOP.back + 1.5 * x * x;
+  return y < edge || (ax > TOP.strap[0] && ax < TOP.strap[1] && y < 1.52);
+};
+/** Paints a geometry's corners by place (its own colour attribute: for a material drawn in vertex colours). */
+function paint(geo: THREE.BufferGeometry, color: (p: THREE.Vector3) => THREE.Color): THREE.BufferGeometry {
+  const p = geo.attributes.position!, c = new Float32Array(p.count * 3), v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { const k = color(v.fromBufferAttribute(p, i)); c[i * 3] = k.r; c[i * 3 + 1] = k.g; c[i * 3 + 2] = k.b; }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
+  return geo;
+}
+
+/** Her: her head's group named 'herHead'; her right arm on its pivot at the shoulder 'herArm'; her left on pivots at
+ *  the shoulder ('herLeftArm') and the elbow ('herLeftForearm'), its hand on the wrist ('herHand': in her lap, or on her
+ *  phone — holdPhone). */
 export function buildHer(mats: Mats): THREE.Group {
   const g = new THREE.Group(), F = FIGURE.her;
-  part(g, loft(HER_TORSO, 44), mats);
-  part(g, tube([V(0, 1.45, -0.345), V(0, 1.56, -0.31), V(0, 1.64, -0.298)], [0.046, 0.042, 0.04]), mats); // the neck
+  // her body, in her top (vertex-painted: the top's colour below its neckline and on its straps, her skin's above)
+  const skinC = new THREE.Color(CAST_INK), topC = new THREE.Color(TOP.color);
+  part(g, paint(loft(HER_TORSO, 144, 14), (p) => /* (fine: her top is painted per corner, coarse its neckline and straps stair-stepped) */ (isTop(p.x, p.y, p.z) ? topC : skinC)), { ...mats, body: mats.top ?? mats.body });
+  part(g, tube([V(0, 1.44, -0.35), V(0, 1.5, -0.332), V(0, 1.565, -0.316), V(0, 1.655, -0.302)], [0.07, 0.054, 0.047, 0.045]), mats); // the neck: long
   const head = new THREE.Group(); head.name = 'herHead'; head.position.copy(F.head); g.add(head);
-  part(head, loft(HER_HEAD, 44), mats);
-  part(head, loft(HER_NOSE, 16), mats);
-  part(head, loft(HAIR, 48), mats);
-  locs(head, mats);
+  // (her head and hair drawn a share shorter than they're cut: at full height her face read long)
+  const skull = new THREE.Group(); skull.scale.y = HAIR.squat; head.add(skull);
+  part(skull, loft(HER_HEAD, 44), mats);
+  part(skull, loft(HER_NOSE, 16), mats);
+  for (const s of [1, -1]) blob(skull, mats, V(s * 0.068, 0.028, -0.016), [0.011, 0.024, 0.017]).rotation.set(-0.2, 0, s * 0.12); // her ears
+  // her hair: the cap, the bun on her crown, the braids' fall (skinned: from her head down onto her shoulder)
+  part(skull, hairCap(), mats);
+  part(skull, bunGeo(), mats);
+  const paths = fallPaths();
+  skinned(g, head, mergeGeometries(paths.map((pts, i) => tube(pts, pts.map((_, k) => HAIR.fall.r * (k < pts.length - 2 ? 1 : k === pts.length - 2 ? 0.95 : 0.7 + 0.1 * (i % 3))), V(0, 0, 1), 1, 8, 60).toNonIndexed())), mats.body, HAIR.fall.from, HAIR.fall.to);
+  // gold: a cuff near the end of every other braid; her hoops, from the lobes
+  paths.forEach((pts, i) => {
+    if (i % 2) return;
+    const c = new THREE.CatmullRomCurve3(pts, false, 'centripetal'), u = 0.86 - 0.03 * (i % 3);
+    const cuff = part(g, new THREE.CylinderGeometry(HAIR.fall.r * 1.3, HAIR.fall.r * 1.3, 0.014, 12), mats, 'gold'); cuff.position.copy(c.getPointAt(u)); cuff.quaternion.setFromUnitVectors(V(0, 1, 0), c.getTangentAt(u));
+  });
+  for (const s of [1, -1]) {
+    const hoop = part(head, new THREE.TorusGeometry(0.024, 0.0028, 8, 40), mats, 'gold'); hoop.position.set(s * 0.073, -0.016, -0.012); hoop.rotation.y = s * 1.0;
+  }
   // her right arm (the door's side, -x) on its pivot: hanging from the shoulder, the forearm forward along her thigh;
   // as the scene swings it up its elbow straightens (worked out from the swing as the world's matrices update: the
-  // scene sets only the arm's turn)
+  // scene sets only the arm's turn); her bangles at the wrist
   const S = V(-F.shoulder.x, F.shoulder.y, F.shoulder.z), arm = new THREE.Group(); arm.name = 'herArm'; arm.position.copy(S); g.add(arm);
-  part(arm, tube([V(0.035, 0.035, -0.005), V(0, 0, 0), V(0.012, -0.27, 0.02)], [0.05, 0.047, 0.036]), mats);
+  part(arm, tube([V(0.035, 0.035, -0.005), V(0, 0, 0), V(0.006, -0.13, 0.01), V(0.012, -0.27, 0.02)], [0.045, 0.043, 0.037, 0.03]), mats);
   const elbow = new THREE.Group(); elbow.position.set(0.012, -0.27, 0.02); arm.add(elbow);
-  part(elbow, tube([V(0, 0.02, 0), V(0, -0.12, 0), V(0, -0.235, 0)], [0.036, 0.033, 0.024]), mats);
-  hand(elbow, mats, V(0, -0.235, 0), V(0, -1, 0), V(0, 0, -1), V(1, 0, 0), 0.88, 0.35, 0.14);
+  part(elbow, tube([V(0, 0.02, 0), V(0, -0.1, 0), V(0, -0.235, 0)], [0.03, 0.028, 0.02]), mats);
+  hand(elbow, mats, V(0, -0.235, 0), V(0, -1, 0), V(0, 0, -1), V(1, 0, 0), 0.86, 0.35, 0.14);
+  for (const y of [-0.2, -0.214]) { const b = part(elbow, new THREE.TorusGeometry(0.026, 0.0035, 6, 24), mats, 'gold'); b.position.set(0, y, 0); b.rotation.x = Math.PI / 2 + (y + 0.207) * 8; }
   arm.updateMatrixWorld = function (force?: boolean) {
     const u = Math.min(1, Math.max(0, -this.rotation.z / ELBOW.up));
     elbow.rotation.x = ELBOW.rest + (ELBOW.raised - ELBOW.rest) * u * u * (3 - 2 * u);
     THREE.Group.prototype.updateMatrixWorld.call(this, force);
   };
   elbow.rotation.x = ELBOW.rest;
-  // her left: down her side, the forearm across her lap, her hand resting in it
-  const S2 = V(F.shoulder.x, F.shoulder.y, F.shoulder.z), E2 = V(0.175, 1.17, -0.275), W2 = V(0.12, 1.115, -0.06);
-  part(g, tube([V(0.11, 1.46, -0.33), S2, E2, W2], [0.05, 0.047, 0.036, 0.025]), mats);
-  hand(g, mats, W2, V(-0.5, -0.1, 1), V(0, -1, 0), V(-1, 0, 0), 0.88, 0.5, 0.05);
+  // her left (toward him): on pivots, each bone along its own -y, the palm facing its forearm's +x; at rest down her
+  // side, the forearm across her lap, her hand in it
+  const A = HER_ARM, S2 = V(F.shoulder.x, F.shoulder.y, F.shoulder.z);
+  part(g, tube([V(0.11, 1.46, -0.33), S2], [0.045, 0.043]), mats);
+  const upper = new THREE.Group(); upper.name = 'herLeftArm'; upper.position.copy(S2); g.add(upper);
+  part(upper, tube([V(0, 0.02, 0), V(0, 0, 0), V(0, -A.upper * 0.5, 0), V(0, -A.upper, 0)], [0.043, 0.043, 0.037, 0.03]), mats);
+  const fore = new THREE.Group(); fore.name = 'herLeftForearm'; fore.position.set(0, -A.upper, 0); upper.add(fore);
+  part(fore, tube([V(0, 0.015, 0), V(0, -A.fore * 0.5, 0), V(0, -A.fore, 0)], [0.03, 0.028, 0.02]), mats);
+  { const b = part(fore, new THREE.TorusGeometry(0.025, 0.0035, 6, 24), mats, 'gold'); b.position.set(0, -A.fore + 0.03, 0); b.rotation.x = Math.PI / 2 + 0.15; }
+  const hd = new THREE.Group(); hd.name = 'herHand'; hd.position.set(0, -A.fore, 0); fore.add(hd);
+  // (two hands, one shown: in her lap, the fingers loose; on her phone, the fingers flat up its back and the thumb
+  // round its foot onto the screen's bottom bar — never over her texts)
+  const lap = new THREE.Group(); lap.name = 'herHandLap'; hd.add(lap);
+  hand(lap, mats, V(0, 0, 0), V(0, -1, 0), V(1, 0, 0), V(0, 0, -1), 0.86, 0.5, 0.05);
+  const grip = new THREE.Group(); grip.name = 'herHandPhone'; grip.visible = false; hd.add(grip);
+  hand(grip, mats, V(0, 0, 0), V(0, -1, 0), V(1, 0, 0), V(0, 0, -1), 0.86, 0.12, 0.03, false);
+  part(grip, tube([V(0.004, -0.02, -0.02), V(0.03, -0.014, -0.032), V(0.054, -0.03, -0.036), V(0.052, -0.052, -0.032)], [0.0125, 0.011, 0.0095, 0.0085], V(1, 0, 0), 0.85, 8, 16), mats);
+  reach(upper, A.lap, A.lapPole, A.lapPalm, A.upper, A.fore, 'herLeftForearm');
   legs(g, mats, F.hip, true);
   return g;
+}
+
+const _hq = new THREE.Quaternion(), _hm = new THREE.Matrix4(), _X = new THREE.Vector3(), _Y = new THREE.Vector3(), _Z = new THREE.Vector3();
+/** Her phone in her left hand (verse 1, scenes/sets/verse1.ts): `grip` is where she holds it, in the car's body — its
+ *  foot's edge on its back, x across it, y up it, z out of its screen — and `u` how far her hand has come up to it from
+ *  her lap (0..1, eased here). Set each frame (after poseCast: in her frame as she sits then). */
+export function holdPhone(body: THREE.Object3D, grip: THREE.Matrix4, u: number) {
+  const her = body.getObjectByName('her'), upper = body.getObjectByName('herLeftArm'), hd = body.getObjectByName('herHand');
+  if (!her || !upper || !hd) return;
+  const A = HER_ARM, e = Math.min(1, Math.max(0, u)), s = e * e * (3 - 2 * e);
+  her.updateMatrix();
+  const m = _hm.copy(her.matrix).invert().multiply(grip), O = new THREE.Vector3().setFromMatrixPosition(m);
+  m.extractBasis(_X, _Y, _Z);
+  const W = O.addScaledVector(_Y, -A.under).addScaledVector(_Z, -A.behind);
+  reach(upper, A.lap.clone().lerp(W, s), A.lapPole.clone().lerp(A.phonePole, s), A.lapPalm.clone().lerp(_Z, s).normalize(), A.upper, A.fore, 'herLeftForearm');
+  // (the hand: straight on from the forearm in her lap; on the phone turned to it — palm to its back, fingers up it)
+  const fore = upper.getObjectByName('herLeftForearm')!, onPhone = _hq.setFromRotationMatrix(_hm.makeBasis(_Z, _Y.clone().negate(), _X));
+  const local = upper.quaternion.clone().multiply(fore.quaternion).invert().multiply(onPhone);
+  hd.quaternion.identity().slerp(local, s);
+  hd.getObjectByName('herHandLap')!.visible = s < 0.5;
+  hd.getObjectByName('herHandPhone')!.visible = s >= 0.5;
 }
 
 /** The two of them, in their places in the car's body (their parts merged, a mesh a material in each moving piece:
  *  a hundred-odd parts would be a hundred-odd draws, twice over with the shadows). */
 export function buildCast(body: THREE.Object3D): void {
-  const mats: Mats = { body: castMaterial(), gold: toon({ color: '#f6c445' }), lens: castMaterial('#0c0910'), plain: toon({ color: '#140d18' }) };
+  const top = castMaterial('#ffffff'); top.vertexColors = true; // (her body: her top's colour and her skin's, painted on)
+  const mats: Mats = { body: castMaterial(), gold: toon({ color: '#f6c445' }), lens: castMaterial('#0c0910'), plain: toon({ color: CAST_INK }), top };
   const him = buildHim(mats); him.name = 'him'; him.position.x = FIGURE.him.x; body.add(compact(him));
   const her = buildHer(mats); her.name = 'her'; her.position.x = FIGURE.her.x; body.add(compact(her));
 }
@@ -404,6 +530,7 @@ export function buildCast(body: THREE.Object3D): void {
 function compact<T extends THREE.Object3D>(g: T): T {
   const byMat = new Map<THREE.Material, THREE.Mesh[]>();
   for (const o of [...g.children]) {
+    if (o instanceof THREE.SkinnedMesh) continue; // (it bends with its bones: kept whole)
     if (o instanceof THREE.Mesh && !o.children.length) (byMat.get(o.material as THREE.Material) ?? byMat.set(o.material as THREE.Material, []).get(o.material as THREE.Material)!).push(o);
     else compact(o);
   }

@@ -16,6 +16,7 @@ import { F, font } from '../../engine/type';
 import { TEXT_SHARE } from '../../drive/ads';
 import { sedan } from './kit';
 import { buildNewsstand } from './newsstand';
+import { holdPhone } from '../../look/cast3d';
 
 const UP = new THREE.Vector3(0, 1, 0);
 type Panel = Verse1Plan['panels'][keyof Verse1Plan['panels']];
@@ -49,6 +50,9 @@ const moving = () => { const g = new THREE.Group(); g.matrixAutoUpdate = false; 
 /** Her phone's screen round the thread (m): its status bar and his name above, the text field below; the Read receipt's
  *  width, and its gap under the last bubble. */
 const PHONE = { top: 0.034, bottom: 0.022, receipt: { w: 0.07 } };
+/** Her hold on it (look/cast3d.ts holdPhone): her left hand on its foot this far in from its edge on her side (m), up
+ *  from her lap over `reach` s before she's on it and back down after. */
+const HOLD = { inset: 0.045, reach: 0.5 };
 const P_GAP = 0.006;
 
 export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: number, car: THREE.Object3D): void } | null {
@@ -180,7 +184,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
 
   // ---- her phone, in her hand: the screen's rows are the carriers; the phone round them; the Read receipt under the
   // last sent bubble (he's seen them and said nothing) ----
-  const phone = moving();
+  const phone = moving(), grip = new THREE.Matrix4();
   let receipt!: THREE.Mesh;
   {
     const p = plan.phone, along = p.up.clone().cross(p.normal).normalize(), slab = new THREE.Group();
@@ -219,16 +223,10 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     // (as bright as the bubbles' panels: lit displays are drawn at 1.6, world.ts buildCarrier — no seam round the thread)
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(p.w + 0.01, H), new THREE.MeshBasicMaterial({ map: screen, color: new THREE.Color(1.6, 1.6, 1.6) }));
     glass.position.set(0, mid, -0.0015); slab.add(glass);
-    // her hand round it (the cast's dark): the phone reads as held, not floating in the cabin's dark
-    const hand = toon({ color: '#241f2a' });
-    const palm = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.06, 4, 10), hand);
-    // (gripping its foot, the thumb over the text field: never over the thread)
-    const foot = -p.h / 2 - P.bottom;
-    palm.position.set(p.w / 2 - 0.006, foot - 0.006, -0.02); palm.rotation.z = 0.5; slab.add(palm);
-    const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.035, 4, 8), hand);
-    thumb.position.set(p.w / 2 - 0.02, foot + 0.004, 0.006); thumb.rotation.z = -1.1; slab.add(thumb);
-    const wrist = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.09, 4, 10), hand);
-    wrist.position.set(p.w / 2 + 0.03, foot - 0.07, -0.03); wrist.rotation.z = 0.7; slab.add(wrist);
+    // her hand on it — hers, her left, from her arm (the user, 2026-10-15: the phone's own hand "reads as floating"): at
+    // its foot, on her side, the thumb round onto the text field (never over the thread); where, in the car's body
+    // (the phone rides it as she does: the slab's frame, at its back's foot)
+    grip.copy(slab.matrix).multiply(new THREE.Matrix4().makeTranslation(p.w / 2 + 0.012 - HOLD.inset, -p.h / 2 - P.bottom - 0.015, -0.014));
     // the Read receipt: grey, small, right-aligned with the bubbles' right edge (carrierart.ts: 0.96 of the face's width)
     const readTex = canvasTex(512, 64, (c) => {
       c.fillStyle = '#8f96a8'; c.textAlign = 'right'; c.textBaseline = 'middle';
@@ -321,8 +319,13 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       if (bus.visible) bus.matrix.copy(busMatrix(t));
       van.visible = vanThere(plan, t);
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
-      phone.matrix.copy(carMatrix(drive.carFrame(t)));
+      // (on the car's body, as she is: lifted and rocked with it on its hydraulics, her hand on it)
+      const body = car.getObjectByName('body')!;
+      body.updateMatrix();
+      phone.matrix.multiplyMatrices(car.matrix, body.matrix);
       phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
+      const up = plan.phone.held.reduce((m, [a, b]) => Math.max(m, Math.min(1, (t - a + HOLD.reach) / HOLD.reach, (b + HOLD.reach - t) / HOLD.reach)), 0);
+      holdPhone(body, grip, up);
       // the Read receipt, under the last sent bubble of the thread on screen
       const thread = plan.phone.held.findIndex(([a, b]) => t >= a && t < b), sent = plan.read.bubbles.filter((b) => b.thread === thread && t >= b.start);
       // (not while her next text is up but not yet sent: it would sit between them)
