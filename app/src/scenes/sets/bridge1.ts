@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { type Bridge1Plan, FANS, ONCOMING, SIGNALS } from '../../drive/sets/bridge1';
-import { TUNNEL } from '../../drive/tunnel';
+import { HEADWALL, TUNNEL } from '../../drive/tunnel';
 import { ROAD_HALF } from '../../drive/route';
 import { boxAt } from '../../drive/blocks';
 import { hash } from '../../engine/util';
@@ -30,8 +30,6 @@ const POINTS = { first: 40, every: 84, boards: 28 };
 /** Tags on the walls: one tried every `step` m a side, kept at this share, thicker within `near` m of a piece; none
  *  within `clear` m of a lyric piece's face (the paint stays the focus). */
 const TAGS = { step: 0.8, keep: 0.55, near: 16, clear: 0.35 };
-/** The headwall round each portal: its half width, top (m over the road), how far it stands proud of the rock. */
-const HEADWALL = { half: 11.2, top: 10.9, proud: 0.35 };
 /** The tunnel's name and its date, cast in its headwalls. */
 const NAME = 'MT. SOMEWHERE TUNNEL', BUILT = 'A.D. 1937';
 

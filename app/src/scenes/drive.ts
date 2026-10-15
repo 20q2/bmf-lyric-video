@@ -90,6 +90,8 @@ const BEACON = { on: 0.5, every: 1.6 };
 const END_MOON = { bearing: (22 * Math.PI) / 180, elev: (10.5 * Math.PI) / 180 };
 /** The shadows turn from the sun to the moon at this sun height, where neither prints. */
 const SHADE_SWITCH = -2 * DEG;
+/** The end's near plane (m: from the cut to the last line; elsewhere LENS.near, for the cabin's close shots). */
+const END_NEAR = 0.5;
 /** The world is posed this often (s of song time) to find its still parts (scenes/zones.ts). */
 const ZONE_STEP = 2;
 const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
@@ -243,7 +245,9 @@ export default class DriveScene extends Scene {
     for (const w of (this.car.userData.wheels as THREE.Object3D[] | undefined) ?? []) w.rotation.x = d.motion.distanceAt(t) / CAR.wheelR;
     // the two of them: her arm up (it swings out and over), her look to him, his nod — and at the end her lean into
     // him, her head on his shoulder, his arm round her (look/cast3d.ts poseCast)
-    poseCast(body, this.cast(t));
+    const cast = this.cast(t);
+    cast.steer *= Math.min(1, d.motion.speedAt(t) / 3); // (still once they've pulled in)
+    poseCast(body, cast);
     // the headlights' throw follows the speed: parked, the beams settle to a glow at the nose
     const beams = this.car.getObjectByName('beams') as THREE.Mesh | undefined;
     if (beams) (beams.material as THREE.ShaderMaterial).uniforms.strength!.value = GLOW.beam * Math.min(1, 0.15 + d.motion.speedAt(t) / 4);
@@ -334,6 +338,10 @@ export default class DriveScene extends Scene {
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
     placeCamera(this.cam, d.camera(t));
+    // (the end's lens, behind the two of them, a metre clear of the car, looks out over the city 2 km off: its near plane
+    // pulled out, the depth buffer resolves the towers finely enough that their windows stop flickering — at 0.1 m it
+    // couldn't tell a window from the face of a tower a metre behind another's, nor the city's plain from the ground)
+    { const near = d.lastCut !== null && t >= d.lastCut ? END_NEAR : LENS.near; if (this.cam.near !== near) { this.cam.near = near; this.cam.updateProjectionMatrix(); } }
 
     // the sky, the sun or the moon, the fog
     const { sky, sunDir, sunColor } = this.skyAt(t), day = daylight(t), e = sky.sunElev;

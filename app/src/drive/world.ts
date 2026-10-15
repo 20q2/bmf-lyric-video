@@ -15,7 +15,7 @@ import { printedGround } from '../look/ground';
 import type { Drive } from './drive';
 import { ROAD_HALF, ROAD_START, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
-import { HEADLAND, TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, drawTiles, headlandAt, nearTunnel } from './tunnel';
+import { HEADLAND, HEADWALL, TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, drawTiles, headlandAt, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
 import { sedan } from '../scenes/sets/kit';
@@ -429,8 +429,15 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   // line's crane (it was a flat-topped prism, read from above as a black slab), scrub on its slopes
   const rock = toon({ color: WORLD.rock, side: THREE.DoubleSide }), len = tn.s1 - tn.s0, H0 = HEADLAND;
   const at = (lat: number, along: number, y: number) => { const f = route.frameAt(tn.s0 + along); return f.pos.clone().addScaledVector(f.right, lat).addScaledVector(UP, y); };
+  // (across the headland: every 0.5 m over the cutting and the mouths, every 2.5 m out on its flanks. The mouths' faces
+  // are cut on the same points, so their edges are the surface's own: cut finer than the surface, the sky showed
+  // through slivers between them, seen from over the hill (the fly line's crane, 119 s))
+  const fine = H0.cutFrom + 6, lats: number[] = [];
+  for (let x = -H0.sea; x < -fine; x += 2.5) lats.push(x);
+  for (let x = -fine; x <= fine + 1e-6; x += 0.5) lats.push(x);
+  for (let x = fine + 2.5; x < H0.land; x += 2.5) lats.push(x);
+  lats.push(H0.land);
   const land = (a0: number, a1: number) => { // a grid over the headland from a0 to a1 m along
-    const lats: number[] = []; for (let x = -H0.sea; x <= H0.land + 1e-6; x += 2.5) lats.push(x);
     const n = Math.max(2, Math.ceil((a1 - a0) / 2) + 1), pos: number[] = [], idx: number[] = [], m = lats.length;
     for (let i = 0; i < n; i++) {
       const a = a0 + ((a1 - a0) * i) / (n - 1);
@@ -446,13 +453,12 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   for (const [a0, a1] of [[-H0.spur[0], -1e-3], [0, len], [len + 1e-3, len + H0.spur[1]]] as const) g.add(new THREE.Mesh(land(a0, a1), earth));
   // the mouths: the face between the headland's profile inside and the cutting's outside, the bore cut out of it
   for (const [along, s] of [[0, tn.s0], [len, tn.s1]] as const) {
-    const out = along === 0 ? -1e-3 : len + 1e-3, xs: number[] = [];
-    for (let x = -(H0.cutFrom + 6); x <= H0.cutFrom + 6 + 1e-6; x += 0.5) xs.push(x);
+    const out = along === 0 ? -1e-3 : len + 1e-3, xs = lats.filter((x) => Math.abs(x) <= fine + 1e-6);
     const face = new THREE.Shape([...xs.map((x) => new THREE.Vector2(x, headlandAt(x, along, len))), ...xs.slice().reverse().map((x) => new THREE.Vector2(x, Math.min(headlandAt(x, along, len), headlandAt(x, out, len)) - 0.02))]);
     face.holes.push(new THREE.Path(bore.map(([x, y]) => new THREE.Vector2(x, y))));
     const f = route.frameAt(s), mouth = new THREE.Mesh(new THREE.ShapeGeometry(face), rock);
     mouth.matrixAutoUpdate = false;
-    mouth.matrix.makeBasis(f.right, f.up, f.fwd).setPosition(f.pos);
+    mouth.matrix.makeBasis(f.right, UP, f.right.clone().cross(UP)).setPosition(f.pos); // (up as the surface's: `at`)
     g.add(mouth);
   }
   // chaparral on the slopes (dark clumps, thinning toward the crest) and pale rock breaking through
@@ -462,6 +468,7 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
       const along = -H0.spur[0] + (len + H0.spur[0] + H0.spur[1]) * hash(k, 31), lat = -H0.sea + (H0.sea + H0.land) * hash(k, 32);
       const y = headlandAt(lat, along, len);
       if (y < 0.4 || (Math.abs(lat) < W + 2.5 && (along < 2 || along > len - 2))) continue; // (not on the road's cutting or over a mouth)
+      if (Math.abs(lat) < HEADWALL.half + 2 && Math.min(Math.abs(along), Math.abs(along - len)) < 2.5) continue; // (nor through a headwall)
       const p = at(lat, along, y - 0.1), sz = 0.45 + 0.9 * hash(k, 33);
       if (hash(k, 34) < 0.06) { stone.push(new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3 * hash(k, 35), 6 * hash(k, 36), 0.3 * hash(k, 37))), new THREE.Vector3(sz * 1.6, sz * 0.7, sz))); continue; }
       bush.push(new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromAxisAngle(UP, 6 * hash(k, 38)), new THREE.Vector3(sz * 1.4, sz * 0.75, sz * 1.2)));
@@ -1007,7 +1014,18 @@ export function buildCar(): THREE.Group {
   // the bench, its cushion and back; door cards with a chrome armrest; the windshield's frame in the cabin's dark
   // with a chrome line (in chrome, the top rail reflected the sky as a beige slab across the shot's foot)
   const trim = toon({ color: WORLD.chrome }); // (the cabin's brightwork: toon, not the hero's chrome — in the sun it streaked)
-  box(Wd - 0.3, 0.5, 0.18, 0, belt + 0.15, -0.55, seat); // the bench's back
+  // the bench's back: a padded roll along its top and tuck-and-roll pleats down the face behind it, a chrome strip
+  // under the roll (a plain block, it filled the end's last shot, seen from behind the two of them, as a red slab)
+  const seatW = Wd - 0.3, roll = 0.09, backTop = belt + 0.4, backZ = -0.55;
+  box(seatW, 0.5 - roll, 0.18, 0, belt - 0.1 + (0.5 - roll) / 2, backZ, seat);
+  { const top = add(new THREE.CylinderGeometry(roll, roll, seatW, 16), seat, 0, backTop - roll, backZ); top.rotation.z = Math.PI / 2; }
+  for (const side of [1, -1]) { const cap = add(new THREE.SphereGeometry(roll, 12, 8), seat, side * seatW / 2, backTop - roll, backZ); cap.scale.set(0.35, 1, 1); }
+  const pleats = 17, pleatW = seatW / pleats, pleatH = 0.5 - roll - 0.05;
+  for (let k = 0; k < pleats; k++) {
+    const p = add(new THREE.CylinderGeometry(pleatW * 0.46, pleatW * 0.46, pleatH, 10, 1, false, Math.PI / 2, Math.PI), seat, -seatW / 2 + pleatW * (k + 0.5), belt - 0.1 + 0.03 + pleatH / 2, backZ - 0.09);
+    p.scale.z = 0.5; // (half-rounds, standing a few cm proud of the back)
+  }
+  box(seatW, 0.02, 0.012, 0, backTop - 2 * roll - 0.01, backZ - 0.09 - pleatW * 0.23 - 0.008, trim); // (over the pleats' tops)
   box(Wd - 0.3, 0.16, 0.62, 0, belt - 0.1, -0.3, seat); // its cushion
   for (const x of [1, -1]) {
     box(0.03, belt - IMPALA.cockpit.floor - 0.12, cl - 0.1, x * (IMPALA.halfWidth(cm) - 0.085), (belt + IMPALA.cockpit.floor) / 2 - 0.03, cm, seat); // the door card
@@ -1094,7 +1112,7 @@ export function buildCar(): THREE.Group {
   // (its face toward him: tipped back at the top like a car's, the hub side (local -z) up and back at him, the column
   // (local +z) down and forward into the dash — at -0.9 the hub faced his lap and its back the windshield (the user,
   // 2026-10-13 and 14: "facing towards the window"))
-  const wheel = new THREE.Group(); wheel.position.copy(WHEEL.hub); wheel.rotation.x = WHEEL.tilt; body.add(wheel);
+  const wheel = new THREE.Group(); wheel.name = 'steering'; wheel.position.copy(WHEEL.hub); wheel.rotation.x = WHEEL.tilt; body.add(wheel); // (turned a touch: look/cast3d.ts poseCast)
   add(new THREE.TorusGeometry(0.19, 0.022, 8, 28), dark, 0, 0, 0, wheel);
   add(new THREE.TorusGeometry(0.1, 0.007, 6, 24), trim, 0, 0, -0.012, wheel);
   for (const a of [0.35, -0.35, Math.PI / 2 + 0.0]) { const spoke = add(new THREE.BoxGeometry(0.36, 0.02, 0.014), dark, 0, 0, 0, wheel); spoke.rotation.z = a; if (a > 1) spoke.scale.x = 0.5, spoke.position.y = -0.09; }

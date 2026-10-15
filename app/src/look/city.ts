@@ -33,7 +33,11 @@ export const MIST = { at: [[235, 16], [420, 40], [900, 60], [1700, 80]] as [numb
 /** When the plane on its approach comes into the end's frame (s). */
 const APPROACH_AT = 168;
 
+/** The least a light is drawn (px across). */
+const LEAST = 2.6;
+
 const VERT = /* glsl */ `
+#define LEAST ${LEAST.toFixed(1)}
 attribute vec3 color; attribute float size; attribute float wake; attribute float sleep; attribute float blink;
 uniform float t, scale, on, offAt, die; uniform vec3 eye;
 varying vec3 vColor; varying float vA;
@@ -44,12 +48,19 @@ void main() {
   if (move.z > 0.0) p += dir * mod(move.x + t * move.y, move.z);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = length(mv.xyz);
-  gl_PointSize = clamp(size * 1400.0 / dist, 1.8, 7.0) * scale;
+  // (a touch nearer the eye along its own ray, so it stays where it is on screen: 2 km off, the depth buffer can't tell
+  // a window 0.5 m proud of its tower from the tower, and downtown's windows flickered on and off as the camera moved)
+  mv.xyz *= 0.996;
+  // (no dot smaller than LEAST px: smaller, one covers one pixel or four as it drifts across them, and the far lights
+  // shimmered; a dot drawn bigger than it is shines that much fainter, the same light in all)
+  float px = size * 1400.0 / dist, drawn = clamp(px, LEAST, 7.0);
+  gl_PointSize = drawn * scale;
   gl_Position = projectionMatrix * mv;
   float tw = 0.75 + 0.25 * sin(t * (1.5 + fract(position.x * 0.013) * 3.0) + position.z);
   // (a beacon blinks: on a third of its second)
   if (blink > 0.0) tw = step(0.66, fract(t * 0.8 + blink));
   vA = smoothstep(wake, wake + 0.5, on) * tw * (1.0 - smoothstep(4800.0, 6800.0, dist));
+  vA *= pow(max(px, 1.8) / drawn, 2.0); // (as bright in all as at the 1.8 px it was drawn at least)
   // the blackout: this light's block goes dark 'sleep' s after the crash
   vA *= 1.0 - smoothstep(offAt + sleep, offAt + sleep + die, t);
   vColor = color;

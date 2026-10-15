@@ -24,6 +24,9 @@ export function drawTiles(x: CanvasRenderingContext2D, face = '#ddd3bc', grout =
 export const TUNNEL = { halfW: 7, h: 6.5, hill: 4 };
 /** No other carrier stands within this far of a tunnel's mouths (m): the camera would be in the rock. */
 export const TUNNEL_CLEAR = 15;
+/** The concrete headwall round each mouth (scenes/sets/bridge1.ts): its half width, top (m over the road), how far it
+ *  stands proud of the rock. The headland's scrub keeps off it (world.ts). */
+export const HEADWALL = { half: 11.2, top: 10.9, proud: 0.35 };
 /** The headland as a landform (the user, 2026-10-15: from the fly line's crane it read as a flat black slab): its crest
  *  this high over the road (m) once `rise` m in from either mouth (TUNNEL.h + hill over the bore at the mouths), its
  *  feet this far out on the sea's side (left: it runs out into the water) and the land's; past each mouth it runs on

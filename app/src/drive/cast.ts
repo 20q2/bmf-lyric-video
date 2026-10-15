@@ -9,8 +9,9 @@
 import type { AudioData } from '../engine/audio';
 import type { Lyrics } from '../engine/lyrics';
 
-/** herArm, herLook, lean, hold: 0..1 (hold: his arm round her shoulders); hisNod: radians. */
-export interface Cast { herArm: number; herLook: number; hisNod: number; lean: number; hold: number }
+/** herArm, herLook: 0..1; lean, hold: 0..1 through her lean and his arm coming round her, linear (look/cast3d.ts eases
+ *  each part of them in its own time); hisNod, steer: radians (steer: his wheel). */
+export interface Cast { herArm: number; herLook: number; hisNod: number; lean: number; hold: number; steer: number }
 
 /** Lines she throws her arm up on, and lines she looks at him on. */
 export const ARM_UP = /blowin.? money|so fly/i, LOOK = /\b(he|he's|him|boy|my man|handsome)\b/i;
@@ -22,7 +23,11 @@ export const IDLE = { nod: 0.05, look: 0.55, in: 0.3, out: 0.78, edge: 1.4, fade
 /** The end: she leans in on the first beat from `at` (s: the car rolling its last metre into the turnout, the last line
  *  read and gone), easing in over `over` s, her face turned toward him by `look`; his arm comes round her `hold` s after
  *  she starts, over `holdOver` s. (It was after the last "crash", at 177 s: too late to read before the end card.) */
-export const LEAN = { at: 170.2, over: 2.2, look: 0.35, hold: 0.6, holdOver: 2.2 };
+export const LEAN = { at: 170.2, over: 2.6, look: 0.35, hold: 0.9, holdOver: 2.4 };
+/** His wheel, turned back and forth a touch as he holds the car on the road (the user, 2026-10-15: "to show that we're
+ *  actually driving"): at most `amp` radians, a slow drift, a slower one and a quick correction (Hz, shares of amp).
+ *  The scene stills it as the car stops. */
+export const STEER = { amp: 0.06, waves: [[0.23, 0.6, 1.0], [0.09, 0.28, 2.3], [0.71, 0.12, 0.4]] as const };
 
 const ramp = (t: number, a: number, b: number) => {
   const u = Math.min((t - a + CAST.ease) / CAST.ease, (b + CAST.linger - t) / CAST.ease);
@@ -44,12 +49,13 @@ export function castOf(audio: AudioData, lyrics: Lyrics): (t: number) => Cast {
     const idle = clamp01((first - t) / IDLE.fade);
     const bob = IDLE.nod * (0.5 - 0.5 * Math.cos(Math.PI * (audio.beatAt(t) % 2)));
     const round = IDLE.look * smooth(first * IDLE.in, first * IDLE.in + IDLE.edge, t) * (1 - smooth(first * IDLE.out - IDLE.edge, first * IDLE.out, t));
-    const lean = smooth(leanAt, leanAt + LEAN.over, t), hold = smooth(leanAt + LEAN.hold, leanAt + LEAN.hold + LEAN.holdOver, t);
+    const lean = clamp01((t - leanAt) / LEAN.over), hold = clamp01((t - leanAt - LEAN.hold) / LEAN.holdOver);
     return {
       herArm: arm.reduce((m, [s, e]) => Math.max(m, ramp(t, s, e)), 0),
-      herLook: look.reduce((m, [s, e]) => Math.max(m, ramp(t, s, e)), 0) - idle * round + LEAN.look * lean,
+      herLook: look.reduce((m, [s, e]) => Math.max(m, ramp(t, s, e)), 0) - idle * round + LEAN.look * smooth(0, 1, lean),
       hisNod: CAST.nod * a.kick * Math.min(1, a.drums * 3) + idle * bob,
       lean, hold,
+      steer: STEER.amp * STEER.waves.reduce((v, [hz, k, ph]) => v + k * Math.sin(2 * Math.PI * hz * t + ph), 0),
     };
   };
 }

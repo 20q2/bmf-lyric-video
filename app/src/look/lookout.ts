@@ -81,13 +81,16 @@ float sFbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += 
   return m;
 }
 
-/** A pine: a trunk and its crown in stacked tiers, dark (a silhouette against the lights). */
+/** A pine: a trunk and its crown in stacked tiers, dark (a silhouette against the lights). The tiers squat and wide,
+ *  each stepping in from the one under it, a little ragged, so the silhouette is notched skirt over skirt (four tall
+ *  cones overlapping lined up into one black triangle). */
 function pine(h: number, r: number, mat: THREE.Material, trunk: THREE.Material): THREE.Group {
-  const g = new THREE.Group();
+  const g = new THREE.Group(), tiers = 6;
   const t = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, h * 0.35, 8), trunk); t.position.y = h * 0.175; g.add(t);
-  for (let k = 0; k < 4; k++) {
-    const u = k / 4, tier = new THREE.Mesh(new THREE.ConeGeometry(r * (1 - 0.2 * k), h * 0.38, 9), mat);
-    tier.position.y = h * (0.4 + 0.15 * k); tier.rotation.y = k * 0.7; tier.scale.set(1, 1, 0.9 + 0.2 * u);
+  for (let k = 0; k < tiers; k++) {
+    const u = k / (tiers - 1), rag = 0.88 + 0.24 * hash(h, k, 61);
+    const tier = new THREE.Mesh(new THREE.ConeGeometry(r * (1.05 - 0.72 * u) * rag, h * (0.24 - 0.06 * u), 9), mat);
+    tier.position.y = h * (0.36 + 0.115 * k); tier.rotation.set(0.06 * (hash(h, k, 62) - 0.5), k * 0.9, 0.06 * (hash(h, k, 63) - 0.5)); tier.scale.z = 0.88 + 0.24 * hash(h, k, 64);
     g.add(tier);
   }
   return g;

@@ -262,9 +262,17 @@ export const FIGURE = {
   him: { x: 0.44, head: V(0, 1.64, -0.29), shoulder: V(0.188, 1.445, -0.322), hip: V(0.095, 1.04, -0.3) },
   her: { x: -0.44, head: V(0, 1.625, -0.302), shoulder: V(0.155, 1.425, -0.325), hip: V(0.085, 1.03, -0.3) },
 };
-/** His grip on the wheel: low on its rim at about half seven, his arm straight to it (the car body's frame; the
- *  wheel's place is drive/cabin.ts WHEEL, shared with world.ts buildCar). */
-const GRIP = WHEEL.hub.clone().add(WHEEL.grip);
+/** The wheel's axis (the car body's frame: its column's way, which it turns about: world.ts buildCar). */
+const WHEEL_AXIS = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(WHEEL.tilt, 0, 0));
+/** His left wrist with the wheel turned `steer` (radians; in his frame, `S` his shoulder, `x` his place across the
+ *  bench): his grip low on the rim at about half seven (drive/cabin.ts WHEEL) turned with it, the wrist back along his
+ *  arm from it; and the arm's way. */
+function wheelWrist(S: THREE.Vector3, x: number, steer: number) {
+  const G = WHEEL.grip.clone().applyAxisAngle(WHEEL_AXIS, steer).add(WHEEL.hub).sub(new THREE.Vector3(x, 0, 0)), dir = G.clone().sub(S).normalize();
+  return { W: G.addScaledVector(dir, -0.085), dir };
+}
+/** Which way his left forearm's +x faces (his frame: in toward her; any way off the forearm's own). */
+const LEFT_PALM = new THREE.Vector3(-1, 0, 0);
 /** Her arm's rest: how far its elbow bends (radians: forearm forward along her thigh), how far up the scene swings
  *  it at most (cast.ts: -2.7 about z), the bend left once it's up. */
 const ELBOW = { rest: -1.3, up: 2.7, raised: -0.25 };
@@ -272,10 +280,16 @@ const ELBOW = { rest: -1.3, up: 2.7, raised: -0.25 };
  *  laid out straight along the bench's top it read "super fucking long"); its rest along the bench's top behind her
  *  (the wrist, and which way the elbow points); round her shoulders, the wrist's place on her far shoulder (her frame),
  *  the elbow out behind her, the hand lifted this high at the middle of its move (over her head and hair). */
-const ARM = { upper: 0.3, fore: 0.27, bench: V(-0.6, 1.44, -0.54), benchPole: V(0, -0.25, -1), shoulder: V(-0.085, 1.505, -0.35), pole: V(0, 0.35, -1), lift: 0.16 };
+const ARM = { upper: 0.3, fore: 0.27, bench: V(-0.6, 1.44, -0.54), benchPole: V(0, -0.25, -1), shoulder: V(0.03, 1.53, -0.36), pole: V(0, 0.35, -1), lift: 0.12 };
 /** The end's lean (cast.ts LEAN): how far she slides over toward him (m), how far she leans in about her hip (radians,
- *  the hip's height), her head's tilt onto his shoulder; his head's tilt onto hers. */
-const LEAN_POSE = { slide: 0.3, tilt: 0.45, hip: 1.0, head: 0.3, his: 0.22 };
+ *  the hip's height), her head's tilt onto his shoulder; his head's tilt onto hers. Each in its own part of the lean
+ *  (`[from, to]` of it), overlapping: she slides over, leaning in as she goes, and her head settles onto his shoulder
+ *  last (all at once, on one curve, she tipped over stiff as a board: the user, 2026-10-15, "a little weird on the
+ *  movement"). */
+const LEAN_POSE = { slide: 0.3, tilt: 0.45, hip: 1.0, head: 0.3, his: 0.22, slideIn: [0, 0.75], tiltIn: [0.15, 0.9], headIn: [0.45, 1] };
+/** Eased in and out softly (no jolt at either end: its speed and its acceleration both start and end at nought), over
+ *  [a, b] of u. */
+const ease = (u: number, [a, b]: readonly number[] = [0, 1]) => { const x = Math.min(1, Math.max(0, (u - a!) / (b! - a!))); return x * x * x * (x * (6 * x - 15) + 10); };
 
 const _q = new THREE.Quaternion(), _m4 = new THREE.Matrix4();
 /** A bone's turn: its -y along `along`, its +x toward `face` (square to it). */
@@ -300,20 +314,25 @@ function reach(upper: THREE.Object3D, W: THREE.Vector3, pole: THREE.Vector3, pal
 
 /** Poses the two of them (in the car's body, by name) for the moment: her arm up, her look to him, his nod; and at the
  *  end her lean into him — over on the bench and in, her head on his shoulder — and his arm round her. */
-export function poseCast(body: THREE.Object3D, c: { herArm: number; herLook: number; hisNod: number; lean: number; hold: number }) {
+export function poseCast(body: THREE.Object3D, c: { herArm: number; herLook: number; hisNod: number; lean: number; hold: number; steer: number }) {
   const her = body.getObjectByName('her')!, him = body.getObjectByName('him')!, L = LEAN_POSE;
+  // his wheel turned a touch, his left hand going with it on the rim
+  const wheel = body.getObjectByName('steering'), left = him.getObjectByName('hisLeftArm');
+  if (wheel) wheel.rotation.z = c.steer;
+  if (left) { const { U, F, pole } = left.userData as { U: number; F: number; pole: THREE.Vector3 }; reach(left, wheelWrist(left.position, him.position.x, c.steer).W, pole, LEFT_PALM, U, F, 'hisLeftForearm'); }
   body.getObjectByName('herArm')!.rotation.set(0, 0, -2.7 * c.herArm);
   // (about her hip: the hip stays on the bench where she's slid to, her shoulders and head come over toward him)
-  const a = -L.tilt * c.lean;
+  const slide = ease(c.lean, L.slideIn), a = -L.tilt * ease(c.lean, L.tiltIn), settle = ease(c.lean, L.headIn);
   her.rotation.set(0, 0, a);
-  her.position.set(FIGURE.her.x + L.slide * c.lean + L.hip * Math.sin(a), L.hip * (1 - Math.cos(a)), 0);
-  body.getObjectByName('herHead')!.rotation.set(0, 0.7 * c.herLook, -L.head * c.lean);
-  body.getObjectByName('hisHead')!.rotation.set(c.hisNod, 0, L.his * c.lean);
-  // his arm: from the bench's top, up over her head and down round her shoulders, his hand on her far shoulder
+  her.position.set(FIGURE.her.x + L.slide * slide + L.hip * Math.sin(a), L.hip * (1 - Math.cos(a)), 0);
+  body.getObjectByName('herHead')!.rotation.set(0, 0.7 * c.herLook, -L.head * settle);
+  body.getObjectByName('hisHead')!.rotation.set(c.hisNod, 0, L.his * settle);
+  // his arm: off the bench's top behind her, up over her shoulders and down round them, his hand over her far shoulder
+  // (the wrist at her nape: on her far shoulder, his hand hung out past her)
   const upper = him.getObjectByName('hisArm');
   if (!upper) return;
   her.updateMatrix();
-  const onHer = ARM.shoulder.clone().applyMatrix4(her.matrix).sub(him.position), h = c.hold;
+  const onHer = ARM.shoulder.clone().applyMatrix4(her.matrix).sub(him.position), h = ease(c.hold);
   const W = ARM.bench.clone().lerp(onHer, h).add(new THREE.Vector3(0, ARM.lift * Math.sin(Math.PI * h), 0));
   reach(upper, W, ARM.benchPole.clone().lerp(ARM.pole, h), new THREE.Vector3(0, -1, 0));
 }
@@ -387,11 +406,23 @@ export function buildHim(mats: Mats, pose: 'drive' | 'bust' = 'drive'): THREE.Gr
   const sh = (s: number) => V(s * F.shoulder.x, F.shoulder.y, F.shoulder.z), top = (s: number) => V(s * 0.13, 1.468, -0.33);
   const sleeve = [0.05, 0.062, 0.056, 0.05, 0.044], cuff = 0.042;
   if (pose === 'drive') {
-    // his left (+x, the door's side): straight out to the wheel, low on its rim
-    const S = sh(1), G = GRIP.clone().sub(V(F.x, 0, 0)), dir = G.clone().sub(S).normalize(), W = G.clone().addScaledVector(dir, -0.085);
-    const E = S.clone().lerp(W, 0.52).add(V(0.035, -0.02, 0));
-    part(g, tube([top(1), S, E, W], [sleeve[0]!, sleeve[1]!, sleeve[3]!, cuff]), mats);
-    hand(g, mats, W, dir, V(-0.3, -0.9, 0.3), V(0, 0.5, 1), 1, 1.5, 0);
+    // his left (+x, the door's side): out to the wheel, low on its rim — on pivots at the shoulder ('hisLeftArm') and
+    // the elbow ('hisLeftForearm') as his right is, so his hand stays on the rim as the wheel turns (poseCast). Built
+    // where it rests, then hung on its pivots (reached to the same wrist, the same elbow: it looks as it did)
+    const S = sh(1), { W, dir } = wheelWrist(S, F.x, 0), E = S.clone().lerp(W, 0.52).add(V(0.035, -0.02, 0));
+    const n = W.clone().sub(S).normalize(), es = E.clone().sub(S), pole = es.clone().addScaledVector(n, -es.dot(n)).normalize();
+    const U = es.length(), Fl = W.distanceTo(E);
+    part(g, tube([top(1), S], [sleeve[0]!, sleeve[1]!]), mats);
+    const upperL = new THREE.Group(); upperL.name = 'hisLeftArm'; upperL.position.copy(S); upperL.userData = { U, F: Fl, pole }; g.add(upperL);
+    const foreL = new THREE.Group(); foreL.name = 'hisLeftForearm'; foreL.position.set(0, -U, 0); upperL.add(foreL);
+    reach(upperL, W, pole, LEFT_PALM, U, Fl, 'hisLeftForearm');
+    const back = (p: THREE.Vector3, q: THREE.Vector3, k: number) => p.clone().addScaledVector(q.clone().sub(p).normalize(), -k);
+    const upperTube = part(g, tube([back(S, E, 0.02), S, S.clone().lerp(E, 0.5), E], [sleeve[1]!, sleeve[1]!, sleeve[2]!, sleeve[3]!]), mats);
+    const foreTube = part(g, tube([back(E, W, 0.015), E.clone().lerp(W, 0.5), W], [sleeve[3]!, sleeve[4]!, cuff]), mats);
+    const grip = new THREE.Group(); g.add(grip);
+    hand(grip, mats, W, dir, V(-0.3, -0.9, 0.3), V(0, 0.5, 1), 1, 1.5, 0);
+    g.updateMatrixWorld(true);
+    upperL.attach(upperTube); foreL.attach(foreTube); foreL.attach(grip);
     // his right: on pivots at the shoulder ('hisArm') and the elbow ('hisForearm'), each bone along its own -y, the
     // palm facing its forearm's +x (poseCast reaches it: along the bench's top behind her, or round her shoulders)
     const S2 = sh(-1);
