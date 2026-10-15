@@ -111,12 +111,14 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   }
   // downtown: the towers (dark silhouettes), their windows lit in columns, beacons on the tall ones
   const group = new THREE.Group();
-  const towerMat = toon({ color: '#0e0b16', fog: false }), crowns: THREE.Mesh[] = []; // (clear of the haze: black against the glow, lit or dark)
+  // (clear of the haze from the cut to the last line: black against the glow, lit or dark; before it, in the haze like
+  // everything else — unhazed, they hung as black blocks in the coast's sky at 106 s, 2026-10-15)
+  const towerMat = toon({ color: '#0e0b16', fog: false }), hazedMat = toon({ color: '#0e0b16' }), crowns: THREE.Mesh[] = [], blocks: THREE.Mesh[] = [];
   for (let i = 0; i < DOWNTOWN.towers; i++) {
     const a = hash(i, 41) * Math.PI * 2, r = DOWNTOWN.radius * Math.sqrt(hash(i, 42));
     const c = D.clone().addScaledVector(F, r * Math.cos(a)).addScaledVector(R, r * Math.sin(a));
     const h = DOWNTOWN.h[0] + (DOWNTOWN.h[1] - DOWNTOWN.h[0]) * hash(i, 43) ** 1.6 * (1 - r / DOWNTOWN.radius * 0.5), w = 22 + 24 * hash(i, 44), d = 22 + 24 * hash(i, 45);
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), towerMat);
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), towerMat); blocks.push(tower);
     tower.position.set(c.x, ground + h / 2, c.z); tower.rotation.y = grid; group.add(tower);
     // windows: columns up each face, some floors dark
     const faces: [THREE.Vector3, number][] = [[gF, d / 2], [gF.clone().negate(), d / 2], [gR, w / 2], [gR.clone().negate(), w / 2]];
@@ -131,7 +133,7 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
     if (h > 80) put(c, [1, 0.12, 0.08], 2.2, undefined, undefined, CITY.spread, 0.2 + 0.6 * hash(i, 48), ground + h + 2);
     // the tallest: a setback on top and a lit crown round it (a band of light, white or teal)
     if (h > 130) {
-      const top = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 14, d * 0.7), towerMat); top.position.set(c.x, ground + h + 7, c.z); top.rotation.y = grid; group.add(top);
+      const top = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 14, d * 0.7), towerMat); blocks.push(top); top.position.set(c.x, ground + h + 7, c.z); top.rotation.y = grid; group.add(top);
       const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7 + 0.6, 2.2, d * 0.7 + 0.6), lampMaterial(hash(i, 49) < 0.5 ? '#bff4ff' : '#fff1d8', 2.4, 0.2));
       crown.position.set(c.x, ground + h + 11.5, c.z); crown.rotation.y = grid; group.add(crown); crowns.push(crown);
     }
@@ -225,6 +227,7 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
       for (const mt of mists) mt.uniforms.strength!.value = MIST.glow * (0.15 + 0.85 * lit);
       for (const c of crowns) c.visible = lit > 0.05;
       plain.visible = t >= plainFrom;
+      for (const b of blocks) b.material = t >= plainFrom ? towerMat : hazedMat;
     },
   };
 }
