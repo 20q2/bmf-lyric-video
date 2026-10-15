@@ -107,7 +107,7 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
       for (const m of heads) {
         const want = red ? cross : arrow;
         if (m.map !== want) { m.map = want; m.needsUpdate = true; }
-        // (the red X burns harder: the scare reads even as the lamps die)
+        // (the red X burns harder than the green: the scare reads down the bore)
         m.color.setScalar(red ? 3 : 2);
       }
     },

@@ -82,6 +82,9 @@ export interface Carrier {
   vel?: THREE.Vector3;
   /** Sky-writing held whole (not dissolving) until then (s): a line written as one. */
   hold?: number;
+  /** Paint on a tunnel's tiles: where its face's top-left corner falls in the tiles' texture repeat (m along it, m
+   *  down it; tunnel.ts TILE_REPEAT), so the grout and grime the paint shows line up with the wall's. */
+  tiles?: { u: number; v: number };
   /** The last line's: shot low behind the parked car, its tail lights, the writing over it (the end). */
   finale?: boolean;
   /** A billboard: the product its ad sells (ads.ts); its lyric is the headline. */

@@ -15,7 +15,7 @@ import { printedGround } from '../look/ground';
 import type { Drive } from './drive';
 import { ROAD_HALF, ROAD_START, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
-import { TUNNEL, TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
+import { TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, drawTiles, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
 import { sedan } from '../scenes/sets/kit';
@@ -396,16 +396,10 @@ function sweep(route: Route, s0: number, s1: number, profile: readonly [number, 
   return g;
 }
 
-/** Glazed wall tiles, 4 to a texture repeat. */
+/** Glazed wall tiles (tunnel.ts drawTiles), 4 to a texture repeat. */
 function tiles(): THREE.Texture {
   const c = document.createElement('canvas'); c.width = c.height = 256;
-  const x = c.getContext('2d')!;
-  x.fillStyle = '#ddd3bc'; x.fillRect(0, 0, 256, 256);
-  x.fillStyle = '#9a907c';
-  for (let k = 0; k < 4; k++) { x.fillRect(k * 64, 0, 5, 256); x.fillRect(0, k * 64, 256, 5); } // big tiles, heavy grout: no shimmer
-  // (grime: a few tiles darker, and streaks run down them — glazed clean, the bore read as a test room)
-  for (let i = 0; i < 16; i++) if (hash(i, 7) < 0.3) { x.fillStyle = `rgba(90,70,60,${(0.1 + 0.15 * hash(i, 8)).toFixed(2)})`; x.fillRect((i % 4) * 64 + 5, Math.floor(i / 4) * 64 + 5, 59, 59); }
-  for (let i = 0; i < 9; i++) { const u = hash(i, 9) * 256, w = 3 + 6 * hash(i, 10); const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(70,50,45,0.35)'); gr.addColorStop(1, 'rgba(70,50,45,0)'); x.fillStyle = gr; x.fillRect(u, 0, w, 256); }
+  drawTiles(c.getContext('2d')!);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
@@ -418,7 +412,7 @@ const PORTAL = { proud: 0.8, lintel: 1.4, jamb: 1.2, walk: { w: 0.7, h: 0.3 } };
 function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
   const g = new THREE.Group(), { halfW: W, h: H, hill, hillHalfW } = TUNNEL;
   const bore: [number, number][] = [[-W, 0], [-W, H], [W, H], [W, 0]];
-  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, bore, 2), toon({ map: tiles(), side: THREE.DoubleSide })));
+  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, bore, TILE_REPEAT), toon({ map: tiles(), side: THREE.DoubleSide })));
   const rock = toon({ color: WORLD.rock, side: THREE.DoubleSide });
   const outside: [number, number][] = [[-hillHalfW, -0.3], [-W - 1, H + hill], [W + 1, H + hill], [hillHalfW, -0.3]];
   g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, outside, 4), rock));
@@ -766,7 +760,12 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
   const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber' || c.kind === 'mirror' || c.kind === 'window' || c.kind === 'carwash'; // the face is only its letters
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  if (c.kind === 'neon' || c.kind === 'tunnel') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
+  if (c.kind === 'neon') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
+  if (c.kind === 'tunnel') { // graffiti: paint on the tiles, lit by the bore's lamps like the tiles round it (the user, 2026-10-14: it glowed — its lighting "doesn't match the environment at all")
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), toon({ map: face, transparent: true, depthWrite: false }));
+    m.name = 'face'; m.matrixAutoUpdate = false; m.matrix.copy(basisOf(c));
+    return m;
+  }
   if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   if (c.kind === 'speed' || c.kind === 'radio' || c.kind === 'phone') mat.color.setScalar(1.6); // (lit displays: they bloom a little)

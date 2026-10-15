@@ -10,7 +10,8 @@
 //   neon         pink italic tubing on a dark wall, glowing; the word being sung lights cyan
 //   street       a green street-name blade, white type; gantry the same green, bigger, over the freeway
 //   banner       a towed banner: dark capitals printed on white cloth, a red hem
-//   tunnel       lit capitals on the tunnel's tiles, glowing sodium orange, the word being sung flaring white
+//   tunnel       a graffiti piece sprayed on the tunnel's tiles (a handstyle, a cloud, a 3D block, drips), the word
+//                being sung a yellow fade; lit by the bore's lamps like the tiles (world.ts), their grout and grime through it
 // and the set-pieces' surfaces, each in its own medium: a speed trailer's amber LEDs, a bus's tail ad (its ad is the
 // prop's), her lipstick on her visor's mirror, stickers, a California plate, her phone's message bubbles, the radio's cyan display, a menu board with its
 // prices, a burger stand's marquee in changeable letters; his posters on the freeway's wall, its big sign's panels;
@@ -29,11 +30,14 @@ import { WORLD } from '../look/toon';
 import { F, font } from '../engine/type';
 import type { Carrier } from './carriers';
 import { STALE, dissolveAt, revealAt, staleAt } from './dissolve';
+import { TILE_REPEAT, drawTiles } from './tunnel';
 import { daylight } from './sky';
 import { BRAND, TEXT_SHARE } from './ads';
 import { AD_STYLE, drawAd, drawRoute } from '../look/adart';
 
 const CANVAS_W = 1024;
+/** The bore's tiles drawn white (made once, for paint on them). */
+let tileMap: HTMLCanvasElement | undefined;
 /** The hill sign's canvas is wider: it's the end's view, held for seconds, its letters bigger on screen than its
  *  texels at 1024. */
 const HILL_CANVAS_W = 2048;
@@ -56,6 +60,12 @@ const SOLO_MAX = 1.6;
 /** Faces that carry poster art until their lyric is revealed. */
 /** A word of emphasis punches up this much as it's sung, settling over `over` s; it fills this share of its row. */
 export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
+/** The tunnel's graffiti (drawGraffiti), in em of its row: letters jittered in size (± size/2), tilt (± tilt/2 rad)
+ *  and step (± step/2), a row's first letter `first` x, crowding each other by `track`, a row's slant (± slant/2);
+ *  the cap height `rowFill` of its row, the row at most `wide` of the face; the strokes' widths (cloud, outline, the
+ *  letters fattened by `fat`), the 3D block `steps` coats `depth` apart, the shine's offset, the share of letters that
+ *  drip; the piece sits `drop` of the face low (clear of the strip lights over it). */
+const GRAFFITI = { size: 0.1, tilt: 0.14, step: 0.08, first: 1.14, track: -0.01, slant: 0.08, rowFill: 0.44, wide: 0.74, cloud: 0.34, outline: 0.11, fat: 0.025, steps: 7, depth: 0.016, shine: 0.025, drips: 0.4, drop: 0.14 };
 /** The word dropping drops as it's sung: falling down its row and landing tilted, with a bounce. */
 export const FALL = { depth: 0.42, fallS: 0.28, tilt: 0.2 };
 function fallAt(w: Word, t: number, rowPx: number): { dy: number; tilt: number } | null {
@@ -89,7 +99,7 @@ const GREEN = '#1f6b44';
 /** Bumper stickers: [paper, ink, the word being sung]. */
 const STICKERS: readonly [string, string, string][] = [['#f4f0e6', '#16131a', '#d81e2c'], ['#16131a', '#f4f0e6', '#ffd65a'], ['#ffd65a', '#16131a', '#d81e2c'], ['#d81e2c', '#ffffff', '#ffd65a']];
 
-interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; /** The bubble on the left (received), not the right (sent). */ bubbleLeft?: boolean; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean; /** The Hollywood sign's: a letter to a panel, the panels evenly spaced across the face, each standing a little out of true. */ panels?: boolean }
+interface Style { bg?: string; border?: string; band?: string; family: string; caps: boolean; colors: [unsung: string, sung: string, now: string]; alpha: [unsung: number, sung: number]; glow?: string; glowPasses?: number; tubes?: boolean; bubble?: string; /** The bubble on the left (received), not the right (sent). */ bubbleLeft?: boolean; outline?: string; shadow?: string; /** Its rows set flush left (an ad's copy). */ align?: 'left'; /** Chalk: each letter a little uneven. */ roughen?: boolean; /** The Hollywood sign's: a letter to a panel, the panels evenly spaced across the face, each standing a little out of true. */ panels?: boolean; /** A spray-painted piece (drawGraffiti): its letters' fade top to foot (the word being sung its own), their 3D block, the cloud sprayed behind. */ graffiti?: { fill: [string, string, string]; now: [string, string, string]; block: string; cloud: string } }
 function styleOf(c: Carrier): Style {
   switch (c.kind) {
     case 'road': return { family: F.archivo(75, 900), caps: true, colors: ['#f3f1ea', '#f3f1ea', '#ffd65a'], alpha: [0.62, 0.97] };
@@ -110,9 +120,13 @@ function styleOf(c: Carrier): Style {
     case 'banner': return { bg: '#f7f4ec', band: '#d23a2a', family: F.archivo(75, 900), caps: true, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.85, 1] };
     // (white sheet metal, floodlit: no accent colour — the word being sung lights full white, the rest wait dimmer)
     case 'hill': return { family: F.archivo(62, 800), caps: true, colors: ['#e6e1d8', '#fbf7ee', '#ffffff'], alpha: [0.5, 1], panels: true };
-    case 'tunnel': return c.phrase.line % 2 // graffiti on the tiles (the user, 2026-10-13: lit lettering "floating in a tunnel"): fat caps, a thick black outline, a drop shadow, a spray halo; the lines in turn hot pink, then electric blue
-      ? { family: F.archivo(100, 900), caps: true, colors: ['#bfefff', '#3ad6ff', '#fff6a0'], alpha: [0.9, 1], outline: '#141218', shadow: '#0b2a3a', glow: 'rgba(58,214,255,0.45)', glowPasses: 2 }
-      : { family: F.archivo(100, 900), caps: true, colors: ['#ffc4e6', '#ff4fa3', '#fff6a0'], alpha: [0.9, 1], outline: '#141218', shadow: '#3a0a2a', glow: 'rgba(255,79,163,0.45)', glowPasses: 2 };
+    // graffiti on the tiles (the user, 2026-10-13: lit lettering "floating in a tunnel"; 2026-10-14: fat glowing caps
+    // didn't read as graffiti): a writer's piece (drawGraffiti), the lines in turn hot pink on a cyan cloud, then
+    // electric blue on a yellow one (in turn by piece: the two "Blowin' money fast" lines are both odd); the word being
+    // sung a yellow-to-orange fade
+    case 'tunnel': return { family: F.graffiti(), caps: true, colors: ['', '', ''], alpha: [1, 1], outline: '#141218', graffiti: (Math.floor(c.phrase.line / 2) + Number(c.id.split('.')[1] ?? 0)) % 2
+      ? { fill: ['#8ff0ff', '#2a8cff', '#1d4fd8'], now: ['#fff7c0', '#ffd23a', '#ff8a1a'], block: '#0b1f5c', cloud: '#f2cf4a' }
+      : { fill: ['#ffb3dc', '#ff4fa3', '#e0186a'], now: ['#fff7c0', '#ffd23a', '#ff8a1a'], block: '#5c0a33', cloud: '#6fe0f0' } };
     case 'barber': return { family: F.archivo(100, 900), caps: true, colors: ['#e9c46a', '#ffd76a', '#fff6d8'], alpha: [0.8, 1], outline: '#3a2408', shadow: '#120b04' }; // gold leaf on the glass
     case 'speed': return { bg: '#0e0d10', family: F.mono(700), caps: true, colors: ['#ffc23a', '#ffb000', '#fff3c4'], alpha: [0.9, 1], glow: 'rgba(255,170,0,0.6)' }; // (the user: its contrast wasn't great — the unsung words were half-dimmed)
     case 'bus': { // (the word being sung by the ad's own lightness, like the billboards: red drowns on a dark ad)
@@ -195,7 +209,7 @@ export class CarrierArt {
     else if (carrier.kind === 'plate') { c.fillStyle = '#c8102e'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.17); c.fillText('California', W / 2, H * 0.15); c.textAlign = 'left'; }
     const TW = W * share; // the lyric's width
     const shown = Math.round(revealAt(carrier, t) * FLIP.steps) / FLIP.steps;
-    if (!COPY.has(carrier.kind)) { if (shown > 0) this.drawWords(c, t, TW, shown); return; }
+    if (!COPY.has(carrier.kind)) { if (shown > 0) { this.drawWords(c, t, TW, shown); if (style.graffiti) this.onTiles(); } return; }
     // a board shows its ad's own copy (its maker, its line) until its lyric comes; then it flips like a tri-vision
     // board, slat by slat, from the copy to the words
     if (shown >= 1) { this.drawWords(c, t, TW, 1); return; }
@@ -225,6 +239,23 @@ export class CarrierArt {
     const l = (this.layers[name] ??= document.createElement('canvas'));
     if (l.width !== this.canvas.width || l.height !== this.canvas.height) { l.width = this.canvas.width; l.height = this.canvas.height; }
     return l;
+  }
+
+  /** Paint on the tunnel's tiles: the paint multiplied by the tiles drawn white (their grout and grime, lined up with
+   *  the wall's by Carrier.tiles), so the tiles show through it as they would through spray paint. */
+  private onTiles() {
+    const { canvas, carrier } = this, W = canvas.width, H = canvas.height, at = carrier.tiles;
+    if (!at) return;
+    const m = W / carrier.w, k = (TILE_REPEAT * m) / 256; // (px a metre; the tiles' canvas px to the face's)
+    const tl = (tileMap ??= (() => { const t = document.createElement('canvas'); t.width = t.height = 256; drawTiles(t.getContext('2d')!, '#ffffff', '#6f6a66'); return t; })());
+    const map = this.layer('tiles'), x = map.getContext('2d')!;
+    x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, W, H);
+    const pat = x.createPattern(tl, 'repeat')!;
+    pat.setTransform(new DOMMatrix().translateSelf(-at.u * m, -at.v * m).scaleSelf(k, k));
+    x.fillStyle = pat; x.fillRect(0, 0, W, H);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(canvas, 0, 0); // (only where there's paint)
+    const c = this.c;
+    c.save(); c.globalCompositeOperation = 'multiply'; c.drawImage(map, 0, 0); c.restore();
   }
 
   /** The ad's own copy where its headline will go: its maker in capitals, its line under it; a set-piece's board its
@@ -272,6 +303,7 @@ export class CarrierArt {
     const gone = Math.round(dissolveAt(carrier, t) * 20) / 20;
     if (gone >= 1) return;
     if (style.panels) { this.drawPanels(c, t, TW, alpha); return; }
+    if (style.graffiti) { this.drawGraffiti(c, t, TW, alpha * (1 - gone)); return; }
     if (style.glow) { c.shadowColor = style.glow; c.shadowBlur = em * (0.22 + 0.6 * gone); }
     const words = carrier.phrase.words, space = c.measureText(' ').width;
     // rows share the face's height, the word of emphasis's row a bigger share
@@ -349,6 +381,130 @@ export class CarrierArt {
     });
     c.globalAlpha = 1;
     c.shadowBlur = 0;
+  }
+
+  /** A writer's piece sprayed on the tiles: the phrase in a handstyle, each letter tilted, stepped and sized a little
+   *  its own way and crowding its neighbour, each row on its own slant; behind it a cloud of a second colour with
+   *  overspray at its edge, a 3D block down and right, a black outline; the letters a fade with a white shine along
+   *  their upper edges, the paint's grain showing the tiles through, drips off their feet, two sparkles. Painted on a
+   *  layer at full strength, then laid on at `alpha` (so its overlapping coats never show through each other). */
+  private drawGraffiti(c: CanvasRenderingContext2D, t: number, TW: number, alpha: number) {
+    if (alpha <= 0) return;
+    const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height, G = style.graffiti!, seed = carrier.phrase.start;
+    const words = carrier.phrase.words, P = GRAFFITI;
+    const soloRow = carrier.phrase.solo === 'first' ? 0 : carrier.phrase.solo === 'last' ? carrier.rows.length - 1 : -1;
+    const weights = carrier.rows.map((_, r) => (r === soloRow ? SOLO_ROW : 1)), sum = weights.reduce((a, b) => a + b, 0);
+    c.font = font(style.family, 100);
+    const capR = c.measureText('H').actualBoundingBoxAscent / 100, spaceR = c.measureText(' ').width / 100;
+    // the rows' letters, each its own size (a row's first letter bigger), measured at 1 em
+    let wi = 0, gi = 0;
+    const rows = carrier.rows.map((row, r) => {
+      const n = row.split(' ').length, rowWords = words.slice(wi, wi + n);
+      wi += n;
+      const chars = rowWords.map((w, k) => [...w.w.toUpperCase()].map((ch, j) => {
+        const m = c.measureText(ch), s = (1 + (hash(seed, gi, 1) - 0.5) * P.size) * (k === 0 && j === 0 ? P.first : 1);
+        return { ch, w, s, wR: (m.width / 100) * s, descR: (m.actualBoundingBoxDescent / 100) * s, i: gi++ };
+      }));
+      const widthR = chars.reduce((a, cs) => a + cs.reduce((b, g) => b + g.wR + P.track, -P.track), 0) + (spaceR + P.track) * (chars.length - 1);
+      const rowH = (H * weights[r]!) / sum;
+      return { chars, widthR, rowH, fit: Math.min((rowH * P.rowFill) / capR, (TW * P.wide) / widthR) };
+    });
+    const plain = rows.filter((_, r) => r !== soloRow), common = Math.min(...(plain.length ? plain : rows).map((r) => r.fit));
+    // laid out: each letter's centre, baseline, tilt (px, rad)
+    interface Glyph { ch: string; w: Word; i: number; s: number; em: number; cx: number; y: number; cw: number; desc: number; rot: number }
+    const glyphs: Glyph[] = [];
+    let top = 0;
+    rows.forEach((row, r) => {
+      const em = r === soloRow ? Math.min(row.fit, common * SOLO_MAX) * (1 + PUNCH.scale * punchAt(carrier, t)) : common;
+      const yMid = top + row.rowH / 2, slope = (hash(seed, r, 7) - 0.5) * P.slant;
+      top += row.rowH;
+      let x = (TW - row.widthR * em) / 2;
+      for (const cs of row.chars) {
+        for (const g of cs) {
+          const cw = g.wR * em, cx = x + cw / 2;
+          glyphs.push({ ch: g.ch, w: g.w, i: g.i, s: g.s, em, cx, cw, desc: g.descR * em, rot: (hash(seed, g.i, 2) - 0.5) * P.tilt,
+            y: yMid + (capR * em) / 2 + (cx - TW / 2) * slope + (hash(seed, g.i, 3) - 0.5) * P.step * em });
+          x += cw + P.track * em;
+        }
+        x += (spaceR + P.track) * em;
+      }
+    });
+    // the whole piece (its cloud's bubbles over the letters, its block and cloud under them) centred in the face below
+    // `drop` of it (clear of the strip lights; a cloud cut flat at the face's edge reads as a decal)
+    const lo = Math.min(...glyphs.map((g) => g.y - capR * g.em * 1.5)), hi = Math.max(...glyphs.map((g) => g.y + g.desc + g.em * 0.3));
+    const shift = (H * (1 + P.drop)) / 2 - (lo + hi) / 2;
+    for (const g of glyphs) g.y += shift;
+    const at = (k: CanvasRenderingContext2D, g: Glyph, dx: number, dy: number, paint: (k: CanvasRenderingContext2D, lw: (emShare: number) => number) => void) => {
+      k.save(); k.translate(g.cx + dx, g.y + dy); k.rotate(g.rot); k.scale(g.s, g.s);
+      k.font = font(style.family, g.em); k.textAlign = 'center'; k.textBaseline = 'alphabetic'; k.lineJoin = 'round'; k.lineCap = 'round';
+      paint(k, (share) => (share * g.em) / g.s);
+      k.restore();
+    };
+    const coat = (k: CanvasRenderingContext2D, g: Glyph, dx: number, dy: number, color: string | CanvasGradient, width: number) =>
+      at(k, g, dx, dy, (k, lw) => { k.fillStyle = color; k.strokeStyle = color; k.lineWidth = lw(width); k.strokeText(g.ch, 0, 0); k.fillText(g.ch, 0, 0); });
+    const block = (g: Glyph, k: number) => [g.em * P.depth * 0.55 * k, g.em * P.depth * k] as const;
+
+    const paint = this.layer('paint'), p = paint.getContext('2d')!;
+    p.clearRect(0, 0, W, H);
+    // the cloud: a coat of the second colour round the letters and their block, a bubble behind each letter, overspray
+    // past its edge (hard-edged: a soft halo read as neon, not paint)
+    p.save(); p.shadowColor = G.cloud; p.shadowBlur = common * 0.025; p.fillStyle = G.cloud;
+    for (const g of glyphs) {
+      coat(p, g, 0, 0, G.cloud, P.cloud); coat(p, g, ...block(g, P.steps), G.cloud, P.cloud);
+      p.beginPath(); p.arc(g.cx + (hash(seed, g.i, 9) - 0.5) * g.cw * 0.4, g.y - capR * g.em * (0.45 + 0.2 * hash(seed, g.i, 10)), capR * g.em * (0.62 + 0.22 * hash(seed, g.i, 11)), 0, Math.PI * 2); p.fill();
+    }
+    p.restore();
+    p.fillStyle = G.cloud;
+    for (const g of glyphs) for (let k = 0; k < 26; k++) {
+      const a = hash(seed, g.i, k, 4) * Math.PI * 2, rad = g.em * (0.3 + 0.2 * hash(seed, g.i, k, 5)), r = g.em * (0.008 + 0.02 * hash(seed, g.i, k, 6));
+      p.globalAlpha = 0.35 + 0.5 * hash(seed, g.i, k, 8);
+      p.beginPath(); p.arc(g.cx + Math.cos(a) * rad, g.y - (capR * g.em) / 2 + Math.sin(a) * rad * 0.8, r, 0, Math.PI * 2); p.fill();
+    }
+    p.globalAlpha = 1;
+    // the 3D block, outlined, down and right; then the letters' own outline over it
+    for (const g of glyphs) for (let k = P.steps; k >= 1; k--) coat(p, g, ...block(g, k), style.outline!, P.outline);
+    for (const g of glyphs) for (let k = P.steps; k >= 1; k--) coat(p, g, ...block(g, k), G.block, P.fat + 0.03);
+    for (const g of glyphs) coat(p, g, 0, 0, style.outline!, P.outline);
+    // drips off the letters' feet (under the fill, so it runs out of the letter)
+    for (const g of glyphs) {
+      if (!/\p{L}/u.test(g.ch) || hash(seed, g.i, 20) > P.drips) continue;
+      const x = g.cx + (hash(seed, g.i, 21) - 0.5) * g.cw * 0.5, y0 = g.y + g.desc - g.em * 0.08, y1 = Math.min(y0 + g.em * (0.14 + 0.36 * hash(seed, g.i, 22)), H - g.em * 0.06);
+      for (const [col, lw, rad] of [[style.outline!, 0.075, 0.046], [G.fill[2], 0.035, 0.028]] as const) {
+        p.strokeStyle = col; p.fillStyle = col; p.lineWidth = lw * g.em; p.lineCap = 'round';
+        p.beginPath(); p.moveTo(x, y0); p.lineTo(x, y1); p.stroke();
+        p.beginPath(); p.arc(x, y1, rad * g.em, 0, Math.PI * 2); p.fill();
+      }
+    }
+    // the letters' faces: white, then their fade laid over it nudged down and right (a shine left on their upper
+    // edges), the word being sung in its own; the paint's grain pricked through to the tiles
+    const face = this.layer('face'), f = face.getContext('2d')!;
+    f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, W, H);
+    for (const g of glyphs) coat(f, g, 0, 0, '#ffffff', P.fat);
+    f.globalCompositeOperation = 'source-atop';
+    for (const g of glyphs) {
+      const now = t >= g.w.start && t < g.w.end, [a, b, d] = now ? G.now : G.fill;
+      at(f, g, g.em * P.shine, g.em * P.shine * 1.2, (k, lw) => {
+        const grad = k.createLinearGradient(0, -capR * g.em, 0, g.desc);
+        grad.addColorStop(0, a); grad.addColorStop(0.5, b); grad.addColorStop(1, d);
+        k.fillStyle = grad; k.strokeStyle = grad; k.lineWidth = lw(P.fat); k.strokeText(g.ch, 0, 0); k.fillText(g.ch, 0, 0);
+      });
+    }
+    p.drawImage(face, 0, 0);
+    p.save(); p.globalCompositeOperation = 'destination-out';
+    const grain = Math.round((W * H) / 900);
+    for (let k = 0; k < grain; k++) { p.globalAlpha = 0.25 + 0.5 * hash(seed, k, 30); p.fillRect(hash(seed, k, 31) * W, hash(seed, k, 32) * H, 2, 2); }
+    p.restore();
+    // two sparkles: off the first letter's shoulder and the last's
+    const star = (x: number, y: number, r: number) => {
+      p.beginPath(); p.moveTo(x, y - r);
+      for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1]] as const) p.quadraticCurveTo(x, y, x + dx * r, y + dy * r);
+      p.fill();
+    };
+    p.fillStyle = '#ffffff';
+    const g0 = glyphs[0], g1 = glyphs[glyphs.length - 1];
+    if (g0) star(g0.cx - g0.cw * 0.45, g0.y - capR * g0.em * 1.05, g0.em * 0.16);
+    if (g1 && g1 !== g0) star(g1.cx + g1.cw * 0.5, g1.y - capR * g1.em * 0.9, g1.em * 0.12);
+    c.globalAlpha = alpha; c.drawImage(paint, 0, 0); c.globalAlpha = 1;
   }
 
   /** The Hollywood sign: the phrase on one row, a letter to each of a row of equal cells (a word's gap a cell), each

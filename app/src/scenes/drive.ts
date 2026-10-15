@@ -39,8 +39,14 @@ import { buildVerse3 } from './sets/verse3';
 import { buildChorus4 } from './sets/chorus4';
 import { buildBridge1 } from './sets/bridge1';
 
-/** The sodium lamps' light (candela, and how far it reaches, m) and the dark a tunnel's far end fades into. */
-const TUNNEL_LIGHT = { intensity: 30, reach: 13 };
+/** The sodium lamps' light (candela, and how far it reaches, m); how many of them light at once, those nearest a point
+ *  `look` m along the camera's view down the bore (the user, 2026-10-14: the graffiti glowed apart from the bore's light
+ *  — painted and lit like the tiles, a piece far from the lens fell into the dark round the three lamps over it); how
+ *  far either side of the car to look for the camera (m); and the dark a tunnel's far end fades into. */
+const TUNNEL_LIGHT = { intensity: 30, reach: 13, lamps: 7, look: 16, search: 110 };
+/** In a tunnel, the car's headlights' light (candela; from this far ahead of its centre and up, m; the cone's half
+ *  angle, rad, and its soft edge). */
+const HEADLIGHT = { intensity: 45, ahead: 2.8, up: 0.75, reach: 45, angle: 0.5, penumbra: 0.7 };
 const TUNNEL_DARK = new THREE.Color('#120a05');
 /** A banner's plane is in the sky from this long before its line is revealed until this long after the line (s). */
 const BANNER_SKY = { before: 0.8, after: 4 };
@@ -112,8 +118,9 @@ export default class DriveScene extends Scene {
   /** The skywriter: a plane at the head of the sky-writing as it's written, flying on and up after. */
   private writer = buildPlane(1);
   private skies: Carrier[] = [];
-  /** In a tunnel: the sodium light of the lamps nearest the camera. */
-  private sodium = [0, 1, 2].map(() => new THREE.PointLight('#ffa24a', 0, TUNNEL_LIGHT.reach, 1.5));
+  /** In a tunnel: the sodium light of the lamps nearest where the camera looks, and the car's headlights. */
+  private sodium = Array.from({ length: TUNNEL_LIGHT.lamps }, () => new THREE.PointLight('#ffa24a', 0, TUNNEL_LIGHT.reach, 1.5));
+  private headlight = new THREE.SpotLight('#ffd08a', 0, HEADLIGHT.reach, HEADLIGHT.angle, HEADLIGHT.penumbra, 1.2);
   /** The set-pieces' props (scenes/sets/), moved each frame. */
   private sets: { group: THREE.Group; update(t: number, car: THREE.Object3D): void }[] = [];
   /** Carriers riding in the car (the radio), with their place in its frame. */
@@ -135,7 +142,7 @@ export default class DriveScene extends Scene {
     this.cast = castOf(audio, lyrics);
     this.skies = this.drive.carriers.filter((c) => c.kind === 'sky');
     this.writer.matrixAutoUpdate = false;
-    this.world.add(world, this.writer, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium);
+    this.world.add(world, this.writer, this.car, this.sun, this.sun.target, this.moon, this.moon.target, this.hemi, this.dome.mesh, ...this.sodium, this.headlight, this.headlight.target);
     for (const c of this.drive.carriers) {
       const art = new CarrierArt(c);
       this.arts.push(art);
@@ -328,17 +335,29 @@ export default class DriveScene extends Scene {
     NIGHT.value = smooth(2 * DEG, -8 * DEG, e); // the lights come on as the sun goes
 
     // in a tunnel (by where the camera is): the daylight shut out, the lamps' light on the tiles and the car
-    const camS = this.roadS(this.cam.position, d.motion.distanceAt(t)), inside = insideAt(d.tunnels, camS);
+    // (searched far either side of the car: the bridge's eye waits up to ~90 m down the bore from it)
+    const camS = this.roadS(this.cam.position, d.motion.distanceAt(t), TUNNEL_LIGHT.search), inside = insideAt(d.tunnels, camS);
     if (inside > 0) {
-      const tn = nearTunnel(d.tunnels, camS)!;
-      let i = tn.lamps.findIndex((s) => s > camS);
-      if (i < 0) i = tn.lamps.length;
+      // the lamps nearest where the camera looks, `look` m down the bore along its view; each fading out as it drops
+      // to the edge of the set (another takes its place unseen)
+      const tn = nearTunnel(d.tunnels, camS)!, view = new THREE.Vector3();
+      this.cam.getWorldDirection(view);
+      const focus = camS + TUNNEL_LIGHT.look * view.dot(d.route.frameAt(camS).fwd);
+      const byNear = tn.lamps.map((s) => ({ s, d: Math.abs(s - focus) })).sort((a, b) => a.d - b.d);
+      const edge = byNear[this.sodium.length]?.d ?? Infinity, gap = (tn.s1 - tn.s0) / Math.max(1, tn.lamps.length);
       this.sodium.forEach((l, k) => {
-        const s = tn.lamps[Math.min(tn.lamps.length - 1, Math.max(0, i - 1 + k))]!, fr = d.route.frameAt(s);
+        const lamp = byNear[k];
+        if (!lamp) { l.intensity = 0; return; }
+        const fr = d.route.frameAt(lamp.s);
         l.position.copy(fr.pos).addScaledVector(fr.up, TUNNEL.h - 0.6);
-        l.intensity = TUNNEL_LIGHT.intensity * inside;
+        l.intensity = TUNNEL_LIGHT.intensity * inside * Math.min(1, (edge - lamp.d) / gap);
       });
-    } else this.sodium.forEach((l) => (l.intensity = 0));
+      // the car's headlights throw real light down the bore: it sweeps the tiles and the paint on them as it passes
+      // (the beams' cones are only drawn: world.ts)
+      this.headlight.position.copy(cf.pos).addScaledVector(cf.fwd, HEADLIGHT.ahead).addScaledVector(cf.up, HEADLIGHT.up);
+      this.headlight.target.position.copy(cf.pos).addScaledVector(cf.fwd, HEADLIGHT.ahead + 20).addScaledVector(cf.up, HEADLIGHT.up - 0.6);
+      this.headlight.intensity = HEADLIGHT.intensity * inside;
+    } else { this.sodium.forEach((l) => (l.intensity = 0)); this.headlight.intensity = 0; }
     this.sun.intensity *= 1 - inside;
     PRINT_SHADE.value = smooth(-1 * DEG, 4 * DEG, e) * (1 - inside); // the printed shadows (look/toon.ts): the sun's
     this.moon.intensity *= 1 - inside;
@@ -379,10 +398,10 @@ export default class DriveScene extends Scene {
     return { sky, sunDir, sunColor };
   }
 
-  /** Where along the road `p` is nearest, searching around `near` (m). */
-  private roadS(p: THREE.Vector3, near: number): number {
+  /** Where along the road `p` is nearest, searching `span` m either side of `near` (m). */
+  private roadS(p: THREE.Vector3, near: number, span = 40): number {
     let best = near, bd = Infinity;
-    for (let s = Math.max(0, near - 40); s <= near + 40; s += 1) {
+    for (let s = Math.max(0, near - span); s <= near + span; s += 1) {
       const dd = this.drive.route.frameAt(s).pos.distanceToSquared(p);
       if (dd < bd) { bd = dd; best = s; }
     }

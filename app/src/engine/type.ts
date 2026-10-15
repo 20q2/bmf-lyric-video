@@ -20,6 +20,7 @@ for (const wt of [400, 500, 700, 900]) DEFS.push({ family: `BodoniModa-o96-${wt}
 for (const wt of [400, 700]) DEFS.push({ family: `BodoniModaItalic-o96-${wt}`, file: `BodoniModaItalic-o96-${wt}.ttf` });
 DEFS.push({ family: 'BodoniModa-o11-400', file: 'BodoniModa-o11-400.ttf' });
 DEFS.push({ family: 'BodoniModaItalic-o11-400', file: 'BodoniModaItalic-o11-400.ttf' });
+DEFS.push({ family: 'SedgwickAve', file: 'src/SedgwickAveDisplay-Regular.ttf' });
 
 /** Convenience family names. */
 export const F = {
@@ -36,6 +37,10 @@ export const F = {
    *  so the eye knows what to read (the user, 2026-10-12). */
   sign(weight = 500): string {
     return F.mono(weight);
+  },
+  /** A graffiti writer's handstyle (Sedgwick Ave Display): the tunnel's spray-painted lyrics. */
+  graffiti(): string {
+    return 'SedgwickAve';
   },
   mono(weight = 400, italic = false): string {
     if (italic) return 'PlexItalic-400';
