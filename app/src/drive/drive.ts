@@ -170,7 +170,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     const w = c.phrase.words[0]!, cue = w.start - LEAD, prev = carriers[i - 1];
     const sf = setFrames.get(c.id);
     if (sf) {
-      const shot: Shot = { at: sf.at ?? { start: w.start, w: w.w }, to: sf.to, move: sf.move };
+      const shot: Shot = { at: sf.at ?? { start: w.start, w: w.w }, to: sf.of?.(c) ?? sf.to!, move: sf.move };
       phraseShots.push(shot); paired.push(false);
       reading.push([resolveAt(shot.at), cue + SNAP_S + dwellFor(c.phrase.words.length)]);
       return shot;

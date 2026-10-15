@@ -68,11 +68,14 @@ export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
 const GRAFFITI = { size: 0.1, tilt: 0.14, step: 0.08, first: 1.14, track: -0.01, slant: 0.08, rowFill: 0.44, wide: 0.74, cloud: 0.34, outline: 0.11, fat: 0.025, steps: 7, depth: 0.016, shine: 0.025, drips: 0.4, drop: 0.14 };
 /** The word dropping drops as it's sung: falling down its row and landing tilted, with a bounce. */
 export const FALL = { depth: 0.42, fallS: 0.28, tilt: 0.2 };
-function fallAt(w: Word, t: number, rowPx: number): { dy: number; tilt: number } | null {
+function fallAt(w: Word, t: number, rowPx: number, room = Infinity, width = 0): { dy: number; tilt: number } | null {
   if (!/^dropping/i.test(w.w) || t < w.start) return null;
   const tau = t - w.start, u = Math.min(1, tau / FALL.fallS);
   const bounce = tau > FALL.fallS ? 0.12 * Math.exp(-(tau - FALL.fallS) * 9) * Math.sin((tau - FALL.fallS) * 30) : 0;
-  return { dy: rowPx * FALL.depth * (u * u - bounce), tilt: FALL.tilt * u };
+  // (never past the face's foot, its far end tilted down included: on a one-row face the word fell out of its canvas
+  // and was cut in half; there, half the room to tilt, half to drop)
+  const tilt = Math.min(FALL.tilt, Math.asin(Math.min(1, Math.max(0, room) / 2 / Math.max(1, width))));
+  return { dy: Math.min(rowPx * FALL.depth, Math.max(0, room - width * Math.sin(tilt))) * (u * u - bounce), tilt: tilt * u };
 }
 /** How far through its punch the emphasis word is at t (1: just sung, 0: settled or not yet). */
 const punchAt = (c: Carrier, t: number) => {
@@ -160,6 +163,11 @@ function styleOf(c: Carrier): Style {
     case 'tunnelsign': return { bg: '#0b0d12', border: '#454b58', family: F.archivo(100, 800), caps: true, colors: ['#ffe2a8', '#ffd98a', '#ffffff'], alpha: [0.6, 1], glow: 'rgba(255,180,80,0.85)' }; // a lit box in the bore
     case 'freeway': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
     case 'street': case 'gantry': return { bg: GREEN, border: '#f4f4f0', family: F.archivo(100, 700), caps: false, colors: ['#f4f4f0', '#f4f4f0', '#ffd65a'], alpha: [0.75, 1] };
+    // (the beach: a towel's bold print, white with a black keyline on its coloured cloth; letters raked into the sand,
+    // dark grooves with their pushed-up rims; the surf shack's hand-painted board, navy on its cream)
+    case 'towel': return { family: F.archivoItalic(75, 800), caps: true, colors: ['#ffffff', '#ffffff', '#ffd65a'], alpha: [0.9, 1], outline: '#16131a', shadow: '#16131a' };
+    case 'sand': return { family: F.archivo(87, 900), caps: true, colors: ['#6e3524', '#5a2618', '#c8102e'], alpha: [0.8, 1], outline: '#ffd9b0', shadow: '#3e1a10' };
+    case 'surfshop': return { family: F.archivoItalic(100, 800), caps: true, colors: ['#123a5c', '#123a5c', '#d81e2c'], alpha: [0.85, 1] };
     default: return { bg: HEX.bg, border: HEX.ink, family: F.bodoni(700, { italic: true }), caps: false, colors: [HEX.ink, HEX.ink, HEX.accent], alpha: [0.62, 1] };
   }
 }
@@ -357,7 +365,7 @@ export class CarrierArt {
         c.fillStyle = solo || now ? style.colors[2] : style.colors[sung ? 1 : 0];
         c.globalAlpha = (solo ? 1 : style.alpha[sung ? 1 : 0]) * (1 - gone) * alpha;
         // dissolving: the letters drift apart and up, a little more each word along
-        const fall = fallAt(w, t, rowH);
+        const fall = fallAt(w, t, rowH, H - y - em * 0.45, c.measureText(label(w)).width);
         if (fall) { c.save(); c.translate(x, y + fall.dy); c.rotate(fall.tilt); }
         const [fx, fy] = fall ? [0, 0] : [x + gone * em * 0.8 * (x / W - 0.5) * 4, y - gone * em * 0.6];
         if (style.tubes) { // neon: the tube's brighter core line over its glow

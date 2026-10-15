@@ -641,6 +641,9 @@ function buildStreetlights(drive: Drive): THREE.Group {
     if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR) || signs.some((c) => Math.abs(c.s - s) < 12)) continue;
     // nor where the camera stands across the road from a face on the left (it would stand beside the lens)
     if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 28)) continue;
+    // nor where the car is while sky-writing's up, as for the palms: the low camera behind it looks up past them into
+    // the words (a lamp's arm ran through "fly" on the coast)
+    if (drive.carriers.some((c) => c.kind === 'sky' && s > motion.distanceAt(c.phrase.start) - 20 && s < motion.distanceAt(c.phrase.end + 1.5) + 40)) continue;
     at.push(s);
   }
   const L = STREETLIGHTS, n = at.length;
@@ -758,7 +761,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber' || c.kind === 'mirror' || c.kind === 'window' || c.kind === 'carwash' || c.kind === 'phone'; // the face is only its letters (the phone's: its bubbles, over the screen's wallpaper)
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber' || c.kind === 'mirror' || c.kind === 'window' || c.kind === 'carwash' || c.kind === 'phone' || c.kind === 'towel' || c.kind === 'sand' || c.kind === 'surfshop'; // the face is only its letters (the phone's: its bubbles, over the screen's wallpaper)
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'tunnel') { // graffiti: paint on the tiles, lit by the bore's lamps like the tiles round it (the user, 2026-10-14: it glowed — its lighting "doesn't match the environment at all")

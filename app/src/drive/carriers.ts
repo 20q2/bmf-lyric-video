@@ -39,12 +39,14 @@ import { AD, ADVERTISED, type Ad, TEXT_SHARE, adFor } from './ads';
 
 export type LeftKind = 'billboard' | 'storefront' | 'neon';
 /** The set-pieces' surfaces (sets/). */
-export type SetKind = 'barber' | 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee' | 'poster' | 'freeway' | 'polesign' | 'aframe' | 'window' | 'vinyl' | 'roofsign' | 'carwash' | 'visor' | 'hood' | 'giant' | 'arch' | 'tunnelsign';
+export type SetKind = 'barber' | 'speed' | 'bus' | 'mirror' | 'sticker' | 'plate' | 'phone' | 'radio' | 'menu' | 'marquee' | 'poster' | 'freeway' | 'polesign' | 'aframe' | 'window' | 'vinyl' | 'roofsign' | 'carwash' | 'visor' | 'hood' | 'giant' | 'arch' | 'tunnelsign' | 'towel' | 'sand' | 'surfshop';
 export type Kind = 'road' | 'sky' | 'banner' | LeftKind | 'sign' | 'street' | 'gantry' | 'tunnel' | 'hill' | SetKind;
-export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'billboard', 'storefront', 'neon', 'sign', 'street', 'gantry', 'tunnel', 'hill',
-  'barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'visor', 'hood', 'giant', 'arch', 'tunnelsign'];
+// (the kinds in use: not 'sign', the plain white roadside board — only a fallback now, for a street name too long for
+// its blade; the beach's towers were its last, the user, 2026-10-14: "atrocious")
+export const KINDS: readonly Kind[] = ['road', 'sky', 'banner', 'billboard', 'storefront', 'neon', 'street', 'gantry', 'tunnel', 'hill',
+  'barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'visor', 'hood', 'giant', 'arch', 'tunnelsign', 'towel', 'sand', 'surfshop'];
 /** The set-pieces' kinds (world.ts draws just their faces: their props stand round them). */
-export const SET_KINDS: ReadonlySet<Kind> = new Set<SetKind>(['barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'visor', 'hood', 'giant', 'arch', 'tunnelsign']);
+export const SET_KINDS: ReadonlySet<Kind> = new Set<SetKind>(['barber', 'speed', 'bus', 'mirror', 'sticker', 'plate', 'phone', 'radio', 'menu', 'marquee', 'poster', 'freeway', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'visor', 'hood', 'giant', 'arch', 'tunnelsign', 'towel', 'sand', 'surfshop']);
 /** Kinds two phrases can share a frame on (pairFraming): the faces on the road's left, side by side. (Paint on a moving
  *  road lies too far on, and two sky phrases too far apart, for a frame that holds both at a readable size: measured,
  *  tests/sung.test.ts.) */
@@ -119,7 +121,7 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   intro: ['sign'],
   chorus1: ['road', 'road', 'billboard', 'sky', 'street'],
   chorus2: ['gantry', 'gantry', 'road', 'sky'],
-  chorus3: ['sign', 'banner', 'sign', 'sky'], // (its own look: chorus 1 has the road paint; its set owns the arch's line)
+  chorus3: ['sky'], // (its set owns the arch's line and the beach's; the campaign's line is his boards, the fly line the sky)
   bridge1: ['tunnel'],
   // (verse3 has no pattern: its set-piece owns every line, sets/verse3.ts)
   chorus4: ['road', 'gantry', 'sky', 'hill'], // (its set owns the campaign's line — his biggest board, on the hillside — and the drive insert's)
@@ -172,12 +174,17 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   arch: { rowH: 2.3, w: 19.5, advance: 0.55, emOfRow: 0.78, wrap: 20 },
   // (a lit overhead sign hung in the tunnel's bore, read down it: the bridge's "Tryna make it last" lines)
   tunnelsign: { rowH: 0.8, w: 7, advance: 0.55, emOfRow: 0.7, wrap: 20 },
+  // (the coast's beach, chorus 3's dropping line: an oversized beach towel's print, words raked giant into the sand,
+  // the surf rental shack's surfboard sign, room under its row for the dropping word to drop)
+  towel: { rowH: 0.78, w: 2.7, advance: 0.52, emOfRow: 0.74, wrap: 10 },
+  sand: { rowH: 3.2, w: 14, advance: 0.55, emOfRow: 0.75, wrap: 14 },
+  surfshop: { rowH: 2.2, w: 8.6, advance: 0.56, emOfRow: 0.48, wrap: 14 },
 };
 /** The hooks: "He's so fly, fly" written bigger each chorus (scale per chorus), "Cruise all night" a giant banner. */
 export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /young and (he )?fine/i;
 export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
-export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'barber', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'hood', 'giant', 'arch', 'tunnelsign']);
+export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'barber', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'hood', 'giant', 'arch', 'tunnelsign', 'towel', 'sand', 'surfshop']);
 /** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
  *  valley), how high its letters' centre stands over the road there. (Far enough out that the parked outro sits NEAR
  *  the sign, not under it: its letters and scaffold were looming over the whole ending.) */

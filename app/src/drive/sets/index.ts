@@ -21,8 +21,9 @@ import { VERSE1 } from './verse1';
 import { VERSE2 } from './verse2';
 import { VERSE3 } from './verse3';
 
-/** How a set frames one of its phrases: the target, the move onto it, and when it starts (default: its cue). */
-export interface SetFrame { to: Target; move: ShotMove; at?: number }
+/** How a set frames one of its phrases: the target, the move onto it, and when it starts (default: its cue). A phrase
+ *  the drive places (the set frames it, not its surface) has its target built on its carrier (`of`). */
+export interface SetFrame { to?: Target; of?: (c: Carrier) => Target; move: ShotMove; at?: number }
 export interface SetContext {
   st: Stretch;
   audio: AudioData;
