@@ -18,7 +18,9 @@ const settle = (tau: number) => (tau < 0 ? 0 : Math.exp(-7 * tau) * Math.cos(15 
 
 export function hydraulics(audio: AudioData, lyrics: Lyrics, stretches: readonly Stretch[]): (t: number) => Stance {
   const H = HYDRAULICS;
-  const choruses = stretches.filter((s) => s.id.startsWith('chorus'));
+  // (not the last chorus: the night climb rides smooth — its hop at 158 s jolted the frame under "Put it in drive",
+  // the user, 2026-10-13 and 2026-10-15)
+  const choruses = stretches.filter((s) => s.id.startsWith('chorus') && s.id !== 'chorus4');
   const hops = audio.downbeats.filter((d, i) => i % 2 === 0 && choruses.some((s) => d >= s.start && d < s.end));
   const words = lyrics.lines.flatMap((l) => l.words);
   const drops = words.filter((w) => /^dropping/i.test(w.w)).map((w) => w.start);

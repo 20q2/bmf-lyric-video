@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { printShadows, toon } from './toon';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { WHEEL } from '../drive/cabin';
 
 /** A cross-section, level: [y, x, back z, front z, half-width, front width share, squareness (2: an ellipse)]. */
 type Sec = [number, number, number, number, number, number?, number?];
@@ -209,8 +210,9 @@ export const FIGURE = {
   him: { x: 0.44, head: V(0, 1.64, -0.29), shoulder: V(0.188, 1.445, -0.322), hip: V(0.095, 1.04, -0.3) },
   her: { x: -0.44, head: V(0, 1.61, -0.3), shoulder: V(0.155, 1.425, -0.325), hip: V(0.085, 1.03, -0.3) },
 };
-/** His grip on the wheel: low on its rim at about half seven, his arm straight to it (the car body's frame). */
-const GRIP = V(0.574, 1.249, 0.344);
+/** His grip on the wheel: low on its rim at about half seven, his arm straight to it (the car body's frame; the
+ *  wheel's place is drive/cabin.ts WHEEL, shared with world.ts buildCar). */
+const GRIP = WHEEL.hub.clone().add(WHEEL.grip);
 /** Her arm's rest: how far its elbow bends (radians: forearm forward along her thigh), how far up the scene swings
  *  it at most (cast.ts: -2.7 about z), the bend left once it's up. */
 const ELBOW = { rest: -1.3, up: 2.7, raised: -0.25 };
