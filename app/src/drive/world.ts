@@ -758,7 +758,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
-  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber' || c.kind === 'mirror' || c.kind === 'window' || c.kind === 'carwash'; // the face is only its letters
+  const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber' || c.kind === 'mirror' || c.kind === 'window' || c.kind === 'carwash' || c.kind === 'phone'; // the face is only its letters (the phone's: its bubbles, over the screen's wallpaper)
   const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'tunnel') { // graffiti: paint on the tiles, lit by the bore's lamps like the tiles round it (the user, 2026-10-14: it glowed — its lighting "doesn't match the environment at all")
@@ -844,7 +844,12 @@ const NEON_WASH = 0.45;
       // line from the banner's leading edge; as big as the banner was made (carriers.ts BANNER.view)
       const k = c.w / LAYOUT.banner.w, tow = BANNER.tow * k, x0 = c.w / 2 + tow;
       box(tow, 0.05 * k, 0.05 * k, c.w / 2 + tow / 2, 0, 0, grey('#3a3a40'));
-      const plane = buildPlane(k); plane.position.x = x0; g.add(plane);
+      // (level, whatever the banner's tilt toward the car: in the banner's frame it banked as if turning; from below
+      // the car we see its underside)
+      const plane = buildPlane(k), B = basisOf(c), rot = new THREE.Matrix4().extractRotation(B);
+      const along = new THREE.Vector3().setFromMatrixColumn(B, 0).setY(0).normalize(), level = new THREE.Matrix4().makeBasis(along, new THREE.Vector3(0, 1, 0), along.clone().cross(new THREE.Vector3(0, 1, 0)));
+      plane.quaternion.setFromRotationMatrix(rot.invert().multiply(level));
+      plane.position.x = x0; g.add(plane);
       break;
     }
     case 'hill': {
