@@ -16,6 +16,11 @@ import { F, font } from '../../engine/type';
 import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, sedan, signFace, walker } from './kit';
 import { glassTex } from './chorus1';
 
+/** Slauson, the side street (m, along it from the main road's edge): its fronts from `from` to `len` (out into the
+ *  haze), their depth, the sidewalk's width. */
+const SLAUSON = { from: 22, len: 700, depth: 14, walk: 3 };
+const SLAUSON_SHOPS = ['LIQUOR', 'TIRES', 'BEAUTY SUPPLY', 'TACOS', 'LAUNDROMAT', 'CHECKS CASHED', 'DONUTS', 'BARBER', 'AUTO PARTS', 'CHURCH OF GOD', 'NAILS', 'UPHOLSTERY', 'PHARMACY', 'BAIL BONDS', 'MARKET', 'RECORDS', 'INSURANCE', 'SHOE REPAIR'];
+
 /** The chicken: white, a red comb and wattle, an orange beak, its tail; standing at (0, y, 0) of g, facing +z. */
 function chicken(g: THREE.Object3D, y: number, k = 1) {
   const white = toon({ color: '#f7f2e6' }), red = toon({ color: '#d4202e' }), orange = toon({ color: '#f29a1a' });
@@ -217,10 +222,59 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   // ---- the side street (Slauson): its asphalt off to the left, a crosswalk across its mouth ----
   {
     const C = plan.corner, asphalt = toon({ color: WORLD.asphalt }), paint = new THREE.MeshBasicMaterial({ color: WORLD.dash });
-    box(onRoad(C.s, 0), 150, 0.04, C.w, ROAD_HALF + 75, 0.0, 0, asphalt); // (x: the road's left; on past the rows behind the street)
-    for (let x = ROAD_HALF + 8; x < 150; x += 6) box(onRoad(C.s, 0), 3, 0.02, 0.15, x, 0.03, 0, paint); // its centre dashes
+    const S = SLAUSON, st = onRoad(C.s, 0); // (x: the road's left, down Slauson; z along the main road)
+    box(st, S.len, 0.04, C.w, ROAD_HALF + S.len / 2, 0.0, 0, asphalt);
+    for (let x = ROAD_HALF + 8; x < S.len; x += 6) box(st, 3, 0.02, 0.15, x, 0.03, 0, paint); // its centre dashes
     const walk = onRoad(C.s, -ROAD_HALF - 1.6);
     for (let z = -C.w / 2 + 0.6; z < C.w / 2; z += 1) box(walk, 2.4, 0.02, 0.5, 0, 0.03, z, paint);
+    // a street, not a strip into the void (the user, 2026-10-15: at 80 s "the road ... goes out into the nothingness"):
+    // level ground under the blocks either side, sidewalks, storefronts wall to wall behind the corner lots out into
+    // the haze, power poles with their wires, street lamps, cars parked at the kerbs
+    const ground = toon({ color: '#b39a7a' }), walkM = toon({ color: '#cbbba7' }), dark = toon({ color: WORLD.post });
+    for (const side of [-1, 1]) {
+      const zs = side * (C.w / 2), zw = zs + side * S.walk / 2;
+      box(st, S.len - S.from + 40, 8, S.depth + 60, ROAD_HALF + (S.from + S.len) / 2, -4 - 0.06, zs + side * (S.walk + (S.depth + 60) / 2), ground); // the blocks' ground, down out of sight
+      box(st, S.len - S.from + 20, 0.16, S.walk, ROAD_HALF + (S.from + S.len) / 2, 0.08, zw, walkM); // the sidewalk
+      // the fronts: varied widths and heights, a fascia with the shop's name, an awning on some, a lot now and then
+      let x = ROAD_HALF + S.from, k = 0;
+      while (x < S.len - 20) {
+        const r = (n: number) => { const v = Math.sin((k + 1) * 12.9898 * (side + 3) + n * 78.233) * 43758.5453; return v - Math.floor(v); };
+        const w = 9 + 13 * r(1), h = 4 + (r(2) < 0.3 ? 7 * r(3) : 3 * r(3)), zc = zs + side * (S.walk + S.depth / 2);
+        if (r(4) < 0.12) { // a lot: a low wall along the walk, a sign on a pole
+          box(st, w - 1, 0.9, 0.3, x + w / 2, 0.45, zs + side * (S.walk + 0.2), toon({ color: '#d9cdb8' }));
+        } else {
+          const col = WORLD.stucco[Math.floor(r(5) * WORLD.stucco.length)]!;
+          const b = box(st, w - 0.4, h + 6, S.depth, x + w / 2, (h - 6) / 2, zc, wallMaterial(col, new THREE.Vector3(w - 0.4, h + 6, S.depth), 0));
+          b.rotation.y = 0; // (its front along Slauson: the wall material puts windows on every wall above the ground floor)
+          const front = zs + side * (S.walk - 0.02), fy = Math.min(h - 0.6, 3.6);
+          const fascia = ['#7a2a36', '#1f4f5a', '#3d2f5a', '#7a5a22', '#2a4a2a'][Math.floor(r(6) * 5)]!;
+          box(st, w - 1.2, 0.7, 0.2, x + w / 2, fy, front + side * 0.08, toon({ color: fascia }));
+          const nm = SLAUSON_SHOPS[(k * 3 + (side > 0 ? 1 : 0)) % SLAUSON_SHOPS.length]!;
+          const sign = plane(st, Math.min(w - 2, 6.5), 0.5, x + w / 2, fy, front - side * 0.04, name(nm, Math.min(w - 2, 6.5), 0.5, '#fff6e0', fascia));
+          if (side > 0) sign.rotation.y = Math.PI; // (the far side's fronts face back across the street)
+          box(st, w - 2, 2.2, 0.06, x + w / 2, 1.4, front + side * 0.03, toon({ color: '#2a3340' })); // its glass
+          if (r(7) < 0.45) { const aw = box(st, w - 1.4, 0.08, 1.4, x + w / 2, 2.85, front - side * 0.7, toon({ color: ['#c8202e', '#2b78a6', '#e0a526'][Math.floor(r(8) * 3)]! })); aw.rotation.x = side * 0.2; }
+        }
+        x += w; k++;
+      }
+      // power poles along the near side and street lamps along the far side, every few lots
+      for (let px = ROAD_HALF + S.from + 6; px < S.len - 20; px += 32) {
+        const pz = zs + side * 0.6;
+        if (side < 0) {
+          cyl(st, 0.14, 9.5, px, 4.75, pz, dark); box(st, 0.12, 0.12, 2.4, px, 8.9, pz, dark);
+          if (px + 32 < S.len - 20) for (const dz of [-0.9, 0, 0.9]) box(st, 32, 0.03, 0.03, px + 16, 8.75 - 0.25, pz + dz, dark); // its wires to the next
+        } else {
+          cyl(st, 0.08, 6.5, px + 16, 3.25, pz, dark); box(st, 1.6, 0.08, 0.08, px + 16, 6.45, pz - 0.8, dark);
+          box(st, 0.5, 0.12, 0.25, px + 16, 6.35, pz - 1.5, lampMaterial('#ffe0a0', GLOW.lamp * 0.6, 0.9));
+        }
+      }
+      // cars parked at the kerb, nose along the street
+      for (let cx = ROAD_HALF + S.from + 10; cx < S.len * 0.6; cx += 23 + 11 * ((cx * 7) % 1)) {
+        if (((cx * 13) % 3) < 1) continue;
+        const car = sedan({ color: ['#e8e2d2', '#5a6a7d', '#b0532e', '#2f7a5a', '#8a5f9e'][Math.floor(cx) % 5]! });
+        car.position.set(cx, 0, zs - side * 1.1); car.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; st.add(car);
+      }
+    }
   }
 
   // ---- the A-frames: a chalkboard each (the carriers), its wooden frame, its legs and back board to the ground ----
