@@ -22,6 +22,7 @@ import { sedan } from '../scenes/sets/kit';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
 import { buildDash } from '../look/dash';
+import { buildCast } from '../look/cast3d';
 import { CAR } from './cabin';
 export { CAR };
 import { candyPaint, chrome as heroChrome } from '../look/hero';
@@ -886,8 +887,8 @@ function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh
 
 /** The car: a '64 Impala convertible, the LA lowrider (nose +z): a long low body (its side profile extruded across its
  *  width, wheel arches cut), a chrome spear down the side, chrome bumpers, whitewalls with chrome caps, quad headlights
- *  and the triple round tail lights (they glow at night, the headlights throw beams); the two of them as flat
- *  silhouettes: him at the wheel (on its left) in a cap, her riding, her hair down her back. */
+ *  and the triple round tail lights (they glow at night, the headlights throw beams); the two of them (look/cast3d.ts):
+ *  him at the wheel (on its left) in a cap, her riding, her hair down her back. */
 export function buildCar(): THREE.Group {
   // the body (and the two of them) on its hydraulics (hydraulics.ts moves it, by name); the wheels on the road
   const g = new THREE.Group(), body = new THREE.Group(), { length: L, width: Wd, belt, wheelZ, wheelR } = CAR, hl = L / 2;
@@ -998,8 +999,6 @@ export function buildCar(): THREE.Group {
   const lit = new THREE.Mesh(throwGeo, glowMaterial('#ffe6bd', GLOW.beam, false, true));
   lit.name = 'beams'; // (the scene ties the throw to speed: parked at the overlook it would searchlight off the cliff)
   g.add(lit); // (on the road, not on the body)
-  // the two of them: him at the wheel (+x: the car's left) in a cap, a hand on it; her, her hair down her back, an arm
-  // that goes up (cast.ts); their heads on pivots at the neck (hers turns to him, his nods): named for the scene
   // his wheel: the rim, two spokes to a chrome hub inside a horn ring, on its column down into the dash
   // (its face toward him: tipped back at the top like a car's, the hub side (local -z) up and back at him, the column
   // (local +z) down and forward into the dash — at -0.9 the hub faced his lap and its back the windshield (the user,
@@ -1010,29 +1009,6 @@ export function buildCar(): THREE.Group {
   for (const a of [0.35, -0.35, Math.PI / 2 + 0.0]) { const spoke = add(new THREE.BoxGeometry(0.36, 0.02, 0.014), dark, 0, 0, 0, wheel); spoke.rotation.z = a; if (a > 1) spoke.scale.x = 0.5, spoke.position.y = -0.09; }
   { const hub = add(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14), trim, 0, 0, -0.01, wheel); hub.rotation.x = Math.PI / 2; }
   { const column = add(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 10), cabin, 0, 0, 0.16, wheel); column.rotation.x = Math.PI / 2; }
-  for (const [x, him] of [[0.44, true], [-0.44, false]] as const) {
-    // (a silhouette with a figure's shape, not a pill: shoulders, a tapered torso, a neck — the user, 2026-10-13)
-    const torso = add(new THREE.CylinderGeometry(him ? 0.2 : 0.16, him ? 0.17 : 0.15, 0.5, 14), dark, x, belt + 0.22, -0.25);
-    torso.scale.z = 0.55;
-    const shoulders = add(new THREE.CapsuleGeometry(him ? 0.075 : 0.065, him ? 0.4 : 0.34, 4, 10), dark, x, belt + 0.47, -0.25); shoulders.rotation.z = Math.PI / 2;
-    add(new THREE.CylinderGeometry(0.05, 0.06, 0.1, 10), dark, x, belt + 0.56, -0.23);
-    const head = new THREE.Group(); head.name = him ? 'hisHead' : 'herHead'; head.position.set(x, belt + 0.66, -0.22); body.add(head);
-    const skull = add(new THREE.SphereGeometry(0.125, 14, 10), dark, 0, 0.1, 0, head); skull.scale.set(0.92, 1.1, 1);
-    if (him) {
-      add(new THREE.SphereGeometry(0.135, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark, 0, 0.17, 0, head); // the cap's crown
-      add(new THREE.BoxGeometry(0.19, 0.022, 0.15), dark, 0, 0.17, 0.15, head); // its brim, forward
-      add(new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8), dark, 0, 0.31, 0, head); // its button
-      const reach = add(new THREE.CapsuleGeometry(0.05, 0.5, 4, 8), dark, x - 0.02, belt + 0.45, 0.1); reach.rotation.x = 1.1; // his arm, to the wheel
-    } else {
-      // her hair: a crown over the head, a fall down her back to the shoulders, a flick at its end
-      const crown = add(new THREE.SphereGeometry(0.15, 14, 10), dark, 0, 0.14, -0.03, head); crown.scale.set(1.05, 0.95, 1.05);
-      const hair = add(new THREE.CapsuleGeometry(0.12, 0.32, 4, 10), dark, 0, -0.1, -0.12, head); hair.scale.set(1.15, 1, 0.55);
-      add(new THREE.SphereGeometry(0.09, 10, 8), dark, 0.06, -0.3, -0.14, head).scale.set(1.4, 0.7, 0.7); // the flick
-      add(new THREE.SphereGeometry(0.05, 10, 8), dark, 0, 0.26, -0.02, head); // a bun on top
-      const arm = new THREE.Group(); arm.name = 'herArm'; arm.position.set(x - 0.2, belt + 0.55, -0.2); body.add(arm);
-      add(new THREE.CapsuleGeometry(0.055, 0.55, 4, 8), dark, 0, -0.3, 0, arm);
-      add(new THREE.SphereGeometry(0.075, 10, 8), dark, 0, -0.62, 0, arm); // her hand
-    }
-  }
+  buildCast(body); // the two of them (look/cast3d.ts)
   return g;
 }

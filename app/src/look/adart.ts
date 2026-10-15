@@ -3,6 +3,7 @@
 // is all shape, no words. Browser only (canvas).
 import type { Ad } from '../drive/ads';
 import { F, font } from '../engine/type';
+import { bustTriangles } from './cast3d';
 
 /** Per ad: its colour field, its headline's colours (sung, the word being sung), and the spotlight behind the product. */
 export const AD_STYLE: Record<Ad, { bg: string; ink: string; now: string; spot: string }> = {
@@ -65,31 +66,81 @@ function star(c: CanvasRenderingContext2D, x: number, y: number, r: number, r2: 
 }
 const rr = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); };
 
+/** His portrait (in the product's 200 x 200 box): the model of him (look/cast3d.ts) posed for it — his shoulders turned
+ *  three-quarters, his head on round toward profile, chin up — seen from a touch below, every face projected flat and
+ *  its tones cut where the light from the side he faces (and a little behind him: his edge catches it) crosses each
+ *  tone's step: posterised along the form, not face by face. Far faces painted first, in runs of a tone. Made once
+ *  (facing right; mirrored to face left). */
+const POSE = { turn: 0.45, below: 0.06, scale: 330, drop: -26, light: [0.75, 0.5, -0.45] as const, steps: [0.06, 0.52] };
+const TONE = { dark: '#16131a', mid: '#5a1c3c', edge: '#c8102e', gold: '#f6c445', goldDark: '#b8862a' };
+type Corner = [number, number, number]; // x, y on the page; the light there
+/** The part of a polygon where f(light) >= 0 (f linear in the light: a tone's step). */
+function keep(poly: Corner[], f: (l: number) => number): Corner[] {
+  const out: Corner[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!, b = poly[(i + 1) % poly.length]!, fa = f(a[2]), fb = f(b[2]);
+    if (fa >= 0) out.push(a);
+    if ((fa >= 0) !== (fb >= 0)) { const u = fa / (fa - fb); out.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u]); }
+  }
+  return out;
+}
+let portraitCache: { paths: { path: Path2D; color: string }[]; glints: [number, number][] } | null = null;
+function portrait() {
+  if (portraitCache) return portraitCache;
+  const { pos, nrm, tone, part } = bustTriangles(), P = POSE, cy = Math.cos(P.turn), sy = Math.sin(P.turn), cp = Math.cos(-P.below), sp = Math.sin(-P.below);
+  const ll = Math.hypot(...P.light), [lx, ly, lz] = P.light.map((v) => v / ll) as [number, number, number];
+  // every corner on the page (X right, Y down, in the box's units), its depth toward the eye (m) and its light
+  const n = pos.length / 9, X = new Float32Array(n * 3), Y = new Float32Array(n * 3), Z = new Float32Array(n * 3), Lt = new Float32Array(n * 3), Nz = new Float32Array(n * 3);
+  const view = (x: number, y: number, z: number) => { const x1 = x * cy + z * sy, z1 = -x * sy + z * cy; return [x1, y * cp - z1 * sp, y * sp + z1 * cp] as const; };
+  for (let i = 0; i < n * 3; i++) {
+    const [x, y, z] = view(pos[i * 3]!, pos[i * 3 + 1]!, pos[i * 3 + 2]!), [nx, ny, nz] = view(nrm[i * 3]!, nrm[i * 3 + 1]!, nrm[i * 3 + 2]!);
+    X[i] = x * P.scale; Y[i] = -y * P.scale + P.drop; Z[i] = z; Nz[i] = nz; Lt[i] = nx * lx + ny * ly + nz * lz;
+  }
+  const tris: { i: number; z: number }[] = [], glint = new Map<number, [number, number, number, number]>(), all = new Path2D();
+  for (let t = 0; t < n; t++) {
+    const a = t * 3, b = a + 1, d = a + 2;
+    if (Y[a]! > 110 && Y[b]! > 110 && Y[d]! > 110) continue; // (below the bust's foot)
+    // (each face wound the same way on the page: one fill of them all is his silhouette)
+    const area = (X[b]! - X[a]!) * (Y[d]! - Y[a]!) - (X[d]! - X[a]!) * (Y[b]! - Y[a]!), [p, q] = area > 0 ? [b, d] : [d, b];
+    all.moveTo(X[a]!, Y[a]!); all.lineTo(X[p]!, Y[p]!); all.lineTo(X[q]!, Y[q]!); all.closePath();
+    if (Nz[a]! + Nz[b]! + Nz[d]! <= 0) continue; // (only the faces turned to the eye are toned)
+    tris.push({ i: a, z: (Z[a]! + Z[b]! + Z[d]!) / 3 });
+    if (tone[t] === 'lens') { const g = glint.get(part[t]!) ?? glint.set(part[t]!, [0, 0, 0, 0]).get(part[t]!)!; g[0] += X[a]!; g[1] += Y[a]!; g[2] += Z[a]!; g[3]++; }
+  }
+  tris.sort((u, w) => u.z - w.z);
+  const paths: { path: Path2D; color: string }[] = [{ path: all, color: TONE.dark }];
+  const put = (poly: Corner[], color: string) => {
+    if (poly.length < 3) return;
+    let run = paths[paths.length - 1]!;
+    if (run.color !== color || run.path === all) paths.push((run = { path: new Path2D(), color }));
+    run.path.moveTo(poly[0]![0], poly[0]![1]); for (let k = 1; k < poly.length; k++) run.path.lineTo(poly[k]![0], poly[k]![1]); run.path.closePath();
+  };
+  for (const { i } of tris) {
+    const tri: Corner[] = [i, i + 1, i + 2].map((k) => [X[k]!, Y[k]!, Lt[k]!]), k = tone[i / 3]!;
+    if (k === 'lens') { put(tri, TONE.dark); continue; }
+    const [lo, hi] = k === 'gold' ? [-0.1, Infinity] : P.steps, [c0, c1, c2] = k === 'gold' ? [TONE.goldDark, TONE.gold, TONE.gold] : [TONE.dark, TONE.mid, TONE.edge];
+    put(keep(tri, (l) => lo - l), c0);
+    put(keep(keep(tri, (l) => l - lo), (l) => hi - l), c1);
+    if (hi < Infinity) put(keep(tri, (l) => l - hi), c2);
+  }
+  return (portraitCache = { paths, glints: [...glint.values()].sort((u, w) => w[2] / w[3] - u[2] / u[3]).slice(0, 1).map((g) => [g[0] / g[3], g[1] / g[3]] as [number, number]) }); // (the near lens's: the far one's behind his nose)
+}
+
 /** Each ad's product in a 200 x 200 box round (0, 0); `seed` (an integer: the board's place in its line) varies the
- *  ones that have variants (his bust's pose), neighbours differing. */
+ *  ones that have variants (his portrait's turn and crop), neighbours differing. */
 const PRODUCT: Record<Ad, (c: CanvasRenderingContext2D, seed: number) => void> = {
-  him: (c, seed) => { // him: a campaign bust, posterised — his silhouette (the cast's: the cap, the chain) cut in two
-    // tones with a lit edge, his shades the only thing in his face; no drawn face (one read as someone else), no mark
-    // (the crown-and-shades badge "wasn't doing it" — the user, 2026-10-14); turned left or right, close or not, per poster
+  him: (c, seed) => { // him: his campaign portrait, the man in the car (look/cast3d.ts) — the same cap, profile and shoulders
+    // drawn from the same model, cut in three tones with a lit edge, his chain and his shades' gold the only bright things
+    // (the user, 2026-10-14: "a dark silhouetted type of person that kind of matches the guy in the car"); turned left or
+    // right, close or not, per poster
     const v = Math.floor(seed), dir = v % 2 ? -1 : 1, close = v % 3 === 2;
     c.save(); if (close) { c.translate(0, 22); c.scale(1.3, 1.3); }
-    const bust = () => {
-      c.beginPath(); c.moveTo(-98, 104); c.lineTo(-98, 72); c.quadraticCurveTo(-92, 44, -58, 36); c.lineTo(-26, 28); c.lineTo(-18, 6); // the shoulders, the neck
-      c.lineTo(-18, -8); c.quadraticCurveTo(-40, -22, -38, -48); c.quadraticCurveTo(-36, -84, 0, -86); c.quadraticCurveTo(36, -84, 38, -48); c.quadraticCurveTo(40, -22, 18, -8); // the head
-      c.lineTo(18, 6); c.lineTo(26, 28); c.lineTo(58, 36); c.quadraticCurveTo(92, 44, 98, 72); c.lineTo(98, 104); c.closePath();
-    };
-    const cap = () => { c.beginPath(); c.ellipse(0, -68, 42, 24, 0, Math.PI, 0); c.lineTo(dir * 70, -62); c.quadraticCurveTo(dir * 72, -54, dir * 60, -52); c.lineTo(dir * 36, -56); c.closePath(); }; // its crown and brim, forward
-    c.fillStyle = '#16131a'; bust(); c.fill(); cap(); c.fill();
-    c.save(); bust(); c.clip(); c.fillStyle = '#5a1c3c'; c.fillRect(dir > 0 ? 8 : -100, -100, 92, 210); c.fillStyle = '#c8102e'; c.fillRect(dir > 0 ? 30 : -38, -100, 8, 210); c.restore(); // the lit side, its edge
-    c.save(); cap(); c.clip(); c.fillStyle = '#5a1c3c'; c.fillRect(dir > 0 ? 8 : -100, -100, 92, 210); c.restore();
-    // his shades: two lenses in a thin gold frame, a glint
-    c.fillStyle = '#16131a'; for (const x of [-16, 16]) { c.beginPath(); c.ellipse(x + dir * 4, -46, 15, 10, 0, 0, Math.PI * 2); c.fill(); }
-    c.strokeStyle = '#f6c445'; c.lineWidth = 2.5; for (const x of [-16, 16]) { c.beginPath(); c.ellipse(x + dir * 4, -46, 15, 10, 0, 0, Math.PI * 2); c.stroke(); }
-    c.beginPath(); c.moveTo(-2 + dir * 4, -48); c.lineTo(2 + dir * 4, -48); c.stroke();
-    c.fillStyle = 'rgba(255,255,255,0.55)'; for (const x of [-16, 16]) { c.beginPath(); c.ellipse(x + dir * 4 - 5, -50, 5, 3, -0.5, 0, Math.PI * 2); c.fill(); }
-    // a rope chain on his chest, a plate on it
-    c.strokeStyle = '#f6c445'; c.lineWidth = 6; c.setLineDash([7, 4]); c.beginPath(); c.moveTo(-30, 30); c.quadraticCurveTo(0, 86, 30, 30); c.stroke(); c.setLineDash([]);
-    c.fillStyle = '#f6c445'; rr(c, -13, 62, 26, 16, 4); c.fillStyle = '#16131a'; c.font = 'bold 12px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('BMF', 0, 70);
+    c.beginPath(); c.rect(-200, -200, 400, 304); c.clip(); // (his chest cut off level at the foot, a bust)
+    c.scale(dir, 1);
+    const { paths, glints } = portrait();
+    c.lineWidth = 0.6; c.lineJoin = 'round';
+    for (const { path, color } of paths) { c.fillStyle = c.strokeStyle = color; c.fill(path); c.stroke(path); }
+    c.fillStyle = 'rgba(255,255,255,0.6)'; for (const [x, y] of glints) { c.beginPath(); c.ellipse(x - 2.5, y - 2, 3.2, 1.8, -0.5, 0, Math.PI * 2); c.fill(); } // his shades' glint
     c.restore();
   },
   sale: (c) => { // a hardware store's poster: a hammer and a wrench crossed behind a SALE burst, the deal on a tag under it
