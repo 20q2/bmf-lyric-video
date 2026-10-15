@@ -13,8 +13,9 @@
 //             far end of a building's long sunset shadow. Every tap follows the receiver's own plane (its depth slope
 //             from the derivatives), so a wide kernel on a face the light grazes doesn't shadow itself.
 //   print     the soft edge printed as halftone dots (the print pass's screen and angle): solid in the core, dots
-//             thinning out across the penumbra. The surface turned from the light takes the same tone (one shadow
-//             ink for form and cast shadows, and no acne where the map can't decide).
+//             thinning out across the penumbra. The shade is a warm tone of the lit colour (look/toon.ts), not the
+//             light taken away: under a low sun that left next to nothing (the user, 2026-10-14: too dark at dusk).
+//             Faces turned from the light are the toon ramp's dark band and take no cast shadow on top.
 //   moon      after sunset the same maps follow the moon (scenes/drive.ts aims them): the car and the props stay on
 //             the ground by night.
 // The lights that carry the maps are dark (intensity 0): three renders and binds their maps, the patch below reads
@@ -28,6 +29,8 @@ export const CASCADES = [
   { half: 45, ahead: 34 },
   { half: 200, ahead: 150 },
 ] as const;
+/** The cascades move out along the view at most this far (m) to where the frame's foot meets the ground. */
+const GROUND_REACH = 120;
 /** The maps' light stands this far back from a cascade's centre and sees this deep (m). */
 const RANGE = { back: 600, depth: 1500 };
 /** The light's apparent radius, as penumbra (m) per metre the blocker stands above (the sun's is ~0.0047: three times
@@ -36,9 +39,12 @@ const RANGE = { back: 600, depth: 1500 };
  *  looked for (m: past the widest penumbra); the depth bias (m) and the normal offset (texels); how far (m) a face
  *  turned just off the light looks past its own depth; the steepest receiver slope followed (depth per depth). */
 export const SOFT = { tan: 0.014, min: 0.012, max: 0.22, search: 0.5, bias: 0.04, normal: 1.5, away: 0.6, slope: 30 };
-/** Faces turned from the light print in shadow from the first N.L to solid by the second (the toon ramp's dark band
- *  starts at -1/3: look/toon.ts). */
-const FORM = [-0.336, -0.330] as const;
+/** Faces turned further from the light than this N.L are the toon ramp's dark band (look/toon.ts): no cast shadow on
+ *  them. */
+const FORM = -0.333;
+/** Casters further than these (m along the light) cast fainter, then not at all: shade from out of shot, up to the
+ *  far end of a long sunset shadow, fades (the user, 2026-10-14: shade at a low sun was too dark and too dominant). */
+const FADE = [160, 320] as const;
 /** The halftone screen the penumbra is printed in (logical px a cell: the print pass's, look/print.ts). */
 const CELL = 5.5;
 
@@ -83,7 +89,10 @@ float shadeIn( sampler2DShadow m, vec3 c, vec4 k, float lift, vec2 gm ) {
   pen = max( pen, 1.2 * k.z );
   float s = 0.0;
   for ( int i = 0; i < 16; i ++ ) s += shadeTap( m, c, g, SHADE_PCF[ i ] * pen, 0.0 );
-  return s / 16.0;
+  // (a caster far off along the light — a headland a few hundred metres up the coast, under a sun a few degrees up —
+  // threw the whole frame into shade from somewhere out of shot: its shadow fades out between these reaches)
+  float gone = 0.5 * ( shadeOver( m, c, g, r, ${FADE[0].toFixed(1)} * k.y ) + shadeOver( m, c, g, r, ${FADE[1].toFixed(1)} * k.y ) ) / f0;
+  return mix( s / 16.0, 1.0, clamp( gone, 0.0, 1.0 ) );
 }
 float shadeEdge( vec3 c ) { vec2 d = min( c.xy, 1.0 - c.xy ); return min( min( d.x, d.y ), 1.0 - c.z ); }
 // the receiver's depth slope (depth units per metre across the light), from the finest map's coordinates' derivatives
@@ -125,26 +134,32 @@ float shadeLit = 1.0, printLit = 1.0;
   vec2 shadeGm = shadeSlope();
   if ( receiveShadow ) {
     float nl = dot( normal, normalize( ( viewMatrix * vec4( shadeDir, 0.0 ) ).xyz ) );
-    // (the toon ramp's dark band, turned well away, is in shadow; a face turned only a little from the light is in
-    // the map itself, so it looks past its own depth: lit unless something else is over it)
-    float form = smoothstep( ${FORM[0].toFixed(3)}, ${FORM[1].toFixed(3)}, nl );
-    shadeLit = form > 0.0 ? min( form, shadeLight( ${SOFT.away.toFixed(2)} * ( 1.0 - smoothstep( 0.0, 0.15, nl ) ), shadeGm ) ) : 0.0;
-    // (a trace of shadow leaves no dots, a near-full one prints solid: no stray dot fields across a lit face)
-    printLit = 1.0 - shadeDots( smoothstep( 0.12, 0.92, 1.0 - shadeLit ) );
+    // (a face turned well away from the light is the toon ramp's dark band already: its form shadow is the ramp's, so
+    // it takes no cast shadow on top — twice darkened it went near black. A face turned only a little from the light
+    // is in the map itself, so it looks past its own depth: lit unless something else is over it)
+    if ( nl > ${FORM.toFixed(3)} ) {
+      shadeLit = shadeLight( ${SOFT.away.toFixed(2)} * ( 1.0 - smoothstep( 0.0, 0.15, nl ) ), shadeGm );
+      // (a trace of shadow leaves no dots, a near-full one prints solid: no stray dot fields across a lit face)
+      printLit = 1.0 - shadeDots( smoothstep( 0.12, 0.92, 1.0 - shadeLit ) );
+    }
   }
 #endif
 `;
 
 const DIR_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
 const DIR_SHADOW = /\n\s*#if defined\( USE_SHADOWMAP \) && \( UNROLLED_LOOP_INDEX < NUM_DIR_LIGHT_SHADOWS \)\n\s*directionalLightShadow = directionalLightShadows\[ i \];\n\s*directLight\.color \*= [^\n]*\n\s*#endif/;
-/** three's lights chunk with the directional lights masked by `lit` (and their own shadow lookups gone: the maps'
- *  lights are dark, the sun and moon cast nothing). */
-function lightsChunk(lit: string): string {
+/** three's lights chunk with the directional lights' own shadow lookups gone (the maps' lights are dark, the sun and
+ *  moon cast nothing), and their light masked by `lit` if given. Only the directional loop is touched: point and spot
+ *  lights (the tunnel's sodium lamps, the headlights) light every material as three lights them. */
+function lightsChunk(lit?: string): string {
   const src = THREE.ShaderChunk.lights_fragment_begin;
   if (!src.includes(DIR_INFO) || !DIR_SHADOW.test(src)) throw new Error('look/shadows: three.js lights chunk changed');
-  return LIT + src.replace(DIR_SHADOW, '').replace(DIR_INFO, `${DIR_INFO}\n\t\tdirectLight.color *= ${lit};`);
+  const out = LIT + src.replace(DIR_SHADOW, '');
+  return lit ? out.replace(DIR_INFO, `${DIR_INFO}\n\t\tdirectLight.color *= ${lit};`) : out;
 }
-const CHUNK = { print: lightsChunk('printLit'), smooth: lightsChunk('shadeLit') };
+/** (printed: the light stays, the shade is printed over it as a tone of the lit colour (look/toon.ts) — taking the
+ *  light away as well went near black under a low sun, where it's nearly all the light there is) */
+const CHUNK = { print: lightsChunk(), smooth: lightsChunk('shadeLit') };
 
 /** Patches a lit material's shader to take the cascades' shadows: printed (dots, solid core) or, for the hero's own
  *  light, smooth. Returns the fragment shader's source; the caller adds its tone after the lights if it prints. */
@@ -173,15 +188,21 @@ export class Cascades {
   }
   get objects(): THREE.Object3D[] { return this.lights.flatMap((l) => [l, l.target]); }
 
-  /** Round the lens's view, from `toLight` (unit). */
-  update(cam: THREE.Camera, toLight: THREE.Vector3) {
+  /** Round the lens's view of the ground (at height `ground`), from `toLight` (unit). */
+  update(cam: THREE.PerspectiveCamera, toLight: THREE.Vector3, ground: number) {
     SHADE_DIR.value.copy(toLight);
     const view = new THREE.Vector3(); cam.getWorldDirection(view);
+    // (the cascades start where the frame's foot meets the ground, not at the lens: a camera high over the road
+    // looking down — chorus 2's top-down take, ~30 m up — sees nothing nearer, and its fine cascades were spent on
+    // air, leaving the road to the coarse far one: stair-stepped edges)
+    const camUp = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    const foot = view.clone().multiplyScalar(Math.cos((cam.fov * Math.PI) / 360)).addScaledVector(camUp, -Math.sin((cam.fov * Math.PI) / 360));
+    const near = foot.y < -1e-3 ? Math.min(GROUND_REACH, ((cam.position.y - ground) / -foot.y) * foot.dot(view)) : 0;
     const lz = toLight.clone().normalize(), up = Math.abs(lz.y) > 0.99 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     const lx = up.cross(lz).normalize(), ly = lz.clone().cross(lx);
     this.lights.forEach((l, i) => {
       const { half, ahead } = CASCADES[i]!, texel = (2 * half) / this.size, snap = (v: number) => Math.round(v / texel) * texel;
-      const c = cam.position.clone().addScaledVector(view, ahead);
+      const c = cam.position.clone().addScaledVector(view, Math.max(0, near) + ahead);
       // (snapped to its texels in the light's frame: edges stay put as the camera moves. The three coordinates are
       // read before c is rebuilt: the old map's snap read them off the half-rebuilt vector, which threw its square tens
       // of metres off the view — why whole shots had no shadows)

@@ -312,7 +312,7 @@ export default class DriveScene extends Scene {
     // the sun lights from no lower than 4° (its shadows stay finite), fading out as it sets
     const lightDir = this.sunAz.clone().multiplyScalar(Math.cos(Math.max(e, 4 * DEG))).add(new THREE.Vector3(0, Math.sin(Math.max(e, 4 * DEG)), 0));
     // the shadows round the lens's view: the sun's, and once it's down (both lights near nothing) the moon's
-    this.shade.update(this.cam, e > SHADE_SWITCH ? lightDir.clone().normalize() : moonDir);
+    this.shade.update(this.cam, e > SHADE_SWITCH ? lightDir.clone().normalize() : moonDir, cf.pos.y);
     this.sun.position.copy(cf.pos).addScaledVector(lightDir, 500);
     this.sun.target.position.copy(cf.pos);
     this.sun.color.copy(sunColor);
