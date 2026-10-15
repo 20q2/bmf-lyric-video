@@ -9,9 +9,9 @@
 //   "I'm just tryna hear you say my name"     the theatre's marquee, out over the sidewalk (left)
 //   "Love to play your ruler, be your Jane"   the tiki bar's big sign on its roof at the corner, turned to face the
 //   "You could be my Tarzan, toss me up"      traffic coming up the strip (right): the one sign, filling row by row
-//   "Other hoes is lacking, call me up"       the hotel's neon between its floors, the payphones at its kerb (left)
-//   "Know my baby packing, why I'm stuck"     the pawn shop's fascia, the three gold balls over it (left)
-//   "That's why he my man"                    the wedding chapel's heart, the camera rising off it (left)
+//   "Other hoes is lacking, call me up"       the hotel's neon between its floors, the payphones on its wall (left)
+//   "Know my baby packing, why I'm stuck"     the pawn shop's board, under its big PAWN sign (left)
+//   "That's why he my man"                    the wedding chapel's neon by its heart, the camera rising off it (left)
 // Five moving takes, cut between lines (never in one): along the right sidewalk as the car slows past, low by the kerb
 // as it crosses the frame under the marquee, behind it up the street to the corner, a crane along the hotel and the
 // pawn shop, and up off the chapel. Pure.
@@ -45,7 +45,8 @@ export const SHOPS: readonly { theme: Theme; kind: Kind; side: -1 | 1; ahead: nu
   { theme: 'marquee', kind: 'marquee', side: -1, ahead: 3, w: 15, h: 12.6, mount: 'marquee', scale: 1.8, y: 5.3 },
   { theme: 'tiki', kind: 'neon', side: 1, ahead: 6, w: 11, h: 4.4, mount: 'cross', scale: 0.64, y: 1.6 },
   { theme: 'phone', kind: 'neon', side: -1, ahead: 6, w: 12, h: 11.2, mount: 'wall', scale: 0.5, y: 5.6 },
-  { theme: 'pawn', kind: 'storefront', side: -1, ahead: 6, w: 11, h: 7.6, mount: 'fascia', scale: 0.62, y: 4.6 },
+  // (the pawn shop a storey taller: its big PAWN box sign stands on its wall over the board, under its parapet)
+  { theme: 'pawn', kind: 'storefront', side: -1, ahead: 6, w: 11, h: 9.6, mount: 'fascia', scale: 0.62, y: 4.6 },
   { theme: 'chapel', kind: 'neon', side: -1, ahead: 5, w: 13, h: 8.2, mount: 'wall', scale: 0.55, y: 5.4 },
 ];
 /** Which business each of the verse's lines is on. */
@@ -93,6 +94,15 @@ export interface Verse3Plan {
   span: [number, number];
   /** When the verse starts and ends (s). */
   t: [number, number];
+}
+
+/** A lot's building as a block. The set's own (`prop`): the town's materials light every window the same warm white
+ *  and paint its signs in full colour, which pulled the eye off the lines' neon (the user, 2026-10-15: "the whites
+ *  especially are really pulling our attention away from the pinks ... desaturate the rest"), so the scene builds
+ *  these fronts (scenes/sets/verse3.ts) from the same geometry with the strip's own muted glass and signs. */
+export function lotBlock(route: SetContext['route'], L: Lot, i: number): Block {
+  const lateral = L.side * (STREET.front + L.d / 2), lift = route.frameAt(L.s).pos.y + 0.4;
+  return { s: L.s, lateral, w: L.w, h: L.h, d: L.d, color: hash(i, 311), bare: true, prop: true, matrix: boxAt(route, L.s, lateral, L.d, L.h + lift, L.w, -lift) };
 }
 
 export const VERSE3: SetPiece = {
@@ -236,11 +246,9 @@ export const VERSE3: SetPiece = {
       ids.forEach((id, i) => frames.set(id, { to: take.to, move: i ? 'snap' : 'cut' }));
     }
 
-    // ---- the buildings: the town's fronts (world.ts builds them), the businesses' bare of the town's awnings ----
-    const blocks: Block[] = lots.map((L, i) => {
-      const lateral = L.side * (STREET.front + L.d / 2), lift = route.frameAt(L.s).pos.y + 0.4;
-      return { s: L.s, lateral, w: L.w, h: L.h, d: L.d, color: hash(i, 311), ...(L.shop !== undefined ? { bare: true } : {}), matrix: boxAt(route, L.s, lateral, L.d, L.h + lift, L.w, -lift) };
-    });
+    // ---- the buildings: the guard's boxes; the scene builds their fronts (the town's, look/facades.ts, in the strip's
+    // own night colours) ----
+    const blocks: Block[] = lots.map((L, i) => lotBlock(route, L, i));
     // (the town keeps off the strip: its fronts are these)
     const clear = [-1, 1].map((side) => ({ side, a: span[0] - 2, b: (side > 0 ? rightEnd : span[1]) + 2 }));
     const openings = [-1, 1].map((side) => ({ side, a: cross[0], b: cross[1] }));
