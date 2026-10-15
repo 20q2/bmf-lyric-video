@@ -114,10 +114,13 @@ export const CHORUS2: SetPiece = {
     const gf = route.frameAt(gantryS), gn = flat(gf.fwd).negate(), pw = GANTRY.panel, span = gps.length * pw + (gps.length - 1) * GANTRY.gap;
     const mid = (GANTRY.legs[0] + GANTRY.legs[1]) / 2;
     const panels: Panel[] = [];
+    // (every panel hung from the beam, their tops level: bottom-aligned, the one-row "The boy" hung in the air under
+    // the beam with sky between — the user, 2026-10-14: "floating in the sky and needs to be anchored")
+    const top = GANTRY.bottom + Math.max(...gps.map((ph) => layout('freeway', ph.text, ph.solo).h));
     gps.forEach((ph, i) => {
       // (left to right as they're read: from the car, its right is the screen's)
       const lateral = mid - span / 2 + pw / 2 + i * (pw + GANTRY.gap), lay = layout('freeway', ph.text, ph.solo);
-      const center = atRoad(gantryS, lateral, GANTRY.bottom + lay.h / 2);
+      const center = atRoad(gantryS, lateral, top - lay.h / 2);
       panels.push({ center, normal: gn, up: UP.clone(), w: lay.w, h: lay.h });
       add('freeway', ph, `L${ph.line}.${i}`, gantryS, center, gn, UP.clone(), lay);
     });

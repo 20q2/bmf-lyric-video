@@ -227,7 +227,7 @@ export default class DriveScene extends Scene {
     const bodyM = new THREE.Matrix4().compose(new THREE.Vector3(0, lift, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(st.pitch, 0, st.roll)), new THREE.Vector3(1, 1, 1));
     for (const [o, local, ahead] of this.riding) o.matrix.multiplyMatrices(ahead ? carMatrix(d.carFrame(t, ahead)) : carMatrix(cf).multiply(bodyM), local);
     for (const set of this.sets) set.update(t, this.car);
-    (this.car.userData.dash as ReturnType<typeof buildDash> | undefined)?.update(t, this.ctx.audio.duration, d.motion.speedAt(t));
+    (this.car.userData.dash as ReturnType<typeof buildDash> | undefined)?.update(t, this.ctx.audio.duration, d.motion.speedAt(t), f.a.kick);
     // banners where they've flown to; each plane in the sky only around its line
     for (const [c, o] of this.flying) {
       const line = this.ctx.lyrics.lines[c.phrase.line]!;

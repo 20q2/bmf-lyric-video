@@ -86,8 +86,11 @@ function gauge(label: string): THREE.CanvasTexture {
   return t;
 }
 
+/** How far the gauges' needles kick on the kick drum (radians at a full kick: about four miles an hour). */
+const NEEDLE_KICK = 0.09;
+
 /** Fits the cabin into the car's body: returns what the scene runs each frame. */
-export function buildDash(body: THREE.Group): { update(t: number, duration: number, speed: number): void } {
+export function buildDash(body: THREE.Group): { update(t: number, duration: number, speed: number, kick?: number): void } {
   const chrome = heroChrome(), dark = toon({ color: '#0d0b10' }), trim = toon({ color: WORLD.chrome });
   // the head unit in its housing, set into the dash's fascia (world.ts buildCar), a chrome rim round its screen (toon:
   // the hero's chrome caught the sun as a bright post under the screen)
@@ -167,11 +170,12 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
     flap.add(board); body.add(flap); flaps.push(flap);
   }
   return {
-    update(t, duration, speed) {
+    update(t, duration, speed, kick = 0) {
       hu.update(t, duration);
-      // (the speedo reads their speed, the tach climbs with it, wobbling)
-      needles[0]!.rotation.z = Math.PI * 0.75 - Math.min(1, speed / 40) * Math.PI * 1.5;
-      needles[1]!.rotation.z = Math.PI * 0.75 - Math.min(1, 0.15 + speed / 60 + 0.03 * Math.sin(t * 7)) * Math.PI * 1.5;
+      // (the speedo reads their speed, the tach climbs with it, wobbling; both needles kick up a hair on the kick drum —
+      // the user, 2026-10-14: "bouncing, not radically, just slightly with the beat")
+      needles[0]!.rotation.z = Math.PI * 0.75 - Math.min(1, speed / 40) * Math.PI * 1.5 - NEEDLE_KICK * kick;
+      needles[1]!.rotation.z = Math.PI * 0.75 - Math.min(1, 0.15 + speed / 60 + 0.03 * Math.sin(t * 7)) * Math.PI * 1.5 - 0.6 * NEEDLE_KICK * kick;
     },
   };
 }
