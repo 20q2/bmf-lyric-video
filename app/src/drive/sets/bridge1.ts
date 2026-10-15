@@ -38,8 +38,20 @@ const PAINT = { y1: 3.9, y2: 3.6 };
  *  overhead sign; red from the word "crash" until `calm` s after it. */
 export const SIGNALS = { y: 5.85, step: 46, clear: 16, calm: 1.5 };
 
+/** Jet fans hung in pairs under the ceiling (the user, 2026-10-15: the bore a "real, built LA tunnel"): either side of
+ *  the centre line this far, their axis this high (m), their drum's radius and length; a pair every `every` m or so,
+ *  none in a shot's way (between the lens and a lyric) nor within `clear` m of the lens. */
+export const FANS = { x: 2.9, y: TUNNEL.h - 0.8, r: 0.55, len: 3.6, every: 52, clear: 1.5 };
+/** The oncoming traffic in the other lane (m off the centre line, m/s): a car about every `gap` s, its box (across,
+ *  high, along; m) — none passing between the lens and a lyric while it's sung, nor within `over` m under the lens. */
+export const ONCOMING = { lane: -1.9, v: 19, gap: 2.6, box: [2, 1.5, 4.8] as const, over: 4.5 };
+
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Bridge1Plan {
+  /** The jet fans' pairs (m along the road). */
+  fans: number[];
+  /** The oncoming cars: when each enters the bore at its far mouth (s); then on at ONCOMING.v toward the near one. */
+  oncoming: number[];
   /** The overhead signs (m along the road; the whole stack's face). */
   panels: { s: number; face: Face }[];
   /** The signals (m along the road), when they flip red and when they calm back to green (s). */
@@ -110,11 +122,14 @@ export const BRIDGE1: SetPiece = {
     };
     // one take: every phrase in it framed by the same curve through its keyframes (a phrase's own shot within the take
     // moves nowhere: the take carries on); cut to at its first phrase
+    const takes: { t0: number; phs: Phrase[]; eye: (t: number) => THREE.Vector3 }[] = [];
     const take = (phs: Phrase[], keys: Key[]) => {
       const ts = keys.map((k) => k.t), curve = (pick: (k: Key) => Bore) => [0, 1, 2].map((i) => monotone(ts, keys.map((k) => pick(k)[i]!)));
       const eye = curve((k) => k.eye), aim = curve((k) => k.at);
-      const to: Target = (t) => poseFrom(at([eye[0]!(t), eye[1]!(t), eye[2]!(t)]), at([aim[0]!(t), aim[1]!(t), aim[2]!(t)]));
+      const eyeAt = (t: number) => at([eye[0]!(t), eye[1]!(t), eye[2]!(t)]);
+      const to: Target = (t) => poseFrom(eyeAt(t), at([aim[0]!(t), aim[1]!(t), aim[2]!(t)]));
       phs.forEach((ph, i) => frames.set(carriers.find((c) => c.phrase === ph)!.id, { to, move: i ? 'snap' : 'cut' }));
+      takes.push({ t0: keys[0]!.t, phs, eye: eyeAt });
     };
     const W0 = -TUNNEL.halfW; // (aims on the left wall's face)
 
@@ -175,8 +190,60 @@ export const BRIDGE1: SetPiece = {
       if (panels.some((p) => Math.abs(p.s - s) < SIGNALS.clear)) continue;
       signals.push(s);
     }
+    // the props that move or hang in the bore's air (the fans, the oncoming cars) kept out of the shots: none between
+    // the lens and any corner of a lyric while it's sung, nor where the lens passes (a box in the road's frame at s:
+    // across, up, along from its centre)
+    const boxAround = (s: number, x: number, y: number, half: THREE.Vector3) => {
+      const f = route.frameAt(s), m = new THREE.Matrix4().makeBasis(flat(f.right.clone()), UP, flat(f.fwd.clone())).setPosition(at([s, x, y]));
+      return { inv: m.invert(), box: new THREE.Box3(half.clone().negate(), half.clone()) };
+    };
+    const ray = new THREE.Ray(), hit = new THREE.Vector3();
+    const views = takes.flatMap((tk) => tk.phs.map((ph) => {
+      const c = carriers.find((k) => k.phrase === ph)!, a = c.up.clone().cross(c.normal).normalize();
+      const pts = [[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]].map(([u, v]) => c.center.clone().addScaledVector(a, (u! * c.w) / 2).addScaledVector(c.up, (v! * c.h) / 2));
+      return { from: ph.start, to: ph.end, eye: tk.eye, pts };
+    }));
+    const inShot = (b: { inv: THREE.Matrix4; box: THREE.Box3 }, t: number) => views.some((v) => {
+      if (t < v.from || t > v.to) return false;
+      const e = v.eye(t).applyMatrix4(b.inv);
+      return v.pts.some((p) => {
+        const q = p.clone().applyMatrix4(b.inv), d = q.clone().sub(e), len = d.length();
+        ray.set(e, d.divideScalar(len));
+        return !!ray.intersectBox(b.box, hit) && hit.distanceTo(e) < len;
+      });
+    });
+    const lensAt = (t: number) => { const tk = takes.filter((k) => k.t0 <= t).pop(); return tk?.eye(t); };
+    const tick = 1 / 30, frameTimes: number[] = [];
+    for (let t = st.start; t < st.end; t += tick) frameTimes.push(t);
+    // the fans: a pair every so often, clear of the signs, the signals and the mouths, never in a shot
+    const fans: number[] = [];
+    for (let s = s0 + 30; s < s1 - 25; s += FANS.every) {
+      if (panels.some((p) => Math.abs(p.s - s) < 16) || signals.some((g) => Math.abs(g - s) < 9)) continue;
+      const pair = [-1, 1].map((side) => boxAround(s, side * FANS.x, FANS.y, new THREE.Vector3(FANS.r + 0.2, FANS.r + 0.2, FANS.len / 2 + 0.3)));
+      const near = pair.map((b) => ({ inv: b.inv, box: b.box.clone().expandByScalar(FANS.clear) }));
+      if (frameTimes.some((t) => pair.some((b) => inShot(b, t)) || near.some((b) => { const e = lensAt(t); return !!e && b.box.containsPoint(e.applyMatrix4(b.inv)); }))) continue;
+      fans.push(s);
+    }
+    // the oncoming cars: one about every `gap` s, each entering at the far mouth and on down the other lane; a car that
+    // would cross a shot is held back a little
+    const oncoming: number[] = [];
+    const B = ONCOMING.box, half = new THREE.Vector3(B[0] / 2, B[1] / 2, B[2] / 2), sAt = (enter: number, t: number) => s1 + 3 - ONCOMING.v * (t - enter);
+    for (let enter = st.start - (s1 - s0) / ONCOMING.v, k = 0; enter < st.end; k++) {
+      let ok = false;
+      for (let tries = 0; tries < 30 && !ok; tries++, enter += 0.1) {
+        // (nor passing right under the lens: from over the other lane a roof filled the frame's foot)
+        ok = !frameTimes.some((t) => {
+          const s = sAt(enter, t);
+          if (s < s0 - 4 || s > s1 + 4) return false;
+          const b = boxAround(s, ONCOMING.lane, B[1] / 2, half), e = lensAt(t);
+          return inShot(b, t) || (!!e && b.box.clone().expandByVector(new THREE.Vector3(0.3, ONCOMING.over, 0.5)).containsPoint(e.applyMatrix4(b.inv)));
+        });
+      }
+      if (ok) oncoming.push(enter);
+      enter += ONCOMING.gap * (0.6 + 0.8 * ((k * 0.618) % 1));
+    }
     carriers.sort((a, b) => a.phrase.start - b.phrase.start);
-    const plan: Bridge1Plan = { panels, signals, crashAt, calm: crashAt + SIGNALS.calm, s0, s1 };
+    const plan: Bridge1Plan = { fans, oncoming, panels, signals, crashAt, calm: crashAt + SIGNALS.calm, s0, s1 };
     return { carriers, frames, clear: [], blocks: [], plan };
   },
 };

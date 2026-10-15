@@ -10,7 +10,7 @@ import { dwellFor } from '../src/drive/phrases';
 import { CABIN, CAR_BOX, REVEAL_AHEAD, makeDrive } from '../src/drive/drive';
 import { LEAD, SNAP_S } from '../src/drive/shots';
 import { dissolveAt, revealAt } from '../src/drive/dissolve';
-import { TUNNEL, TUNNEL_CLEAR, nearTunnel } from '../src/drive/tunnel';
+import { HEADLAND, TUNNEL, TUNNEL_CLEAR, headlandAt, nearTunnel } from '../src/drive/tunnel';
 import { SHOULDER, SLOPE } from '../src/drive/world';
 import { AUDIBLE, shown } from '../src/drive/stretches';
 import { audio, lyrics } from './data';
@@ -226,11 +226,10 @@ function groundAt(p: THREE.Vector3, near: number): { y: number; rock: boolean } 
   for (let s = Math.max(0, near - 220); s <= Math.min(drive.route.length, near + 220); s += 2) { const dd = drive.route.frameAt(s).pos.distanceToSquared(p); if (dd < bd) { bd = dd; best = s; } }
   for (let s = best - 2; s <= best + 2; s += 0.25) { const dd = drive.route.frameAt(Math.max(0, s)).pos.distanceToSquared(p); if (dd < bd) { bd = dd; best = Math.max(0, s); } }
   const f = drive.route.frameAt(best), rel = p.clone().sub(f.pos), lat = rel.dot(f.right), up = rel.y;
-  const tn = nearTunnel(drive.tunnels, best);
+  const tn = nearTunnel(drive.tunnels, best, HEADLAND.spur[1]); // (the headland runs on past its mouths, the road in a cutting)
   if (tn) {
-    const inBore = Math.abs(lat) < TUNNEL.halfW && up < TUNNEL.h;
-    const hillTop = Math.abs(lat) < TUNNEL.halfW + 1 ? TUNNEL.h + TUNNEL.hill : (TUNNEL.h + TUNNEL.hill) * (1 - (Math.abs(lat) - TUNNEL.halfW - 1) / (TUNNEL.hillHalfW - TUNNEL.halfW - 1));
-    return { y: f.pos.y, rock: !inBore && up < hillTop };
+    const inBore = best > tn.s0 && best < tn.s1 && Math.abs(lat) < TUNNEL.halfW && up < TUNNEL.h;
+    return { y: f.pos.y, rock: !inBore && up < headlandAt(lat, best - tn.s0, tn.s1 - tn.s0) };
   }
   const edge = SHOULDER, over = Math.abs(lat) - edge;
   return { y: over <= 0 ? f.pos.y - 0.05 : Math.max(-0.4, f.pos.y - over / SLOPE), rock: false };

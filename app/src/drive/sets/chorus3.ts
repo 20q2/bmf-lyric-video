@@ -42,8 +42,9 @@ export const SHORE = {
 /** The pier: this far before the chorus's end (m: past the beach's words, short of the tunnel's mouth). */
 export const PIER = { before: 38 };
 /** The fly line's take: this far behind the car, off its side, up (m, as the drive's sky shots); rising this much more
- *  from this far through the line (its share) to its end — over the headland's crest by then. */
-export const FLY_TAKE = { back: 8, side: 1.2, up: 1.6, rise: 10.5, from: 0.35 };
+ *  from this far through the line (its share) to its end — over the headland's crest by then — its aim settling this
+ *  far below the writing as it rises (m). */
+export const FLY_TAKE = { back: 8, side: 1.2, up: 1.6, rise: 16.5, from: 0.35, dip: 19 };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Chorus3Plan {
@@ -169,11 +170,14 @@ export const CHORUS3: SetPiece = {
     // the writing's foot from down by the road (the lead, 2026-10-14)
     if (flyLine) {
       const T0 = flyLine.words[0]!.start, T1 = flyLine.end, F = FLY_TAKE;
+      const craned = (t: number) => { const u = Math.min(1, Math.max(0, (t - T0 - F.from * (T1 - T0)) / ((1 - F.from) * (T1 - T0)))); return u * u * (3 - 2 * u); };
       const eyeAt = (t: number) => {
-        const f = ctx.carFrame(t), u = Math.min(1, Math.max(0, (t - T0 - F.from * (T1 - T0)) / ((1 - F.from) * (T1 - T0))));
-        return f.pos.clone().addScaledVector(flat(f.fwd), -F.back).addScaledVector(f.right, F.side).addScaledVector(UP, F.up + F.rise * u * u * (3 - 2 * u));
+        const f = ctx.carFrame(t);
+        return f.pos.clone().addScaledVector(flat(f.fwd), -F.back).addScaledVector(f.right, F.side).addScaledVector(UP, F.up + F.rise * craned(t));
       };
-      phrasesOf(flyLine, ctx.nextStart(flyLine.i), ctx.solo).forEach((_, i) => frames.set(`L${flyLine.i}.${i}`, { of: (c) => (t) => lookFrom(eyeAt(t), centerAt(c, t).add(c.aim ?? new THREE.Vector3())), move: i ? 'snap' : 'cut' }));
+      // (as it rises the aim settles below the writing: the words ride high in the frame and the land comes up under
+      // them — the headland, the sea running out to the haze, the city and the hills beyond; the user, 2026-10-15)
+      phrasesOf(flyLine, ctx.nextStart(flyLine.i), ctx.solo).forEach((_, i) => frames.set(`L${flyLine.i}.${i}`, { of: (c) => (t) => lookFrom(eyeAt(t), centerAt(c, t).add(c.aim ?? new THREE.Vector3()).addScaledVector(UP, -F.dip * craned(t))), move: i ? 'snap' : 'cut' }));
     }
     const face =(c: Carrier) => ({ s: c.s, center: c.center.clone(), normal: c.normal.clone(), up: c.up.clone(), w: c.w, h: c.h });
     const plan: Chorus3Plan = {

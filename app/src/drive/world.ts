@@ -15,7 +15,7 @@ import { printedGround } from '../look/ground';
 import type { Drive } from './drive';
 import { ROAD_HALF, ROAD_START, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
-import { TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, drawTiles, nearTunnel } from './tunnel';
+import { HEADLAND, TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, drawTiles, headlandAt, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BLOCKS, boxAt } from './blocks';
 import { sedan } from '../scenes/sets/kit';
@@ -250,7 +250,8 @@ export function buildWorld(drive: Drive): THREE.Group {
   const paint = drive.carriers.filter((c) => c.kind === 'road');
   const dashAt: number[] = [];
   // (nor across a cross street's mouth: its crosswalks)
-  for (let s = ROAD_START; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2) && !drive.openings.some((o) => s > o.a - 4 && s < o.b + 4)) dashAt.push(s);
+  // (nor in a tunnel: its two-way bore has its own double yellow line, scenes/sets/bridge1.ts)
+  for (let s = ROAD_START; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2) && !drive.openings.some((o) => s > o.a - 4 && s < o.b + 4) && !nearTunnel(drive.tunnels, s, 2)) dashAt.push(s);
   const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
   dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
   g.add(named(dashes, 'dashes'));
@@ -411,30 +412,79 @@ function tiles(): THREE.Texture {
 const PORTAL = { proud: 0.8, lintel: 1.4, jamb: 1.2, walk: { w: 0.7, h: 0.3 } };
 /** A tunnel (tunnel.ts): the tiled bore, the headland over it with a mouth at each end, and its lamps. */
 function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
-  const g = new THREE.Group(), { halfW: W, h: H, hill, hillHalfW } = TUNNEL;
+  const g = new THREE.Group(), { halfW: W, h: H } = TUNNEL, UP = new THREE.Vector3(0, 1, 0);
+  // the bore, grimed: the tiles darken toward the road (spray, brake dust, water) and the ceiling's soot gathers over
+  // the lanes, so the lamps' pools read (the tiles were one clean colour floor to ceiling; the user, 2026-10-15: a
+  // "quality pass")
   const bore: [number, number][] = [[-W, 0], [-W, H], [W, H], [W, 0]];
-  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, bore, TILE_REPEAT), toon({ map: tiles(), side: THREE.DoubleSide })));
-  const rock = toon({ color: WORLD.rock, side: THREE.DoubleSide });
-  const outside: [number, number][] = [[-hillHalfW, -0.3], [-W - 1, H + hill], [W + 1, H + hill], [hillHalfW, -0.3]];
-  g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, outside, 4), rock));
-  // the mouths: the headland's face with the bore cut out
-  const face = new THREE.Shape(outside.map(([x, y]) => new THREE.Vector2(x, y)));
-  face.holes.push(new THREE.Path(bore.map(([x, y]) => new THREE.Vector2(x, y))));
-  for (const s of [tn.s0, tn.s1]) {
+  const walls: [number, number, number][] = [[0, 0.3], [0.5, 0.42], [1.4, 0.62], [2.6, 0.86], [H - 0.6, 1], [H, 0.74]].map(([y, c]) => [W, y!, c!]);
+  const grimed: [number, number, number][] = [...walls.map(([x, y, c]) => [-x, y, c] as [number, number, number]), [-0.45 * W, H, 0.55], [0, H, 0.48], [0.45 * W, H, 0.55], ...walls.slice().reverse()];
+  const boreGeo = sweep(route, tn.s0, tn.s1, grimed.map(([x, y]) => [x, y]), TILE_REPEAT), nv = boreGeo.attributes.position!.count, tone = new Float32Array(nv * 3);
+  for (let i = 0; i < nv; i++) tone.fill(grimed[i % grimed.length]![2], i * 3, i * 3 + 3);
+  boreGeo.setAttribute('color', new THREE.BufferAttribute(tone, 3));
+  g.add(new THREE.Mesh(boreGeo, toon({ map: tiles(), vertexColors: true, side: THREE.DoubleSide })));
+  // the headland over it: a hill (tunnel.ts headlandAt) rising off the mouths to a lumpy crest, its flanks falling to
+  // the sea and the land, running on past each mouth with the road in a cutting — a closed landform seen from the fly
+  // line's crane (it was a flat-topped prism, read from above as a black slab), scrub on its slopes
+  const rock = toon({ color: WORLD.rock, side: THREE.DoubleSide }), len = tn.s1 - tn.s0, H0 = HEADLAND;
+  const at = (lat: number, along: number, y: number) => { const f = route.frameAt(tn.s0 + along); return f.pos.clone().addScaledVector(f.right, lat).addScaledVector(UP, y); };
+  const land = (a0: number, a1: number) => { // a grid over the headland from a0 to a1 m along
+    const lats: number[] = []; for (let x = -H0.sea; x <= H0.land + 1e-6; x += 2.5) lats.push(x);
+    const n = Math.max(2, Math.ceil((a1 - a0) / 2) + 1), pos: number[] = [], idx: number[] = [], m = lats.length;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + ((a1 - a0) * i) / (n - 1);
+      for (const x of lats) { const p = at(x, a, headlandAt(x, a, len)); pos.push(p.x, p.y, p.z); }
+      if (i) for (let j = 0; j < m - 1; j++) { const p = (i - 1) * m + j, q = i * m + j; idx.push(p, q, p + 1, p + 1, q, q + 1); }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    return geo;
+  };
+  const earth = printedGround(toon({ color: '#b48c66', side: THREE.DoubleSide }));
+  // (just inside each mouth and just outside it: the surface steps down across the mouth's face)
+  for (const [a0, a1] of [[-H0.spur[0], -1e-3], [0, len], [len + 1e-3, len + H0.spur[1]]] as const) g.add(new THREE.Mesh(land(a0, a1), earth));
+  // the mouths: the face between the headland's profile inside and the cutting's outside, the bore cut out of it
+  for (const [along, s] of [[0, tn.s0], [len, tn.s1]] as const) {
+    const out = along === 0 ? -1e-3 : len + 1e-3, xs: number[] = [];
+    for (let x = -(H0.cutFrom + 6); x <= H0.cutFrom + 6 + 1e-6; x += 0.5) xs.push(x);
+    const face = new THREE.Shape([...xs.map((x) => new THREE.Vector2(x, headlandAt(x, along, len))), ...xs.slice().reverse().map((x) => new THREE.Vector2(x, Math.min(headlandAt(x, along, len), headlandAt(x, out, len)) - 0.02))]);
+    face.holes.push(new THREE.Path(bore.map(([x, y]) => new THREE.Vector2(x, y))));
     const f = route.frameAt(s), mouth = new THREE.Mesh(new THREE.ShapeGeometry(face), rock);
     mouth.matrixAutoUpdate = false;
     mouth.matrix.makeBasis(f.right, f.up, f.fwd).setPosition(f.pos);
     g.add(mouth);
   }
+  // chaparral on the slopes (dark clumps, thinning toward the crest) and pale rock breaking through
+  {
+    const bush: THREE.Matrix4[] = [], stone: THREE.Matrix4[] = [], tint: THREE.Color[] = [];
+    for (let k = 0; k < 2600; k++) {
+      const along = -H0.spur[0] + (len + H0.spur[0] + H0.spur[1]) * hash(k, 31), lat = -H0.sea + (H0.sea + H0.land) * hash(k, 32);
+      const y = headlandAt(lat, along, len);
+      if (y < 0.4 || (Math.abs(lat) < W + 2.5 && (along < 2 || along > len - 2))) continue; // (not on the road's cutting or over a mouth)
+      const p = at(lat, along, y - 0.1), sz = 0.45 + 0.9 * hash(k, 33);
+      if (hash(k, 34) < 0.06) { stone.push(new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3 * hash(k, 35), 6 * hash(k, 36), 0.3 * hash(k, 37))), new THREE.Vector3(sz * 1.6, sz * 0.7, sz))); continue; }
+      bush.push(new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromAxisAngle(UP, 6 * hash(k, 38)), new THREE.Vector3(sz * 1.4, sz * 0.75, sz * 1.2)));
+      tint.push(new THREE.Color(['#4a5a36', '#66703e', '#3a4a30', '#7a7646'][Math.floor(hash(k, 39) * 4)]!));
+    }
+    const scrub = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), toon(), bush.length);
+    bush.forEach((m, i) => { scrub.setMatrixAt(i, m); scrub.setColorAt(i, tint[i]!); });
+    const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), toon({ color: '#c9b49a' }), stone.length);
+    stone.forEach((m, i) => rocks.setMatrixAt(i, m));
+    g.add(scrub, rocks);
+  }
   // a raised walkway along each wall (a kerb's step: the bore read as a box with a floor)
   const crete = toon({ color: '#a39a8c' });
   for (const side of [-1, 1]) g.add(new THREE.Mesh(sweep(route, tn.s0, tn.s1, [[side * W, PORTAL.walk.h], [side * (W - PORTAL.walk.w), PORTAL.walk.h], [side * (W - PORTAL.walk.w), 0]], 2), toon({ color: '#a39a8c', side: THREE.DoubleSide })));
-  // a sodium lamp over the car on every beat, in its housing
-  const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffb347' }), tn.lamps.length);
-  tn.lamps.forEach((s, i) => lamps.setMatrixAt(i, boxAt(route, s, 0, 1.6, 0.15, 0.6, H - 0.15)));
-  const housings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#2a2430' }), tn.lamps.length);
-  tn.lamps.forEach((s, i) => housings.setMatrixAt(i, boxAt(route, s, 0, 1.9, 0.22, 0.9, H - 0.17)));
-  g.add(lamps, housings);
+  // a sodium lamp over the car on every beat: a fixture flush to the ceiling — its steel housing, the lit lens standing
+  // just proud of it behind a guard's bars, a visor lip along each side (it was a plain box)
+  const fix = (m: THREE.Material, parts: [number, number, number, number, number][]) => {
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), m, tn.lamps.length * parts.length);
+    tn.lamps.forEach((s, i) => parts.forEach(([across, h, along, dz, y0], k) => im.setMatrixAt(i * parts.length + k, boxAt(route, s + dz, 0, across, h, along, y0))));
+    g.add(im);
+  };
+  fix(toon({ color: '#3a3640' }), [[2.3, 0.24, 0.84, 0, H - 0.24], [2.3, 0.14, 0.05, -0.42, H - 0.34], [2.3, 0.14, 0.05, 0.42, H - 0.34]]);
+  fix(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.9, 1.15, 0.5) }), [[1.9, 0.05, 0.56, 0, H - 0.29]]);
+  fix(toon({ color: '#1e1a20' }), [-0.22, -0.11, 0, 0.11, 0.22].map((dz): [number, number, number, number, number] => [1.96, 0.025, 0.035, dz, H - 0.315]));
   // the portals: a concrete frame round each mouth (a lintel over the bore, a jamb each side with chevrons), standing
   // proud of the headland's face
   const chevrons = (() => {

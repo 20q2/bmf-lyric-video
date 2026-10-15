@@ -19,11 +19,34 @@ export function drawTiles(x: CanvasRenderingContext2D, face = '#ddd3bc', grout =
   for (let i = 0; i < 9; i++) { const u = hash(i, 9) * 256, w = 3 + 6 * hash(i, 10); const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(70,50,45,0.35)'); gr.addColorStop(1, 'rgba(70,50,45,0)'); x.fillStyle = gr; x.fillRect(u, 0, w, 256); }
 }
 
-/** The bore: half its width and its height (m); the headland over it: how far above the ceiling its top stands, and
- *  how far out either side it meets the ground. */
-export const TUNNEL = { halfW: 7, h: 6.5, hill: 4, hillHalfW: 45 };
+/** The bore: half its width and its height (m); the headland over it: how far above the ceiling it stands at the
+ *  mouths (its shape: HEADLAND). */
+export const TUNNEL = { halfW: 7, h: 6.5, hill: 4 };
 /** No other carrier stands within this far of a tunnel's mouths (m): the camera would be in the rock. */
 export const TUNNEL_CLEAR = 15;
+/** The headland as a landform (the user, 2026-10-15: from the fly line's crane it read as a flat black slab): its crest
+ *  this high over the road (m) once `rise` m in from either mouth (TUNNEL.h + hill over the bore at the mouths), its
+ *  feet this far out on the sea's side (left: it runs out into the water) and the land's; past each mouth it runs on
+ *  this far (m), falling away, a cutting for the road through it (its sides rising `cut` m per m from `cutFrom` m out). */
+export const HEADLAND = { crest: 14.5, rise: 50, sea: 88, land: 62, spur: [16, 26] as const, cut: 2.4, cutFrom: 8.6 };
+const smooth01 = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
+/** The headland's surface over the road's level (m), `lat` m across from the road's centre (+ right), `along` m on
+ *  from the entrance mouth of a bore `len` long; -0.3 where there's none (under the ground). Over the bore it never
+ *  falls below TUNNEL.h + hill. The scene builds it (world.ts), the guard keeps the camera out of it. */
+export function headlandAt(lat: number, along: number, len: number): number {
+  const { halfW: W, h: H, hill } = TUNNEL, top = H + hill, inner = W + 1, H0 = HEADLAND;
+  const k = smooth01(Math.min(along, len - along) / H0.rise);
+  // the crest: rising off the mouths to the headland's top, lumped along its length (never under `top`)
+  const crest = top + (H0.crest - top) * k + 1.5 * k * Math.sin(along * 0.045 + 1.3);
+  const half = lat < 0 ? H0.sea : H0.land, u = Math.min(1, Math.max(0, (Math.abs(lat) - inner) / (half - inner)));
+  // rounded off the crest down to its feet, its flanks lumped (a spur, a gully)
+  let y = -0.3 + (crest + 0.3) * (1 - smooth01(u)) + 2 * Math.sin(lat * 0.11 + along * 0.037) * 4 * u * (1 - u);
+  if (along < 0 || along > len) {
+    const out = along < 0 ? -along / H0.spur[0] : (along - len) / H0.spur[1];
+    y = Math.min(-0.3 + (y + 0.3) * (1 - smooth01(out)), -0.3 + Math.max(0, Math.abs(lat) - H0.cutFrom) * H0.cut);
+  }
+  return y;
+}
 
 export interface Tunnel {
   stretch: string;

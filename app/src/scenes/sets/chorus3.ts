@@ -10,7 +10,9 @@
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { ARCH, type Chorus3Plan } from '../../drive/sets/chorus3';
-import { BEACH, SEA } from '../../drive/world';
+import { BEACH, SEA, SHOULDER } from '../../drive/world';
+import { BLOCKS } from '../../drive/blocks';
+import { printedGround } from '../../look/ground';
 import { SUN_AZ_DEG, COAST_T } from '../../drive/sky';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -535,11 +537,70 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     root.add(glitter);
   }
 
+  // ---- the far scenery the fly line's crane rises into view of (the user, 2026-10-15: "the ocean doesn't extend out
+  // forever … the mountain in the distance is clipping"): the sea runs on past its strip out to the haze, and the hills
+  // the road climbs to the overlook stand as land under it (from the coast the climb read as a ribbon floating in the
+  // haze, its embankments' fill gone into the fog colour). Only while the coast is seen: the city spreads over that
+  // side at the end, and the ending's own views stay as they are. ----
+  const far = new THREE.Group(); root.add(far);
+  {
+    const coast = drive.stretches.filter((st) => BLOCKS[st.id]?.seaLeft);
+    const a = drive.motion.distanceAt(coast[0]!.start) - 60, b = drive.motion.distanceAt(coast[coast.length - 1]!.end) + 60;
+    // the coast's mean heading and its seaward side (flat)
+    const T = new THREE.Vector3(), D = new THREE.Vector3();
+    for (let s = a; s <= b; s += 10) { const f = route.frameAt(s); T.add(new THREE.Vector3(f.fwd.x, 0, f.fwd.z)); D.add(new THREE.Vector3(-f.right.x, 0, -f.right.z)); }
+    T.normalize(); D.normalize();
+    // the sea: from inside the sea strip's outer edge (under it) out past the haze, flaring away at either end
+    const edge: THREE.Vector2[] = [];
+    for (let s = a; s <= b + 1e-6; s += 4) { const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, -(SEA - 12)); edge.push(new THREE.Vector2(p.x, p.z)); }
+    const FAR = 5000, e0 = edge[0]!, e1 = edge[edge.length - 1]!;
+    const corner = (e: THREE.Vector2, k: number) => new THREE.Vector2(e.x + D.x * FAR + T.x * FAR * k, e.y + D.z * FAR + T.z * FAR * k);
+    const shape = new THREE.Shape([...edge, corner(e1, 0.6), corner(e0, -0.6)]);
+    const sea = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2).translate(0, route.frameAt(a).pos.y - 0.16, 0), toon({ color: WORLD.sea, side: THREE.DoubleSide }));
+    sea.name = 'sea'; far.add(sea);
+    // the hills: land under the climb to the overlook, falling from its verges' edges (SHOULDER out) to the plain
+    const climb: THREE.Vector3[] = [];
+    for (let s = b; s < route.length; s += 4) { const p = route.frameAt(s).pos; if (p.y > 0.3) climb.push(p.clone()); }
+    if (climb.length) {
+      const HILL = { fall: 0.32, cell: 6, scrub: 700 };
+      const box = new THREE.Box3().setFromPoints(climb), reach = SHOULDER + Math.max(...climb.map((p) => p.y)) / HILL.fall + 10;
+      const hAt = (x: number, z: number) => {
+        let h = -0.6;
+        for (const p of climb) { const d = Math.hypot(p.x - x, p.z - z); h = Math.max(h, p.y - 0.5 - HILL.fall * Math.max(0, d - SHOULDER)); }
+        // (rolled a little: spurs and gullies down the slope)
+        return h > -0.4 ? h + 1.6 * Math.sin(x * 0.045) * Math.sin(z * 0.05) * Math.min(1, h / 8) : h;
+      };
+      const x0 = box.min.x - reach, z0 = box.min.z - reach, nx = Math.ceil((box.max.x - box.min.x + 2 * reach) / HILL.cell) + 1, nz = Math.ceil((box.max.z - box.min.z + 2 * reach) / HILL.cell) + 1;
+      const pos: number[] = [], idx: number[] = [];
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        const x = x0 + i * HILL.cell, z = z0 + j * HILL.cell;
+        pos.push(x, hAt(x, z), z);
+        if (i && j) { const p = (j - 1) * nx + i - 1, q = j * nx + i - 1; idx.push(p, q, p + 1, p + 1, q, q + 1); }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+      const hills = new THREE.Mesh(geo, printedGround(toon({ color: '#6b6448', side: THREE.DoubleSide })));
+      hills.name = 'hills'; far.add(hills);
+      // chaparral over them, darker clumps
+      const ms: THREE.Matrix4[] = [];
+      for (let k = 0; k < HILL.scrub; k++) {
+        const x = x0 + (nx - 1) * HILL.cell * hash(k, 201), z = z0 + (nz - 1) * HILL.cell * hash(k, 202), h = hAt(x, z), sz = 1.5 + 2.5 * hash(k, 203);
+        if (h < 1.5 || climb.some((p) => Math.hypot(p.x - x, p.z - z) < SHOULDER + 4)) continue; // (not on the road's verges)
+        ms.push(new THREE.Matrix4().compose(new THREE.Vector3(x, h - 0.3, z), new THREE.Quaternion(), new THREE.Vector3(sz * 1.4, sz * 0.7, sz * 1.2)));
+      }
+      const scrub = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), toon({ color: '#3a4030' }), ms.length);
+      ms.forEach((m, i) => scrub.setMatrixAt(i, m));
+      far.add(scrub);
+    }
+  }
+  const farUntil = drive.tunnels[0] ? drive.stretches.find((st) => st.tunnel)!.end : 136;
+
   const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
   const on = (t: number) => t > 99 && t < 124; // (the coast's props move only while it's seen)
   return {
     group: root,
     update(t) {
+      far.visible = t < farUntil;
       // the glitter burns while the sun is low on the water, and goes with it
       const gm = glitter.material as THREE.MeshBasicMaterial;
       gm.opacity = smooth(99, 104, t) * (1 - smooth(112.5, 117, t));
