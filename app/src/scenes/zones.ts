@@ -10,13 +10,18 @@
 //            are the parts (big ones split into their children); what moves is left to three's own culling. A light
 //            counts as moving (hidden, it would stop lighting what's seen), and so does a mesh three is told not to
 //            cull, unless it's instanced (its instances' bounds are known; another may be shaped in its shader).
+//   batched  each compact still subtree's meshes merged, one per material (scenes/batch.ts), before the parts are cut.
 //   frame    `hide` before the render, `restore` after: the parts' own visibility (set by the sets, the carriers,
 //            ?hide=) is never touched between renders.
 // Browser and bun (no DOM).
 import * as THREE from 'three';
+import { batch } from './batch';
 
 /** A still subtree bigger than this (objects) is split into its children: finer culling, a few more tests. */
 const MOST = 64;
+/** A still subtree no wider than this (m, bounding radius: a parked car, a storefront and its dressing) has its meshes
+ *  merged into a few (scenes/batch.ts): compact, so it's still culled as a piece. */
+const BATCH = 15;
 /** Each part's bounds are this much wider (m): what wobbles in place between poses (the chicken shop's roof bird). */
 const PAD = 2;
 /** What's kept of an object at each pose: its matrix and its position, rotation and scale, the versions of what moves
@@ -26,6 +31,8 @@ const N = 28;
 export class Zones {
   private parts: { o: THREE.Object3D; s: THREE.Sphere }[] = [];
   private hid: THREE.Object3D[] = [];
+  /** How many meshes batching took out of the world. */
+  merged = 0;
 
   /** `roots`: the world's, of which `posed` move with `pose` (the rest never move: they're not posed). */
   constructor(roots: THREE.Object3D[], posed: THREE.Object3D[], pose: (t: number) => void, times: number[]) {
@@ -58,18 +65,26 @@ export class Zones {
     });
     const index = new Map(nodes.map((o, k) => [o, k]));
     const still = new Map<THREE.Object3D, boolean>(), size = new Map<THREE.Object3D, number>();
+    // (a merged mesh is new: still)
     const walk = (o: THREE.Object3D, carried = false): boolean => {
-      const k = index.get(o)!;
-      if (carried) moves[k] = 1;
-      let s = !moves[k], n = 1;
-      for (const c of o.children) { s = walk(c, !!moves[k]) && s; n += size.get(c)!; }
+      const k = index.get(o);
+      if (carried && k !== undefined) moves[k] = 1;
+      let s = k === undefined || !moves[k], n = 1;
+      for (const c of o.children) { s = walk(c, k !== undefined && !!moves[k]) && s; n += size.get(c)!; }
       still.set(o, s); size.set(o, n);
       return s;
     };
     roots.forEach((r) => walk(r));
     // (the unposed roots' places too: nothing has rendered yet, so nothing has worked them out)
     for (const r of roots) r.updateMatrixWorld(true);
-    const box = new THREE.Box3();
+    const box = new THREE.Box3(), sphere = new THREE.Sphere();
+    const merge = (o: THREE.Object3D) => {
+      if (still.get(o) && box.setFromObject(o).getBoundingSphere(sphere).radius <= BATCH) { this.merged += batch(o); return; }
+      o.children.slice().forEach(merge);
+    };
+    roots.forEach(merge);
+    still.clear(); size.clear();
+    roots.forEach((r) => walk(r));
     const part = (o: THREE.Object3D) => {
       if (still.get(o) && (size.get(o)! <= MOST || !o.children.length)) {
         if (!box.setFromObject(o).isEmpty()) { const s = box.getBoundingSphere(new THREE.Sphere()); s.radius += PAD; this.parts.push({ o, s }); }
