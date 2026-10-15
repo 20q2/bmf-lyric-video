@@ -5,8 +5,8 @@
 import * as THREE from 'three';
 import type { SkyState } from '../drive/sky';
 
-/** How many bands the gradient prints in, the sun's radius (degrees) and its brightness (HDR). */
-export const SKYDOME = { bands: 9, sunDeg: 2.4, sunHDR: 9, radius: 2500 };
+/** How many bands the gradient prints in, the sun's radius (degrees) and its brightness (HDR); the moon's radius. */
+export const SKYDOME = { bands: 9, sunDeg: 2.4, sunHDR: 9, radius: 2500, moonDeg: 0.9 };
 
 const VERT = /* glsl */ `
 varying vec3 vDir;
@@ -19,7 +19,7 @@ void main() {
 const FRAG = /* glsl */ `
 uniform vec3 zenith, horizon, sunDir, sunColor, mountainDir;
 uniform float stars, bands, sunR, sunHDR, time, groundMix, clouds, rays, mountains, moon;
-uniform vec3 moonDir;
+uniform vec3 moonDir; uniform float moonR;
 varying vec3 vDir;
 const float PI_ = 3.14159265;
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -77,11 +77,16 @@ void main() {
     vec3 shadeC = mix(zenith, horizon, 0.35) * 0.82, litC = mix(horizon, sunColor, 0.55) * 1.05;
     c = mix(c, mix(shadeC, litC, lit) * (1.0 - 0.22 * clamp(rim, 0.0, 1.0)), cover * clouds);
   }
-  // the moon: a pale disc in a soft halo, once the sun's down
+  // the moon, once the sun's down: a pale disc, its seas printed darker, in a soft halo — a wide faint one and a close
+  // brighter one (the damp air round it)
   if (moon > 0.0 && d.y > 0.0) {
     float am = acos(clamp(dot(d, moonDir), -1.0, 1.0)), pm = fwidth(am);
-    c += vec3(0.7, 0.76, 0.95) * 0.3 * moon * exp(-am * 16.0);
-    c = mix(c, vec3(0.92, 0.94, 1.0) * 1.3, smoothstep(0.012 + pm, 0.012 - pm, am) * moon);
+    c += vec3(0.62, 0.68, 0.95) * moon * (0.06 * exp(-am * 4.0) + 0.2 * exp(-am * 14.0) + 0.3 * exp(-am * 45.0));
+    vec3 mx = normalize(cross(moonDir, vec3(0.0, 1.0, 0.0)) + 1e-5), my = cross(mx, moonDir);
+    vec2 mp = vec2(dot(d, mx), dot(d, my)) / moonR;
+    float seas = smoothstep(0.52, 0.6, fbm(mp * 1.3 + vec2(3.1, 7.7)));
+    vec3 disc = mix(vec3(0.95, 0.95, 1.0) * 1.45, vec3(0.66, 0.68, 0.82) * 1.15, seas);
+    c = mix(c, disc, smoothstep(moonR + pm, moonR - pm, am) * moon);
   }
   // stars: one in some cells of a grid over the sky, twinkling
   if (stars > 0.0 && d.y > 0.02) {
@@ -104,7 +109,7 @@ export class SkyDome {
   constructor() {
     this.u = {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
-      sunDir: { value: new THREE.Vector3(0, 0.2, -1).normalize() }, sunColor: { value: new THREE.Color('#ffd9a0') }, moonDir: { value: new THREE.Vector3(0, 1, 0) }, moon: { value: 0 },
+      sunDir: { value: new THREE.Vector3(0, 0.2, -1).normalize() }, sunColor: { value: new THREE.Color('#ffd9a0') }, moonDir: { value: new THREE.Vector3(0, 1, 0) }, moon: { value: 0 }, moonR: { value: (SKYDOME.moonDeg * Math.PI) / 180 },
       stars: { value: 0 }, bands: { value: SKYDOME.bands }, sunR: { value: (SKYDOME.sunDeg * Math.PI) / 180 },
       sunHDR: { value: SKYDOME.sunHDR }, time: { value: 0 }, groundMix: { value: 0 }, clouds: { value: 0 }, rays: { value: 0 },
       mountainDir: { value: new THREE.Vector3(1, 0, 0) }, mountains: { value: 0 },

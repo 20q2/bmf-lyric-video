@@ -5,10 +5,12 @@
 // shoulders that slope from the neck, a chest, a waist), the limbs tubes through their joints, tapering. A rim on the
 // silhouette's edge (strongest toward the sky) keeps their form against the dark cabin.
 //   him  at the wheel (the car's left, +x), a jacket's collar, a gold chain, shades: his left arm straight out to the
-//        wheel low on its rim, the lowrider's lean-back grip; his right along the bench's top behind her
+//        wheel low on its rim, the lowrider's lean-back grip; his right along the bench's top behind her, and at the
+//        end round her shoulders (on pivots, reached by poseCast)
 //   her  beside him, her hair down her back, her right arm on a pivot at the shoulder (the scene swings it out and up,
 //        cast.ts), its elbow straightening as it rises; her left hand in her lap
-// The heads turn on pivots at the neck ('hisHead', 'herHead'), her arm on 'herArm': the scene moves them by name.
+// The heads turn on pivots at the neck ('hisHead', 'herHead'), her arm on 'herArm', his right on 'hisArm': poseCast
+// moves them by name (and her whole figure, 'her', as she leans into him at the end).
 // His campaign poster is drawn from this same model (`bustTriangles`, look/adart.ts): the same cap, the same profile.
 // Browser and bun (no DOM).
 import * as THREE from 'three';
@@ -216,6 +218,55 @@ const GRIP = WHEEL.hub.clone().add(WHEEL.grip);
 /** Her arm's rest: how far its elbow bends (radians: forearm forward along her thigh), how far up the scene swings
  *  it at most (cast.ts: -2.7 about z), the bend left once it's up. */
 const ELBOW = { rest: -1.3, up: 2.7, raised: -0.25 };
+/** His right arm (his frame): its bones (m, shoulder to elbow to wrist, his left arm's build — the user, 2026-10-15:
+ *  laid out straight along the bench's top it read "super fucking long"); its rest along the bench's top behind her
+ *  (the wrist, and which way the elbow points); round her shoulders, the wrist's place on her far shoulder (her frame),
+ *  the elbow out behind her, the hand lifted this high at the middle of its move (over her head and hair). */
+const ARM = { upper: 0.3, fore: 0.27, bench: V(-0.6, 1.44, -0.54), benchPole: V(0, -0.25, -1), shoulder: V(-0.085, 1.505, -0.35), pole: V(0, 0.35, -1), lift: 0.16 };
+/** The end's lean (cast.ts LEAN): how far she slides over toward him (m), how far she leans in about her hip (radians,
+ *  the hip's height), her head's tilt onto his shoulder; his head's tilt onto hers. */
+const LEAN_POSE = { slide: 0.3, tilt: 0.45, hip: 1.0, head: 0.3, his: 0.22 };
+
+const _q = new THREE.Quaternion(), _m4 = new THREE.Matrix4();
+/** A bone's turn: its -y along `along`, its +x toward `face` (square to it). */
+function boneQ(along: THREE.Vector3, face: THREE.Vector3, out = new THREE.Quaternion()): THREE.Quaternion {
+  const y = along.clone().normalize().negate(), x = face.clone().addScaledVector(y, -face.dot(y));
+  if (x.lengthSq() < 1e-8) x.set(1, 0, 0).addScaledVector(y, -y.x);
+  x.normalize();
+  return out.setFromRotationMatrix(_m4.makeBasis(x, y, x.clone().cross(y)));
+}
+/** Reaches his right arm (its shoulder's group, its forearm's inside) for wrist `W` (his frame): the elbow bent out
+ *  toward `pole`, the palm facing `palm`. */
+function reach(upper: THREE.Object3D, W: THREE.Vector3, pole: THREE.Vector3, palm: THREE.Vector3) {
+  const S = upper.position, U = ARM.upper, F = ARM.fore, sw = W.clone().sub(S);
+  const d = Math.min(U + F - 1e-3, Math.max(Math.abs(U - F) + 1e-3, sw.length())), n = sw.normalize();
+  const cosA = (U * U + d * d - F * F) / (2 * U * d), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+  const m = pole.clone().addScaledVector(n, -pole.dot(n)).normalize();
+  const E = S.clone().addScaledVector(n, U * cosA).addScaledVector(m, U * sinA), Wd = S.clone().addScaledVector(n, d);
+  boneQ(E.clone().sub(S), m, upper.quaternion);
+  const fore = upper.getObjectByName('hisForearm')!;
+  fore.quaternion.copy(upper.quaternion).invert().multiply(boneQ(Wd.sub(E), palm, _q));
+}
+
+/** Poses the two of them (in the car's body, by name) for the moment: her arm up, her look to him, his nod; and at the
+ *  end her lean into him — over on the bench and in, her head on his shoulder — and his arm round her. */
+export function poseCast(body: THREE.Object3D, c: { herArm: number; herLook: number; hisNod: number; lean: number; hold: number }) {
+  const her = body.getObjectByName('her')!, him = body.getObjectByName('him')!, L = LEAN_POSE;
+  body.getObjectByName('herArm')!.rotation.set(0, 0, -2.7 * c.herArm);
+  // (about her hip: the hip stays on the bench where she's slid to, her shoulders and head come over toward him)
+  const a = -L.tilt * c.lean;
+  her.rotation.set(0, 0, a);
+  her.position.set(FIGURE.her.x + L.slide * c.lean + L.hip * Math.sin(a), L.hip * (1 - Math.cos(a)), 0);
+  body.getObjectByName('herHead')!.rotation.set(0, 0.7 * c.herLook, -L.head * c.lean);
+  body.getObjectByName('hisHead')!.rotation.set(c.hisNod, 0, L.his * c.lean);
+  // his arm: from the bench's top, up over her head and down round her shoulders, his hand on her far shoulder
+  const upper = him.getObjectByName('hisArm');
+  if (!upper) return;
+  her.updateMatrix();
+  const onHer = ARM.shoulder.clone().applyMatrix4(her.matrix).sub(him.position), h = c.hold;
+  const W = ARM.bench.clone().lerp(onHer, h).add(new THREE.Vector3(0, ARM.lift * Math.sin(Math.PI * h), 0));
+  reach(upper, W, ARM.benchPole.clone().lerp(ARM.pole, h), new THREE.Vector3(0, -1, 0));
+}
 
 function legs(g: THREE.Object3D, mats: Mats, hip: THREE.Vector3, her: boolean) {
   for (const s of [1, -1]) {
@@ -290,10 +341,16 @@ export function buildHim(mats: Mats, pose: 'drive' | 'bust' = 'drive'): THREE.Gr
     const E = S.clone().lerp(W, 0.52).add(V(0.035, -0.02, 0));
     part(g, tube([top(1), S, E, W], [sleeve[0]!, sleeve[1]!, sleeve[3]!, cuff]), mats);
     hand(g, mats, W, dir, V(-0.3, -0.9, 0.3), V(0, 0.5, 1), 1, 1.5, 0);
-    // his right: back along the bench's top behind her, his hand over its edge
-    const S2 = sh(-1), E2 = V(-0.42, 1.43, -0.52), W2 = V(-0.68, 1.425, -0.535);
-    part(g, tube([top(-1), S2, E2, W2], [sleeve[0]!, sleeve[1]!, sleeve[3]!, cuff]), mats);
-    hand(g, mats, W2, V(-1, -0.1, -0.1), V(0, -1, 0), V(0, 0, 1), 1, 0.7, 0.06);
+    // his right: on pivots at the shoulder ('hisArm') and the elbow ('hisForearm'), each bone along its own -y, the
+    // palm facing its forearm's +x (poseCast reaches it: along the bench's top behind her, or round her shoulders)
+    const S2 = sh(-1);
+    part(g, tube([top(-1), S2], [sleeve[0]!, sleeve[1]!]), mats);
+    const upper = new THREE.Group(); upper.name = 'hisArm'; upper.position.copy(S2); g.add(upper);
+    part(upper, tube([V(0, 0.02, 0), V(0, 0, 0), V(0, -ARM.upper * 0.5, 0), V(0, -ARM.upper, 0)], [sleeve[1]!, sleeve[1]!, sleeve[2]!, sleeve[3]!]), mats);
+    const fore = new THREE.Group(); fore.name = 'hisForearm'; fore.position.set(0, -ARM.upper, 0); upper.add(fore);
+    part(fore, tube([V(0, 0.015, 0), V(0, -ARM.fore * 0.5, 0), V(0, -ARM.fore, 0)], [sleeve[3]!, sleeve[4]!, cuff]), mats);
+    hand(fore, mats, V(0, -ARM.fore, 0), V(0, -1, 0), V(1, 0, 0), V(0, 0, 1), 1, 0.75, 0.06);
+    reach(upper, ARM.bench, ARM.benchPole, V(0, -1, 0));
     legs(g, mats, F.hip, false);
   } else {
     for (const s of [1, -1]) {
@@ -340,8 +397,8 @@ export function buildHer(mats: Mats): THREE.Group {
  *  a hundred-odd parts would be a hundred-odd draws, twice over with the shadows). */
 export function buildCast(body: THREE.Object3D): void {
   const mats: Mats = { body: castMaterial(), gold: toon({ color: '#f6c445' }), lens: castMaterial('#0c0910'), plain: toon({ color: '#140d18' }) };
-  const him = buildHim(mats); him.position.x = FIGURE.him.x; body.add(compact(him));
-  const her = buildHer(mats); her.position.x = FIGURE.her.x; body.add(compact(her));
+  const him = buildHim(mats); him.name = 'him'; him.position.x = FIGURE.him.x; body.add(compact(him));
+  const her = buildHer(mats); her.name = 'her'; her.position.x = FIGURE.her.x; body.add(compact(her));
 }
 /** A group's own meshes merged by material (its child groups, which move, each compacted in turn). */
 function compact<T extends THREE.Object3D>(g: T): T {

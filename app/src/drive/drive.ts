@@ -56,10 +56,14 @@ export const LANE = 1.9;
  *  its first shot stands (m). */
 export const SIGN_SHOT = { dist: 7.5, push: 0.5, over: 3 };
 /** The end, after the last line: on a beat at least `after` s past it (and no later than `before` s ahead of the fade
- *  out of hearing), the camera glides down behind the two of them, over their shoulders (m behind the car's centre, up
- *  off the road), and cranes slowly up and back from there (m/s each), looking out with them at the hill sign and the
- *  city (aimed m ahead of where the car parks, off to its side, under its level). */
-export const END = { after: 0.8, before: 0.6, back: 3.2, backRate: 0.35, up: 1.9, rise: 0.22, look: 300, side: -45, under: 40 };
+ *  out of hearing), the camera glides down behind the two of them, low over their shoulders (m behind the car's centre,
+ *  up off the road: `back`, `up` [from, to]), lingers there while she leans into him, then from `from` of the way to
+ *  the end card eases slowly back and up to the poster: the two of them in silhouette in the car, the hill sign on
+ *  the left, the city and the moon over downtown on the right. High enough to see them over the bench's back (her
+ *  head on his shoulder, his arm round her), low enough that the city's lights stand over the wall above them (craned
+ *  high, they sank onto the grey lot). Looking out with them, aimed m ahead of where the car parks, off to its side,
+ *  under its level. */
+export const END = { after: 0.8, before: 0.6, back: [3.6, 6.8] as [number, number], up: [2.3, 2.9] as [number, number], from: 0.42, look: 300, side: -10, under: 28 };
 /** The end: the cut to the motel (s, a half-beat after the last line has been read), and the fade out (s). */
 export const FINALE = { endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
@@ -238,7 +242,10 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const away = beatAtOrAfter(audio, Math.max(lastLine.end + END.after, AUDIBLE - END.before));
   // (the eye rides with the car as it rolls the last metres to a stop; the aim holds on the view)
   const view = park.pos.clone().addScaledVector(pf, END.look).addScaledVector(pr, END.side).add(new THREE.Vector3(0, -END.under, 0));
-  const crane: Target = (t) => { const u = Math.max(0, t - away), f = carFrame(t); return lookFrom(f.pos.clone().addScaledVector(flat(f.fwd), -END.back - END.backRate * u).add(new THREE.Vector3(0, END.up + END.rise * u, 0)), view); };
+  const crane: Target = (t) => {
+    const u = Math.min(1, Math.max(0, (t - away) / (FINALE.endCard - away) - END.from) / (1 - END.from)), e = u * u * (3 - 2 * u), f = carFrame(t);
+    return lookFrom(f.pos.clone().addScaledVector(flat(f.fwd), -(END.back[0] + (END.back[1] - END.back[0]) * e)).add(new THREE.Vector3(0, END.up[0] + (END.up[1] - END.up[0]) * e, 0)), view);
+  };
   const scene: Shot = { at: away, to: crane, move: 'glide' };
   const endCard: Shot = { at: endCardAt, to: signShot, move: 'cut' };
   shots.push(scene, endCard); own.add(scene); own.add(endCard);

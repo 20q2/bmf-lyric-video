@@ -23,6 +23,7 @@ import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
 import { buildDash } from '../look/dash';
 import { buildCast } from '../look/cast3d';
+import { LOT, buildClimbHills, buildLookout, dressHill, scrubGround } from '../look/lookout';
 import { CAR, WHEEL } from './cabin';
 export { CAR };
 import { candyPaint, chrome as heroChrome } from '../look/hero';
@@ -40,15 +41,11 @@ const BASE = 12000;
 export const SLOPE = 1;
 /** The road runs on this far past where the car parks, to the overlook's edge (m). */
 const OVERLOOK_LIP = 9;
-/** The overlook: its gravel turnout's radius, the wall's radius round the car and its blocks (either way of the middle,
- *  this far apart in radians), and how far the hillside runs down to the plain (m). */
-const LOOKOUT = { apron: 19, r: 12, blocks: 12, pitch: 0.095, fall: 190 };
-const WOOD_DARK = toon({ color: '#3a2a24' });
 const STEP = 2;
 export { ROAD_START }; // (route.ts: the road starts this far behind the light)
 
 /** Each section's ground (sRGB; others the golden fields). */
-const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
+const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c', outro1: '#6b5b55' };
 const PALMS = new Set(['intro', 'chorus1', 'chorus3']); // (none in verse 2: its take's camera rides where they'd stand; none on the Strip: its fronts stand where they would; on the coast, on the beach by the water)
 /** Kerbs and sidewalks along the town's streets (not the freeway, the coast, the tunnel or the hills): the kerb's
  *  height, the sidewalk's width (m) and its concrete; broken where a cross street opens (the set-pieces' openings). */
@@ -92,6 +89,46 @@ function strip(route: Route, a: number | ((s: number) => number), b: number | ((
   return g;
 }
 
+/** Lines painted on the road (each piece from s0 to s1 along it, from lateral a to b), laid on the road strip's own
+ *  facets — the strip from `left` to `right` that `strip` builds, sample for sample, each quad split on its diagonal
+ *  the same way — so they never sink into it or stand off it, however it climbs and turns; `lift` m over it (the
+ *  material's polygon offset does the rest at any distance). */
+function roadPaint(route: Route, end: number, left: number, right: (s: number) => number, pieces: { s0: number; s1: number; a: number | ((s: number) => number); b: number | ((s: number) => number) }[], lift = 0.006): THREE.BufferGeometry {
+  const pos: number[] = [], at = (x: number | ((s: number) => number), s: number) => (typeof x === 'number' ? x : x(s));
+  const row = (s: number) => { const f = route.frameAt(s); return { p: f.pos.clone().addScaledVector(f.right, left), q: f.pos.clone().addScaledVector(f.right, right(s)), w: right(s) - left }; };
+  for (const pc of pieces) {
+    const i0 = Math.max(0, Math.floor((pc.s0 - ROAD_START) / STEP)), i1 = Math.ceil((Math.min(pc.s1, end) - ROAD_START) / STEP);
+    for (let i = i0; i < i1; i++) {
+      const sA = ROAD_START + i * STEP, sB = Math.min(end, sA + STEP);
+      if (sB <= sA) continue;
+      const A = row(sA), B = row(sB);
+      // (the quad's two facets: (pA, qA, pB) where u + v <= 1, (qA, qB, pB) past it; u along, v across from the left)
+      const surf = (u: number, v: number) => u + v <= 1
+        ? A.p.clone().addScaledVector(B.p.clone().sub(A.p), u).addScaledVector(A.q.clone().sub(A.p), v)
+        : B.q.clone().addScaledVector(A.q.clone().sub(B.q), 1 - u).addScaledVector(B.p.clone().sub(B.q), 1 - v);
+      const u0 = Math.max(0, (pc.s0 - sA) / (sB - sA)), u1 = Math.min(1, (pc.s1 - sA) / (sB - sA));
+      if (u1 <= u0) continue;
+      const va = (u: number) => { const s = sA + u * (sB - sA); return (at(pc.a, s) - left) / (A.w + (B.w - A.w) * u); };
+      const vb = (u: number) => { const s = sA + u * (sB - sA); return (at(pc.b, s) - left) / (A.w + (B.w - A.w) * u); };
+      // cut where each of its edges crosses the facets' diagonal, so no triangle of paint spans the fold
+      const cross = (v: (u: number) => number) => { const a = v(0), b = v(1); return (1 - a) / (1 + b - a); };
+      const us = [u0, u1, cross(va), cross(vb)].filter((u) => u >= u0 && u <= u1).sort((x, y) => x - y);
+      for (let k = 0; k + 1 < us.length; k++) {
+        const ua = us[k]!, ub = us[k + 1]!;
+        if (ub - ua < 1e-6) continue;
+        const c = [surf(ua, va(ua)), surf(ua, vb(ua)), surf(ub, va(ub)), surf(ub, vb(ub))];
+        // (split from (ua, b) to (ub, a): along the facets' diagonal where it crosses)
+        for (const t of [[0, 1, 2], [1, 3, 2]]) for (const j of t) { const p = c[j]!; pos.push(p.x, p.y + lift, p.z); }
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const n = new Float32Array(pos.length); for (let i = 1; i < n.length; i += 3) n[i] = 1;
+  g.setAttribute('normal', new THREE.BufferAttribute(n, 3));
+  return g;
+}
+
 /** An embankment along one side of the road (side: -1 left, +1 right): from the verge's edge (`edge` m out) down to
  *  the plain at SLOPE, wherever the road stands above it; steeper on a bend's inside, where it may reach no further
  *  out than the bend's radius (past it, the hairpin up into the hills folded it into tall sheets across the sky). */
@@ -124,6 +161,33 @@ function skirt(route: Route, side: number, edge: (s: number) => number, end = ro
 }
 
 
+/** The climb into the hills keeps a verge this wide (m off the road's centre) once it's this high over the plain (m). */
+const CLIMB_VERGE = { w: 7.5, h: 8 };
+/** How far out the verges reach at s on a side (m off the road's centre): SHOULDER, but narrow where the road climbs
+ *  into the hills (40 m shelves either side of the climb read from afar as a band floating in the fog), widening again
+ *  over the last of it to hold the overlook's lot; and never further out on a bend's inside than most of its radius
+ *  (past its centre, the hairpin's verge and embankment folded into a spike standing over it). */
+function vergesOf(drive: Drive, end: number): (side: number, s: number) => number {
+  const { route, motion } = drive, n = Math.ceil((end - ROAD_START) / STEP) + 1;
+  const sm = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
+  const climb = drive.stretches.find((st) => st.id === 'chorus4'), from = climb ? motion.distanceAt(climb.start) : Infinity, lot = end - OVERLOOK_LIP - LOT.entry;
+  // each sample's bend radius on either side (Infinity where it runs straight or bends the other way), then the least
+  // within a verge's reach along the road
+  const radius = (side: number) => {
+    const r = Array.from({ length: n }, (_, i) => {
+      const s = Math.min(end, ROAD_START + i * STEP), a = route.frameAt(s), b = route.frameAt(s + STEP), turn = Math.acos(Math.min(1, a.fwd.dot(b.fwd)));
+      return turn > 1e-6 && Math.sign(b.fwd.dot(a.right)) === side ? STEP / turn : Infinity;
+    }), k = Math.ceil(SHOULDER / STEP);
+    return r.map((_, i) => Math.min(...r.slice(Math.max(0, i - k), i + k + 1)));
+  };
+  const inside = { [-1]: radius(-1), [1]: radius(1) } as Record<number, number[]>;
+  return (side, s) => {
+    const h = route.frameAt(s).pos.y + 0.4, narrow = s >= from ? sm(h / CLIMB_VERGE.h) * (1 - sm((s - (lot - 55)) / 45)) : 0;
+    const i = Math.min(n - 1, Math.max(0, Math.round((s - ROAD_START) / STEP)));
+    return Math.max(ROAD_HALF + 1, Math.min(SHOULDER - (SHOULDER - CLIMB_VERGE.w) * narrow, 0.85 * inside[side]![i]!));
+  };
+}
+
 export function buildWorld(drive: Drive): THREE.Group {
   const { route, motion } = drive, g = new THREE.Group();
   const stretchAtS = (s: number): Stretch => {
@@ -140,8 +204,9 @@ export function buildWorld(drive: Drive): THREE.Group {
   const named = <T extends THREE.Object3D>(o: T, name: string) => { o.name = name; return o; };
   // each section its own ground: the city's paving, the freeway's concrete, the neighbourhood's lawns, the coast's sand
   const groundOf = (s: number) => { const g0 = GROUND[stretchAtS(s).id]; return g0 ? new THREE.Color(g0) : grass; };
-  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -BEACH : -SHOULDER), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
-  g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, SHOULDER, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
+  const verge = vergesOf(drive, end);
+  g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -BEACH : -verge(-1, s)), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
+  g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, (s) => verge(1, s), -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
   // the sea beyond the beach, and the surf's foam along the shore: broken white lines, a second set further out
   {
     const water = toon({ color: WORLD.sea, side: THREE.DoubleSide }), foam: THREE.Matrix4[] = [];
@@ -159,80 +224,13 @@ export function buildWorld(drive: Drive): THREE.Group {
     foam.forEach((m, i) => fm.setMatrixAt(i, m));
     g.add(named(fm, 'sea'));
   }
-  // the overlook (the user, 2026-10-13: they sat "at the top of a box"): the road ends on a gravel turnout at the lip;
-  // a low stone wall with a pipe rail runs along it; a coin viewer, a bench and a bin stand by the wall; pines frame
-  // the view either side; and the hillside falls away below, rolling down to the plain
-  {
-    const park = route.frameAt(end - OVERLOOK_LIP), lipF = route.frameAt(end);
-    const fwd = new THREE.Vector3(lipF.fwd.x, 0, lipF.fwd.z).normalize(), right = new THREE.Vector3(lipF.right.x, 0, lipF.right.z).normalize();
-    const look = new THREE.Group(); g.add(named(look, 'lookout'));
-    const y0 = park.pos.y, centre = park.pos.clone().addScaledVector(fwd, 2);
-    const apron = new THREE.Mesh(new THREE.CircleGeometry(LOOKOUT.apron, 48), printedGround(toon({ color: '#8a8074' })));
-    apron.rotation.x = -Math.PI / 2; apron.position.copy(centre).addScaledVector(fwd, 2).setY(y0 + 0.03); look.add(apron);
-    const stone = toon({ color: '#9a8d7e' }), cap = toon({ color: '#b3a797' }), steel = toon({ color: WORLD.post }), dark = toon({ color: '#1a2430' }), wood = toon({ color: '#5a3a2a' });
-    const put = (geo: THREE.BufferGeometry, m: THREE.Material, p: THREE.Vector3, yaw = 0) => { const o = new THREE.Mesh(geo, m); o.position.copy(p); o.rotation.y = yaw; look.add(o); return o; };
-    const onArc = (a: number, r: number) => { const d = fwd.clone().multiplyScalar(Math.cos(a)).addScaledVector(right, Math.sin(a)); return { p: centre.clone().addScaledVector(d, r), yaw: Math.atan2(d.x, d.z) }; };
-    // the wall, block by block on its arc, capped, with the rail's posts and pipes over it
-    for (let i = -LOOKOUT.blocks; i <= LOOKOUT.blocks; i++) {
-      const { p, yaw } = onArc(i * LOOKOUT.pitch, LOOKOUT.r);
-      put(new THREE.BoxGeometry(1.14, 0.55, 0.5), stone, p.clone().setY(y0 + 0.28), yaw);
-      put(new THREE.BoxGeometry(1.2, 0.08, 0.62), cap, p.clone().setY(y0 + 0.59), yaw);
-      if (i % 4 === 0) put(new THREE.CylinderGeometry(0.03, 0.03, 0.55, 8), steel, p.clone().setY(y0 + 0.9));
-      if (i % 4 === 0 && i < LOOKOUT.blocks) { // the pipe to the next post, along the chord
-        const q = onArc((i + 4) * LOOKOUT.pitch, LOOKOUT.r).p, mid = p.clone().add(q).multiplyScalar(0.5).setY(y0 + 1.16), d = q.clone().sub(p);
-        const pipe = put(new THREE.CylinderGeometry(0.025, 0.025, d.length(), 8), steel, mid, Math.atan2(d.x, d.z)); pipe.rotation.x = Math.PI / 2; pipe.rotation.order = 'YXZ';
-      }
-    }
-    // the coin viewer, left of the car's nose at the wall; a bench and a bin to the right
-    { const { p } = onArc(-0.42, LOOKOUT.r - 1.2); put(new THREE.CylinderGeometry(0.06, 0.09, 1.25, 10), steel, p.clone().setY(y0 + 0.62)); put(new THREE.BoxGeometry(0.42, 0.26, 0.5), dark, p.clone().setY(y0 + 1.4), Math.atan2(fwd.x, fwd.z)); }
-    { const { p, yaw } = onArc(0.5, LOOKOUT.r - 1.6); put(new THREE.BoxGeometry(1.8, 0.07, 0.45), wood, p.clone().setY(y0 + 0.46), yaw); put(new THREE.BoxGeometry(1.8, 0.4, 0.07), wood, p.clone().addScaledVector(fwd, -0.22).setY(y0 + 0.72), yaw); for (const dx of [-0.75, 0.75]) put(new THREE.BoxGeometry(0.06, 0.45, 0.4), steel, p.clone().addScaledVector(right, dx).setY(y0 + 0.22), yaw); }
-    { const { p } = onArc(0.8, LOOKOUT.r - 1.4); put(new THREE.CylinderGeometry(0.32, 0.3, 0.9, 12), toon({ color: '#2f5d3a' }), p.clone().setY(y0 + 0.45)); }
-    // pines either side, framing the view
-    for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) {
-      const p = centre.clone().addScaledVector(right, sx * (LOOKOUT.apron - 2 + 7 * k)).addScaledVector(fwd, 3 - 6 * k + 3 * hash(sx, k, 3)), h = 7 + 4 * hash(sx, k, 4);
-      put(new THREE.CylinderGeometry(0.18, 0.26, 2.2, 8), WOOD_DARK, p.clone().setY(y0 + 1.1));
-      put(new THREE.ConeGeometry(2.2 + 0.8 * hash(sx, k, 5), h, 10), dark, p.clone().setY(y0 + 2 + h / 2));
-    }
-    // chaparral: dark scrub round the turnout's edge and down the hillside, and a VISTA POINT sign where the road meets
-    // the apron (the turnout read as a flat grey disc)
-    {
-      const scrubM: THREE.Matrix4[] = [];
-      for (let i = 0; i < 90; i++) {
-        const a = hash(i, 11) * Math.PI * 2, r = LOOKOUT.apron + 1 + 10 * hash(i, 12) ** 1.5, p = centre.clone().addScaledVector(fwd, r * Math.cos(a) + 2).addScaledVector(right, r * Math.sin(a));
-        if (Math.cos(a) > 0.25) continue; // (none ahead, past the wall: there it stood across the view)
-        if (Math.abs(p.clone().sub(park.pos).dot(right)) < ROAD_HALF + 2 && p.clone().sub(park.pos).dot(fwd) < 2) continue; // (not on the road in)
-        const sz = 0.5 + 0.9 * hash(i, 13);
-        scrubM.push(new THREE.Matrix4().compose(p.setY(y0 - 0.1 - 0.4 * hash(i, 14)), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(i, 15) * 6), new THREE.Vector3(sz * 1.3, sz * 0.7, sz)));
-      }
-      for (let i = 0; i < 160; i++) { // down the slope, thinning
-        const u = 0.2 + 0.78 * hash(i, 21) ** 0.7, x = (hash(i, 22) - 0.5) * (2 * SHOULDER + 60), sz = 0.6 + 1.2 * hash(i, 23);
-        const drop = y0 - (-0.4), ease = u * u * (3 - 2 * u), p = lipF.pos.clone().addScaledVector(fwd, 1 + u * LOOKOUT.fall).addScaledVector(right, x).setY(-0.4 + drop * (1 - ease) + 0.1);
-        scrubM.push(new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(i, 24) * 6), new THREE.Vector3(sz * 1.3, sz * 0.8, sz)));
-      }
-      const scrub = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), toon({ color: '#1e2a24' }), scrubM.length);
-      scrubM.forEach((m, i) => scrub.setMatrixAt(i, m));
-      look.add(scrub);
-      const sp = park.pos.clone().addScaledVector(fwd, -8).addScaledVector(right, ROAD_HALF + 1.6);
-      put(new THREE.BoxGeometry(0.12, 2.4, 0.12), steel, sp.clone().setY(y0 + 1.2));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.6), new THREE.MeshBasicMaterial({ map: (() => { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 192; const c = cv.getContext('2d')!; c.fillStyle = '#6b4a2a'; c.fillRect(0, 0, 512, 192); c.strokeStyle = '#f4f0e6'; c.lineWidth = 8; c.strokeRect(10, 10, 492, 172); c.fillStyle = '#f4f0e6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `700 70px "${F.sign(700)}"`; c.fillText('VISTA POINT', 256, 96); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t; })() }));
-      face.position.copy(sp).setY(y0 + 2.2); face.lookAt(face.position.clone().addScaledVector(fwd, -1)); look.add(face);
-    }
-    // the hillside: from the lip down to the plain, rolling
-    const across = 2 * SHOULDER + 70, along = LOOKOUT.fall, geo = new THREE.PlaneGeometry(across, along, 28, 40).rotateX(-Math.PI / 2), P = geo.attributes.position!;
-    const drop = y0 - (-0.4);
-    for (let i = 0; i < P.count; i++) {
-      const x = P.getX(i), u = (P.getZ(i) + along / 2) / along; // (u: 0 at the lip, 1 at the plain)
-      const ease = u * u * (3 - 2 * u), roll = (1.6 * Math.sin(x * 0.07 + u * 9) + 1.1 * Math.sin(x * 0.19 - u * 5)) * Math.sin(Math.PI * u);
-      P.setY(i, -0.4 + drop * (1 - ease) + roll - 0.1);
-    }
-    geo.computeVertexNormals();
-    const hill = new THREE.Mesh(geo, printedGround(toon({ color: '#5e5048' })));
-    hill.matrixAutoUpdate = false;
-    hill.matrix.makeBasis(right, new THREE.Vector3(0, 1, 0), fwd).setPosition(lipF.pos.clone().addScaledVector(fwd, along / 2 + 1).setY(0));
-    look.add(hill);
-  }
+  // the overlook (the user, 2026-10-13: they sat "at the top of a box"): the road ends in a lot at the lip, a stone
+  // wall along it, the city below (look/lookout.ts)
+  g.add(named(buildLookout(route.frameAt(end - OVERLOOK_LIP), OVERLOOK_LIP, SHOULDER), 'lookout'));
+  // the hills the climb runs up to it (shown from the climb on: the scene)
+  { const climb = drive.stretches.find((st) => st.id === 'chorus4'); if (climb) g.add(named(buildClimbHills((s) => route.frameAt(s), motion.distanceAt(climb.start), end, (s) => Math.max(verge(-1, s), verge(1, s))), 'climb')); }
   // embankments where the road has climbed: from each verge's edge down to the plain
-  for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? BEACH : SHOULDER), end), lambert()), 'skirts'));
+  for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? BEACH : verge(side, s)), end), lambert()), 'skirts'));
   const box3 = new THREE.Box3();
   for (let s = 0; s < route.length; s += 50) box3.expandByPoint(route.frameAt(s).pos);
   const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), printedGround(toon({ color: grass.clone().multiplyScalar(0.85) })));
@@ -245,25 +243,28 @@ export function buildWorld(drive: Drive): THREE.Group {
   const ease = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
   const rightEdge = (s: number) => (lanes ? ROAD_HALF + (lanes.edge - ROAD_HALF) * ease((s - lanes.a) / lanes.merge) * ease((lanes.b - s) / lanes.merge) : ROAD_HALF);
   g.add(named(new THREE.Mesh(strip(route, -ROAD_HALF, rightEdge, 0, () => asphalt, end), lambert()), 'road'));
-  // the centre line's dashes, but none under road paint (they'd cut through its letters; left out, not squashed
-  // flat: a flat box's normals are NaN, and the bloom spreads a NaN into a white dot)
+  // the centre line's dashes and the edge lines: paint laid on the road strip's own facets and drawn over them
+  // (roadPaint) — a dash was a flat box tangent to the road at its middle, and on the climb to the overlook its ends sank
+  // into the grade and stood off it; the edge lines' samples fell between the road's, a centimetre off its facets: they
+  // flickered in and out of the asphalt (the user, 2026-10-15: "the lines in the road are clipping like crazy"). The
+  // road's paint ends where the overlook's lot begins (it has its own bays: look/lookout.ts).
+  const lines = toon({ color: WORLD.dash, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+  const lotAt = end - OVERLOOK_LIP - LOT.entry;
   const paint = drive.carriers.filter((c) => c.kind === 'road');
-  const dashAt: number[] = [];
-  // (nor across a cross street's mouth: its crosswalks)
-  // (nor in a tunnel: its two-way bore has its own double yellow line, scenes/sets/bridge1.ts)
-  for (let s = ROAD_START; s < end; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2) && !drive.openings.some((o) => s > o.a - 4 && s < o.b + 4) && !nearTunnel(drive.tunnels, s, 2)) dashAt.push(s);
-  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), dashAt.length);
-  dashAt.forEach((s, i) => dashes.setMatrixAt(i, boxAt(route, s, 0, 0.15, 0.02, 3, 0.01)));
-  g.add(named(dashes, 'dashes'));
+  const dashes: { s0: number; s1: number; a: number; b: number }[] = [];
+  // (none under road paint, they'd cut through its letters; nor across a cross street's mouth: its crosswalks; nor in a
+  // tunnel: its two-way bore has its own double yellow line, scenes/sets/bridge1.ts)
+  for (let s = ROAD_START; s + 1.5 < lotAt; s += 8) if (!paint.some((c) => Math.abs(c.s - s) < c.h / 2 + 2) && !drive.openings.some((o) => s > o.a - 4 && s < o.b + 4) && !nearTunnel(drive.tunnels, s, 2)) dashes.push({ s0: s - 1.5, s1: s + 1.5, a: -0.075, b: 0.075 });
+  g.add(named(new THREE.Mesh(roadPaint(route, end, -ROAD_HALF, rightEdge, dashes), lines), 'dashes'));
   // the edge lines, along every road the town's kerbs don't line (the freeway, the coast, the hills); not in a tunnel
   {
-    const line = toon({ color: WORLD.dash, side: THREE.DoubleSide }), spans: [number, number][] = [];
-    for (const st of drive.stretches) if (!SIDEWALKS.stretches.has(st.id) && !st.tunnel) spans.push([motion.distanceAt(st.start), Math.min(end, motion.distanceAt(st.end))]);
-    for (const [a, b] of spans) for (const side of [-1, 1]) {
+    const spans: [number, number][] = [], edges: { s0: number; s1: number; a: number | ((s: number) => number); b: number | ((s: number) => number) }[] = [];
+    for (const st of drive.stretches) if (!SIDEWALKS.stretches.has(st.id) && !st.tunnel) spans.push([motion.distanceAt(st.start), Math.min(lotAt, motion.distanceAt(st.end))]);
+    for (const [a, b] of spans) {
       if (b - a < 2) continue;
-      const edge = (inset: number) => (side > 0 ? (s: number) => rightEdge(s) - inset : -(ROAD_HALF - inset));
-      g.add(named(new THREE.Mesh(ribbon(route, a, b, edge(0.38), 0.015, edge(0.22), 0.015), line), 'dashes'));
+      edges.push({ s0: a, s1: b, a: -(ROAD_HALF - 0.22), b: -(ROAD_HALF - 0.38) }, { s0: a, s1: b, a: (s) => rightEdge(s) - 0.38, b: (s) => rightEdge(s) - 0.22 });
     }
+    g.add(named(new THREE.Mesh(roadPaint(route, end, -ROAD_HALF, rightEdge, edges), lines), 'dashes'));
   }
   // a guardrail along the sea side of the coast road (the road's edge dropped straight into the water): posts and a rail
   {
@@ -814,7 +815,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
 export const HILLSIDE = { ridge: 45, across: 60, right: 120, left: 320, under: 1.5, roll: 0.06, w: 860, d: 420, x: -130, z: -60, mast: { x: -70, h: 30 },
   /** The floodlights' wash on the slope: its patch (deep, centred), brightest this far in front of the letters, how far it
    *  falls off, how bright. */
-  wash: { d: 50, z: 3, z0: 1, fall: 8, glow: 0.12 } };
+  wash: { d: 50, z: 3, z0: 1, fall: 8, glow: 0.08 } };
 
 /** A carrier with its face's texture: a board on posts (a sign, a billboard), a street blade on its pole, a gantry over
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
@@ -926,7 +927,9 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
       const p = geo.attributes.position!;
       for (let i = 0; i < p.count; i++) p.setY(i, rise(p.getX(i), p.getZ(i)));
       geo.computeVertexNormals();
-      const hill = new THREE.Mesh(geo, printedGround(toon({ color: GROUND.chorus4! }))); hill.name = 'mound'; g.add(hill);
+      // (in chaparral, darker and clear of the haze: by moonlight its plain ground read as a pale dune — the user,
+      // 2026-10-15)
+      const hill = new THREE.Mesh(geo, scrubGround(toon({ color: '#5a4b4c', fog: false }), '#1d241f', 0.09)); hill.name = 'mound'; g.add(hill);
       // the floodlights' wash on the slope round the letters (they're lit from below, the Hollywood sign's way): the
       // hill's skin under them again, a hand over it, added light fading out from the letters' feet
       const wash = new THREE.PlaneGeometry(c.w * 1.3, H.wash.d, Math.round(c.w / 4), Math.round(H.wash.d / 2)).rotateX(-Math.PI / 2).translate(0, 0, H.wash.z);
@@ -946,9 +949,10 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
         for (const y of [top * 0.2, -top * 0.6]) box(cell * 0.66, 0.2, 0.2, x, y, -0.8, steel);
       });
       const mx = H.mast.x, my = rise(mx, -H.ridge);
-      box(0.6, H.mast.h, 0.6, mx, my + H.mast.h / 2, -H.ridge, steel);
       const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 0.35, 0.3) }));
       beacon.position.set(mx, my + H.mast.h + 0.6, -H.ridge); beacon.name = 'beacon'; g.add(beacon);
+      // its slope's scrub and ridge bushes, the letters' floodlights and beams, the mast's lattice, the observatory
+      dressHill(g, c, rise, { x: mx, z: -H.ridge, h: H.mast.h }, beacon.material);
       break;
     }
     case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey(WORLD.post)); break;

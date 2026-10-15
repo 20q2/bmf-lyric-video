@@ -3,24 +3,35 @@
 //   - a downtown: a cluster of dark towers with lit window columns and red beacons, under a dome of light;
 //   - boulevards: long straight rows of bright sodium lights running out across the plain;
 //   - the street grid between them, denser toward downtown, broken by dark blocks (parks, yards, hills);
-//   - freeways: ribbons of headlights coming and tail lights going;
-//   - a plane or two blinking across the sky.
+//   - freeways: ribbons of headlights coming and tail lights going, two lanes each way;
+//   - planes blinking across the sky, one low on its approach, its landing lights on;
+//   - searchlights from two lots in the city sweeping the sky (a premiere somewhere);
+//   - a mist lying in the canyon and over the plain, lit warm from under by the city (the user, 2026-10-15: "make it
+//     look just like really nice at the end").
+// Downtown's tallest towers wear lit crowns and setbacks; every tall one a blinking red beacon.
 // HDR points, so the city glitters in the bloom; the towers toon-dark silhouettes against the glow. The lights switch
 // on in a wave as the car parks, rolling out from the overlook to the horizon, and twinkle. On the outro's "we might
 // crash" (sung after the song has faded out of hearing: the end is the scene's own) they go out block by block, the
 // freeways last. Deterministic (hashed). Browser only (points shader).
 import * as THREE from 'three';
 import { hash } from '../engine/util';
-import { NIGHT, glowMaterial } from './night';
+import { NIGHT, glowMaterial, lampMaterial } from './night';
 import { toon } from './toon';
 
 /** Where the city spreads (m ahead of the parked car, and either side), its streets' spacing, the wave (when it
  *  starts, how fast it rolls out), how bright its lights shine (HDR), and the blackout (each block's lights die within
- *  `spread` s of the crash, over `die` s; the freeways this much later). */
-export const CITY = { near: 300, far: 5200, half: 3800, street: 85, step: 14, waveAt: 165.6, wave: 1800, glow: 3.6, freeways: 7, spread: 1.5, die: 0.3, freewayLag: 1.5 };
+ *  `spread` s of the crash, over `die` s; the freeways this much later); its dark plain from this far out. */
+export const CITY = { plain: 196, near: 300, far: 5200, half: 3800, street: 85, step: 14, waveAt: 165.6, wave: 1800, glow: 3.6, freeways: 7, spread: 1.5, die: 0.3, freewayLag: 1.5 };
 /** Downtown: how far ahead and to the right (m), its towers (how many, within this radius, their heights) and the glow
  *  over it; the boulevards (how many each way). */
 export const DOWNTOWN = { ahead: 1700, right: 520, towers: 22, radius: 320, h: [55, 190] as [number, number], glow: 0.4, boulevards: [11, 7] as [number, number] };
+/** The searchlights: where they stand (m ahead of the parked car, right of it), how long their beams reach, how wide
+ *  they open, how bright; their sweep (radians off the vertical, how far either way, how fast). */
+export const SEARCH = { at: [[1350, 320], [1950, -380]] as [number, number][], len: 1600, r: 26, glow: 0.3, tilt: 0.42, sweep: 0.55, rate: 0.33 };
+/** The mist: bands of glow standing over the canyon and the plain (m ahead, how tall), how bright. */
+export const MIST = { at: [[235, 16], [420, 40], [900, 60], [1700, 80]] as [number, number][], glow: 0.12 };
+/** When the plane on its approach comes into the end's frame (s). */
+const APPROACH_AT = 168;
 
 const VERT = /* glsl */ `
 attribute vec3 color; attribute float size; attribute float wake; attribute float sleep; attribute float blink;
@@ -54,7 +65,7 @@ void main() {
   gl_FragColor = vec4(vColor * glow, a);
 }`;
 
-export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Vector3, ground: number, offAt = 1e7): { group: THREE.Group; update(t: number, eye: THREE.Vector3, scale: number): void } {
+export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Vector3, ground: number, offAt = 1e7, plainFrom = 0): { group: THREE.Group; update(t: number, eye: THREE.Vector3, scale: number): void } {
   const pos: number[] = [], col: number[] = [], size: number[] = [], wake: number[] = [], dir: number[] = [], move: number[] = [], sleep: number[] = [], blink: number[] = [];
   const F = fwd.clone().setY(0).normalize(), R = right.clone().setY(0).normalize();
   const grid = 0.21; // the street grid's slant to the view (radians)
@@ -100,7 +111,7 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   }
   // downtown: the towers (dark silhouettes), their windows lit in columns, beacons on the tall ones
   const group = new THREE.Group();
-  const towerMat = toon({ color: '#0e0b16' });
+  const towerMat = toon({ color: '#0e0b16', fog: false }), crowns: THREE.Mesh[] = []; // (clear of the haze: black against the glow, lit or dark)
   for (let i = 0; i < DOWNTOWN.towers; i++) {
     const a = hash(i, 41) * Math.PI * 2, r = DOWNTOWN.radius * Math.sqrt(hash(i, 42));
     const c = D.clone().addScaledVector(F, r * Math.cos(a)).addScaledVector(R, r * Math.sin(a));
@@ -117,8 +128,23 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
         put(p, hash(i, y, 46) < 0.8 ? white : cool, 1.9, undefined, undefined, CITY.spread * hash(i, Math.floor(y / 12), 47), 0, ground + y);
       }
     }
-    if (h > 110) put(c, [1, 0.12, 0.08], 2.2, undefined, undefined, CITY.spread, 0.2 + 0.6 * hash(i, 48), ground + h + 2);
+    if (h > 80) put(c, [1, 0.12, 0.08], 2.2, undefined, undefined, CITY.spread, 0.2 + 0.6 * hash(i, 48), ground + h + 2);
+    // the tallest: a setback on top and a lit crown round it (a band of light, white or teal)
+    if (h > 130) {
+      const top = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 14, d * 0.7), towerMat); top.position.set(c.x, ground + h + 7, c.z); top.rotation.y = grid; group.add(top);
+      const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7 + 0.6, 2.2, d * 0.7 + 0.6), lampMaterial(hash(i, 49) < 0.5 ? '#bff4ff' : '#fff1d8', 2.4, 0.2));
+      crown.position.set(c.x, ground + h + 11.5, c.z); crown.rotation.y = grid; group.add(crown); crowns.push(crown);
+    }
   }
+  // the plain the city stands on, dark between its lights (moonlit, it read pale through them, and with the lights out
+  // as a flat lavender sea: the haze is the mist's); from the foot of the lookout's slope out. Laid from `plainFrom`
+  // (the cut to the last line): earlier, other sections look out over this ground
+  const plain = (() => {
+    const L = 12000, plain = new THREE.Mesh(new THREE.PlaneGeometry(9000, L).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#120e18', fog: false }));
+    plain.rotation.y = Math.atan2(F.x, F.z); plain.position.copy(at).addScaledVector(F, CITY.plain + L / 2).setY(ground + 0.06); plain.name = 'plain';
+    group.add(plain);
+    return plain;
+  })();
   // the dome of light over downtown: a warm glow standing behind it, facing the lookout
   const dome = new THREE.Mesh(new THREE.PlaneGeometry(3000, 760), glowMaterial('#ff9a4c', DOWNTOWN.glow, true));
   dome.position.copy(D).addScaledVector(F, 500).setY(ground + 70);
@@ -128,12 +154,13 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   for (let f = 0; f < CITY.freeways; f++) {
     const a = 0.5 + 1.1 * hash(f, 9), cross = gR.clone().multiplyScalar(Math.cos(a)).addScaledVector(gF, Math.sin(a)).normalize();
     const mid = at.clone().addScaledVector(F, CITY.near + 300 + 2600 * hash(f, 10)).addScaledVector(R, (hash(f, 11) - 0.5) * 2200);
-    const len = 5600, start = mid.clone().addScaledVector(cross, -len / 2);
-    for (let i = 0; i < 560; i++) {
-      const lane = i % 2;
-      const p0 = start.clone().addScaledVector(cross.clone().cross(new THREE.Vector3(0, 1, 0)), lane ? 6 : -6);
+    const len = 5600, start = mid.clone().addScaledVector(cross, -len / 2), side = cross.clone().cross(new THREE.Vector3(0, 1, 0));
+    for (let i = 0; i < 1100; i++) {
+      // (two lanes each way: white coming, red going, the outer lane a little slower)
+      const lane = i % 2, outer = Math.floor(i / 2) % 2;
+      const p0 = start.clone().addScaledVector(side, (lane ? 1 : -1) * (5 + 4 * outer));
       const d = lane ? cross : cross.clone().negate(), s0 = lane ? p0 : p0.clone().addScaledVector(cross, len);
-      put(s0, lane ? white : [1, 0.15, 0.1], 1.6, d, [hash(f, i, 12) * len, 22 + 8 * hash(f, i, 13), len], CITY.freewayLag + CITY.spread * hash(f, i, 14));
+      put(s0, lane ? white : [1, 0.15, 0.1], lane ? 1.9 : 1.6, d, [hash(f, i, 12) * len, 24 + 8 * hash(f, i, 13) - 5 * outer, len], CITY.freewayLag + CITY.spread * hash(f, i, 14));
     }
   }
   // a plane or two, blinking, crossing the sky slowly
@@ -142,6 +169,16 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
     const p = at.clone().addScaledVector(F, 1200 + 1500 * i).addScaledVector(d, -len / 2);
     put(p, [1, 0.3, 0.25], 1.8, d, [hash(i, 51) * len, 45, len], 1e6, 0.3 + 0.5 * i, ground + 520 + 180 * i);
     put(p, white, 1.4, d, [hash(i, 51) * len, 45, len], 1e6, 0, ground + 520 + 180 * i);
+  }
+  // and one low on its approach, right to left across the city's side of the view as they park: its landing lights
+  // ahead of it, its beacon blinking (in the end's frame from APPROACH_AT)
+  {
+    const d = R.clone().negate().addScaledVector(F, -0.12).normalize(), len = 9000, speed = 95, y = ground + 230;
+    const at0 = at.clone().addScaledVector(F, 2100).addScaledVector(R, 1500).addScaledVector(d, -len / 2), on = (u: number) => at0.clone().addScaledVector(d, u);
+    const phase = len / 2 - speed * APPROACH_AT;
+    put(on(0), [1, 1, 0.95], 11, d, [phase, speed, len], 1e6, 0, y); // its landing lights
+    put(on(-24), [1, 0.2, 0.15], 6, d, [phase, speed, len], 1e6, 0.1, y + 4);
+    put(on(-16), [0.3, 1, 0.4], 4.5, d, [phase, speed, len], 1e6, 0, y);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -157,8 +194,37 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   const points = new THREE.Points(g, m);
   points.frustumCulled = false;
   group.add(points);
+  // the searchlights: open cones from their lots up into the sky, swept to and fro
+  const beams = SEARCH.at.map(([a, r], k) => {
+    const mat = glowMaterial('#d8e6ff', SEARCH.glow), beam = new THREE.Mesh(new THREE.CylinderGeometry(SEARCH.r, 1.5, SEARCH.len, 24, 1, true), mat);
+    beam.frustumCulled = false; group.add(beam);
+    return { beam, mat, base: at.clone().addScaledVector(F, a).addScaledVector(R, r).setY(ground + 2), phase: 1.7 * k + 0.4 };
+  });
+  // the mist: tall bands of soft glow standing across the view, lit from under
+  const mists = MIST.at.map(([a, h], k) => {
+    const mat = glowMaterial(k < 1 ? '#ff9c86' : '#ffb07a', MIST.glow), band = new THREE.Mesh(new THREE.PlaneGeometry(9000, h * 2), mat);
+    band.position.copy(at).addScaledVector(F, a).setY(ground + h * 0.6 - 4); band.lookAt(at.x, band.position.y, at.z);
+    band.frustumCulled = false; group.add(band);
+    return mat;
+  });
+  const up = new THREE.Vector3(0, 1, 0), aim = new THREE.Vector3();
   return {
     group,
-    update(t, eye, scale) { u.t.value = t; u.on.value = t; u.eye.value.copy(eye); u.scale.value = scale; },
+    update(t, eye, scale) {
+      u.t.value = t; u.on.value = t; u.eye.value.copy(eye); u.scale.value = scale;
+      // (the city's own light: it comes up with the wave and goes with the blackout — the searchlights, the crowns and
+      // the mist it lights with it)
+      const lit = Math.min(1, Math.max(0, (t - CITY.waveAt) / 2)) * (1 - Math.min(1, Math.max(0, (t - offAt - CITY.spread) / 1.2)));
+      for (const b of beams) {
+        const az = b.phase + SEARCH.sweep * Math.sin(t * SEARCH.rate + b.phase * 2), tilt = SEARCH.tilt + 0.12 * Math.sin(t * SEARCH.rate * 0.7 + b.phase);
+        aim.copy(F).multiplyScalar(Math.sin(tilt) * Math.cos(az)).addScaledVector(R, Math.sin(tilt) * Math.sin(az)).setY(Math.cos(tilt)).normalize();
+        b.beam.quaternion.setFromUnitVectors(up, aim); b.beam.position.copy(b.base).addScaledVector(aim, SEARCH.len / 2);
+        b.mat.uniforms.strength!.value = SEARCH.glow * lit;
+        b.beam.visible = lit > 0;
+      }
+      for (const mt of mists) mt.uniforms.strength!.value = MIST.glow * (0.15 + 0.85 * lit);
+      for (const c of crowns) c.visible = lit > 0.05;
+      plain.visible = t >= plainFrom;
+    },
   };
 }

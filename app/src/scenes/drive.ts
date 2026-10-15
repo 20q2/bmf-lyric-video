@@ -26,6 +26,7 @@ import { buildCity } from '../look/city';
 import { type Stance, hydraulics } from '../drive/hydraulics';
 import { neonAt } from '../drive/landmarks';
 import { type Cast, castOf } from '../drive/cast';
+import { poseCast } from '../look/cast3d';
 import { FINALE } from '../drive/drive';
 import { AUDIBLE } from '../drive/stretches';
 import { carMatrix } from '../drive/carriers';
@@ -82,6 +83,9 @@ const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * M
 const DEG = Math.PI / 180;
 /** The hill sign's mast beacon: lit this long (s) in every `every`. */
 const BEACON = { on: 0.5, every: 1.6 };
+/** At the end the moon hangs over downtown in the view from the overlook: this far right of the parked car's heading
+ *  and this high (radians). */
+const END_MOON = { bearing: (22 * Math.PI) / 180, elev: (10.5 * Math.PI) / 180 };
 /** The shadows turn from the sun to the moon at this sun height, where neither prints. */
 const SHADE_SWITCH = -2 * DEG;
 const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
@@ -131,6 +135,12 @@ export default class DriveScene extends Scene {
   private riding: [THREE.Object3D, THREE.Matrix4, number][] = [];
   /** The red beacon on the hill sign's mast (it blinks). */
   private beacons: THREE.MeshBasicMaterial[] = [];
+  /** The hills the climb runs up (world.ts), shown from the climb's first cut on: from the coast they'd stand in its
+   *  views. */
+  private climb: THREE.Object3D | null = null;
+  private climbFrom = Infinity;
+  /** Where the moon hangs at the end (unit). */
+  private endMoon = new THREE.Vector3();
 
   override init() {
     const { audio, lyrics, renderer } = this.ctx;
@@ -141,6 +151,8 @@ export default class DriveScene extends Scene {
     this.env = new SkyEnv(renderer, QUALITY.envStep);
     const world = buildWorld(this.drive);
     this.sign = world.userData.sign;
+    this.climb = world.getObjectByName('climb') ?? null;
+    this.climbFrom = this.drive.stretches.find((st) => st.id === 'chorus4')?.start ?? Infinity;
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
     this.heft = heftOf(this.drive.stretches, this.drive.reading);
     this.cast = castOf(audio, lyrics);
@@ -188,7 +200,9 @@ export default class DriveScene extends Scene {
     const end = this.drive.carFrame(this.ctx.audio.duration);
     const crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w)).map((w) => w.start));
     const lastCrash = crashes.length ? Math.max(...crashes) : undefined;
-    this.city = buildCity(end.pos, end.fwd, end.right, -0.4, lastCrash);
+    this.city = buildCity(end.pos, end.fwd, end.right, -0.4, lastCrash, this.drive.lastCut ?? 0);
+    { const f = new THREE.Vector3(end.fwd.x, 0, end.fwd.z).normalize(), r = new THREE.Vector3(end.right.x, 0, end.right.z).normalize();
+      this.endMoon.copy(f).multiplyScalar(Math.cos(END_MOON.bearing)).addScaledVector(r, Math.sin(END_MOON.bearing)).multiplyScalar(Math.cos(END_MOON.elev)).setY(Math.sin(END_MOON.elev)).normalize(); }
     this.world.add(this.city.group);
   }
 
@@ -210,12 +224,9 @@ export default class DriveScene extends Scene {
     }
     // the wire wheels roll with the road (their spokes turning: they'd read as hubcaps standing still)
     for (const w of (this.car.userData.wheels as THREE.Object3D[] | undefined) ?? []) w.rotation.x = d.motion.distanceAt(t) / CAR.wheelR;
-    // the two of them: her arm up (it swings out and over), her look to him, his nod — and at the end her head onto
-    // his shoulder, his tilting to meet it
-    const cast = this.cast(t);
-    body.getObjectByName('herArm')!.rotation.set(0, 0, -2.7 * cast.herArm);
-    body.getObjectByName('herHead')!.rotation.set(0, 0.7 * cast.herLook, -0.55 * cast.lean);
-    body.getObjectByName('hisHead')!.rotation.set(cast.hisNod, 0, 0.2 * cast.lean);
+    // the two of them: her arm up (it swings out and over), her look to him, his nod — and at the end her lean into
+    // him, her head on his shoulder, his arm round her (look/cast3d.ts poseCast)
+    poseCast(body, this.cast(t));
     // the headlights' throw follows the speed: parked, the beams settle to a glow at the nose
     const beams = this.car.getObjectByName('beams') as THREE.Mesh | undefined;
     if (beams) (beams.material as THREE.ShaderMaterial).uniforms.strength!.value = GLOW.beam * Math.min(1, 0.15 + d.motion.speedAt(t) / 4);
@@ -299,6 +310,7 @@ export default class DriveScene extends Scene {
       up.addScaledVector(a, -up.dot(a)).normalize();
       this.writer.matrix.makeBasis(a, up, a.clone().cross(up)).scale(new THREE.Vector3(k, k, k)).setPosition(at);
     }
+    if (this.climb) this.climb.visible = t >= this.climbFrom;
     // the hill sign stays floodlit to the end (it's the view they parked for); the beacon on its mast blinks
     for (const m of this.beacons) m.visible = (t % BEACON.every) < BEACON.on;
     // the lyric faces near now
@@ -310,7 +322,10 @@ export default class DriveScene extends Scene {
     // (the hero's reflections: the sky of this moment, remade on steps of song time)
     this.world.environment = this.env.update(t, (tau) => this.skyAt(tau));
     const moonDir = this.sunAz.clone().multiplyScalar(-Math.cos(MOON.elev)).add(new THREE.Vector3(0, Math.sin(MOON.elev), 0));
-    this.dome.update(sky, sunDir, sunColor, this.cam, t, cloudsAt(t), raysAt(t), moonDir, smooth(-2 * DEG, -9 * DEG, e)); // (the moon up once the sun's well down)
+    // (the moon up once the sun's well down; from the cut to the last line it hangs in the view they parked for, low
+    // over downtown: up where it lights from, it never made the end's frame)
+    const shownMoon = d.lastCut !== null && t >= d.lastCut ? this.endMoon : moonDir;
+    this.dome.update(sky, sunDir, sunColor, this.cam, t, cloudsAt(t), raysAt(t), shownMoon, smooth(-2 * DEG, -9 * DEG, e));
     // the sun lights from no lower than 4° (its shadows stay finite), fading out as it sets
     const lightDir = this.sunAz.clone().multiplyScalar(Math.cos(Math.max(e, 4 * DEG))).add(new THREE.Vector3(0, Math.sin(Math.max(e, 4 * DEG)), 0));
     // the shadows round the lens's view: the sun's, and once it's down (both lights near nothing) the moon's
