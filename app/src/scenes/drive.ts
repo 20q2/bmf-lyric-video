@@ -19,6 +19,7 @@ import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
 import { QUALITY } from '../look/quality';
+import { Cascades } from '../look/shadows';
 import { SkyEnv } from '../look/envsky';
 import { GLOW, NIGHT, PULSE } from '../look/night';
 import { buildCity } from '../look/city';
@@ -74,14 +75,13 @@ const SYNC = { punch: [0.002, 0.004] as [number, number], bounce: 0.012, pulse: 
 /** The sun sets over the sea: it stands SUN_AZ_DEG left of the coast road's heading (sky.ts) — inside the arch
  *  wide's frame, kissing the water (sets/chorus3.ts shares the bearing for its glitter path). */
 const SUN_AZ = (SUN_AZ_DEG * Math.PI) / 180;
-/** Sunlight (low and warm, warmest as it sets), moonlight (cool, from high in the east), and the shadows' reach (m). */
+/** Sunlight (low and warm, warmest as it sets) and moonlight (cool, from high in the east; `shade`: how much its
+ *  shadows print, of the sun's). */
 const SUN = { intensity: 2.8, high: new THREE.Color('#ffe6b8'), low: new THREE.Color('#ff8a4c') };
-const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * Math.PI) / 180 };
-/** The sun's shadows cover what the camera sees, not where the car is: a square this many metres either side of a point
- *  this far ahead of the lens along the ground (QA 2026-10-13: at ±110 m round the car close shots got 11–14 cm
- *  shadow texels, stair-stepped palms; shots looking far ahead ran off its edge). */
-const SHADOW = { half: 60, ahead: 32 };
+const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * Math.PI) / 180, shade: 0.6 };
 const DEG = Math.PI / 180;
+/** The shadows turn from the sun to the moon at this sun height, where neither prints. */
+const SHADE_SWITCH = -2 * DEG;
 const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 
 export default class DriveScene extends Scene {
@@ -94,6 +94,8 @@ export default class DriveScene extends Scene {
   private sun = new THREE.DirectionalLight('#fff3df', 2.2);
   private moon = new THREE.DirectionalLight('#9fa8ff', 0);
   private hemi = new THREE.HemisphereLight('#ffffff', '#3a3326', 1.2);
+  /** The shadows (look/shadows.ts). */
+  private shade = new Cascades(QUALITY.shadowMap);
   private dome = new SkyDome();
   /** The sky as the hero sees it (its reflections). */
   private env!: SkyEnv;
@@ -166,12 +168,8 @@ export default class DriveScene extends Scene {
       const lit = o.material instanceof THREE.MeshToonMaterial || o.material instanceof THREE.MeshStandardMaterial;
       o.castShadow = o.receiveShadow = lit;
     });
-    const sh = this.sun.shadow;
-    sh.mapSize.set(QUALITY.shadowMap, QUALITY.shadowMap);
-    Object.assign(sh.camera, { left: -SHADOW.half, right: SHADOW.half, top: SHADOW.half, bottom: -SHADOW.half, near: 1, far: 1200 });
-    sh.camera.updateProjectionMatrix();
-    sh.bias = -0.001; sh.normalBias = 0.12;
-    this.sun.castShadow = true;
+    // (the shadows are the cascades' (look/shadows.ts): the sun and the moon cast nothing themselves)
+    this.world.add(...this.shade.objects);
     // (nothing up in the sky casts: the skywriter, the banners' tow planes — their shadows fell on the facades out of
     // nowhere)
     for (const o of [this.writer, ...this.flying.map(([, f]) => f)]) o.traverse((m) => { if (m instanceof THREE.Mesh) m.castShadow = false; });
@@ -313,14 +311,10 @@ export default class DriveScene extends Scene {
     this.dome.update(sky, sunDir, sunColor, this.cam, t, cloudsAt(t), raysAt(t), moonDir, smooth(-2 * DEG, -9 * DEG, e)); // (the moon up once the sun's well down)
     // the sun lights from no lower than 4° (its shadows stay finite), fading out as it sets
     const lightDir = this.sunAz.clone().multiplyScalar(Math.cos(Math.max(e, 4 * DEG))).add(new THREE.Vector3(0, Math.sin(Math.max(e, 4 * DEG)), 0));
-    // (centred ahead of the lens, snapped to the map's texels in the light's own frame: no shimmer as the camera moves)
-    const look = new THREE.Vector3(); this.cam.getWorldDirection(look); look.y = 0;
-    const centre = this.cam.position.clone().addScaledVector(look.lengthSq() > 1e-6 ? look.normalize() : look, SHADOW.ahead); centre.y = cf.pos.y;
-    const texel = (2 * SHADOW.half) / QUALITY.shadowMap, lz = lightDir.clone().normalize(), lx = new THREE.Vector3(0, 1, 0).cross(lz).normalize(), ly = lz.clone().cross(lx);
-    const snap = (v: number) => Math.round(v / texel) * texel;
-    centre.copy(lx.clone().multiplyScalar(snap(centre.dot(lx)))).addScaledVector(ly, snap(centre.dot(ly))).addScaledVector(lz, centre.dot(lz));
-    this.sun.position.copy(centre).addScaledVector(lightDir, 500);
-    this.sun.target.position.copy(centre);
+    // the shadows round the lens's view: the sun's, and once it's down (both lights near nothing) the moon's
+    this.shade.update(this.cam, e > SHADE_SWITCH ? lightDir.clone().normalize() : moonDir);
+    this.sun.position.copy(cf.pos).addScaledVector(lightDir, 500);
+    this.sun.target.position.copy(cf.pos);
     this.sun.color.copy(sunColor);
     this.sun.intensity = SUN.intensity * smooth(-3 * DEG, 3 * DEG, e);
     this.moon.position.copy(cf.pos).addScaledVector(moonDir, 500);
@@ -359,7 +353,8 @@ export default class DriveScene extends Scene {
       this.headlight.intensity = HEADLIGHT.intensity * inside;
     } else { this.sodium.forEach((l) => (l.intensity = 0)); this.headlight.intensity = 0; }
     this.sun.intensity *= 1 - inside;
-    PRINT_SHADE.value = smooth(-1 * DEG, 4 * DEG, e) * (1 - inside); // the printed shadows (look/toon.ts): the sun's
+    // the printed shadows (look/toon.ts): the sun's, then fainter, the moon's
+    PRINT_SHADE.value = Math.max(smooth(-1 * DEG, 4 * DEG, e), MOON.shade * smooth(-3 * DEG, -9 * DEG, e)) * (1 - inside);
     this.moon.intensity *= 1 - inside;
     this.hemi.intensity *= 1 - 0.85 * inside;
     this.fogColor.lerp(TUNNEL_DARK, inside);

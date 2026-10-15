@@ -1,6 +1,7 @@
 // Materials for the screen-printed world: toon shading in three flat tones (shadow, mid, lit), and the palette the
 // world is printed in — LA stucco pastels, dark palm silhouettes, warm asphalt. Browser and bun (no DOM).
 import * as THREE from 'three';
+import { shadePatch } from './shadows';
 
 /** The three tones a lit surface prints in (shares of the light it gets). */
 export const TONES = [0.5, 0.78, 1] as const;
@@ -14,20 +15,17 @@ export const PRINT_SHADE: THREE.IUniform<number> = { value: 0 };
 /** What a surface in the sun's shadow keeps of its light: the print's shadow tone. */
 export const SHADE_TONE = 0.5;
 
-/** Printed shadows: the sun's shadow mask darkens the whole surface to a flat tone, not just the direct light it blocks
- *  (under a low sun the ground gets next to no direct light, so its cast shadows barely showed: poles and the car
- *  seemed to hover). A patch for a toon material's shader: materials with their own patch call it first. */
+/** Printed shadows: the shadow (look/shadows.ts: cascaded, contact-hardening, its soft edge printed in halftone dots)
+ *  darkens the whole surface to a flat tone, not just the direct light it blocks (under a low sun the ground gets next
+ *  to no direct light, so its cast shadows barely showed: poles and the car seemed to hover). A patch for a toon
+ *  material's shader: materials with their own patch call it first. */
 export function printShadows(sh: { uniforms: Record<string, THREE.IUniform>; fragmentShader: string }) {
+  shadePatch(sh);
   sh.uniforms.printShade = PRINT_SHADE;
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', `#include <common>
 uniform float printShade;`)
-    .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>
-  float printShadow = 1.0;
-  #if defined( USE_SHADOWMAP ) && ( NUM_DIR_LIGHT_SHADOWS > 0 )
-    if (receiveShadow) printShadow = getShadow( directionalShadowMap[ 0 ], directionalLightShadows[ 0 ].shadowMapSize, directionalLightShadows[ 0 ].shadowIntensity, directionalLightShadows[ 0 ].shadowBias, directionalLightShadows[ 0 ].shadowRadius, vDirectionalShadowCoord[ 0 ] );
-  #endif`)
-    .replace('#include <opaque_fragment>', `outgoingLight *= mix(1.0, ${SHADE_TONE.toFixed(2)}, (1.0 - printShadow) * printShade);
+    .replace('#include <opaque_fragment>', `outgoingLight *= mix(1.0, ${SHADE_TONE.toFixed(2)}, (1.0 - printLit) * printShade);
 #include <opaque_fragment>`);
 }
 

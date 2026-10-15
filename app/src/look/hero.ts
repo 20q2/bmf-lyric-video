@@ -6,6 +6,7 @@
 // out pale.
 // Browser and bun (no DOM).
 import * as THREE from 'three';
+import { shadePatch } from './shadows';
 
 /** The alpha a hero surface writes (the print pass treats anything under ~0.75 as hero). */
 export const HERO_ALPHA = 0.5;
@@ -15,6 +16,7 @@ export const HERO_ALPHA = 0.5;
 export function heroize<T extends THREE.Material>(m: T, coat?: THREE.ColorRepresentation): T {
   const tint = coat === undefined ? null : new THREE.Color(coat), glsl = tint ? `vec3( ${tint.r.toFixed(4)}, ${tint.g.toFixed(4)}, ${tint.b.toFixed(4)} )` : '';
   m.onBeforeCompile = (sh) => {
+    shadePatch(sh, false); // (the shadows mask its light, smooth: no printed tone or dots on the hero)
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
 	iblIrradiance = vec3( 0.0 );`)
