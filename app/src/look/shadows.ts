@@ -18,16 +18,23 @@
 //             Faces turned from the light are the toon ramp's dark band and take no cast shadow on top.
 //   moon      after sunset the same maps follow the moon (scenes/drive.ts aims them): the car and the props stay on
 //             the ground by night.
+//   cost      three draws every caster into every map whose box it touches, walking the whole world once a map: with
+//             three maps that walk and those draws took ~45 ms of a ~100 ms frame (the user, 2026-10-15: "brutally
+//             destroyed"). So a caster is drawn only into a map whose texels it spans (a pebble isn't drawn into the
+//             far map, where it'd print as a speck at most) and only if its shadow can fall in the lens's view
+//             (`sees`): ~6500 draws a frame became ~1900. scenes/zones.ts uses `sees` to hide whole parts of the world.
 // The lights that carry the maps are dark (intensity 0): three renders and binds their maps, the patch below reads
 // them and masks the scene's own sun and moon (which cast nothing themselves). Browser and bun (no DOM).
 import * as THREE from 'three';
 import { SCALE } from '../engine/scale';
 
-/** Each cascade's half-width (m, in the light's frame) and how far along the lens's view its centre stands (m). */
+/** Each cascade's half-width (m, in the light's frame), how far along the lens's view its centre stands (m), and the
+ *  least caster drawn into it (m, bounding radius: about its least penumbra, 1.2 texels; smaller, its shadow is a
+ *  speck the halftone doesn't print). */
 export const CASCADES = [
-  { half: 12, ahead: 7 },
-  { half: 45, ahead: 34 },
-  { half: 200, ahead: 150 },
+  { half: 12, ahead: 7, least: 0 },
+  { half: 45, ahead: 34, least: 0.06 },
+  { half: 200, ahead: 150, least: 0.3 },
 ] as const;
 /** The cascades move out along the view at most this far (m) to where the frame's foot meets the ground. */
 const GROUND_REACH = 120;
@@ -174,8 +181,22 @@ export function shadePatch(sh: { uniforms: Record<string, THREE.IUniform>; fragm
 /** The cascades' lights: add `objects` to the scene, `update` each frame. */
 export class Cascades {
   readonly lights = CASCADES.map(() => new THREE.DirectionalLight(0xffffff, 0));
+  /** The lens's view this frame, and the way to the light. */
+  private view = new THREE.Frustum();
+  private toLight = new THREE.Vector3(0, 1, 0);
+  private far = new THREE.Vector3();
   constructor(private size: number) {
+    const sphere = new THREE.Sphere();
     this.lights.forEach((l, i) => {
+      // (three asks each map's box which casters to draw: only those big enough for it whose shadow can be seen)
+      const box = l.shadow.getFrustum(), least = CASCADES[i]!.least;
+      box.intersectsObject = (o: THREE.Object3D) => {
+        const inst = o as THREE.InstancedMesh;
+        if (inst.isInstancedMesh) { if (!inst.boundingSphere) inst.computeBoundingSphere(); sphere.copy(inst.boundingSphere!); }
+        else { const g = (o as THREE.Mesh).geometry; if (!g.boundingSphere) g.computeBoundingSphere(); sphere.copy(g.boundingSphere!); }
+        sphere.applyMatrix4(o.matrixWorld);
+        return sphere.radius >= least && box.intersectsSphere(sphere) && this.sees(sphere);
+      };
       const h = CASCADES[i]!.half, texel = (2 * h) / size;
       l.castShadow = true;
       l.shadow.mapSize.set(size, size);
@@ -188,9 +209,24 @@ export class Cascades {
   }
   get objects(): THREE.Object3D[] { return this.lights.flatMap((l) => [l, l.target]); }
 
+  /** Whether anything in `s` (world) can be in the lens's view this frame, or cast a shadow there: the sphere swept
+   *  away from the light as far as a shadow still prints (FADE) touches the view. (A little wider: the blocker search
+   *  and the soft edge read the map round a pixel.) */
+  sees(s: THREE.Sphere): boolean {
+    const r = s.radius + SOFT.search;
+    this.far.copy(s.center).addScaledVector(this.toLight, -FADE[1]);
+    for (const p of this.view.planes) if (p.distanceToPoint(s.center) < -r && p.distanceToPoint(this.far) < -r) return false;
+    return true;
+  }
+
+  /** Whether the maps are drawn this frame (not while nothing would show them: deep in a tunnel). */
+  set live(on: boolean) { for (const l of this.lights) l.shadow.autoUpdate = on; }
+
   /** Round the lens's view of the ground (at height `ground`), from `toLight` (unit). */
   update(cam: THREE.PerspectiveCamera, toLight: THREE.Vector3, ground: number) {
     SHADE_DIR.value.copy(toLight);
+    this.toLight.copy(toLight).normalize();
+    this.view.setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     const view = new THREE.Vector3(); cam.getWorldDirection(view);
     // (the cascades start where the frame's foot meets the ground, not at the lens: a camera high over the road
     // looking down — chorus 2's top-down take, ~30 m up — sees nothing nearer, and its fine cascades were spent on

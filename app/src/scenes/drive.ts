@@ -20,6 +20,7 @@ import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
 import { QUALITY } from '../look/quality';
 import { Cascades } from '../look/shadows';
+import { Zones } from './zones';
 import { SkyEnv } from '../look/envsky';
 import { GLOW, NIGHT, PULSE } from '../look/night';
 import { buildCity } from '../look/city';
@@ -89,6 +90,8 @@ const BEACON = { on: 0.5, every: 1.6 };
 const END_MOON = { bearing: (22 * Math.PI) / 180, elev: (10.5 * Math.PI) / 180 };
 /** The shadows turn from the sun to the moon at this sun height, where neither prints. */
 const SHADE_SWITCH = -2 * DEG;
+/** The world is posed this often (s of song time) to find its still parts (scenes/zones.ts). */
+const ZONE_STEP = 2;
 const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 
 export default class DriveScene extends Scene {
@@ -142,6 +145,8 @@ export default class DriveScene extends Scene {
   private climbFrom = Infinity;
   /** Where the moon hangs at the end (unit). */
   private endMoon = new THREE.Vector3();
+  /** The world's still parts, hidden while off screen. */
+  private zones!: Zones;
 
   override init() {
     const { audio, lyrics, renderer } = this.ctx;
@@ -188,6 +193,17 @@ export default class DriveScene extends Scene {
     // (nothing up in the sky casts: the skywriter, the banners' tow planes — their shadows fell on the facades out of
     // nowhere)
     for (const o of [this.writer, ...this.flying.map(([, f]) => f)]) o.traverse((m) => { if (m instanceof THREE.Mesh) m.castShadow = false; });
+    // (the set-pieces posed through the song, the car on the road for the sets that ride with it; the world's own
+    // pieces never move)
+    const dur = this.ctx.audio.duration;
+    const sets = this.sets.map((s) => s.group);
+    this.zones = new Zones([world, ...sets], sets, (t) => {
+      const cf = this.drive.carFrame(t);
+      this.car.matrixAutoUpdate = false;
+      this.car.matrix.makeBasis(cf.right.clone().negate(), cf.up, cf.fwd).setPosition(cf.pos);
+      this.car.updateMatrixWorld(true);
+      for (const set of this.sets) set.update(t, this.car);
+    }, Array.from({ length: Math.ceil(dur / ZONE_STEP) + 1 }, (_, i) => Math.min(i * ZONE_STEP, dur)));
     const coast = this.drive.route.frameAt(this.drive.motion.distanceAt(COAST_T));
     this.sunAz.set(coast.fwd.x, 0, coast.fwd.z).normalize().multiplyScalar(Math.cos(SUN_AZ))
       .addScaledVector(new THREE.Vector3(coast.right.x, 0, coast.right.z).normalize(), -Math.sin(SUN_AZ)).normalize();
@@ -386,9 +402,13 @@ export default class DriveScene extends Scene {
     fog.far = far - (far - 140) * inside;
 
     this.city.update(t, this.cam.position, this.rt.width / W);
+    // (the maps aren't drawn while nothing shows them: deep in a tunnel; nor is what can't be seen: scenes/zones.ts)
+    this.shade.live = PRINT_SHADE.value > 0 || this.sun.intensity > 0 || this.moon.intensity > 0;
+    this.zones.hide((s) => this.shade.sees(s));
     renderer.setRenderTarget(this.rt);
     renderer.clear(true, true, true); // the engine leaves autoClear off; the dome draws the sky, so nothing else clears
     renderer.render(this.world, this.cam);
+    this.zones.restore();
     // screen-printed: halftone fades out at night (neon noir is clean), its tones following the light
     this.print.render(renderer, this.rt, this.cam, out, { halftone: 0.55 * day * (1 - inside), lo: 0.004 + 0.02 * day, hi: 0.04 + 0.18 * day });
     // the beat: while the drums play, the frame punches in a touch on each kick (no jolt, no flash: the user cut every

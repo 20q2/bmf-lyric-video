@@ -596,10 +596,16 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
   const farUntil = drive.tunnels[0] ? drive.stretches.find((st) => st.tunnel)!.end : 136;
 
   const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
-  const on = (t: number) => t > 99 && t < 124; // (the coast's props move only while it's seen)
+  const ON = [99, 124] as const, on = (t: number) => t > ON[0] && t < ON[1]; // (the coast's props move only while it's seen)
+  /** The edge of ON the props were last posed at, while it's not seen. */
+  let held = NaN;
   return {
     group: root,
     update(t) {
+      // (unseen, the props hold their pose at the nearest edge of ON: never posed, the waves, boats, gulls and strollers
+      // all stood at the world's origin, in the intro's street, until the coast had been played once)
+      if (on(t)) held = NaN;
+      else { const edge = t <= ON[0] ? ON[0] + 1e-3 : ON[1] - 1e-3; if (held !== edge) { this.update(edge); held = edge; } }
       far.visible = t < farUntil;
       // the glitter burns while the sun is low on the water, and goes with it
       const gm = glitter.material as THREE.MeshBasicMaterial;
