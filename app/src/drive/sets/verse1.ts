@@ -47,6 +47,11 @@ export const AT = {
   trailer: { passAt: 31.2, lateral: ROAD_HALF + 0.9, y: 2.2 },
   menu: { through: 0.45, lateral: ROAD_HALF + 1.3, y: 1.9 },
   marquee: { ds: 7, lateral: ROAD_HALF + 2.6, y: 5 },
+  /** The newsstand (scenes/sets/newsstand.ts: the user's Easter egg, 2026-10-14): where the car passes it, and its
+   *  middle off the road's centre, at the back of the right's sidewalk. Passed while they tailgate the bus: from the back seat
+   *  its end comes up to the right of the bus for the last second before the whip up to her visor, off the line to
+   *  the tail ad (the bus hides it until then; the van shot from the hood saw it for half that). */
+  newsstand: { passAt: 35.1, lateral: ROAD_HALF + 3.1 },
   phone: new THREE.Vector3(-0.15, 1.2, 0.15),
   /** Her sun visor's mirror (cabin.ts), flipped down from the windshield's top rail: how long it takes to flip down,
    *  and how much before her line's half it starts. */

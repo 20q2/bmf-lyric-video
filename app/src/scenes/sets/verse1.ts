@@ -1,8 +1,8 @@
 // Verse 1's props (drive/sets/verse1.ts places them and the lyrics on them): the speed trailer by the road; the bus
 // they tailgate, its tail ad, turning off right at a cross street (the light green, the crosswalks, the DONT WALK hand);
-// the van ahead, closing in; her phone in her hand; the burger stand with its menu board and its marquee on a pole; and
-// her visor (the car's own: look/dash.ts) flipping down. (The city's blocks are the drive's: blocks.ts.) Browser only
-// (canvas).
+// the van ahead, closing in; her phone in her hand; the burger stand with its menu board and its marquee on a pole;
+// her visor (the car's own: look/dash.ts) flipping down; and the newsstand they pass behind the bus (./newsstand). (The
+// city's blocks are the drive's: blocks.ts.) Browser only (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
@@ -15,6 +15,7 @@ import { drawAd } from '../../look/adart';
 import { F, font } from '../../engine/type';
 import { TEXT_SHARE } from '../../drive/ads';
 import { sedan } from './kit';
+import { buildNewsstand } from './newsstand';
 
 const UP = new THREE.Vector3(0, 1, 0);
 type Panel = Verse1Plan['panels'][keyof Verse1Plan['panels']];
@@ -287,6 +288,9 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     box(q, 0.3, qdrop - qh / 2 - 0.15, 0.3, 0, -(qdrop + qh / 2) / 2 - 0.07, -0.2, dark);
     root.add(q);
   }
+
+  // ---- the newsstand up the street (the user's Easter egg: his other video's magazine on its racks) ----
+  buildNewsstand(drive, root);
 
   /** The bus at t: waiting at its stop, pulling out ahead of them into their lane, riding ahead of them until it
    *  turns, then on and round the corner into the cross street. */
