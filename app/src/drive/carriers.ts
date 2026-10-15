@@ -14,7 +14,7 @@
 //   banner towed across the sky by a plane flying left to right, the plane leading, so the words read the way it
 //          flies; a line's banners in formation, one over the next, keeping pace ahead of the car; framed like
 //          sky-writing, the camera following them as they move (Carrier.vel)
-//   hill   giant white capitals standing on a hillside across the valley, as LA signs its hills (the last chorus's
+//   hill   giant white capitals standing on a hillside across the canyon, as LA signs its hills (the last chorus's
 //          payoff, "Cruise all night"), framed from behind the climbing car, lit at night
 //   tunnel lit up along a tunnel's left wall (the bridge, tunnel.ts), framed from across the bore like the left faces
 // A set-piece (sets/) places the lines it owns (a stretch's, or some of them) on its own surfaces (SetKind: a speed
@@ -143,7 +143,7 @@ export const LAYOUT: Record<Kind, { rowH: number; w: number; advance: number; em
   street: { rowH: 1, w: 5.2, advance: 0.55, emOfRow: 0.66 },
   gantry: { rowH: 2, w: 9.5, advance: 0.55, emOfRow: 0.62 },
   tunnel: { rowH: 2, w: 10, advance: 0.62, emOfRow: 0.7 },
-  hill: { rowH: 13, w: 120, advance: 0.62, emOfRow: 0.82 },
+  hill: { rowH: 18, w: 160, advance: 0.6, emOfRow: 0.95, wrap: 20 }, // (one row, a letter to a panel: the Hollywood sign's)
   // (the set-pieces' surfaces, each phrase its own panel's rows: `wrap` the longest row it holds)
   barber: { rowH: 1, w: 5.6, advance: 0.6, emOfRow: 0.7, wrap: 10 },
   speed: { rowH: 0.4, w: 1.8, advance: 0.6, emOfRow: 0.66, wrap: 15 },
@@ -185,10 +185,9 @@ export const FLY = /\bso fly\b/i, CRUISE = /^cruise all night/i, CAMPAIGN = /you
 export const HOOK = { campaign: [1, 1.25, 1.5], fly: [1.15, 1.6, 2.05], recede: 0.12, rise: 9, lift: 10, cruise: 1.7, gap: 1, bannerIn: 'chorus2' };
 /** Kinds set in capitals. */
 export const CAPS: ReadonlySet<Kind> = new Set<Kind>(['road', 'barber', 'billboard', 'storefront', 'tunnel', 'banner', 'hill', 'speed', 'bus', 'sticker', 'plate', 'radio', 'menu', 'marquee', 'poster', 'polesign', 'aframe', 'window', 'vinyl', 'roofsign', 'carwash', 'hood', 'giant', 'arch', 'tunnelsign', 'towel', 'sand', 'surfshop']);
-/** The hill sign: how far along the road from the car as its line starts, how far off to the side (m, left: the
- *  valley), how high its letters' centre stands over the road there. (Far enough out that the parked outro sits NEAR
- *  the sign, not under it: its letters and scaffold were looming over the whole ending.) */
-export const HILL = { ahead: 230, side: -70, y: 16 };
+/** The hill sign, the overlook's view: how far ahead of where the car parks and off to its side (m, left: the city
+ *  spreads ahead and to the right), and how high its letters' centre stands over the overlook. */
+export const HILL = { ahead: 300, side: -105, y: 18 };
 /** A phrase longer than this (characters) takes two rows. */
 export const WRAP_AT = 13;
 const TEXT_W = 0.9;
@@ -287,6 +286,7 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
   const clear = (s: number) => { const tn = nearTunnel(tunnels, s, TUNNEL_CLEAR); return tn ? tn.s1 + TUNNEL_CLEAR : s; };
   const last: Record<string, number> = {};
   const room = (key: string, s: number, gap: number) => { const v = Math.max(s, (last[key] ?? -Infinity) + gap); last[key] = v; return v; };
+  const parkS = motion.distanceAt(R[R.length - 1]!.end); // (where the car parks: the overlook)
   const lines = R.flatMap((st) => st.lines), lastLine = lines[lines.length - 1]?.i ?? -1;
   let flyCount = 0, campaignCount = 0;
   const nextStart = (i: number) => lines.find((l) => l.i > i)?.words[0]!.start ?? Infinity;
@@ -396,14 +396,14 @@ export function placeCarriers(R: readonly Stretch[], motion: Motion, route: Rout
           ({ center, normal, up } = at(s));
           foot = L.y;
         } else if (kind_ === 'hill') {
-          // across the valley, facing the car halfway through its line
-          const T0 = phs[0]!.start, T1 = phs[phs.length - 1]!.end;
-          s = motion.distanceAt(T0) + HILL.ahead; const f = route.frameAt(s);
-          center = f.pos.clone().addScaledVector(f.right, HILL.side).addScaledVector(WORLD_UP, HILL.y);
-          const car = route.frameAt(motion.distanceAt((T0 + T1) / 2)).pos;
-          normal = flat(car.clone().sub(center));
+          // the overlook's view: across the canyon from where the car parks, facing it — seen coming up the last of
+          // the road as it's sung, and looked out at from the parked car to the end (drive.ts END)
+          const park = route.frameAt(parkS);
+          s = parkS;
+          center = park.pos.clone().addScaledVector(flat(park.fwd), HILL.ahead).addScaledVector(flat(park.right), HILL.side).addScaledVector(WORLD_UP, HILL.y);
+          normal = flat(park.pos.clone().sub(center));
           up = WORLD_UP.clone();
-          foot = center.y + 0.4; solid = null; // (its mound stands on the plain)
+          foot = center.y + 0.4; solid = null; // (its hill rises from the plain the city's on)
         } else if (kind_ === 'tunnel') {
           // on the bore's left wall
           // far enough in that its camera, sliding with the car, stays in the bore

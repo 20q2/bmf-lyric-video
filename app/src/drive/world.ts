@@ -758,24 +758,32 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
   p.needsUpdate = true;
 }
 
+/** The hill under the hill sign (in its face's frame, m): its ridge this far behind the letters, its slope's falloff
+ *  toward the overlook, how far it runs on to the city's side and the other, the ground this far under the letters'
+ *  feet, a gentle roll in it; its mesh's extent and offset; the mast on its ridge (along, height). */
+export const HILLSIDE = { ridge: 45, across: 60, right: 120, left: 320, under: 1.5, roll: 0.06, w: 860, d: 420, x: -130, z: -60, mast: { x: -70, h: 30 },
+  /** The floodlights' wash on the slope: its patch (deep, centred), brightest this far in front of the letters, how far it
+   *  falls off, how bright. */
+  wash: { d: 50, z: 3, z0: 1, fall: 8, glow: 0.12 } };
+
 /** A carrier with its face's texture: a board on posts (a sign, a billboard), a street blade on its pole, a gantry over
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
  *  sky. */
+/** How bright a neon sign's wash on its wall is (HDR; by night). */
+const NEON_WASH = 0.45;
 export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color, route: Route): THREE.Object3D {
   const clear = c.kind === 'road' || c.kind === 'sky' || c.kind === 'neon' || c.kind === 'tunnel' || c.kind === 'hill' || c.kind === 'bus' || c.kind === 'hood' || c.kind === 'giant' || c.kind === 'barber' || c.kind === 'mirror' || c.kind === 'window' || c.kind === 'carwash' || c.kind === 'phone' || c.kind === 'towel' || c.kind === 'sand' || c.kind === 'surfshop'; // the face is only its letters (the phone's: its bubbles, over the screen's wallpaper)
-  const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const mat = new THREE.MeshBasicMaterial({ map: face, transparent: clear, depthWrite: !clear, fog: c.kind !== 'sky' && c.kind !== 'hill', polygonOffset: c.kind === 'road', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   if (c.kind === 'neon') mat.color.setScalar(GLOW.neon); // lit lettering: HDR, it blooms
   if (c.kind === 'tunnel') { // graffiti: paint on the tiles, lit by the bore's lamps like the tiles round it (the user, 2026-10-14: it glowed — its lighting "doesn't match the environment at all")
     const m = new THREE.Mesh(new THREE.PlaneGeometry(c.w, c.h), toon({ map: face, transparent: true, depthWrite: false }));
     m.name = 'face'; m.matrixAutoUpdate = false; m.matrix.copy(basisOf(c));
     return m;
   }
-  if (c.kind === 'hill') mat.color.setScalar(1.5); // floodlit at night
+  if (c.kind === 'hill') mat.color.setScalar(2); // floodlit at night: through the haze (fogged, its letters went lavender)
   if (c.kind === 'road') return drapedOnRoad(c, mat, route);
   if (c.kind === 'speed' || c.kind === 'radio' || c.kind === 'phone') mat.color.setScalar(1.6); // (lit displays: they bloom a little)
   if (c.kind === 'polesign' || c.kind === 'roofsign') mat.color.setScalar(1.25); // (lightboxes)
-/** How bright a neon sign's wash on its wall is (HDR; by night). */
-const NEON_WASH = 0.45;
   if (c.kind === 'tunnelsign') mat.color.setScalar(1.7); // (a lit box in the dark bore)
   if (c.kind === 'plate' || c.kind === 'sticker') mat.color.setScalar(1.25); // (plate lamps: the rear reads at dusk)
   if (SET_KINDS.has(c.kind)) { // a set-piece's surface: just the face; its props stand round it (scenes/sets/)
@@ -857,11 +865,40 @@ const NEON_WASH = 0.45;
       break;
     }
     case 'hill': {
-      // the mound it stands on (from the plain up to the letters' feet), and the scaffold behind each letter
-      // (a low shoulder, not a mountain: the outro's crane looks past it at the city)
-      const mh = c.foot - c.h / 2 + 2, mound = new THREE.Mesh(new THREE.ConeGeometry(c.w * 0.48, mh, 24, 1), toon({ color: '#5a4a52' }));
-      mound.position.set(0, -c.h / 2 + 2 - mh / 2, -6); mound.scale.z = 0.5; g.add(mound);
-      for (let i = 0; i < 16; i++) box(0.4, c.h * 0.9, 0.4, -c.w * 0.45 + (i * c.w * 0.9) / 15, -c.h * 0.05, -1.2, grey(WORLD.post));
+      // Mount Lee: a steep hill up from the plain, its ridge behind the letters, falling away fast on the city's side
+      // (right) and running on along the left; each letter on its own scaffold down to the slope; the mast on top
+      // (the hills' own ground, not a dark fill: at night that read as a black wedge cut into the city's lights)
+      const H = HILLSIDE, under = c.foot - c.h / 2 - H.under; // (the ground's height over the plain under the letters)
+      const along = (x: number) => Math.exp(-((x / (x > 0 ? H.right : H.left)) ** 4)), across = (z: number) => Math.exp(-(((z + H.ridge) / H.across) ** 2));
+      const peak = under / across(0);
+      const rise = (x: number, z: number) => peak * along(x) * across(z) * (1 + H.roll * Math.sin(x * 0.045 + 1.3) * Math.sin(z * 0.06 + 0.4)) - c.foot - 0.5;
+      const geo = new THREE.PlaneGeometry(H.w, H.d, Math.round(H.w / 5), Math.round(H.d / 5)).rotateX(-Math.PI / 2).translate(H.x, 0, H.z);
+      const p = geo.attributes.position!;
+      for (let i = 0; i < p.count; i++) p.setY(i, rise(p.getX(i), p.getZ(i)));
+      geo.computeVertexNormals();
+      const hill = new THREE.Mesh(geo, printedGround(toon({ color: GROUND.chorus4! }))); hill.name = 'mound'; g.add(hill);
+      // the floodlights' wash on the slope round the letters (they're lit from below, the Hollywood sign's way): the
+      // hill's skin under them again, a hand over it, added light fading out from the letters' feet
+      const wash = new THREE.PlaneGeometry(c.w * 1.3, H.wash.d, Math.round(c.w / 4), Math.round(H.wash.d / 2)).rotateX(-Math.PI / 2).translate(0, 0, H.wash.z);
+      const wp = wash.attributes.position!, wc: number[] = [];
+      for (let i = 0; i < wp.count; i++) {
+        const x = wp.getX(i), z = wp.getZ(i), k = H.wash.glow * Math.exp(-((x / (c.w * 0.6)) ** 6)) * Math.exp(-(((z - H.wash.z0) / H.wash.fall) ** 2));
+        wp.setY(i, rise(x, z) + 0.25);
+        wc.push(k, k * 0.9, k * 0.78);
+      }
+      wash.setAttribute('color', new THREE.Float32BufferAttribute(wc, 3));
+      g.add(new THREE.Mesh(wash, new THREE.MeshBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false })));
+      const n = c.rows[0]!.length, cell = c.w / n, steel = grey(WORLD.post);
+      [...c.rows[0]!].forEach((ch, i) => {
+        if (ch === ' ') return;
+        const x = -c.w / 2 + cell * (i + 0.5), top = c.h * 0.4, foot = rise(x, -1.5) - 1, drop = top - foot;
+        for (const dx of [-0.3, 0, 0.3]) box(0.3, drop, 0.3, x + dx * cell, top - drop / 2, -0.8, steel);
+        for (const y of [top * 0.2, -top * 0.6]) box(cell * 0.66, 0.2, 0.2, x, y, -0.8, steel);
+      });
+      const mx = H.mast.x, my = rise(mx, -H.ridge);
+      box(0.6, H.mast.h, 0.6, mx, my + H.mast.h / 2, -H.ridge, steel);
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 0.35, 0.3) }));
+      beacon.position.set(mx, my + H.mast.h + 0.6, -H.ridge); beacon.name = 'beacon'; g.add(beacon);
       break;
     }
     case 'gantry': legs([-6.5, 6.5]); box(13.4, 0.4, 0.4, 0, c.h / 2 + 0.2, -0.2, grey(WORLD.post)); break;

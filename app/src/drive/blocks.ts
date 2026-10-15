@@ -54,14 +54,18 @@ export function boxAt(route: Route, s: number, lateral: number, across: number, 
   return m;
 }
 
+/** The hill sign's side of the road is kept clear from this far before the car as its line starts (m). */
+const HILL_CLEAR = 30;
+
 export function blocksOf(route: Route, motion: Motion, stretches: readonly Stretch[], carriers: readonly Carrier[], tunnels: readonly Tunnel[], keepClear: readonly { side: number; a: number; b: number }[] = [], own: readonly Block[] = [], openings: readonly { side: number; a: number; b: number }[] = []): Block[] {
   const stretchAtS = (s: number): Stretch => {
     for (const st of stretches) if (s < motion.distanceAt(st.end)) return st;
     return stretches[stretches.length - 1]!;
   };
   // where the words stand, per side (−1 left, +1 right): [s from, s to]
-  // (a hill sign keeps its whole side of the road clear, from well before it: it's seen across the valley)
-  const hills = carriers.filter((c) => c.kind === 'hill').map((c) => ({ side: -1, a: c.s - 260, b: c.s + 60 }));
+  // (a hill sign keeps its side of the road clear from just before where the car is as its line starts — its shot looks
+  // across the canyon from there — to past the overlook: not from its own s, which is the overlook's, back over the Strip)
+  const hills = carriers.filter((c) => c.kind === 'hill').map((c) => ({ side: -1, a: motion.distanceAt(c.phrase.start) - HILL_CLEAR, b: c.s + 60 }));
   const faces = [...hills, ...carriers.filter((c) => c.solid).flatMap((c) => {
     const side = Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) || 1;
     // a face on the left is filmed from across the road (a wide pair stands well back): that side stays open too, and

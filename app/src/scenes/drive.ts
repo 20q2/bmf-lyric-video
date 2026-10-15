@@ -80,6 +80,8 @@ const SUN_AZ = (SUN_AZ_DEG * Math.PI) / 180;
 const SUN = { intensity: 2.8, high: new THREE.Color('#ffe6b8'), low: new THREE.Color('#ff8a4c') };
 const MOON = { intensity: 0.55, color: new THREE.Color('#9fa8ff'), elev: (38 * Math.PI) / 180, shade: 0.6 };
 const DEG = Math.PI / 180;
+/** The hill sign's mast beacon: lit this long (s) in every `every`. */
+const BEACON = { on: 0.5, every: 1.6 };
 /** The shadows turn from the sun to the moon at this sun height, where neither prints. */
 const SHADE_SWITCH = -2 * DEG;
 const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
@@ -127,8 +129,8 @@ export default class DriveScene extends Scene {
   private sets: { group: THREE.Group; update(t: number, car: THREE.Object3D): void }[] = [];
   /** Carriers riding in the car (the radio), with their place in its frame. */
   private riding: [THREE.Object3D, THREE.Matrix4, number][] = [];
-  /** The hill sign's faces: floodlit for their line, dimming after (the outro's star-writing takes over the sky). */
-  private hillFaces: [Carrier, THREE.MeshBasicMaterial][] = [];
+  /** The red beacon on the hill sign's mast (it blinks). */
+  private beacons: THREE.MeshBasicMaterial[] = [];
 
   override init() {
     const { audio, lyrics, renderer } = this.ctx;
@@ -150,7 +152,7 @@ export default class DriveScene extends Scene {
       this.arts.push(art);
       const o = buildCarrier(c, art.texture, wallColor(c), this.drive.route);
       if (c.vel) this.flying.push([c, o]);
-      if (c.kind === 'hill') { const f = o.getObjectByName('face') as THREE.Mesh | null; if (f) this.hillFaces.push([c, f.material as THREE.MeshBasicMaterial]); }
+      if (c.kind === 'hill') { const b = o.getObjectByName('beacon') as THREE.Mesh | null; if (b) this.beacons.push(b.material as THREE.MeshBasicMaterial); }
       this.placed.push([c, o]);
       this.world.add(o);
     }
@@ -297,8 +299,8 @@ export default class DriveScene extends Scene {
       up.addScaledVector(a, -up.dot(a)).normalize();
       this.writer.matrix.makeBasis(a, up, a.clone().cross(up)).scale(new THREE.Vector3(k, k, k)).setPosition(at);
     }
-    // the hill sign dims once its line is read: the end belongs to the city's lights and the two of them
-    for (const [c, m] of this.hillFaces) m.color.setScalar(1.5 - 1.2 * smooth(c.phrase.end + 1.2, c.phrase.end + 3.4, t));
+    // the hill sign stays floodlit to the end (it's the view they parked for); the beacon on its mast blinks
+    for (const m of this.beacons) m.visible = (t % BEACON.every) < BEACON.on;
     // the lyric faces near now
     this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
     placeCamera(this.cam, d.camera(t));

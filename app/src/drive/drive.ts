@@ -56,9 +56,10 @@ export const LANE = 1.9;
  *  its first shot stands (m). */
 export const SIGN_SHOT = { dist: 7.5, push: 0.5, over: 3 };
 /** The end, after the last line: on a beat at least `after` s past it (and no later than `before` s ahead of the fade
- *  out of hearing), the camera glides up and away behind the parked car (m back, up, and how fast each grows), looking
- *  out over the city's lights (m ahead of the car, below its level). */
-export const END = { after: 0.8, before: 0.6, back: 9, backRate: 1.2, up: 2.5, rise: 0.9, look: 120, under: 18, side: 22 };
+ *  out of hearing), the camera glides down behind the two of them, over their shoulders (m behind the car's centre, up
+ *  off the road), and cranes slowly up and back from there (m/s each), looking out with them at the hill sign and the
+ *  city (aimed m ahead of where the car parks, off to its side, under its level). */
+export const END = { after: 0.8, before: 0.6, back: 3.2, backRate: 0.35, up: 1.9, rise: 0.22, look: 300, side: -45, under: 40 };
 /** The end: the cut to the motel (s, a half-beat after the last line has been read), and the fade out (s). */
 export const FINALE = { endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
@@ -74,7 +75,7 @@ export const far = (a: Pose, b: Pose) => eyeOf(a).distanceTo(eyeOf(b)) > CUT.dis
   || [0.25, 0.5, 0.75].some((u) => eyeOf(lerpPose(a, b, u)).y < Math.min(eyeOf(a).y, eyeOf(b).y) - 0.3); // it would dip
 
 /** The kinds a line glides along in one take (glideTake; the faces on the left have theirs: lineTake). */
-const GLIDES: ReadonlySet<Kind> = new Set(['road', 'sign', 'street', 'gantry', 'tunnel', 'banner']); // (banner: from one towed banner to the next the aim pans; the cut between them jarred)
+const GLIDES: ReadonlySet<Kind> = new Set(['road', 'sign', 'street', 'gantry', 'tunnel', 'banner']); // (banner: one take for its formation; a cut between them jarred)
 /** The road through the stretches: each stretch's segment is the distance the car covers in it. */
 export function routeFor(R: readonly Stretch[], motion: Motion): Route {
   return new Route(R.map((s) => ({ s0: motion.distanceAt(s.start), s1: motion.distanceAt(s.end), turn: s.turn * DEG, rise: s.rise })));
@@ -96,10 +97,10 @@ export interface Drive {
   carFrame(t: number, ahead?: number): RouteFrame;
   /** The cut to the last line (s): every word sung before it goes, so the end starts clean. */
   lastCut: number | null;
-  stretchAt(t: number): Stretch;
   /** Each phrase's reading window (s: from its shot until it has been up its dwell) and its length in words (the sync
    *  layer ducks under long ones: heft.ts). */
   reading: { a: number; b: number; words: number }[];
+  stretchAt(t: number): Stretch;
   camera(t: number): Pose;
   shots: Shot[];
   /** Each set-piece's plan for its props (sets/; scenes/sets/ builds them), by stretch. */
@@ -162,7 +163,11 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     if (j === i + 1 && GLIDES.has(carriers[i]!.kind)) while (j < carriers.length && !own_(j) && carriers[j]!.phrase.line === carriers[i]!.phrase.line && carriers[j]!.kind === carriers[i]!.kind) j++;
     const run = carriers.slice(i, j);
     const take = run.length < 2 ? undefined : PAIRABLE.has(run[0]!.kind) ? lineTake(run, run.map((_, k) => fastAt(i + k)))
-      : run[0]!.kind === 'road' ? roadTake(run, route) : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t))));
+      : run[0]!.kind === 'road' ? roadTake(run, route)
+      // (a line's towed banners share one aim, the formation's top: the line rides on its first's framing — gliding
+      // to the next's only swapped the eye's seeded offset, a whip mid-line at "fly, fly" — the user, 2026-10-14)
+      : run[0]!.kind === 'banner' ? framing(run[0]!, carFrame, (t) => motion.distanceAt(t))
+      : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t))));
     for (let k = i; k < j; k++) takes[k] = take;
     i = j;
   }
@@ -226,15 +231,14 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const signShot: Target = (t) => lookFrom(sign.center.clone().addScaledVector(sign.normal, SIGN_SHOT.dist - SIGN_SHOT.push * Math.min(1, Math.max(0, t - endCardAt) / SIGN_SHOT.over)).add(new THREE.Vector3(0, -0.8, 0)), sign.center);
   shots.push(...setShots);
   for (const o of setShots) own.add(o);
-  // the end: after "crash" (a jolt), the last line low behind the parked car (its tail lights, the banner over it;
-  // carriers.ts); then the motel again, empty at night, and its NO goes out
-  // after the last line (the song fading out of hearing), the scene alone: a slow crane up and away from the parked car
-  // over the city's lights; then the motel's sign
+  // after the last line (the song fading out of hearing), the scene alone: the view they parked for — the hill sign
+  // across the canyon, CRUISE ALL NIGHT over the city's lights — from just behind them, then a slow crane up and away;
+  // then the motel's sign
   const lastLine = carriers[carriers.length - 1]!.phrase, park = carFrame(audio.duration), pf = flat(park.fwd), pr = flat(park.right);
   const away = beatAtOrAfter(audio, Math.max(lastLine.end + END.after, AUDIBLE - END.before));
-  // (aimed a little right of straight ahead: the hill sign's shoulder stands off to the left, and the end belongs to
-  // the city)
-  const crane: Target = (t) => { const u = Math.max(0, t - away); return lookFrom(park.pos.clone().addScaledVector(pf, -END.back - END.backRate * u).add(new THREE.Vector3(0, END.up + END.rise * u, 0)), park.pos.clone().addScaledVector(pf, END.look).addScaledVector(pr, END.side).add(new THREE.Vector3(0, -END.under, 0))); };
+  // (the eye rides with the car as it rolls the last metres to a stop; the aim holds on the view)
+  const view = park.pos.clone().addScaledVector(pf, END.look).addScaledVector(pr, END.side).add(new THREE.Vector3(0, -END.under, 0));
+  const crane: Target = (t) => { const u = Math.max(0, t - away), f = carFrame(t); return lookFrom(f.pos.clone().addScaledVector(flat(f.fwd), -END.back - END.backRate * u).add(new THREE.Vector3(0, END.up + END.rise * u, 0)), view); };
   const scene: Shot = { at: away, to: crane, move: 'glide' };
   const endCard: Shot = { at: endCardAt, to: signShot, move: 'cut' };
   shots.push(scene, endCard); own.add(scene); own.add(endCard);

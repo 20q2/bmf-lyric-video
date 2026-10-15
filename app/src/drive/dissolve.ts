@@ -13,9 +13,10 @@ export const revealAt = (c: Carrier, t: number) => Math.min(1, Math.max(0, (t - 
 
 /** A board's words dim to `to` of their strength, from `after` s past its phrase (and its reading time), over `over` s. */
 export const STALE = { after: 1.2, over: 0.4, to: 0.45 };
-/** How far a board's words are dimmed back at t (0: full, 1: dimmed to STALE.to; 0 for sky-writing, which dissolves). */
+/** How far a board's words are dimmed back at t (0: full, 1: dimmed to STALE.to; 0 for sky-writing, which dissolves,
+ *  and the hill sign, the last line: it stays lit over the city to the end). */
 export function staleAt(c: Carrier, t: number) {
-  if (c.kind === 'sky') return 0;
+  if (c.kind === 'sky' || c.kind === 'hill') return 0;
   const from = Math.max(c.phrase.end + STALE.after, c.phrase.start + SETTLE + dwellFor(c.phrase.words.length) + 0.1, c.hold ?? 0);
   return Math.min(1, Math.max(0, (t - from) / STALE.over));
 }
