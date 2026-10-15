@@ -49,7 +49,7 @@ export { ROAD_START }; // (route.ts: the road starts this far behind the light)
 
 /** Each section's ground (sRGB; others the golden fields). */
 const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', verse2: '#9fae62', chorus3: '#f0d39b', verse3: '#6a5a78', chorus4: '#7d6a5c' };
-const PALMS = new Set(['intro', 'chorus1', 'chorus3', 'verse3']); // (none in verse 2: its take's camera rides where they'd stand; on the coast, on the beach by the water)
+const PALMS = new Set(['intro', 'chorus1', 'chorus3']); // (none in verse 2: its take's camera rides where they'd stand; none on the Strip: its fronts stand where they would; on the coast, on the beach by the water)
 /** Kerbs and sidewalks along the town's streets (not the freeway, the coast, the tunnel or the hills): the kerb's
  *  height, the sidewalk's width (m) and its concrete; broken where a cross street opens (the set-pieces' openings). */
 const SIDEWALKS = { stretches: new Set(['intro', 'chorus1', 'verse1', 'verse2', 'verse3']), kerb: 0.15, width: 3, colour: '#cbbba7' };
