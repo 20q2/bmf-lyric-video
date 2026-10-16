@@ -44,4 +44,4 @@ test('a motion made of fbm2 keeps moving along either axis: under a tenth of its
       slowFraction((s) => [fbm2(0.37, s, 3, sx), fbm2(0.37, s, 3, sy)], steps, step));
   }
   expect(worst).toBeLessThan(0.02);
-});
+}, 30000); // (≈1 s alone; past bun's 5 s default when renders share the machine)
