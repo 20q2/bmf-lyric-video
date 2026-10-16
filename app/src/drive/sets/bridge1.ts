@@ -142,17 +142,17 @@ export const BRIDGE1: SetPiece = {
 
     // ---- take 1, "Blowin' money fast, it won't last": the eye low on the right, backing slowly away down the bore
     // while it looks back up it at the mural, the mouth's dusk beyond; the car comes in out of the light and rushes
-    // the lens, its nose reaching it as the line ends. The two phrases one mural, read left to right as the aim pans.
+    // the lens, its nose reaching it as the line ends. The two phrases one mural, read left to right as the aim pans:
+    // one steady pan from the cut to the cut (it held on the first, swung to the second and held again: the user,
+    // 2026-10-16, "just keep it one smooth camera motion").
     {
       const [A, B] = wallLines[0]!.phs as [Phrase, Phrase], T0 = A.start - 0.05, T1 = B.end;
       const eyeS = (t: number) => carS(T1) + 4.6 - 3 * (T1 - t), E = { x: 4.1, y: 2.3 }, aimY = 3.1;
       const sA = paint(A, 0, eyeS(A.end) - 18.5), sB = paint(B, 1, sA + 11);
       take([A, B], [
-        { t: T0, eye: [eyeS(T0), E.x, E.y], at: [sA, W0, aimY] },
-        { t: A.end, eye: [eyeS(A.end), E.x, E.y], at: [sA, W0, aimY] },
-        { t: B.start + 0.25, eye: [eyeS(B.start + 0.25), E.x, E.y], at: [sB, W0, aimY] },
-        { t: T1 + 0.5, eye: [eyeS(T1 + 0.5), E.x, E.y], at: [sB, W0, aimY] },
-      ]);
+        { t: T0, eye: [eyeS(T0), E.x, E.y], at: [sA - 1.5, W0, aimY] },
+        { t: T1 + 0.5, eye: [eyeS(T1 + 0.5), E.x, E.y], at: [sB + 1.5, W0, aimY] },
+      ], true);
     }
 
     // ---- take 2, the first sign and "Blowin' money fast, we might crash": high over the oncoming lane, the sign ahead
@@ -169,11 +169,18 @@ export const BRIDGE1: SetPiece = {
       // a little bit late and like it could be a little bit smoother")
       const sC = paint(C, 0, sS + 11), sD = paint(D, 1, sC + 26), go = Math.max(C.start + 0.8, C.end - 0.45);
       const hi = { x: -2.8, y: 5.1 }, lo = { x: 3.5, y: 1.1 }, mid = { x: 3, y: 2.6 };
-      take([...S.phs, C, D], [
-        { t: S.phs[0]!.start - 0.05, eye: [sS - 13.5, hi.x, hi.y], at: [sS, 0, 3] },
+      // (the sign held, creeping on, until "Blowin'" comes again; then a cut to the piece, low behind them — it panned
+      // down to it: the user, 2026-10-16, "instead of panning down, we should just cut ... I like that it kind of
+      // lingers")
+      const S0 = S.phs[0]!.start - 0.05, creep = 1 / (S.line.end - S0);
+      take(S.phs, [
+        { t: S0, eye: [sS - 13.5, hi.x, hi.y], at: [sS, 0, 3] },
         { t: S.line.end, eye: [sS - 12.5, hi.x, hi.y], at: [sS, 0, 3] },
-        { t: C.start + 0.25, eye: [sC - 20, lo.x, lo.y], at: [sC, W0, 3.3] },
-        { t: go, eye: [sC - 9, lo.x, lo.y + 0.3], at: [sC, W0, 3.3] },
+        { t: C.start, eye: [sS - 12.5 + creep * (C.start - S.line.end), hi.x, hi.y], at: [sS, 0, 3] },
+      ], true);
+      take([C, D], [
+        { t: C.start - 0.3, eye: [sC - 10.5, lo.x, lo.y], at: [sC, W0, 3.3] }, // (just past the sign: it's behind the lens)
+        { t: go, eye: [sC - 8, lo.x, lo.y + 0.3], at: [sC, W0, 3.3] },
         { t: C.end, eye: [sC - 5.5, lo.x - 0.2, lo.y + 0.6], at: [sC + 1, W0, 3.3] },
         { t: D.start - 0.15, eye: [sD - 14, mid.x, mid.y], at: [sD + 5, W0 + 2, 3] },
         { t: D.end + 0.6, eye: [sD - 12.5, mid.x, mid.y], at: [sD + 5, W0 + 2, 3] },
