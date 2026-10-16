@@ -4,11 +4,14 @@
 // wall, DRUGS down a blade at its corner, the green cross; the liquor store's sign on a steel frame on its roof, the
 // champagne glass beside it; the theatre's marquee out over the sidewalk on tie rods, its bulbs chasing, NITE OWL down
 // a blade over it; the tiki bar's big roof sign on its lattice at the corner, bamboo round it, torches at the kerb; the
-// hotel's neon between its floors, HOTEL down its blade, its canopy over the door, the payphones on its wall; the pawn
-// shop's board under its big PAWN sign (LOANS, WE BUY GOLD), the three gold balls, barred windows full of guitars
-// and watches; the wedding chapel's clapboard front, gable, steeple and bell, its portico, stained glass, lawn and
-// picket fence, the limo at the kerb. Round them the strip's own neon (blades, a word over each shop, signs in the
-// windows), the cross street and its signals, street lamps, people on the sidewalks, the traffic's lights, the wet
+// hotel's neon between its floors, HOTEL down its blade, its canopy over the door, the payphones on its wall, CALL ME
+// in tube in its window by them; the pawn shop's one big lit cabinet (PAWN · LOANS · GOLD over the lines), the three
+// gold balls, its display windows (guitars, TVs, jewellery, tools, WE BUY GOLD and a guitar in neon) under grilles
+// part way down; the wedding chapel's clapboard front, gable, steeple and bell, its portico, stained glass, lawn and
+// picket fence, the white stretch limo at the kerb. Round them the strip's other businesses (STRIP: a diner, a donut
+// shop, a check casher, a tattoo parlour, a motel ...), each with its own sign, room, window neon, awning and people;
+// fire escapes, roof signs and plant above; the kerbs' furniture, the cross street and its signals, street lamps,
+// people on the sidewalks, the traffic's lights, the wet
 // road holding the lines' pink, steam off a manhole.
 //
 // The colour script (the user, 2026-10-15: "a lot of things ... competing for our attention along with the actual
@@ -20,16 +23,17 @@
 // Browser only (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
-import { type Lot, MOUNT, SHOPS, STREET, type Theme, type Verse3Plan, lotBlock } from '../../drive/sets/verse3';
+import { LIMO, type Lot, MOUNT, SHOPS, STREET, type Theme, type Verse3Plan, limoS, lotBlock } from '../../drive/sets/verse3';
+import { PARKED } from '../../drive/blocks';
 import { ROAD_HALF } from '../../drive/route';
 import { LANE } from '../../drive/drive';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, glowMaterial, lampMaterial } from '../../look/night';
-import { facadeOf } from '../../look/facades';
+import { FACADE, facadeOf } from '../../look/facades';
 import { F, font } from '../../engine/type';
 import { hash } from '../../engine/util';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, rightFront, roadFrame, sedan, signFace, stride, walker } from './kit';
+import { ball, box, canvasTex, cyl, fuse, leftFront, onPanel, paint as painted, part, pic, plane, rightFront, roadFrame, sedan, signFace, stride, tbox, tcyl, tinted, walker } from './kit';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -59,6 +63,114 @@ const bladeWord = (text: string, color: string, tube: boolean, bg?: string) => {
   return tube ? neonTex(256, h, color, draw) : canvasTex(256, h, draw);
 };
 
+type Spaced = CanvasRenderingContext2D & { letterSpacing: string };
+/** Sets `text` in the signs' face as big as fits `maxW` (from `px` down), centred at (x, y): never squeezed (a canvas's
+ *  maxWidth squashes the letters: the theatre's end panels read squished, the user 2026-10-16). */
+function fitText(c: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, px: number, weight: number, spacing = 0.08, stroke = false) {
+  let size = px;
+  for (;; size *= 0.94) {
+    c.font = font(F.sign(weight), size); (c as Spaced).letterSpacing = `${size * spacing}px`;
+    if (c.measureText(text).width <= maxW || size < 6) break;
+  }
+  if (stroke) c.strokeText(text, x, y); else c.fillText(text, x, y);
+}
+/** A lit box sign's face in a w x h cell at (x0, y0): its colour, lit brighter across its middle (the tubes behind it),
+ *  a keyline, its name and a second line, optionally the pawnbroker's three balls before them. */
+function boxFace(c: CanvasRenderingContext2D, x0: number, y0: number, w: number, h: number, text: string, ink: string, bg: string, sub = '', balls = false) {
+  c.save(); c.translate(x0, y0); c.beginPath(); c.rect(0, 0, w, h); c.clip();
+  c.fillStyle = bg; c.fillRect(0, 0, w, h);
+  const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(0,0,0,0.16)'); g.addColorStop(0.5, 'rgba(255,255,255,0.07)'); g.addColorStop(1, 'rgba(0,0,0,0.18)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  c.strokeStyle = ink; c.lineWidth = h * 0.035; c.strokeRect(h * 0.08, h * 0.08, w - h * 0.16, h * 0.84);
+  const bx = balls ? h * 0.95 : 0;
+  if (balls) for (const [px, py] of [[0.32, 0.36], [0.68, 0.36], [0.5, 0.68]] as const) { c.fillStyle = ink; c.beginPath(); c.arc(h * 0.14 + px * h * 0.75, py * h, h * 0.13, 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = ink; c.textAlign = 'center'; c.textBaseline = 'middle';
+  const cx = bx + (w - bx) / 2, mw = w - bx - h * 0.45;
+  fitText(c, text, cx, sub ? h * 0.42 : h * 0.54, mw, h * (sub ? 0.44 : 0.58), 700);
+  if (sub) fitText(c, sub, cx, h * 0.75, mw, h * 0.16, 600, 0.05);
+  c.restore();
+}
+/** A neon drawing beside a trade's name (STRIP), in a 256 x 256 cell, stroked in `col` (neonTex sets the glow). */
+function drawIcon(c: CanvasRenderingContext2D, icon: Icon, col: string) {
+  c.strokeStyle = col; c.fillStyle = col; c.lineWidth = 10;
+  const arc = (x: number, y: number, r: number, a0 = 0, a1 = Math.PI * 2) => { c.beginPath(); c.arc(x, y, r, a0, a1); c.stroke(); };
+  switch (icon) {
+    case 'donut': arc(128, 128, 92); arc(128, 128, 34); for (let k = 0; k < 9; k++) { const a = k * 0.7, r = 62; c.beginPath(); c.moveTo(128 + Math.cos(a) * r, 128 + Math.sin(a) * r); c.lineTo(128 + Math.cos(a + 0.18) * (r + 8), 128 + Math.sin(a + 0.18) * (r + 8)); c.stroke(); } break;
+    case 'record': arc(128, 128, 96); arc(128, 128, 30); arc(128, 128, 62, -0.6, 0.9); arc(128, 128, 78, 2.4, 3.6); c.beginPath(); c.arc(128, 128, 6, 0, Math.PI * 2); c.fill(); break;
+    case 'martini': c.beginPath(); c.moveTo(40, 50); c.lineTo(216, 50); c.lineTo(128, 150); c.closePath(); c.stroke(); c.beginPath(); c.moveTo(128, 150); c.lineTo(128, 214); c.moveTo(84, 220); c.lineTo(172, 220); c.stroke(); arc(150, 84, 14); c.beginPath(); c.moveTo(150, 84); c.lineTo(196, 22); c.stroke(); break;
+    case 'eye': c.beginPath(); c.moveTo(20, 128); c.quadraticCurveTo(128, 30, 236, 128); c.quadraticCurveTo(128, 226, 20, 128); c.stroke(); arc(128, 128, 36); c.beginPath(); c.arc(128, 128, 14, 0, Math.PI * 2); c.fill(); for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k - 2) * 0.36; c.beginPath(); c.moveTo(128 + Math.cos(a) * 88, 128 + Math.sin(a) * 88); c.lineTo(128 + Math.cos(a) * 116, 128 + Math.sin(a) * 116); c.stroke(); } break;
+    case 'star': c.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5, r = k % 2 ? 42 : 104; c.lineTo(128 + Math.cos(a) * r, 136 + Math.sin(a) * r); } c.closePath(); c.stroke(); break;
+    case 'slice': c.beginPath(); c.moveTo(128, 230); c.lineTo(40, 50); c.quadraticCurveTo(128, 10, 216, 50); c.closePath(); c.stroke(); c.beginPath(); c.moveTo(52, 74); c.quadraticCurveTo(128, 38, 204, 74); c.stroke(); for (const [x, y] of [[110, 100], [150, 120], [124, 160]] as const) arc(x, y, 13); break;
+    case 'cup': c.beginPath(); c.moveTo(50, 110); c.lineTo(60, 210); c.lineTo(170, 210); c.lineTo(180, 110); c.closePath(); c.stroke(); arc(196, 150, 26, -Math.PI / 2, Math.PI / 2); for (const x of [90, 130]) { c.beginPath(); c.moveTo(x, 90); c.bezierCurveTo(x - 20, 70, x + 20, 50, x, 26); c.stroke(); } break;
+  }
+}
+
+/** The chapel's white stretch limo, from the town's sedan (kit.ts sedan(), called, not copied): built at a sedan's
+ *  length, cut through its back door and pulled apart to LIMO.len, the body's straight middle (its loft, glass, roof
+ *  and spear run straight there) stretched across the gap and the back wheels moved with the tail; in the stretch a
+ *  passenger door and two fixed windows a side between new pillars, a vinyl landau panel over the roof's back half, an
+ *  antenna; JUST MARRIED on a card off its back bumper, cans trailing on their strings. White held to a lavender grey
+ *  (the colour script: nothing white stands up to the lines' pink). Nose +z. */
+function stretchLimo(): THREE.Group {
+  const base = 5.0, S = LIMO.len - base, paint = '#aaa4ba', car = sedan({ color: paint, length: base });
+  // (the cut: behind the B-pillar and ahead of the back door's seam, as sedan() lays a 5 m car out)
+  const cut = -0.45, wheels = (car.userData.roll as { wheels: THREE.Object3D[] }).wheels;
+  for (const part of car.children) {
+    if (wheels.includes(part)) { part.position.z += Math.sign(part.position.z) * S / 2; continue; }
+    part.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const p = m.geometry.getAttribute('position');
+      for (let j = 0; j < p.count; j++) p.setZ(j, p.getZ(j) + (p.getZ(j) > cut ? S / 2 : -S / 2));
+      p.needsUpdate = true; m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere();
+    });
+  }
+  // its stretch, in sedan()'s own measures: the belt and the roof (m up); the side glass's plane, leaning in from the
+  // ring under it (hb out at yb up) to the roof's edge (hr); the B-pillar and the side glass's back end once pulled
+  // apart (m along); the flank's curve at the seams' and the rocker's heights (m out)
+  const belt = 0.87, roof = 1.27, yb = belt - 0.08, hb = 0.76, hr = 0.63, zB = 0.03 + S / 2, zBack = -1.08 - S / 2, zRoofBack = -0.778 - S / 2, hl = LIMO.len / 2;
+  const x = new THREE.Group(); car.add(x);
+  const span = zB - zBack, pillars = [zB - span * 0.25, zB - span * 0.5, zB - span * 0.75];
+  /** A strip laid from (x0, y0) to (x1, y1) on side s at z, `w` along the car, `t` thick. */
+  const strip = (s: number, x0: number, y0: number, x1: number, y1: number, z: number, w: number, t: number, col: string) => {
+    const len = Math.hypot(x1 - x0, y1 - y0), m = tbox(x, t, len, w, s * (x0 + x1) / 2, (y0 + y1) / 2, z, col);
+    m.rotation.z = s * Math.atan2(x0 - x1, y1 - y0); return m;
+  };
+  for (const s of [1, -1]) {
+    // the new pillars on the side glass's plane, splitting its long pane into four
+    for (const z of pillars) strip(s, hb + 0.006, yb, hr + 0.006, roof, z, 0.075, 0.012, paint);
+    // the passenger door (behind the B-pillar) and the back door's front seam, on the flank's curve; the door's handle
+    for (const z of [pillars[0]!, pillars[2]!]) strip(s, 0.889, 0.45, 0.842, 0.76, z, 0.014, 0.012, '#1d2026');
+    tbox(x, 0.02, 0.025, 0.12, s * 0.81, 0.79, pillars[0]! - 0.13, WORLD.chrome);
+    tbox(x, 0.015, 0.05, span, s * 0.862, 0.38, (zB + zBack) / 2, WORLD.chrome); // (a chrome rocker along the stretch)
+  }
+  tbox(x, 2 * hr - 0.06, 0.03, zB - 0.4 - (zRoofBack + 0.08), 0, roof + 0.008, (zB - 0.4 + zRoofBack + 0.08) / 2, '#7c768c'); // the landau panel
+  tbox(x, 0.02, 0.09, 0.26, 0, roof + 0.06, zRoofBack + 0.35, '#2a2a30'); // the antenna's fin
+  // the wedding's ribbons down its hood from the windshield's corners to a bow on its nose (seen from the street ahead:
+  // the cans and the card are behind it)
+  const zA = 0.998 + S / 2, bow = new THREE.Vector3(0, 0.82, hl - 0.25);
+  for (const s of [1, -1]) {
+    const from = new THREE.Vector3(s * 0.72, belt + 0.02, zA), d = bow.clone().sub(from), rib = tbox(x, 0.08, 0.012, d.length(), (from.x + bow.x) / 2, (from.y + bow.y) / 2 + 0.01, (from.z + bow.z) / 2, '#d8c4cc');
+    rib.rotation.order = 'YXZ'; rib.rotation.y = Math.atan2(d.x, d.z); rib.rotation.x = -Math.atan2(d.y, Math.hypot(d.x, d.z));
+    part(x, new THREE.SphereGeometry(0.09, 10, 8).scale(1, 0.55, 0.5), '#d8c4cc', s * 0.08, bow.y + 0.05, bow.z);
+  }
+  // the cans on their strings off the back bumper, lying on the road behind it
+  [[-0.5, 0.75], [-0.15, 1.15], [0.2, 0.9], [0.52, 1.35]].forEach(([cx, back]) => {
+    const z = -hl - back!, can = tcyl(x, 0.045, 0.12, cx!, 0.045, z, '#9a98a2', 10); can.rotation.z = Math.PI / 2; can.rotation.y = cx! * 0.8;
+    const y0 = 0.4, z0 = -hl - 0.04, len = Math.hypot(z - z0, y0 - 0.05), str = tbox(x, 0.008, 0.008, len, cx! * 0.6, (y0 + 0.05) / 2, (z + z0) / 2, '#c8c4cc');
+    str.rotation.x = -Math.atan2(y0 - 0.05, z0 - z);
+  });
+  fuse(x);
+  // JUST MARRIED on a card hung off the back bumper (painted: it takes the street's light)
+  const card = plane(car, 0.92, 0.34, 0, 0.5, -hl - 0.11, painted(canvasTex(512, 190, (c) => {
+    c.fillStyle = '#e6e0d4'; c.fillRect(0, 0, 512, 190); c.strokeStyle = '#b04a5a'; c.lineWidth = 6; c.strokeRect(10, 10, 492, 170);
+    c.fillStyle = '#3a2a3a'; c.textAlign = 'center'; c.textBaseline = 'middle'; fitText(c, 'JUST MARRIED', 256, 98, 440, 96, 700, 0.06);
+    c.fillStyle = '#b04a5a'; for (const hx of [40, 472]) { c.beginPath(); c.moveTo(hx, 112); c.bezierCurveTo(hx - 26, 92, hx - 18, 66, hx, 80); c.bezierCurveTo(hx + 18, 66, hx + 26, 92, hx, 112); c.fill(); }
+  })));
+  card.rotation.set(0.12, Math.PI, 0);
+  return car;
+}
+
 /** The flicker on: dark before, stuttering on over the last 1.1 s before `start`, lit from it. */
 const flickAt = (t: number, start: number) => {
   if (t >= start) return 1;
@@ -75,18 +187,50 @@ const C = { teal: '#5d9a92', amber: '#c29a5c', blue: '#6c84b0', red: '#b25454', 
 /** How bright the strip's own neon shines (x its colour), against the lines' GLOW.neon (2.6): under half, so it reads
  *  as lit without blooming over them. */
 const SECONDARY = 1.05;
-/** The strip's own neon, on the lots between the businesses: blades down a corner, a word over a shop, signs in its
- *  window (seeded). (No HOTEL or PAWN among them: the strip's hotel and pawn shop are the lines' own.) */
-const BLADES = [['BAR', C.red], ['TATTOO', C.green], ['CLUB', C.violet], ['XXX', C.red], ['MOTEL', C.rose], ['BOOKS', C.amber], ['LOUNGE', C.teal], ['ROOMS', C.orange], ['GIRLS', C.rose]] as const;
-const WORDS = [['COCKTAILS', C.rose], ['LIVE NUDES', C.red], ['PSYCHIC', C.violet], ['ADULT BOOKS', C.amber], ['CHECKS CASHED', C.green], ['BAIL BONDS', C.blue], ['PEEP SHOW', C.red], ['DANCERS', C.rose], ['TATTOOS', C.teal], ['DISCOUNT', C.amber]] as const;
-const WINDOWS = [['OPEN', C.red], ['BEER', C.amber], ['ATM', C.green], ['XXX', C.rose], ['24 HRS', C.blue], ['COLD BEER', C.teal]] as const;
-/** The shops' names on the fillers' sign bands (the town's atlas layout, look/facades.ts: 4 x 4 cells), painted dim. */
-const FILL_NAMES = ['DONUTS', 'TACOS', 'BEAUTY SUPPLY', 'CHECKS CASHED', 'LAUNDROMAT', 'WIGS', 'BAIL BONDS', 'MARKET', 'NAILS', 'RECORDS', 'SHOES', 'CAMERAS', 'DISCOUNT', 'BURGERS', 'LUGGAGE', 'SMOKE SHOP'];
+/** The strip's other businesses, on the lots between the lines' own: each a trade with its own front — its sign over its
+ *  glass (a lit box sign on its band, or its name in tube on a raceway, a drawing beside it), its own room behind the
+ *  glass (the atlas's cells), the neon it hangs in its window, a blade down its corner on a building tall enough, an
+ *  awning (two colours: striped). The user, 2026-10-16: no adult signs ("I don't think there needs to be like a peep
+ *  show sign ... LIVE NUDES ... I don't think I want to advertise that so explicitly"), and "the storefront is, like,
+ *  super bland. I don't know what it's supposed to be". (No HOTEL or PAWN among them: those are the lines' own.) */
+type Icon = 'donut' | 'record' | 'martini' | 'eye' | 'star' | 'slice' | 'cup';
+interface StripTrade { name: string; sign: 'box' | 'neon'; bg: string; ink: string; sub?: string; icon?: Icon; rooms: number[]; window?: readonly [string, string]; blade?: readonly [string, string]; awning?: readonly string[]; tall?: boolean; closed?: boolean }
+const STRIP: Record<string, StripTrade> = {
+  // (the one the user picked out at 142 s, bottom right: its own front below — bars, posters, the ATM, the camera)
+  checks: { name: 'CHECKS CASHED', sign: 'box', bg: '#d6b23e', ink: '#1c3a28', sub: 'PAYDAY LOANS · MONEY ORDERS', rooms: [24], window: ['OPEN', C.red] },
+  donuts: { name: 'DONUTS', sign: 'neon', bg: '', ink: C.orange, icon: 'donut', rooms: [25], window: ['HOT NOW', C.red], blade: ['DONUTS', C.orange], awning: ['#6a3a2a', '#a89878'] },
+  diner: { name: 'DINER', sign: 'box', bg: '#2a4a52', ink: '#e0d0a8', sub: 'BREAKFAST ALL NIGHT', rooms: [4], window: ['OPEN', C.red], blade: ['EAT', C.red], awning: ['#5a2a30', '#a89878'] },
+  records: { name: 'RECORDS', sign: 'neon', bg: '', ink: C.blue, icon: 'record', rooms: [8], window: ['OPEN', C.red], blade: ['RECORDS', C.amber] },
+  tattoo: { name: 'TATTOO', sign: 'neon', bg: '', ink: C.green, icon: 'star', rooms: [26], window: ['WALK-INS', C.amber], blade: ['TATTOO', C.green] },
+  motel: { name: 'MOTEL', sign: 'box', bg: '#3a2a44', ink: '#d8c8a8', sub: 'AIR CONDITIONED · POOL', rooms: [28], window: ['VACANCY', C.red], blade: ['MOTEL', C.rose], tall: true },
+  laundry: { name: 'COIN LAUNDRY', sign: 'box', bg: '#34587a', ink: '#e0dccc', sub: 'OPEN 24 HOURS', rooms: [2, 31], window: ['24 HRS', C.blue] },
+  lounge: { name: 'COCKTAILS', sign: 'neon', bg: '', ink: C.teal, icon: 'martini', rooms: [3], window: ['COLD BEER', C.amber], blade: ['LOUNGE', C.teal], awning: ['#2a3048'] },
+  psychic: { name: 'PSYCHIC', sign: 'neon', bg: '', ink: C.violet, icon: 'eye', rooms: [27], window: ['READINGS', C.violet] },
+  bail: { name: 'BAIL BONDS', sign: 'box', bg: '#28386a', ink: '#e4dcc4', sub: '24 HOURS · 555-0144', rooms: [20], window: ['OPEN 24', C.blue] },
+  tacos: { name: 'TACOS', sign: 'box', bg: '#c49a3c', ink: '#561c1c', sub: 'BURRITOS · TORTAS', rooms: [29], window: ['OPEN', C.red], awning: ['#2a5a3a'] },
+  arcade: { name: 'ARCADE', sign: 'neon', bg: '', ink: C.blue, icon: 'star', rooms: [30], blade: ['ARCADE', C.violet] },
+  pizza: { name: 'PIZZA', sign: 'neon', bg: '', ink: C.amber, icon: 'slice', rooms: [29], window: ['SLICES', C.orange], awning: ['#5a2a2a', '#a89878'] },
+  barber: { name: 'BARBER', sign: 'box', bg: '#d4ccbc', ink: '#2a3a6a', sub: 'CUTS · SHAVES · FADES', rooms: [9], window: ['OPEN', C.red], awning: ['#2a3a6a', '#a89878'] },
+  coffee: { name: 'COFFEE', sign: 'neon', bg: '', ink: C.amber, icon: 'cup', rooms: [4], window: ['OPEN', C.red], awning: ['#3e3a30'] },
+  shoes: { name: 'SHOE REPAIR', sign: 'box', bg: '#5a2a2a', ink: '#d8c8a0', sub: 'KEYS CUT · WHILE U WAIT', rooms: [5], closed: true },
+};
+/** The trades dealt to the lots in turn (checks to its own lot): none repeated within the last few on a side. */
+const DEAL = ['donuts', 'diner', 'records', 'tattoo', 'motel', 'laundry', 'lounge', 'psychic', 'bail', 'tacos', 'arcade', 'pizza', 'barber', 'coffee', 'shoes'];
+/** Signs on a frame on a tall filler's roof, facing the street (where no view of the words crosses them). */
+const ROOF_WORDS = [['JAZZ', C.amber], ['BILLIARDS', C.teal], ['KARAOKE', C.violet], ['STEAKS · CHOPS', C.orange], ['BOWL', C.blue], ['DANCING', C.rose]] as const;
 
-/** People on the sidewalks: how many a side, their pace (m/s), and how far from the kerb's edge they walk (m). */
-const PEOPLE = { perSide: 16, v: [0.9, 1.5] as [number, number], from: [0.6, 2.4] as [number, number] };
+/** People on the sidewalks: how many a side, their pace (m/s), and how far from the kerb's edge they walk (m: clear of
+ *  the kerb's furniture). */
+const PEOPLE = { perSide: 22, v: [0.9, 1.5] as [number, number], from: [0.95, 2.4] as [number, number] };
+/** The kerb's furniture (hydrants, meters, bins, newspaper boxes): how far apart (m), how far in from the kerb's edge. */
+const KERB = { every: 7, in: 0.42 };
 /** The traffic: cars ahead in their lane (m ahead of the car at the verse's start, m/s), oncoming in the other. */
-const TRAFFIC = { ahead: [[26, 8.6], [52, 9]] as [number, number][], oncoming: [[60, -10], [110, -9], [150, -11]] as [number, number][] };
+const TRAFFIC = {
+  ahead: [[26, 8.6], [52, 9]] as [number, number][], oncoming: [[60, -10], [110, -9], [150, -11]] as [number, number][],
+  /** The oncoming cars' line (m off the centre): a car's width in from the left kerb's parked cars (blocks.ts PARKED).
+   *  In their lane's middle (−LANE) they drove 0.7 m into the parked cars' sides. */
+  oncomingLane: -(PARKED.lateral - 1.9),
+};
 /** Street lamps on both kerbs: every `every` m (staggered), their height and reach over the road, their glow (a dim
  *  sodium amber: at the town's full strength their heads were the frame's brightest white). */
 const LAMPS = { every: 26, h: 7.4, reach: 2.4, kerb: 0.5, glow: 1.4 };
@@ -94,17 +238,14 @@ const LAMPS = { every: 26, h: 7.4, reach: 2.4, kerb: 0.5, glow: 1.4 };
 const ROOMS = { fill: 0.72, shop: 0.7 };
 /** The chapel (m, in its front's frame): its gable's rise over the wall, the portico (width, depth, height to its
  *  roof), the steeple (its tower's side, how far back on the roof, the belfry's height, the spire's), the lawn's
- *  depth to its picket fence; the limo at the kerb (its length, how far up the street of the chapel's middle). */
-const CHAPEL = { gable: 3.2, portico: { w: 4.6, d: 1.6, h: 2.95 }, steeple: { side: 2.3, back: 2.2, tower: 3.6, belfry: 2.2, spire: 3.6 }, lawn: 1.3, limo: { len: 7.4, at: -5.0 } };
+ *  depth to its picket fence. (Its limo at the kerb: drive/sets/verse3.ts LIMO.) */
+const CHAPEL = { gable: 3.2, portico: { w: 4.6, d: 1.6, h: 2.95 }, steeple: { side: 2.3, back: 2.2, tower: 3.6, belfry: 2.2, spire: 3.6 }, lawn: 1.3 };
 
-/** The rooms seen through the fillers' windows: an atlas of 8 x 3 cells, each a room of its own. Shops' ground-floor
- *  rooms, the floors' rooms above, and dark ones (the user, 2026-10-15: "it's kind of just like a repeating texture.
- *  all of the windows"). */
-const ATLAS = { cols: 8, rows: 3, cell: 256 };
-const CELLS = {
-  shopLit: [0, 1, 2, 3, 4, 7, 8, 9], shopDark: [5, 6],
-  roomLit: [10, 11, 12, 13, 14, 15, 16, 20, 21, 22], roomDark: [17, 18, 19, 23],
-};
+/** The rooms seen through the fillers' windows: an atlas of 8 x 4 cells, each a room of its own. Shops' ground-floor
+ *  rooms (each trade's own: STRIP), the floors' rooms above, and dark ones (the user, 2026-10-15: "it's kind of just
+ *  like a repeating texture. all of the windows"). No words in them: on the left the fronts are mirrored. */
+const ATLAS = { cols: 8, rows: 4, cell: 256 };
+const CELLS = { roomLit: [10, 11, 12, 13, 14, 15, 16, 20, 21, 22], roomDark: [17, 18, 19, 23] };
 function roomAtlas(): THREE.CanvasTexture {
   const { cols, rows, cell: S } = ATLAS;
   return canvasTex(cols * S, rows * S, (c) => {
@@ -129,6 +270,13 @@ function roomAtlas(): THREE.CanvasTexture {
     const blinds = (wall: string, slat: string, open: number) => {
       rect(0, 0, S, S, wall);
       for (let y = 0; y < S * open; y += 12) rect(0, y, S, 8, slat);
+    };
+    /** A person seen through the glass: a silhouette standing, feet at `foot`, `h` px tall. */
+    const who = (x: number, foot: number, h: number, col: string) => {
+      c.fillStyle = col; const top = foot - h;
+      c.beginPath(); c.arc(x, top + h * 0.075, h * 0.075, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.roundRect(x - h * 0.15, top + h * 0.17, h * 0.3, h * 0.4, h * 0.08); c.fill();
+      c.fillRect(x - h * 0.11, top + h * 0.5, h * 0.22, h * 0.5);
     };
     const curtains = (glow: string, cloth: string, gap: number) => {
       rect(0, 0, S, S, glow);
@@ -174,6 +322,72 @@ function roomAtlas(): THREE.CanvasTexture {
     cellAt(21, () => { rect(0, 0, S, S, '#7a6a52'); for (let x = 0; x < S; x += 64) { rect(x + 4, 20, 56, 70, '#5a4632'); rect(x + 4, 160, 56, 96, '#5a4632'); } rect(0, 150, S, 10, '#8a7a62'); });
     cellAt(22, () => { rect(0, 0, S, S, '#8a6e50'); for (let x = 0; x < S; x += 16) rect(x, 0, 8, S, 'rgba(230,210,180,0.22)'); });
     cellAt(23, () => { dark(23, '#1a1820'); rect(0, 0, S, 14, '#24202c'); });
+    // the trades' own rooms (STRIP), each with its people
+    // 24 a check-casher's: the counter behind its thick glass, a clerk at each window, the rates board, the tubes
+    cellAt(24, () => {
+      rect(0, 0, S, S, '#5c6a66'); for (const x of [30, 150]) rect(x, 6, 80, 7, '#a8b4ac');
+      rect(14, 26, 70, 46, '#232a2a'); for (let k = 0; k < 5; k++) rect(20, 32 + k * 8, 40 + rnd(24, k) * 18, 3, '#b8c49a');
+      who(118, 168, 120, '#2a2a30'); who(200, 168, 116, '#3a3034');
+      rect(0, 140, S, 116, '#40464a'); rect(0, 136, S, 8, '#8a8e86'); for (let x = 12; x < S; x += 40) rect(x, 160, 28, 70, '#4a5054');
+      c.fillStyle = 'rgba(200,232,228,0.13)'; c.fillRect(90, 40, S - 90, 96); for (const x of [90, 160, 230]) rect(x - 2, 40, 5, 96, '#7a827e');
+      rect(96, 128, 52, 6, '#2a2e30'); rect(166, 128, 52, 6, '#2a2e30'); // (the deal trays)
+    });
+    // 25 a donut shop: the menu over the case, trays of donuts, the clerk, the floor's tiles
+    cellAt(25, () => {
+      rect(0, 0, S, S, '#86684e'); rect(10, 10, S - 20, 40, '#2a2420'); for (let k = 0; k < 3; k++) for (let j = 0; j < 4; j++) rect(18 + j * 58, 17 + k * 11, 38, 4, '#d0b070');
+      who(80, 150, 110, '#2a2026'); rect(60, 70, 40, 20, '#c8c0b0');
+      rect(0, 120, S, 100, '#5a4a40'); c.fillStyle = 'rgba(220,210,190,0.18)'; c.fillRect(6, 124, S - 12, 86);
+      for (let k = 0; k < 3; k++) for (let x = 20; x < S - 10; x += 26) { const col = ['#a86a70', '#5a3424', '#c49a58', '#8a5a3a'][(x / 26 + k) % 4 | 0]!; disc(x, 140 + k * 26, 10, col); disc(x, 140 + k * 26, 3.5, '#4a3a30'); }
+      for (let y = 222; y < S; y += 12) for (let x = (y / 12) % 2 ? 0 : 12; x < S; x += 24) rect(x, y, 12, 12, '#6a5a4c');
+    });
+    // 26 a tattoo parlour: flash framed on the walls, the chair under its lamp, the artist at work
+    cellAt(26, () => {
+      rect(0, 0, S, S, '#4a2228');
+      for (let k = 0; k < 2; k++) for (let j = 0; j < 7; j++) { const x = 10 + j * 35, y = 14 + k * 46; rect(x, y, 30, 40, '#1a1012'); rect(x + 2, y + 2, 26, 36, '#b8a888'); for (let q = 0; q < 3; q++) disc(x + 8 + q * 7, y + 12 + (q % 2) * 12, 4, ['#8a3a3a', '#3a6a5a', '#c89a4a', '#3a4a7a'][(j + k + q) % 4]!); }
+      rect(60, 170, 120, 20, '#1a1416'); c.save(); c.translate(170, 170); c.rotate(-0.5); rect(0, -14, 70, 18, '#1a1416'); c.restore(); rect(110, 190, 12, 50, '#2a2426');
+      rect(200, 108, 4, 70, '#2a2426'); disc(180, 108, 14, '#c8b080'); who(56, 230, 112, '#241a1e'); rect(0, 236, S, 20, '#2a1a1e');
+    });
+    // 27 a psychic's parlour: draped in violet, a crystal ball glowing on its table, candles, the palm on the wall
+    cellAt(27, () => {
+      rect(0, 0, S, S, '#33264a'); for (let x = 0; x < S; x += 20) rect(x, 0, 8, S, 'rgba(0,0,0,0.18)');
+      const g = c.createRadialGradient(128, 150, 4, 128, 150, 90); g.addColorStop(0, 'rgba(190,170,240,0.85)'); g.addColorStop(0.25, 'rgba(150,130,210,0.35)'); g.addColorStop(1, 'rgba(120,100,180,0)'); c.fillStyle = g; c.fillRect(0, 40, S, 200);
+      disc(128, 158, 22, '#b4a4e0'); disc(122, 152, 7, '#e0d8f4');
+      c.fillStyle = '#4e2e5a'; c.beginPath(); c.ellipse(128, 196, 96, 22, 0, 0, Math.PI * 2); c.fill(); rect(32, 196, 192, 60, '#4e2e5a');
+      for (const x of [56, 200]) { rect(x - 3, 168, 6, 22, '#c8bc98'); disc(x, 164, 4, '#e8c070'); }
+      c.strokeStyle = '#a090c0'; c.lineWidth = 3; c.beginPath(); c.roundRect(186, 30, 44, 60, 16); c.stroke(); for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(192 + k * 10, 34); c.lineTo(192 + k * 10, 12); c.stroke(); }
+      who(40, 240, 104, '#1e1628');
+    });
+    // 28 a motel's office: panelled, the key board behind the desk, the clerk, the bell, a soda machine
+    cellAt(28, () => {
+      rect(0, 0, S, S, '#6a4a32'); for (let x = 0; x < S; x += 22) rect(x, 0, 3, S, '#5a3e2a');
+      rect(30, 28, 100, 64, '#4a3424'); for (let k = 0; k < 3; k++) for (let j = 0; j < 6; j++) { rect(38 + j * 15, 36 + k * 19, 3, 6, '#2a1e14'); rect(36 + j * 15, 42 + k * 19, 7, 9, '#c8b48a'); }
+      who(84, 168, 112, '#2a2024'); rect(0, 140, 170, 116, '#4a3220'); rect(0, 136, 170, 8, '#8a6a48'); disc(140, 132, 6, '#c8a860');
+      rect(186, 40, 56, 200, '#6a2a2c'); rect(194, 52, 40, 70, '#c8b8a0'); for (let k = 0; k < 4; k++) rect(196 + k * 10, 130, 6, 40, '#3a1a1c'); rect(196, 200, 36, 12, '#1a1012');
+    });
+    // 29 a counter's kitchen (tacos, pizza): the tiled wall, menu boards, the steel line, heat lamps, the cook
+    cellAt(29, () => {
+      rect(0, 0, S, S, '#86807a'); for (let y = 0; y < S; y += 16) rect(0, y, S, 1.5, '#6e6a64'); for (let x = 0; x < S; x += 16) rect(x, 0, 1.5, S, '#6e6a64');
+      for (let j = 0; j < 3; j++) { rect(12 + j * 82, 12, 72, 52, '#1e1c1a'); for (let k = 0; k < 5; k++) rect(18 + j * 82, 20 + k * 8, 40 + rnd(29, j * 5 + k) * 18, 3, '#d8c080'); }
+      for (const x of [70, 150, 220]) { rect(x - 1, 64, 2, 30, '#2a2a2a'); rect(x - 16, 94, 32, 8, '#8a3a2a'); }
+      who(110, 190, 120, '#2a2226'); rect(0, 150, S, 106, '#7a7e80'); rect(0, 146, S, 8, '#a8acae'); for (let x = 20; x < S; x += 50) rect(x, 128, 34, 18, ['#8a6a3a', '#6a7a3a', '#9a4a2a'][(x / 50) % 3 | 0]!);
+    });
+    // 30 an arcade: dark, its cabinets' screens glowing, the players
+    cellAt(30, () => {
+      rect(0, 0, S, S, '#181222'); for (let x = 0; x < S; x += 6) for (let y = 220; y < S; y += 6) if (rnd(30, x * 7 + y) > 0.8) rect(x, y, 3, 3, ['#5a4a7a', '#3a6a6a', '#7a5a3a'][(x + y) % 3]!);
+      for (let k = 0; k < 4; k++) { const x = 10 + k * 62; rect(x, 50, 50, 170, '#26203a'); rect(x + 4, 56, 42, 14, ['#b07a4a', '#6a8ab0', '#a06a9a', '#6aa08a'][k]!); rect(x + 6, 82, 38, 34, ['#4a9a9a', '#9a6ab4', '#c0a050', '#5a7ac0'][k]!); rect(x + 4, 128, 42, 10, '#3a3450'); }
+      who(70, 236, 110, '#0e0a14'); who(196, 236, 104, '#0e0a14');
+    });
+    // 31 a laundromat's front: the folding table, someone folding, the change machine
+    cellAt(31, () => {
+      rect(0, 0, S, S, '#56606a'); for (const x of [40, 180]) rect(x, 8, 60, 6, '#a0a8a8');
+      for (let x = 136; x < S; x += 60) { rect(x, 120, 52, 110, '#7a8088'); disc(x + 26, 170, 18, '#2e3640'); disc(x + 26, 170, 11, '#4a5664'); }
+      rect(10, 60, 40, 90, '#6a7a6a'); rect(16, 70, 28, 20, '#a4b0a0');
+      who(80, 236, 110, '#2a2a34'); rect(40, 160, 90, 10, '#9a948a'); rect(48, 170, 6, 66, '#4a4a50'); rect(116, 170, 6, 66, '#4a4a50'); for (let k = 0; k < 3; k++) rect(56 + k * 22, 148, 18, 12, ['#8a5a5a', '#5a6a8a', '#a09060'][k]!);
+    });
+    // and the people in the bar's, the diner's and the laundromat's rooms
+    cellAt(3, () => { who(100, 250, 120, '#120a0c'); who(190, 120, 70, '#1e1214'); });
+    cellAt(4, () => { who(150, 186, 100, '#2a2024'); who(60, 230, 96, '#3a2a2a'); });
+    cellAt(2, () => who(110, 250, 118, '#2a2e36'));
   });
 }
 
@@ -248,18 +462,44 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     });
   });
 
-  // ---- the fronts: the town's geometry (look/facades.ts) for every lot but the chapel's (its own, below), in the
-  // strip's colours: the stucco greyed and dimmed, the trim off white, each window a room of its own (the atlas), a
-  // word in neon or a dim painted name over each filler's shop ----
-  const bandWord = new Set<number>(); // (the fillers whose sign band carries a neon word instead of a painted name)
-  plan.lots.forEach((lot, i) => {
-    const B = lotBlock(route, lot, i), apartments = lot.h <= 9 && hash(B.s, B.lateral, 2) > 0.72; // (as look/facades.ts decides: no shop, no band)
-    if (lot.shop === undefined && !apartments && hash(i, 3, 701) < 0.55) bandWord.add(i);
-  });
-  /** Each filler's lit ground-floor panes (world centre, for the neon hung in them). */
-  const shopPanes = new Map<number, THREE.Vector3[]>();
+  // ---- the strip's other businesses: a trade dealt to each filler with a shop (STRIP); the check casher on the right
+  // beside the take up the street (142 s) ----
+  const tradeOf = new Map<number, StripTrade>();
   {
-    const walls: THREE.BufferGeometry[] = [], trim: THREE.BufferGeometry[] = [], glass: THREE.BufferGeometry[] = [], signs: THREE.BufferGeometry[] = [];
+    const fillers = plan.lots.map((lot, i) => ({ lot, i })).filter(({ lot, i }) => {
+      const B = lotBlock(route, lot, i), apartments = lot.h <= 9 && hash(B.s, B.lateral, 2) > 0.72; // (as look/facades.ts decides: no shop)
+      return lot.shop === undefined && !apartments;
+    });
+    // (the one beside the lens as the take up the street to the tiki bar's sign settles: the user's frame)
+    const tiki = plan.signs.find((g) => g.theme === 'tiki')!, t = Math.min(...faces.filter((c) => Math.abs(c.s - tiki.s) < 0.01).map((c) => c.reveal)) + 0.75;
+    const eye = eyeAt(t), cam = drive.camera(t), aim = new THREE.Vector3(cam.tx, cam.ty, cam.tz).sub(eye).normalize();
+    const front = (l: Lot) => atRoad(l.s, l.side * STREET.front, 1.5), seen = (l: Lot) => front(l).sub(eye).normalize().dot(aim) > Math.cos(0.6);
+    const checks = fillers.filter(({ lot }) => lot.side > 0 && seen(lot)).sort((a, b) => front(a.lot).distanceTo(eye) - front(b.lot).distanceTo(eye))[0];
+    if (checks) tradeOf.set(checks.i, STRIP.checks!);
+    for (const side of [-1, 1]) {
+      const recent: string[] = [];
+      let k = Math.floor(hash(side, 7, 707) * DEAL.length);
+      for (const { lot, i } of fillers.filter((f) => f.lot.side === side).sort((a, b) => a.lot.s - b.lot.s)) {
+        if (tradeOf.has(i)) { recent.push('checks'); continue; }
+        let name = DEAL[k % DEAL.length]!;
+        for (let n = 0; n < DEAL.length && (recent.slice(-5).includes(name) || (STRIP[name]!.tall && lot.h < 9)); n++) name = DEAL[++k % DEAL.length]!;
+        k += 1 + Math.floor(hash(i, 5, 709) * 3);
+        tradeOf.set(i, STRIP[name]!); recent.push(name);
+      }
+    }
+  }
+  /** Each lot's own frame, made once (see lotFrame). */
+  const frames = new Map<number, THREE.Group>();
+  const frameOf = (i: number) => { let g = frames.get(i); if (!g) { g = lotFrame(plan.lots[i]!); frames.set(i, g); } return g; };
+
+  // ---- the fronts: the town's geometry (look/facades.ts) for every lot but the chapel's (its own, below), in the
+  // strip's colours: the stucco greyed and dimmed, the trim off white, each window a room of its own (the atlas; a
+  // filler's shop's its trade's own); its sign is its trade's (below), not the town's painted band ----
+  /** Each filler's ground-floor panes, in its lot's frame (x, y their middle; w, h; z their face; door: the one the
+   *  town's front makes its door). */
+  const panesOf = new Map<number, { x: number; y: number; w: number; h: number; z: number; door: boolean }[]>();
+  {
+    const walls: THREE.BufferGeometry[] = [], trim: THREE.BufferGeometry[] = [], glass: THREE.BufferGeometry[] = [];
     /** Greys a front's vertex colours toward their luminance and dims them (the night's street, not its signs). */
     const mute = (g: THREE.BufferGeometry, sat: number, k: number, ceil: number) => {
       const col = g.getAttribute('color');
@@ -274,10 +514,14 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       const f = facadeOf(lotBlock(route, lot, i)), ground = route.frameAt(lot.s).pos.y;
       mute(f.walls, 0.55, 0.82, 0.5); mute(f.trim, 0.45, 0.72, 0.42);
       walls.push(f.walls); trim.push(f.trim);
-      if (!shop && !bandWord.has(i)) signs.push(f.signs);
-      // its panes: each a room from the atlas (some dark), mirrored back on the left (the front's own mirror)
+      // its panes: each a room from the atlas (some dark), mirrored back on the left (the front's own mirror); a
+      // filler's shop's panes its trade's rooms, all lit (it's open), the door among them
       const pos = f.glass.getAttribute('position'), uv = f.glass.getAttribute('uv'), lit = f.glass.getAttribute('lit');
-      const keep: number[] = [], panes: THREE.Vector3[] = [];
+      const keep: number[] = [], panes: { x: number; y: number; w: number; h: number; z: number; door: boolean }[] = [], trade = tradeOf.get(i);
+      const inv = shop ? null : frameOf(i).matrix.clone().invert();
+      // (its door: the pane the town's front makes it, by the same hash: look/facades.ts)
+      const B = lotBlock(route, lot, i), doorAt = Math.floor(hash(B.s, B.lateral, 3) * Math.max(1, Math.floor((lot.w - 1) / 3.2)));
+      let low0 = 0;
       for (let p = 0; p * 4 < pos.count; p++) {
         const c = new THREE.Vector3();
         for (let j = 0; j < 4; j++) c.add(new THREE.Vector3().fromBufferAttribute(pos, p * 4 + j));
@@ -287,15 +531,23 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         keep.push(p);
         const r = (k: number) => hash(i, p, k);
         const on = lit.getX(p * 4) > 0.5 && (low || r(1) < 0.72);
-        const set = low ? (on ? CELLS.shopLit : CELLS.shopDark) : on ? CELLS.roomLit : CELLS.roomDark;
-        const k = set[Math.floor(r(2) * set.length)]!, cx = k % ATLAS.cols, cy = Math.floor(k / ATLAS.cols);
-        if (low && on) panes.push(c);
+        let k: number;
+        if (low) {
+          const ord = low0++;
+          k = trade ? trade.rooms[ord % trade.rooms.length]! : 5; // (an apartment block's carport: its roll-down door)
+          if (inv) {
+            const q = [0, 1, 2, 3].map((j) => new THREE.Vector3().fromBufferAttribute(pos, p * 4 + j).applyMatrix4(inv));
+            const x0 = Math.min(...q.map((v) => v.x)), x1 = Math.max(...q.map((v) => v.x)), y0 = Math.min(...q.map((v) => v.y)), y1 = Math.max(...q.map((v) => v.y));
+            panes.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0, z: q[0]!.z, door: ord === doorAt });
+          }
+        } else { const set = on ? CELLS.roomLit : CELLS.roomDark; k = set[Math.floor(r(2) * set.length)]!; }
+        const cx = k % ATLAS.cols, cy = Math.floor(k / ATLAS.cols);
         for (let j = 0; j < 4; j++) {
           const v = p * 4 + j, u0 = uv.getX(v), v0 = uv.getY(v);
           uv.setXY(v, (cx + (lot.side < 0 ? 1 - u0 : u0)) / ATLAS.cols, 1 - (cy + 1 - v0) / ATLAS.rows);
         }
       }
-      shopPanes.set(i, panes);
+      if (!shop) panesOf.set(i, panes.sort((a, b) => a.x - b.x));
       if (keep.length * 4 === pos.count) { glass.push(f.glass); return; }
       // (the business's ground-floor panes left out: a new index over the kept ones)
       const ix = f.glass.getIndex()!, idx: number[] = [];
@@ -308,14 +560,6 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     const m = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs.filter((g) => g.getAttribute('position').count > 0).map((g) => { for (const n of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(n)) g.deleteAttribute(n); return g; }))!;
     fronts.add(new THREE.Mesh(m(walls), toon({ vertexColors: true })), new THREE.Mesh(m(trim), toon({ vertexColors: true })));
     fronts.add(new THREE.Mesh(m(glass), pic(roomAtlas(), { color: new THREE.Color().setScalar(ROOMS.fill) })));
-    if (signs.length) {
-      const atlas = canvasTex(512 * 4, 112 * 4, (c) => FILL_NAMES.forEach((name, k) => {
-        const x = (k % 4) * 512, y = Math.floor(k / 4) * 112, [bg, ink] = [['#2a2430', '#b8a888'], ['#30282a', '#a89070'], ['#262c34', '#98a4b0'], ['#2c2a26', '#b0a080']][k % 4]!;
-        c.fillStyle = bg; c.fillRect(x, y, 512, 112); c.strokeStyle = ink; c.lineWidth = 3; c.strokeRect(x + 8, y + 8, 496, 96);
-        c.fillStyle = ink; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 52); c.fillText(name, x + 256, y + 60, 450);
-      }));
-      fronts.add(new THREE.Mesh(m(signs), pic(atlas, { color: new THREE.Color().setScalar(0.62) })));
-    }
   }
 
   // ---- a business's ground floor: its glass, its own rooms behind it (pane by pane: the trade's things, a lobby, a
@@ -365,16 +609,20 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     marquee: { fascia: '#6a2028', ink: '#c0a060', sign: 'NOW PLAYING' },
     tiki: { fascia: '#4a2e18', ink: '#8ab0a4', sign: 'MAI TAIS · ZOMBIES · HAPPY HOUR 4-7' },
     phone: { fascia: '#1f3450', ink: '#b8b0a0', sign: 'COLOR TV · PHONES · WEEKLY RATES' },
-    pawn: { fascia: '#4a1a1a', ink: '#c8a050', sign: 'WE BUY GOLD · LOANS · GUNS · TOOLS' },
+    pawn: { fascia: '#4a1a1a', ink: '#c8a050', sign: 'WE BUY GOLD · LOANS · JEWELRY · TOOLS' },
   };
   /** A business's glass front (in its lot's frame), `solid` the stretches of its front (x from, to) kept wall instead
-   *  of glass (the hotel's payphones'), `fascia` false for a front whose board covers its fascia's place. */
-  const storefront = (g: THREE.Object3D, w: number, theme: Exclude<Theme, 'chapel'>, glassTop = 2.9, opts: { solid?: [number, number][]; fascia?: boolean; wall?: string } = {}) => {
+   *  of glass (the hotel's payphones'), `fascia` false for a front whose board covers its fascia's place, `recess` its
+   *  display windows' rooms set back in the front's depth (a display's things stand in front of them). Its panes (x,
+   *  width, which is the door, which is wall). */
+  const storefront = (g: THREE.Object3D, w: number, theme: Exclude<Theme, 'chapel'>, glassTop = 2.9, opts: { solid?: [number, number][]; fascia?: boolean; wall?: string; recess?: boolean } = {}) => {
     const T = TRADES[theme], frame = toon({ color: '#1d1a22' });
     const W = w - 0.6, panes = Math.max(2, Math.round(W / 2.4)), pw = W / panes, glassH = glassTop - 0.35;
     const solidAt = (x: number) => (opts.solid ?? []).some(([a, b]) => x > a && x < b);
+    const out: { x: number; w: number; door: boolean; solid: boolean }[] = [];
     for (let i = 0; i < panes; i++) {
       const x = -W / 2 + pw * (i + 0.5);
+      out.push({ x, w: pw, door: i === Math.floor(panes / 2), solid: solidAt(x) });
       if (solidAt(x)) { box(g, pw, glassTop, 0.1, x, glassTop / 2, 0.04, toon({ color: opts.wall ?? '#4a4258' })); continue; }
       if (i === Math.floor(panes / 2)) { // the door
         box(g, pw - 0.2, glassTop - 0.05, 0.08, x, (glassTop - 0.05) / 2, 0.06, frame);
@@ -382,8 +630,12 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         box(g, 0.05, 0.6, 0.05, x + pw / 2 - 0.45, 1.1, 0.13, chrome);
         continue;
       }
-      plane(g, pw - 0.1, glassH, x, 0.35 + glassH / 2, 0.06, pic(roomOf(theme, i), { color: new THREE.Color().setScalar(ROOMS.shop) }));
+      plane(g, pw - 0.1, glassH, x, 0.35 + glassH / 2, opts.recess ? -0.22 : 0.06, pic(roomOf(theme, i), { color: new THREE.Color().setScalar(ROOMS.shop) }));
       box(g, pw, 0.35, 0.2, x, 0.175, 0.08, toon({ color: '#3a3540' })); // the base course
+      if (opts.recess) { // the display's floor and its sides, back to the room
+        tbox(g, pw - 0.1, 0.05, 0.32, x, 0.38, -0.08, '#3a2c26');
+        for (const sd of [-1, 1]) tbox(g, 0.04, glassH, 0.3, x + sd * (pw / 2 - 0.07), 0.35 + glassH / 2, -0.08, '#2a2428');
+      }
     }
     for (let i = 0; i <= panes; i++) box(g, 0.1, glassTop, 0.12, -W / 2 + pw * i, glassTop / 2, 0.08, frame);
     box(g, W + 0.2, 0.1, 0.2, 0, glassTop, 0.08, frame);
@@ -395,6 +647,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     if (T.awning) { const a = box(g, w * 0.8, 0.08, 1.5, 0, glassTop - 0.15, 0.85, toon({ color: T.awning })); a.rotation.x = 0.2; }
     // its light spilling out on the sidewalk
     wash(g, w * 0.9, 3.4, 0, 0.17, 1.7, '#c8a078', 0.16, true);
+    return out;
   };
 
   /** A wall sign's hardware round its face (in the face's frame, the wall `back` m behind it): standoffs, the
@@ -418,23 +671,31 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   };
   /** A lit box sign's face: `text` filled (not tubed: a box sign's letters read from across the street) in `ink` on
    *  `bg`, a border, optionally the pawnbroker's three balls before it. */
-  const boxSignTex = (text: string, ink: string, bg: string, w: number, h: number, balls = false, sub = '') => canvasTex(w, h, (c) => {
-    c.fillStyle = bg; c.fillRect(0, 0, w, h);
-    c.strokeStyle = ink; c.lineWidth = h * 0.04; c.strokeRect(h * 0.06, h * 0.06, w - h * 0.12, h * 0.88);
-    const x0 = balls ? h * 0.95 : 0;
-    if (balls) for (const [bx, by] of [[0.32, 0.36], [0.68, 0.36], [0.5, 0.68]] as const) { c.fillStyle = ink; c.beginPath(); c.arc(h * 0.14 + bx * h * 0.75, by * h, h * 0.13, 0, Math.PI * 2); c.fill(); }
-    const big = sub ? 0.5 : 0.66;
-    c.fillStyle = ink; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), h * big);
-    (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${h * 0.08}px`;
-    c.fillText(text, x0 + (w - x0) / 2, sub ? h * 0.38 : h * 0.55, (w - x0) * 0.86);
-    if (sub) { c.font = font(F.sign(600), h * 0.2); (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${h * 0.03}px`; c.fillText(sub, x0 + (w - x0) / 2, h * 0.76, (w - x0) * 0.86); }
-  });
+  const boxSignTex = (text: string, ink: string, bg: string, w: number, h: number, balls = false, sub = '') => canvasTex(w, h, (c) => boxFace(c, 0, 0, w, h, text, ink, bg, sub, balls));
+  /** Someone standing still on the sidewalk (in `g`'s frame, at x, z, turned `ry`): built once and never moved, so it's
+   *  batched with what it stands by (the walkers are posed every frame). */
+  const stander = (g: THREE.Object3D, x: number, z: number, ry: number) => { const p = walker(); p.position.set(x, 0.15, z); p.rotation.y = ry; g.add(p); return p; };
+  /** A shop's things seen in its window, lit by the shop behind them, not by the street (unlit, their colours held
+   *  low): one material, so a window's things are one draw. */
+  const DISPLAY = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color().setScalar(0.66) });
+  const displayPart = (to: THREE.Object3D, geo: THREE.BufferGeometry, color: string, x: number, y: number, z: number) => { const m = new THREE.Mesh(tinted(geo, color), DISPLAY); m.position.set(x, y, z); to.add(m); return m; };
+  /** A roll-down security grille, `h` m of it down from its housing at `top` over a w-wide opening (in `g`'s frame, at
+   *  x, its face at z): the link mesh, its bottom bar, its guides, the housing it rolls into. */
+  const grilleTex = canvasTex(64, 64, (c) => { c.clearRect(0, 0, 64, 64); c.fillStyle = '#ffffff'; for (let y = 0; y < 64; y += 16) { c.fillRect(0, y, 64, 4); for (let x = (y / 16) % 2 ? 0 : 16; x < 64; x += 32) c.fillRect(x, y, 5, 16); } });
+  grilleTex.wrapS = grilleTex.wrapT = THREE.RepeatWrapping;
+  const GRILLE = toon({ map: grilleTex, alphaTest: 0.5, side: THREE.DoubleSide, color: '#8a8692' });
+  const grille = (g: THREE.Object3D, w: number, h: number, x: number, top: number, z: number) => {
+    const geo = new THREE.PlaneGeometry(w, h), uv = geo.getAttribute('uv');
+    for (let j = 0; j < uv.count; j++) uv.setXY(j, (uv.getX(j) * w) / 0.3, (uv.getY(j) * h) / 0.3);
+    const m = new THREE.Mesh(geo, GRILLE); m.position.set(x, top - h / 2, z); g.add(m);
+    tbox(g, w + 0.04, 0.06, 0.06, x, top - h, z, '#4a4650');
+    for (const sd of [-1, 1]) tbox(g, 0.05, h + 0.1, 0.07, x + sd * (w / 2 + 0.02), top - h / 2, z, '#3a3640');
+    tbox(g, w + 0.14, 0.24, 0.28, x, top + 0.1, z - 0.06, '#3a3640');
+  };
 
-  /** Where a limo parks (m off the road's centre: the kerb's parked cars' line). */
-  const PARKED_LIMO = ROAD_HALF - 1.05;
   // ---- the businesses ----
   for (const sign of plan.signs) {
-    const lot = plan.lots[sign.lot]!, g = lotFrame(lot), { face, theme } = sign, W = face.w, H = face.h, start = sign.starts[0]!;
+    const lot = plan.lots[sign.lot]!, g = frameOf(sign.lot), { face, theme } = sign, W = face.w, H = face.h, start = sign.starts[0]!;
     const fg = onPanel(face); root.add(fg);
     const groundY = -(face.center.y - route.frameAt(sign.s).pos.y);
     // (the lines' own pink in the wet road under them; the marquee's and the board's in their lights' warm)
@@ -498,10 +759,15 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         const e = mw / 2 - 0.15, f = mh / 2 - 0.15, n = 22;
         for (let i = 0; i <= n; i++) for (const y of [f, -f]) ball(fg, 0.07, -e + (2 * e * i) / n, y, 0.04, bulb[i % 2]!);
         for (let i = 1; i < 6; i++) for (const x of [-e, e]) ball(fg, 0.07, x, -f + (2 * f * i) / 6, 0.04, bulb[i % 2]!);
-        // its ends, the house's name on each (seen coming up the street)
+        // its ends: burgundy panels framed in gold, a column of bulbs down each front edge (the house's name was set on
+        // them squeezed into the end's narrow panel — the user, 2026-10-16: "the squished burgundy background gold text
+        // NITE OWL"; the blade over it says it)
         for (const sd of [-1, 1]) {
-          const p = plane(fg, out - 0.3, mh - 0.4, sd * (mw / 2 + 0.01), 0, -out / 2, litPic(signFace('NITE OWL', 512, 256, '#c8a060', '#5a1e26', F.sign(700), 0.4, 0.1), 0.75));
-          p.rotation.y = sd * Math.PI / 2;
+          const ex = sd * (mw / 2 + 0.03);
+          for (const z of [-0.2, -out + 0.15]) tbox(fg, 0.04, mh - 0.3, 0.06, ex, 0, z, '#8a7040');
+          tbox(fg, 0.04, 0.06, out - 0.3, ex, mh / 2 - 0.2, -out / 2, '#8a7040'); tbox(fg, 0.04, 0.06, out - 0.3, ex, -mh / 2 + 0.2, -out / 2, '#8a7040');
+          tbox(fg, 0.03, mh - 0.7, 0.5, ex, 0, -out / 2, '#4a1820');
+          for (let k = 0; k < 7; k++) ball(fg, 0.06, ex + sd * 0.02, -mh / 2 + 0.4 + (k * (mh - 0.8)) / 6, -out / 2, bulb[k % 2]!);
         }
         // the soffit's lights under it, pooling on the sidewalk
         plane(fg, mw - 0.4, out - 0.3, 0, -mh / 2 - 0.21, -out / 2, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.72, 0.5) })).rotation.x = Math.PI / 2;
@@ -509,9 +775,19 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         for (const x of [-mw / 2 + 0.5, mw / 2 - 0.5]) { const rod = box(fg, 0.05, Math.hypot(2.6, out), 0.05, x, mh / 2 + 1.3, -out / 2, steel); rod.rotation.x = -Math.atan2(out, 2.6); }
         // NITE OWL down a blade over it
         const top = face.center.y - route.frameAt(sign.s).pos.y + mh / 2 + 0.6;
-        blade(g, 0, top, Math.min(6.4, lot.h + 1.5 - top), 'NITEOWL', C.amber, 1.6);
-        // the ticket booth and the poster cases either side of it
-        box(g, 2.0, 2.5, 0.8, 0, 1.25, 0.45, toon({ color: '#6a2a32' }));
+        blade(g, 0, top, Math.min(6.8, lot.h + 1.5 - top), 'NITE OWL', C.amber, 1.6);
+        // the ticket booth (glazed on three sides, a gold-trimmed base, its domed cap, the cashier lit inside) and the
+        // poster cases either side of it
+        {
+          const bz = 0.55;
+          tbox(g, 1.9, 1.0, 1.0, 0, 0.5, bz, '#5a2028'); tbox(g, 2.0, 0.08, 1.1, 0, 1.02, bz, '#8a7040');
+          for (const x of [-0.92, 0.92]) for (const z of [bz - 0.47, bz + 0.47]) tbox(g, 0.08, 1.3, 0.08, x, 1.68, z, '#8a7040');
+          tbox(g, 2.06, 0.22, 1.16, 0, 2.42, bz, '#5a2028'); tbox(g, 2.12, 0.06, 1.22, 0, 2.3, bz, '#8a7040');
+          const cap = tcyl(g, 0.62, 0.3, 0, 2.66, bz, '#6a2a32', 16); cap.scale.set(1.5, 1, 0.85);
+          displayPart(g, new THREE.BoxGeometry(1.76, 1.24, 0.9), '#a07a52', 0, 1.66, bz); // (its glass, the booth lit within)
+          displayPart(g, new THREE.SphereGeometry(0.13, 10, 8), '#2a1a1a', 0.1, 1.72, bz + 0.1); displayPart(g, new THREE.BoxGeometry(0.34, 0.32, 0.2), '#2a1a1a', 0.1, 1.46, bz + 0.1); // the cashier
+          tbox(g, 0.5, 0.04, 0.2, 0, 1.08, bz + 0.55, '#8a7040'); // the ticket sill
+        }
         for (const x of [-lot.w / 2 + 1.4, lot.w / 2 - 1.4]) {
           box(g, 1.3, 1.9, 0.1, x, 1.5, 0.12, toon({ color: '#8a7040' }));
           plane(g, 1.05, 1.6, x, 1.5, 0.18, litPic(canvasTex(128, 192, (c) => { c.fillStyle = x > 0 ? '#5a3a5e' : '#2b1b4e'; c.fillRect(0, 0, 128, 192); c.fillStyle = '#a08850'; c.beginPath(); c.arc(64, 70, 36, 0, Math.PI * 2); c.fill(); c.fillStyle = '#16131a'; c.fillRect(20, 130, 88, 10); c.fillRect(30, 150, 68, 8); }), 0.7));
@@ -566,7 +842,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         // that's clipping over the front of the store, and then there's, like, randomly phones poking out of the front
         // windows". Its words now on its fascia and its canopy, its payphones on a stretch of its own wall.)
         const phoneX = -lot.w / 2 + 1.5; // (the payphones' wall: the front's up-street end)
-        storefront(g, lot.w, 'phone', 2.9, { solid: [[-lot.w / 2, -lot.w / 2 + 3.0]], wall: '#3e3a52' });
+        const phonePanes = storefront(g, lot.w, 'phone', 2.9, { solid: [[-lot.w / 2, -lot.w / 2 + 3.0]], wall: '#3e3a52' });
         wallMount(fg, W, H, start);
         blade(g, lot.w / 2 - 0.6, 3.9, 7.2, 'HOTEL', C.red, 1.5);
         wash(fg, W + 6, H + 4, 0, 0, -MOUNT.wall + 0.02, PINK, 0.18);
@@ -589,32 +865,83 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         }
         coin = plane(ph, 0.08, 0.08, 0.6, 1.95, 0.29, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 0.3, 0.25), toneMapped: false }));
         coinStart = sign.starts[0]!;
+        // someone on the near phone, turned to it
+        { const p = stander(ph, -0.6, 0.62, Math.PI); p.getObjectByName('armR')!.rotation.set(-2.25, 0, 0.55); }
+        // CALL ME in its first window by the phones: a handset in rose tube, the words under it (the user, 2026-10-16:
+        // "'other hoes is lacking, call me up', and I can see that that is by a phone in the environment, which is nice.
+        // Maybe if you want to use the girl sign, that would be a good place" — the strip's GIRLS blade gone, this in
+        // its place: the line's own invitation, not an advert)
+        {
+          const pane = phonePanes.find((p) => !p.solid && !p.door)!;
+          neon(g, 1.7, 0.96, pane.x, 1.95, 0.13, neonTex(512, 288, C.rose, (c) => {
+            c.strokeStyle = C.rose; c.lineWidth = 9; c.lineCap = 'round';
+            c.save(); c.translate(256, 92); c.rotate(-0.18);
+            c.beginPath(); c.moveTo(-96, 18); c.quadraticCurveTo(-90, -40, 0, -44); c.quadraticCurveTo(90, -40, 96, 18); c.stroke();
+            for (const sd of [-1, 1]) { c.beginPath(); c.roundRect(sd * 96 - 26, 6, 52, 34, 10); c.stroke(); }
+            c.restore();
+            c.textAlign = 'center'; c.textBaseline = 'middle'; fitText(c, 'CALL ME', 256, 214, 440, 104, 600, 0.12, true);
+          }), { peak: 1.0 });
+        }
         break;
       }
       case 'pawn': {
         // (the user, 2026-10-15, at 148 s: "I have no idea what the word on the sign is ... it looks like P-A-M-E ... oh,
-        // it's a pawn shop. I see. Okay, yeah, that was not clear to me at all." Now its name is a big lit box sign over
-        // the board, the balls in it and hung off its corner, LOANS and WE BUY GOLD under it, its windows barred and full of
-        // what it's lent on, WE BUY GOLD on its glass; the board, the lines', framed as its front's own.)
-        storefront(g, lot.w, 'pawn', 2.2, { fascia: false });
-        for (let x = -lot.w / 2 + 0.6; x < lot.w / 2 - 0.4; x += 0.34) box(g, 0.045, 2.0, 0.045, x, 1.2, 0.2, toon({ color: '#2a2630' })); // the bars
-        for (const y of [0.35, 2.15]) box(g, lot.w - 0.8, 0.06, 0.06, 0, y, 0.2, toon({ color: '#2a2630' }));
-        // WE BUY GOLD lettered on the glass, gold leaf
-        for (const [x, text] of [[-lot.w / 2 + 2.6, 'WE BUY GOLD'], [lot.w / 2 - 2.6, 'LOANS · GUNS · TV']] as const) plane(g, 3.4, 0.5, x, 1.75, 0.1, pic(signFace(text, 1024, 150, '#c8a050', null, F.sign(700), 0.62, 0.1), { transparent: true, color: new THREE.Color(0.9, 0.9, 0.9) }));
-        // the board's frame: an oxblood surround with a gold edge, its bulbs warm and low
-        box(fg, W + 0.9, H + 0.5, 0.14, 0, 0, -0.12, toon({ color: '#4a1a1e' }));
-        box(fg, W + 0.5, H + 0.3, 0.15, 0, 0, -0.1, toon({ color: '#8a6a2e' }));
-        const bulb = [lampMaterial('#e8b878', 1.3, 0.6), lampMaterial('#e8b878', 0.4, 0.3)];
-        marqueeBulbs.push(...bulb.map((m, i) => ({ m, phase: i, k: 1.3 })));
-        { const e = W / 2 + 0.33, f = H / 2 + 0.2, n = 22, m = 9;
-          for (let i = 0; i <= n; i++) for (const y of [f, -f]) ball(fg, 0.06, -e + (2 * e * i) / n, y, 0.0, bulb[i % 2]!);
-          for (let i = 1; i < m; i++) for (const x of [-e, e]) ball(fg, 0.06, x, -f + (2 * f * i) / m, 0.0, bulb[i % 2]!); }
-        // PAWN: a big lit box sign on its wall over the board, the three balls before the word, LOANS and WE BUY GOLD
-        // under it (on it: a blade down its corner stood between the crane and the board's first letters)
-        const bw = Math.min(lot.w - 1.2, 7.2), bh = 2.0, by = face.center.y - route.frameAt(sign.s).pos.y + H / 2 + 0.35 + bh / 2;
-        box(g, bw + 0.3, bh + 0.3, 0.4, 0, by, 0.25, toon({ color: '#3a1416' }));
-        plane(g, bw, bh, 0, by, 0.46, pic(boxSignTex('PAWN', '#d8ac58', '#5a1a1c', 1024, 284, true, 'LOANS · WE BUY GOLD'), { color: new THREE.Color().setScalar(0.92) }));
-        for (const x of [-bw / 3, bw / 3]) box(g, 0.1, 0.1, 0.5, x, by - bh / 2 - 0.1, 0.2, steel);
+        // it's a pawn shop." And 2026-10-16: "there's kind of like a marquee sign on a pawn shop, and I'm not sure why it
+        // looks that way ... The pawn shop's also locked up and is selling guitars and needs a quality pass". Its sign now
+        // a pawnbroker's own: one big lit cabinet over its front, PAWN · LOANS · GOLD across its head after the three
+        // balls, the lines on its face below, the whole in a gold retainer (the chase bulbs round the board made it a
+        // marquee: gone); the balls hung off its corner too. Shut for the night: its display windows set back in its
+        // front, full of what it's lent on — guitars hung, TVs, a jewellery case, tools — WE BUY GOLD and a guitar in
+        // neon in them, their grilles part way down, the door's all the way.)
+        const panes = storefront(g, lot.w, 'pawn', 2.2, { fascia: false, recess: true });
+        {
+          const head = 1.75, hy = H / 2 + 0.16 + head / 2, wall = MOUNT.wall + FACADE.depth, cw = W + 0.36;
+          tbox(fg, cw, H + head + 0.5, wall - 0.04, 0, (head + 0.16) / 2, -wall / 2 - 0.01, '#232120'); // the cabinet's box
+          plane(fg, W, head, 0, hy, 0.0, pic(boxSignTex('PAWN · LOANS · GOLD', '#d8ac58', '#1d3b30', 1024, Math.round((1024 * head) / W), true), { color: new THREE.Color().setScalar(0.86) }));
+          // the retainer round it all, gold, and the bar between the head and the face
+          const top = hy + head / 2 + 0.07, bot = -H / 2 - 0.07;
+          for (const y of [top, bot, H / 2 + 0.08]) tbox(fg, cw, 0.12, 0.07, 0, y, 0.02, '#8a6a2e');
+          for (const sd of [-1, 1]) tbox(fg, 0.12, top - bot + 0.12, 0.07, sd * (cw / 2 - 0.06), (top + bot) / 2, 0.02, '#8a6a2e');
+          // its feet on the wall: angle brackets under it, the conduit down to the front
+          for (const x of [-W / 3, W / 3]) tbox(fg, 0.1, 0.1, wall, x, bot - 0.12, -wall / 2, '#3a3640');
+          tcyl(fg, 0.04, 1.2, cw / 2 - 0.4, bot - 0.6, -wall + 0.06, '#5b5660');
+        }
+        // the displays: guitars hung up, TVs stacked, the jewellery case, a toolbox and a drill; lit by the shop behind
+        const guitar = (x: number, y: number, z: number, col: string) => {
+          displayPart(g, new THREE.SphereGeometry(0.2, 12, 8).scale(1, 1.15, 0.22), col, x, y - 0.12, z);
+          displayPart(g, new THREE.SphereGeometry(0.15, 12, 8).scale(1, 1.1, 0.22), col, x, y + 0.15, z);
+          displayPart(g, new THREE.CylinderGeometry(0.05, 0.05, 0.02, 12).rotateX(Math.PI / 2), '#1a1210', x, y + 0.03, z + 0.045);
+          displayPart(g, new THREE.BoxGeometry(0.05, 0.5, 0.03), '#3a2a1c', x, y + 0.5, z);
+          displayPart(g, new THREE.BoxGeometry(0.09, 0.14, 0.035), '#1e1612', x, y + 0.81, z);
+          displayPart(g, new THREE.BoxGeometry(0.07, 0.045, 0.005), '#d0c8b8', x + 0.13, y - 0.3, z + 0.05); // its tag
+        };
+        panes.filter((p) => !p.door).forEach((p, d) => {
+          const x = p.x;
+          if (d === 0) {
+            [['#9a5a24', -0.75], ['#2a2224', -0.1], ['#7a2a24', 0.55]].forEach(([col, dx]) => guitar(x + (dx as number), 1.3, -0.15, col as string));
+            neon(g, 2.1, 0.44, x, 0.82, -0.03, tubeWord('WE BUY GOLD', C.amber, 1024, 214), { peak: 1.0 });
+          } else if (d === 1) {
+            displayPart(g, new THREE.BoxGeometry(0.62, 0.46, 0.3), '#3a3634', x - 0.55, 0.64, -0.12); displayPart(g, new THREE.BoxGeometry(0.46, 0.32, 0.01), '#58788e', x - 0.6, 0.65, 0.035);
+            displayPart(g, new THREE.BoxGeometry(0.52, 0.4, 0.28), '#2e2a28', x - 0.55, 1.07, -0.12); displayPart(g, new THREE.BoxGeometry(0.38, 0.27, 0.01), '#3e4e5a', x - 0.6, 1.08, 0.025);
+            displayPart(g, new THREE.BoxGeometry(0.6, 0.26, 0.14), '#2a2a2e', x + 0.1, 0.54, -0.1); for (const dx of [-0.17, 0.17]) displayPart(g, new THREE.CylinderGeometry(0.08, 0.08, 0.02, 12).rotateX(Math.PI / 2), '#5a5a60', x + 0.1 + dx, 0.54, -0.025);
+            displayPart(g, new THREE.BoxGeometry(0.8, 0.3, 0.22), '#2a1e26', x + 0.55, 1.3, -0.12); displayPart(g, new THREE.BoxGeometry(0.76, 0.02, 0.2), '#8a8296', x + 0.55, 1.46, -0.12);
+            for (let k = 0; k < 7; k++) displayPart(g, new THREE.TorusGeometry(0.028, 0.009, 6, 12), '#c8a050', x + 0.25 + k * 0.1, 1.38, -0.03);
+            guitar(x + 0.65, 1.55, -0.18, '#c09050');
+          } else {
+            displayPart(g, new THREE.BoxGeometry(0.56, 0.28, 0.24), '#8a2a24', x - 0.6, 0.55, -0.1); displayPart(g, new THREE.BoxGeometry(0.3, 0.04, 0.04), '#2a2a2a', x - 0.6, 0.72, -0.1);
+            displayPart(g, new THREE.BoxGeometry(0.28, 0.1, 0.08), '#c8a040', x + 0.0, 0.52, -0.08); displayPart(g, new THREE.BoxGeometry(0.06, 0.16, 0.07), '#2a2a2a', x - 0.06, 0.4, -0.08);
+            displayPart(g, new THREE.BoxGeometry(0.9, 0.3, 0.22), '#2a1e26', x + 0.45, 0.55, -0.12); displayPart(g, new THREE.BoxGeometry(0.86, 0.02, 0.2), '#8a8296', x + 0.45, 0.71, -0.12);
+            for (let k = 0; k < 6; k++) displayPart(g, new THREE.SphereGeometry(0.04, 8, 6), '#c8a050', x + 0.12 + k * 0.13, 0.62, -0.06);
+            neon(g, 0.7, 1.4, x - 0.5, 1.45, -0.03, neonTex(256, 512, C.orange, (c) => {
+              c.strokeStyle = C.orange; c.lineWidth = 10;
+              c.beginPath(); c.ellipse(128, 380, 84, 96, 0, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.ellipse(128, 250, 62, 62, 0, 0.6, Math.PI - 0.6, true); c.stroke();
+              c.beginPath(); c.arc(128, 330, 26, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.moveTo(128, 200); c.lineTo(128, 50); c.stroke(); c.strokeRect(108, 18, 40, 40);
+            }), { peak: 1.0 });
+            guitar(x + 0.5, 1.45, -0.16, '#3a4a5a');
+          }
+          grille(g, p.w - 0.08, 0.5, p.x, 2.15, 0.17); // (part way down for the night)
+        });
+        { const door = panes.find((p) => p.door)!; grille(g, door.w - 0.08, 2.1, door.x, 2.15, 0.17); tbox(g, 0.08, 0.1, 0.06, door.x + 0.2, 0.14, 0.22, '#c8a050'); } // (all the way down, padlocked)
         // the three gold balls hung from an arm off its far corner, out over the sidewalk, big enough to read
         const bx = lot.w / 2 - 0.45, ay = 6.4;
         box(g, 0.1, 0.1, 2.6, bx, ay, 1.3, dark); // the arm
@@ -740,50 +1067,186 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     }), 0.7));
     // two low floodlights on the lawn, washing the front faintly warm
     for (const x of [-Wl / 2 + 3.2, Wl / 2 - 2.6]) { box(g, 0.3, 0.2, 0.3, x, 0.42, 0.9, toon({ color: '#2a2430' })); wash(g, 3.2, 5.5, x, 2.9, 0.06, '#c0a088', 0.07); }
-    // the limo at the kerb in front (white, held to a lavender grey), up the street of its middle, its nose down it
-    const limoS = sign.s + CHAPEL.limo.at * (lot.side < 0 ? 1 : -1);
-    const lp = atRoad(limoS, lot.side * PARKED_LIMO, 0);
-    if (!inView(lp, 1.2, 1.6)) {
-      const lg = onRoad(limoS, lot.side * PARKED_LIMO);
-      const limo = sedan({ color: '#9690a6', length: K.limo.len }); limo.rotation.y = Math.PI; lg.add(limo);
-      for (const z of [-1.5, -0.2, 1.1]) box(limo, 1.48, 0.34, 1.1, 0, 1.0, z, toon({ color: '#1d2026' })); // (its long cabin's glass)
-      box(limo, 1.44, 0.04, K.limo.len * 0.62, 0, 1.2, -0.1, toon({ color: '#9690a6' }));
-      // a ribbon and cans off its back bumper: just married
-      for (let k = 0; k < 3; k++) cyl(limo, 0.06, 0.12, (k - 1) * 0.3, 0.1, -K.limo.len / 2 - 0.5 - k * 0.12, toon({ color: '#8a8a90' }));
-    }
+    // the limo at the kerb in front, where the drive's block for it stands (the town parks none of its cars there), its
+    // nose down the street: the far lane's way
+    const lg = onRoad(limoS(sign.s, lot.side), lot.side * PARKED.lateral);
+    const limo = stretchLimo(); limo.rotation.y = Math.PI; lg.add(limo);
   }
 
-  // ---- the strip's own neon, on the lots between: a blade down a corner, a word over its shop (on its sign band, in
-  // place of a painted name), a sign hung in a lit window ----
+  // ---- the strip's other businesses (STRIP), on the lots between the lines' own: each its trade's sign over its glass,
+  // its window's neon, its blade, its awning, its light on the sidewalk, people at its door; and over them the floors'
+  // fire escapes, a sign on a roof here and there, the roofs' plant ----
+  /** Every box sign's face on the strip: one atlas (a cell a trade), one material (lit low, as the windows are). */
+  const boxed = Object.entries(STRIP).filter(([, t]) => t.sign === 'box'), BOX = { cols: 4, w: 512, h: 128 };
+  const boxAtlas = canvasTex(BOX.cols * BOX.w, Math.ceil(boxed.length / BOX.cols) * BOX.h, (c) => boxed.forEach(([, t], k) => boxFace(c, (k % BOX.cols) * BOX.w, Math.floor(k / BOX.cols) * BOX.h, BOX.w, BOX.h, t.name, t.ink, t.bg, t.sub)));
+  // (the check casher's brighter: the user wanted "a bright lit box sign")
+  const boxMat = litPic(boxAtlas, 0.74), checksMat = litPic(boxAtlas, 0.86), boxCell = new Map(boxed.map(([, t], k) => [t, k]));
+  /** A box sign's face (BOX's aspect: w = 4h) in `g`, the atlas's cell for `t`, at (x, y, z) facing +z. */
+  const boxSign = (g: THREE.Object3D, t: StripTrade, h: number, x: number, y: number, z: number, mat = boxMat) => {
+    const k = boxCell.get(t)!, rows = Math.ceil(boxed.length / BOX.cols), geo = new THREE.PlaneGeometry(4 * h, h), uv = geo.getAttribute('uv');
+    for (let j = 0; j < uv.count; j++) uv.setXY(j, ((k % BOX.cols) + uv.getX(j)) / BOX.cols, 1 - (Math.floor(k / BOX.cols) + 1 - uv.getY(j)) / rows);
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m;
+  };
+  /** A striped (or plain) canvas awning over a front's glass: its slope out from the wall, its valance. */
+  const awning = (g: THREE.Object3D, w: number, cols: readonly string[], y0 = 2.92, out = 1.3, drop = 0.42) => {
+    const n = cols.length > 1 ? Math.max(6, Math.round(w / 0.45)) : 1, sw = w / n, len = Math.hypot(out, drop), a = Math.atan2(drop, out);
+    for (let k = 0; k < n; k++) {
+      const x = -w / 2 + sw * (k + 0.5), col = cols[k % cols.length]!;
+      tbox(g, sw, 0.04, len, x, y0 - drop / 2, -0.2 + out / 2, col).rotation.x = a;
+      tbox(g, sw, 0.26, 0.03, x, y0 - drop - 0.12, -0.2 + out, col);
+    }
+    for (const sd of [-1, 1]) { const arm = tbox(g, 0.03, 0.03, len, sd * (w / 2 - 0.05), y0 - drop / 2 - 0.05, -0.2 + out / 2, '#2a2630'); arm.rotation.x = a; }
+  };
+  /** A fire escape down a window column (x) of a front from its second floor up: each floor's landing and its rail, the
+   *  stairs between, the ladder drawn up under the lowest, its brackets. */
+  const fireEscape = (g: THREE.Object3D, x: number, top: number) => {
+    const col = '#2a2630', w = 2.5, d = 1.0, z = -0.3 + d / 2;
+    const floors: number[] = [];
+    for (let y = 4.2; y + 1.9 < top; y += STREET.storey) floors.push(y);
+    floors.forEach((y, k) => {
+      tbox(g, w, 0.05, d, x, y, z, col);
+      tbox(g, w, 0.04, 0.04, x, y + 0.95, z + d / 2 - 0.02, col); for (const sd of [-1, 1]) tbox(g, 0.04, 0.04, d, x + sd * (w / 2 - 0.02), y + 0.95, z, col);
+      for (let b = 0; b <= 8; b++) tbox(g, 0.022, 0.95, 0.022, x - w / 2 + 0.02 + (b * (w - 0.04)) / 8, y + 0.47, z + d / 2 - 0.02, col);
+      for (const sd of [-1, 1]) { const br = tbox(g, 0.04, 0.04, Math.hypot(d, 0.7), x + sd * (w / 2 - 0.15), y - 0.35, -0.3 + d / 2, col); br.rotation.x = -Math.atan2(0.7, d); }
+      if (k + 1 < floors.length) { // the stair up to the next landing, along the rail's back half
+        const rise = STREET.storey, run = w - 0.5, len = Math.hypot(run, rise), a = Math.atan2(rise, run);
+        for (const dz of [-0.12, 0.28]) { const st = tbox(g, len, 0.05, 0.04, x, y + rise / 2, z + dz, col); st.rotation.z = (k % 2 ? 1 : -1) * a; }
+        for (let q = 1; q < 9; q++) tbox(g, 0.14, 0.03, 0.4, x - (k % 2 ? -1 : 1) * (run / 2 - (q * run) / 9), y + (q * rise) / 9, z + 0.08, col);
+      }
+    });
+    if (floors.length) for (const sd of [-0.3, 0.3]) tbox(g, 0.04, 1.6, 0.04, x + w / 2 - 0.5 + sd, floors[0]! - 0.6, z + d / 2 - 0.1, col); // (the ladder, drawn up)
+  };
+  /** A sign up on a frame on a roof, facing the street: its word in tube on a dark box, the legs and braces under it. */
+  const roofSign = (g: THREE.Object3D, lot: Lot, word: string, color: string) => {
+    const w = Math.min(lot.w * 0.72, 0.62 * word.length + 1.2), h = 1.35, y = lot.h + 1.3 + h / 2, z = -1.2;
+    tbox(g, w + 0.3, h + 0.3, 0.3, 0, y, z - 0.2, '#1e1b22');
+    neon(g, w, h, 0, y, z - 0.03, tubeWord(word, color, 1024, Math.round((1024 * h) / w)));
+    for (const x of [-w / 2 + 0.4, 0, w / 2 - 0.4]) { tbox(g, 0.12, 1.3 + 0.2, 0.12, x, lot.h + 0.75, z - 0.25, '#3a3640'); const br = tbox(g, 0.08, 1.9, 0.08, x, lot.h + 0.7, z - 0.95, '#3a3640'); br.rotation.x = -0.7; }
+    tbox(g, w + 0.4, 0.08, 0.7, 0, lot.h + 1.25, z - 0.1, '#3a3640'); // (its catwalk)
+  };
+  /** The check casher's front (the user, 2026-10-16, at 142 s: "the CHECKS CASHED green text sign in the bottom
+   *  right-hand corner ... the storefront is, like, super bland. I don't know what it's supposed to be"): bars over its
+   *  windows, its posters taped inside them (PAYDAY LOANS, MONEY ORDERS, a wire service's own), the ATM set in its wall
+   *  by the door under its lit header, the camera on its bracket over the door, someone at the machine. */
+  type Pane = { x: number; y: number; w: number; h: number; z: number; door: boolean };
+  const dressChecks = (g: THREE.Object3D, windows: Pane[], door: Pane | undefined) => {
+    const posters = canvasTex(768, 340, (c) => {
+      const at = (k: number, draw: () => void) => { c.save(); c.translate(k * 256, 0); c.beginPath(); c.rect(0, 0, 256, 340); c.clip(); draw(); c.restore(); };
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      at(0, () => { c.fillStyle = '#d0ae3c'; c.fillRect(0, 0, 256, 340); c.fillStyle = '#8a2a24'; c.fillRect(0, 0, 256, 92); c.fillStyle = '#f0e6cc'; fitText(c, 'PAYDAY', 128, 48, 220, 60, 700, 0.04); c.fillStyle = '#2a1a14'; fitText(c, 'LOANS', 128, 140, 228, 78, 700, 0.04); fitText(c, '$100 – $1000', 128, 214, 220, 36, 700, 0.02); for (let k = 0; k < 4; k++) c.fillRect(40, 252 + k * 16, 176 - (k % 2) * 40, 6); });
+      at(1, () => { c.fillStyle = '#d8d2c0'; c.fillRect(0, 0, 256, 340); c.fillStyle = '#2a3a6a'; fitText(c, 'MONEY', 128, 54, 220, 56, 700, 0.04); fitText(c, 'ORDERS', 128, 112, 220, 56, 700, 0.04); c.fillStyle = '#8a2a24'; fitText(c, '79¢', 128, 210, 200, 110, 700, 0); c.fillStyle = '#2a3a6a'; c.fillRect(30, 286, 196, 8); c.fillRect(56, 304, 144, 6); });
+      at(2, () => { c.fillStyle = '#18181c'; c.fillRect(0, 0, 256, 340); c.strokeStyle = '#d8b030'; c.lineWidth = 7; c.beginPath(); c.arc(128, 116, 66, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.ellipse(128, 116, 28, 66, 0, 0, Math.PI * 2); c.stroke(); for (const dy of [-30, 0, 30]) { c.beginPath(); c.moveTo(128 - Math.sqrt(66 * 66 - dy * dy), 116 + dy); c.lineTo(128 + Math.sqrt(66 * 66 - dy * dy), 116 + dy); c.stroke(); } c.fillStyle = '#d8b030'; fitText(c, 'GLOBEWIRE', 128, 228, 228, 48, 700, 0.04); c.fillStyle = '#d8d4c8'; fitText(c, 'SEND MONEY WORLDWIDE', 128, 272, 220, 20, 600, 0.04); fitText(c, 'IN MINUTES', 128, 300, 220, 20, 600, 0.04); });
+    });
+    const posterMat = litPic(posters, 0.82);
+    const poster = (k: number, x: number, y: number, z: number) => {
+      const geo = new THREE.PlaneGeometry(0.62, 0.82), uv = geo.getAttribute('uv');
+      for (let j = 0; j < uv.count; j++) uv.setX(j, (k + uv.getX(j)) / 3);
+      const m = new THREE.Mesh(geo, posterMat); m.position.set(x, y, z); g.add(m);
+    };
+    // the ATM set in the wall at the far end of the window nearest the door (from the door: its queue's out of the way)
+    const host = door && windows.length ? windows.reduce((a, b) => (Math.abs(a.x - door.x) < Math.abs(b.x - door.x) ? a : b)) : windows[0] ?? door!;
+    const away = Math.sign(host.x - (door?.x ?? host.x - 1)) || 1, ax = host.x + away * (host.w / 2 - 0.55), zf = host.z + 0.3;
+    windows.forEach((p, n) => {
+      // the bars: a frame of flat steel, uprights every 15 cm, a rail across the middle (short of the ATM)
+      const cut = p === host ? 1.1 : 0, w = p.w - cut, x = p.x - (p === host ? away * cut / 2 : 0), zb = p.z + 0.15, nb = Math.max(2, Math.floor(w / 0.15));
+      for (let b = 1; b < nb; b++) tbox(g, 0.03, p.h, 0.03, x - w / 2 + (b * w) / nb, p.y, zb, '#2a2830');
+      for (const y of [p.y - p.h / 2 + 0.03, p.y, p.y + p.h / 2 - 0.03]) tbox(g, w, 0.05, 0.04, x, y, zb, '#2a2830');
+      for (const sd of [-1, 1]) tbox(g, 0.05, p.h, 0.04, x + sd * (w / 2 - 0.02), p.y, zb, '#2a2830');
+      // its posters, taped inside the glass behind the bars
+      const room = w - 0.3, k0 = n * 2;
+      if (room > 1.5) { poster(k0 % 3, x - room * 0.25, 1.45, p.z + 0.012); poster((k0 + 1) % 3, x + room * 0.25, 1.35, p.z + 0.012); } else if (room > 0.7) poster(k0 % 3, x, 1.4, p.z + 0.012);
+    });
+    tbox(g, 1.0, 1.75, 0.08, ax, 1.2, zf - 0.04, '#4e525a'); // its surround
+    tbox(g, 0.84, 1.2, 0.3, ax, 1.25, zf - 0.12, '#363a40');
+    tbox(g, 1.04, 0.07, 0.42, ax, 2.1, zf - 0.02, '#4e525a'); // the hood over the screen
+    const scr = plane(g, 0.38, 0.28, ax, 1.5, zf + 0.035, litPic(canvasTex(128, 96, (c) => { c.fillStyle = '#1e4a6a'; c.fillRect(0, 0, 128, 96); c.fillStyle = '#9ac8d8'; c.fillRect(12, 12, 104, 14); for (let k = 0; k < 3; k++) { c.fillRect(8, 38 + k * 18, 30, 10); c.fillRect(90, 38 + k * 18, 30, 10); } }), 0.9));
+    scr.rotation.x = -0.12;
+    const pad = tbox(g, 0.3, 0.05, 0.18, ax, 1.12, zf + 0.06, '#26262c'); pad.rotation.x = 0.35;
+    tbox(g, 0.14, 0.025, 0.03, ax + 0.26, 1.28, zf + 0.04, '#0e0e10'); tbox(g, 0.4, 0.035, 0.03, ax, 0.96, zf + 0.04, '#0e0e10'); // the card's slot, the cash's
+    plane(g, 0.84, 0.22, ax, 2.0, zf + 0.025, litPic(signFace('ATM', 256, 64, '#e8e2d0', '#1c5a3a', F.sign(700), 0.7, 0.3), 0.85));
+    // the camera over the door, on its bracket, looking down the sidewalk; its light
+    const cx = (door ?? host).x + 0.75, cz = host.z;
+    tbox(g, 0.06, 0.06, 0.32, cx, 2.78, cz + 0.16, '#2a2a30');
+    const cam = tbox(g, 0.16, 0.13, 0.34, cx, 2.7, cz + 0.42, '#c8c4bc'); cam.rotation.x = 0.4;
+    tbox(g, 0.2, 0.03, 0.4, cx, 2.79, cz + 0.4, '#8a8680').rotation.x = 0.4;
+    plane(g, 0.025, 0.025, cx + 0.05, 2.62, cz + 0.6, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.1, 0.2, 0.15) }));
+    // someone at the machine, reaching for its keys
+    stander(g, ax, zf + 0.55, Math.PI).getObjectByName('armR')!.rotation.x = -1.0;
+  };
   plan.lots.forEach((lot, i) => {
     if (lot.shop !== undefined) return;
-    const g = lotFrame(lot), r = (k: number) => hash(i, k, 701);
-    const low = lot.h < 6;
+    const g = frameOf(i), r = (k: number) => hash(i, k, 701), low = lot.h < 6, t = tradeOf.get(i), panes = panesOf.get(i) ?? [];
     // (the lot's frame runs along the road on the left, against it on the right: its up-street end is −x on the left)
     const upEnd = lot.side < 0 ? -lot.w / 2 + 0.5 : lot.w / 2 - 0.5;
-    if (!low && r(1) < 0.5 && lot.w > 4.5) {
-      const [word, col] = BLADES[Math.floor(r(2) * BLADES.length)]!, h = Math.min(lot.h - 4.4, 1.2 + word.length * 0.95);
+    const world = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(g.matrix);
+    // the roof's plant: an air conditioner or two (their fans), a vent stack
+    for (let k = 0; k < 1 + Math.floor(r(15) * 2); k++) {
+      const x = (r(16 + k) - 0.5) * lot.w * 0.6, z = -2 - r(20 + k) * (lot.d - 5);
+      tbox(g, 1.5, 0.9, 1.2, x, lot.h + 0.45, z, '#4a4652'); tcyl(g, 0.4, 0.06, x, lot.h + 0.92, z, '#26242a', 14); tbox(g, 1.56, 0.06, 1.26, x, lot.h + 0.1, z, '#3a3640');
+    }
+    tcyl(g, 0.12, 1.1, (r(24) - 0.5) * lot.w * 0.7, lot.h + 0.55, -lot.d * 0.6, '#3e3a44', 8);
+    // the floors above: a fire escape down a window column on some (at the down-street end, clear of a blade), a sign up
+    // on the roof of a few — none where it would cross a view of the words
+    if (lot.h > 9 && r(40) < 0.6) {
+      const m = Math.max(0, Math.floor((lot.w - 1.2) / 2.6)), x = m > 1 ? -Math.sign(upEnd) * ((m - 1) / 2) * 2.6 : 0;
+      if (m >= 1 && !inView(world(x, 4, 0.3), 1.4, lot.h - 4)) fireEscape(g, x, lot.h - 0.9);
+    }
+    if (lot.h > 9 && r(50) < 0.4) {
+      const [word, col] = ROOF_WORDS[Math.floor(r(51) * ROOF_WORDS.length)]!;
+      if (!inView(world(0, lot.h, -1.2), Math.min(lot.w * 0.4, 3.5), 3.2)) roofSign(g, lot, word, col);
+    }
+    fuse(g); // (the tinted parts so far: one mesh)
+    if (!t) return; // (an apartment block: no shop)
+    // its sign over its glass: a lit box on its band, or its name in tube on a raceway (a drawing in tube beside it)
+    const y = 3.55, glowCol = t.sign === 'box' ? t.bg : t.ink;
+    if (t.sign === 'box') {
+      const h = Math.min(t === STRIP.checks ? 1.28 : t.sub ? 1.1 : 0.95, (lot.w - 1) / 4), w = 4 * h;
+      tbox(g, w + 0.16, h + 0.16, 0.32, 0, y, 0.0, '#24212a'); tbox(g, w + 0.22, 0.05, 0.36, 0, y + h / 2 + 0.08, 0.0, '#3a3640');
+      boxSign(g, t, h, 0, y, 0.165, t === STRIP.checks ? checksMat : boxMat);
+    } else {
+      const ih = t.icon ? 0.95 : 0, tw = Math.min(lot.w * 0.82 - ih - 0.3, 0.5 * t.name.length + 0.9), h = 0.95, x0 = (ih ? -(ih + 0.15) / 2 : 0);
+      tbox(g, tw * 0.92, 0.16, 0.12, x0, y - 0.3, 0.0, '#2a2630'); // (the raceway the letters stand on)
+      neon(g, tw, h, x0, y, 0.09, tubeWord(t.name, t.ink, 1024, Math.round((1024 * h) / tw)));
+      if (t.icon) { const ix = x0 + tw / 2 + 0.15 + ih / 2; tbox(g, ih * 0.5, 0.14, 0.12, ix, y - 0.32, 0.0, '#2a2630'); neon(g, ih, ih, ix, y, 0.09, neonTex(256, 256, t.ink, (c) => drawIcon(c, t.icon!, t.ink))); }
+    }
+    wash(g, Math.min(lot.w, 8), 3.0, 0, 0.17, 1.5, glowCol, 0.14, true); // (its light on the sidewalk)
+    if (r(11) < 0.5) reflect(lot.s, lot.side, Math.min(lot.w, 6), glowCol, 0.12);
+    // the neon it hangs in its window (not in the door), just inside the glass
+    // (a front of one bay: its door at one end of it, the rest its window)
+    let shown = panes.filter((p) => !p.door), doors = panes.filter((p) => p.door).map((p) => ({ ...p, w: 1.1 }));
+    if (!shown.length && panes.length) {
+      const p = panes[0]!;
+      doors = [{ ...p, x: p.x - p.w / 2 + 0.7, w: 1.1, door: true }];
+      shown = [{ ...p, x: p.x + 0.65, w: p.w - 1.5, door: false }];
+    }
+    if (t.window && shown.length && !t.closed) {
+      const p = shown[Math.floor(r(8) * shown.length)]!, [word, col] = t.window, w = Math.min(p.w - 0.4, 0.3 * word.length + 0.6);
+      neon(g, w, 0.48, p.x, 1.85, p.z + 0.05, tubeWord(word, col, 512, Math.round((512 * 0.48) / w)), { peak: 0.9 });
+    }
+    // its door: the frame, the push bar (on a closed shop, its grille down)
+    for (const p of doors) {
+      if (t.closed) { grille(g, p.w, p.h, p.x, p.y + p.h / 2, p.z + 0.08); continue; }
+      tbox(g, 1.1, 0.06, 0.06, p.x, 2.42, p.z + 0.04, '#1d1a22'); for (const sd of [-1, 1]) tbox(g, 0.06, 2.42, 0.06, p.x + sd * 0.55, 1.21, p.z + 0.04, '#1d1a22');
+      tbox(g, 0.7, 0.04, 0.05, p.x, 1.05, p.z + 0.08, WORLD.chrome);
+    }
+    if (t.closed) for (const p of shown) grille(g, p.w, p.h * 0.55, p.x, p.y + p.h / 2, p.z + 0.08);
+    // its awning, its blade (tall enough, wide enough, out of the views)
+    if (t.awning) awning(g, Math.min(lot.w * 0.78, 9), t.awning);
+    if (t.blade && !low && lot.w > 4.5 && r(1) < 0.7) {
+      const [word, col] = t.blade, h = Math.min(lot.h - 4.4, 1.2 + word.length * 0.95);
       const p = atRoad(lot.s - lot.w / 2 + 0.5, lot.side * (STREET.front - 0.7), 3.8);
       if (h > 2.2 && !inView(p, 0.9, h)) blade(g, upEnd, 4.2, h, word, col, 1.0);
     }
-    // a word in neon on its sign band, over its shop's glass (the band of look/facades.ts: 3.15 to 3.95 m up, its
-    // face 0.135 m behind the lot's front)
-    if (bandWord.has(i)) {
-      const [word, col] = WORDS[Math.floor(r(4) * WORDS.length)]!, w = Math.min(lot.w * 0.62, 9, 0.42 * word.length + 1);
-      neon(g, w, 0.7, 0, 3.55, -0.1, tubeWord(word, col, 1024, Math.round(1024 * 0.7 / w)));
+    // the check casher's own front: bars on its windows, its posters inside them, the ATM in its wall, the camera over
+    // its door, someone at the machine
+    if (t === STRIP.checks) dressChecks(g, shown, doors[0]);
+    // people at its door: a pair talking, on some (still: built once, and left)
+    const door = doors[0];
+    if (door && !t.closed && t !== STRIP.checks && r(30) < 0.45) {
+      const at = [[door.x - 0.4, 1.3, Math.PI / 2], [door.x + 0.45, 1.25, -Math.PI / 2]] as const;
+      if (at.every(([x, z]) => !inView(world(x, 0.15, z), 0.45, 1.85))) for (const [x, z, ry] of at) stander(g, x, z, ry + (r(31) - 0.5) * 0.6);
     }
-    // a sign hung in one of its lit windows, just inside the glass
-    const panes = shopPanes.get(i) ?? [];
-    if (panes.length && r(6) < 0.6) {
-      const [word, col] = WINDOWS[Math.floor(r(7) * WINDOWS.length)]!, at = panes[Math.floor(r(8) * panes.length)]!;
-      const local = at.clone().applyMatrix4(g.matrix.clone().invert());
-      neon(g, 1.2, 0.5, local.x, 1.9, local.z + 0.06, tubeWord(word, col, 512, 216), { peak: 0.9 });
-    }
-    // an awning over its glass, a dull canvas, on most
-    if (!low && r(13) < 0.55) { const a = box(g, lot.w * 0.7, 0.08, 1.5, 0, 2.95, 0.6, toon({ color: ['#5a2a30', '#2a4448', '#5e4a2a', '#2a3048', '#3e3a30'][Math.floor(r(14) * 5)]! })); a.rotation.x = 0.22; }
-    // the roof's clutter: an air conditioner or two, a vent
-    for (let k = 0; k < 1 + Math.floor(r(15) * 2); k++) box(g, 1.5, 1.0, 1.2, (r(16 + k) - 0.5) * lot.w * 0.6, lot.h + 0.5, -2 - r(20 + k) * (lot.d - 5), toon({ color: '#4a4652' }));
-    if (r(11) < 0.4) reflect(lot.s, lot.side, Math.min(lot.w, 6), [C.rose, C.blue, C.red, C.amber, C.teal][Math.floor(r(12) * 5)]!, 0.14);
+    fuse(g);
   });
 
   // ---- the cross street: its asphalt off both sides, crosswalks, the signals ----
@@ -818,6 +1281,8 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   }
 
   // ---- street lamps, both kerbs, staggered; none where they'd stand in a view of the words ----
+  const lampAt: { s: number; side: number }[] = [];
+  const lampHead = lampMaterial('#d8a060', LAMPS.glow, 0.4), lampPool = glowMaterial('#c08850', GLOW.pool * 0.6, true);
   for (const side of [-1, 1]) {
     for (let s = plan.span[0] + (side < 0 ? 15 : 28); s < plan.span[1] - 4; s += LAMPS.every) {
       if (s > plan.cross[0] - 3 && s < plan.cross[1] + 3) continue;
@@ -826,10 +1291,80 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       const pole = atRoad(s, lateral, 0), head = atRoad(s, side * (ROAD_HALF + LAMPS.kerb - LAMPS.reach), LAMPS.h - 0.2);
       if (inView(pole, 0.6, LAMPS.h + 0.4) || inView(head.clone().setY(head.y - 1), 1.6, 2) || lens.some((e) => Math.hypot(e.x - pole.x, e.z - pole.z) < 4.5 || e.distanceTo(head) < 6)) continue;
       const g = onRoad(s, lateral);
-      box(g, 0.2, LAMPS.h, 0.2, 0, LAMPS.h / 2, 0, toon({ color: WORLD.post }));
-      box(g, LAMPS.reach, 0.14, 0.14, side * LAMPS.reach / 2, LAMPS.h - 0.1, 0, toon({ color: WORLD.post }));
-      box(g, 0.9, 0.2, 0.45, side * LAMPS.reach, LAMPS.h - 0.25, 0, lampMaterial('#d8a060', LAMPS.glow, 0.4));
-      const pool = new THREE.Mesh(new THREE.CircleGeometry(5.5, 24), glowMaterial('#c08850', GLOW.pool * 0.6, true)); pool.rotation.x = -Math.PI / 2; pool.position.set(side * LAMPS.reach, 0.04, 0); g.add(pool);
+      lampAt.push({ s, side });
+      // a tapered pole on its base, the arm out over the road, the cobra head's housing, its lamp's face under it
+      part(g, new THREE.CylinderGeometry(0.075, 0.12, LAMPS.h, 10), WORLD.post, 0, LAMPS.h / 2, 0);
+      tcyl(g, 0.17, 0.4, 0, 0.35, 0, WORLD.post, 10);
+      tcyl(g, 0.05, LAMPS.reach, side * LAMPS.reach / 2, LAMPS.h - 0.12, 0, WORLD.post, 8).rotation.z = Math.PI / 2;
+      part(g, new THREE.SphereGeometry(0.4, 12, 8).scale(1.3, 0.38, 0.62), WORLD.post, side * LAMPS.reach, LAMPS.h - 0.12, 0);
+      fuse(g);
+      const face = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), lampHead); face.rotation.x = Math.PI / 2; face.scale.set(1.2, 0.6, 1); face.position.set(side * LAMPS.reach, LAMPS.h - 0.25, 0); g.add(face);
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(5.5, 24), lampPool); pool.rotation.x = -Math.PI / 2; pool.position.set(side * LAMPS.reach, 0.04, 0); g.add(pool);
+    }
+  }
+
+  // ---- the kerbs' furniture: hydrants, parking meters, bins (bags beside some), newspaper boxes in twos and threes, a
+  // mailbox; low (nothing reaches 1.5 m), out of the views and away from the lenses and the lamps' feet. (The town's
+  // own were a few coloured boxes each: world.ts leaves this stretch to these.) In 24 m pieces, each one mesh. ----
+  {
+    const pieces = new Map<string, { g: THREE.Group; inv: THREE.Matrix4 }>();
+    /** A group at (s, lateral) in the road's frame (x to the road's left, z along it), in its piece of kerb. */
+    const spot = (s: number, lateral: number, side: number) => {
+      const key = `${side}:${Math.floor(s / 24)}`;
+      let pc = pieces.get(key);
+      if (!pc) { const g = onRoad(Math.floor(s / 24) * 24 + 12, lateral); pc = { g, inv: g.matrix.clone().invert() }; pieces.set(key, pc); }
+      const t = onRoad(s, lateral); root.remove(t);
+      const item = new THREE.Group(); item.matrixAutoUpdate = false; item.matrix.copy(pc.inv).multiply(t.matrix); pc.g.add(item);
+      return item;
+    };
+    const half = (r: number) => new THREE.SphereGeometry(r, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+    const hydrant = (g: THREE.Object3D, out: number) => {
+      const red = '#8a3430';
+      tcyl(g, 0.16, 0.05, 0, 0.175, 0, red); tcyl(g, 0.1, 0.48, 0, 0.42, 0, red); tcyl(g, 0.125, 0.06, 0, 0.66, 0, red);
+      part(g, half(0.1), red, 0, 0.69, 0); tcyl(g, 0.025, 0.06, 0, 0.81, 0, '#6a2a26', 6);
+      for (const dz of [-1, 1]) { const n = tcyl(g, 0.045, 0.1, 0, 0.52, dz * 0.13, red, 8); n.rotation.x = Math.PI / 2; }
+      const p = tcyl(g, 0.065, 0.12, out * 0.14, 0.5, 0, '#a8a090', 10); p.rotation.z = Math.PI / 2; // (its pumper nozzle, to the street)
+    };
+    const meter = (g: THREE.Object3D, double: boolean) => {
+      tcyl(g, 0.035, 1.0, 0, 0.65, 0, '#4a4e4a', 8);
+      for (const dz of double ? [-0.12, 0.12] : [0]) {
+        tbox(g, 0.16, 0.24, 0.12, 0, 1.26, dz, '#56665a'); part(g, half(0.08).scale(1, 1.1, 0.8), '#56665a', 0, 1.38, dz);
+        for (const sx of [-1, 1]) tbox(g, 0.012, 0.08, 0.09, sx * 0.082, 1.31, dz, '#b8b4a0');
+      }
+      if (double) tbox(g, 0.06, 0.04, 0.3, 0, 1.13, 0, '#4a4e4a');
+    };
+    const bin = (g: THREE.Object3D, out: number, junk: number) => {
+      tcyl(g, 0.27, 0.82, 0, 0.56, 0, '#2c4434', 14); tcyl(g, 0.29, 0.05, 0, 0.98, 0, '#22382a', 14); part(g, half(0.27).scale(1, 0.38, 1), '#22382a', 0, 1.0, 0);
+      for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; tbox(g, 0.03, 0.78, 0.03, Math.cos(a) * 0.275, 0.56, Math.sin(a) * 0.275, '#3a5442'); }
+      if (junk > 0.5) part(g, new THREE.SphereGeometry(0.24, 10, 8).scale(1, 0.75, 1.1), '#18181c', -out * 0.1, 0.33, 0.62);
+      if (junk > 0.75) tbox(g, 0.42, 0.3, 0.36, -out * 0.25, 0.3, -0.62, '#6e5a3e');
+    };
+    const news = (g: THREE.Object3D, out: number, n: number, seed: number) => {
+      for (let k = 0; k < n; k++) {
+        const z = (k - (n - 1) / 2) * 0.5, col = ['#2a5a7a', '#8a2e2a', '#c4a648', '#cfcabe', '#3a6a4a'][Math.floor(hash(seed, k, 911) * 5)]!;
+        tbox(g, 0.08, 0.34, 0.3, 0, 0.32, z, '#3a3a40'); tbox(g, 0.34, 0.04, 0.36, 0, 0.17, z, '#3a3a40');
+        tbox(g, 0.4, 0.52, 0.42, 0, 0.75, z, col); tbox(g, 0.42, 0.05, 0.44, 0, 1.03, z, col);
+        tbox(g, 0.012, 0.2, 0.3, -out * 0.205, 0.8, z, '#2e343c'); tbox(g, 0.014, 0.13, 0.24, -out * 0.21, 0.78, z, '#a8a49a'); // (its window, today's paper)
+        tbox(g, 0.02, 0.1, 0.07, -out * 0.21, 0.94, z + 0.12, '#8a8a90');
+      }
+    };
+    const mailbox = (g: THREE.Object3D) => {
+      for (const dz of [-0.18, 0.18]) for (const dx of [-0.18, 0.18]) tbox(g, 0.05, 0.3, 0.05, dx, 0.3, dz, '#22385e');
+      tbox(g, 0.48, 0.6, 0.5, 0, 0.75, 0, '#2a4a7a'); const top = tcyl(g, 0.24, 0.5, 0, 1.05, 0, '#2a4a7a', 14); top.rotation.x = Math.PI / 2; top.scale.set(1, 1, 0.5);
+    };
+    for (const side of [-1, 1]) {
+      const out = side; // (in the road's frame +x is its left: toward the road from this kerb is +x on the right, −x on the left)
+      for (let s = plan.span[0] + 5, k = 0; s < plan.span[1] - 3; s += KERB.every, k++) {
+        const r = (j: number) => hash(k, side, 900 + j);
+        if (r(0) > 0.8) continue;
+        const sp = s + (r(2) - 0.5) * 2, lateral = side * (ROAD_HALF + KERB.in), p = atRoad(sp, lateral, 0.15);
+        if (sp > plan.cross[0] - 3 && sp < plan.cross[1] + 3) continue;
+        if (lampAt.some((l) => l.side === side && Math.abs(l.s - sp) < 1.6)) continue;
+        if (lens.some((e) => Math.hypot(e.x - p.x, e.z - p.z) < 1.8) || inView(p, 0.4, 1.4)) continue;
+        const g = spot(sp, lateral, side), u = r(1);
+        if (u < 0.2) hydrant(g, out); else if (u < 0.48) meter(g, r(3) < 0.4); else if (u < 0.7) bin(g, out, r(4)); else if (u < 0.93) news(g, out, 2 + Math.floor(r(5) * 2), k * 3 + side); else mailbox(g);
+        fuse(g);
+      }
     }
   }
 
@@ -862,7 +1397,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   const tail = lampMaterial('#c8302a', GLOW.tail * 0.6, 1.1), headL = lampMaterial('#e8d8b8', GLOW.head * 0.22, 1.1);
   const s0car = drive.motion.distanceAt(plan.t[0]);
   for (const [ahead, v] of TRAFFIC.ahead) traffic.push({ g: new THREE.Group(), s0: s0car + ahead, v, lateral: LANE });
-  for (const [ahead, v] of TRAFFIC.oncoming) traffic.push({ g: new THREE.Group(), s0: s0car + ahead, v, lateral: -LANE });
+  for (const [ahead, v] of TRAFFIC.oncoming) traffic.push({ g: new THREE.Group(), s0: s0car + ahead, v, lateral: TRAFFIC.oncomingLane });
   traffic.forEach((c, i) => {
     const car = sedan({ color: ['#2b2f3a', '#5a2a32', '#7a7686', '#2b4a66', '#3a3444'][i % 5]! }); c.g.add(car);
     c.g.matrixAutoUpdate = false; root.add(c.g);

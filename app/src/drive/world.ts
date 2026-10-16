@@ -318,7 +318,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   {
     const cars = new THREE.Group(), colours = ['#e8e2d2', '#5a6a7d', '#b0532e', '#2b4a6b', '#8a8f8a', '#d9b24a', '#3a3a40', '#7a9a6a'];
     for (const b of drive.blocks) {
-      if (!b.car) continue;
+      if (b.car !== true) continue; // ('set': its set-piece builds its own)
       const car = sedan({ color: colours[Math.floor(b.color * colours.length)]!, length: b.w }), f = route.frameAt(b.s);
       car.matrixAutoUpdate = false;
       // (facing the far lane's way: its nose back toward the start)
@@ -665,12 +665,12 @@ function buildTunnel(route: Route, tn: Tunnel): THREE.Group {
 /** The kerb's furniture along the town's sidewalks (SIDEWALKS): hydrants, parking meters, bins, newspaper boxes and bus
  *  benches, seeded every `every` m on both sides, none by a cross street or a driveway (the openings) or a lyric's
  *  face; all low (under 1.3 m: nothing stands in a shot). One instanced mesh of unit boxes, coloured. */
-const FURNITURE = { every: 9, keep: 0.6, clear: 5 };
+const FURNITURE = { every: 9, keep: 0.6, clear: 5, /** (the stretches whose sets dress their own kerbs: scenes/sets/verse3.ts) */ own: new Set(['verse3']) };
 function furniture(drive: Drive): THREE.InstancedMesh {
   const { route, motion } = drive, K = SIDEWALKS, at: THREE.Matrix4[] = [], col: THREE.Color[] = [];
   const put = (s: number, lateral: number, across: number, h: number, along: number, y0: number, c: string) => { at.push(boxAt(route, s, lateral, across, h, along, K.kerb + y0)); col.push(new THREE.Color(c)); };
   const spans: [number, number][] = [];
-  for (const st of drive.stretches) if (K.stretches.has(st.id)) spans.push([st.k === 0 ? ROAD_START : motion.distanceAt(st.start), motion.distanceAt(st.end)]);
+  for (const st of drive.stretches) if (K.stretches.has(st.id) && !FURNITURE.own.has(st.id)) spans.push([st.k === 0 ? ROAD_START : motion.distanceAt(st.start), motion.distanceAt(st.end)]);
   const faces = drive.carriers.filter((c) => c.solid || SET_KINDS.has(c.kind)).map((c) => ({ s: c.s, w: c.w, side: Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) }));
   for (const [a, b] of spans) for (let s = a + FURNITURE.every / 2; s < b; s += FURNITURE.every) {
     for (const side of [-1, 1]) {

@@ -10,7 +10,7 @@
 //   "Love to play your ruler, be your Jane"   the tiki bar's big sign on its roof at the corner, turned to face the
 //   "You could be my Tarzan, toss me up"      traffic coming up the strip (right): the one sign, filling row by row
 //   "Other hoes is lacking, call me up"       the hotel's neon between its floors, the payphones on its wall (left)
-//   "Know my baby packing, why I'm stuck"     the pawn shop's board, under its big PAWN sign (left)
+//   "Know my baby packing, why I'm stuck"     the pawn shop's big lit cabinet, under its PAWN · LOANS · GOLD head (left)
 //   "That's why he my man"                    the wedding chapel's neon by its heart, the camera rising off it (left)
 // Five moving takes, cut between lines (never in one): along the right sidewalk as the car slows past, low by the kerb
 // as it crosses the frame under the marquee, behind it up the street to the corner, a crane along the hotel and the
@@ -19,7 +19,7 @@ import * as THREE from 'three';
 import { type Carrier, type Kind, layout, lookFrom } from '../carriers';
 import { phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
-import { type Block, boxAt } from '../blocks';
+import { type Block, PARKED, boxAt } from '../blocks';
 import { TUNNEL_CLEAR } from '../tunnel';
 import { hash } from '../../engine/util';
 import type { Placed, SetContext, SetFrame, SetPiece } from './index';
@@ -56,6 +56,11 @@ export const LINE_SHOP = [0, 1, 2, 3, 3, 4, 5, 6];
 export const MOUNT = { marquee: 2.3, roofBack: 0.8, crossIn: 0.5, wall: 0.28 };
 /** The cross street: how far past the theatre's far end it opens, its width (m). */
 export const CROSS = { after: 2, w: 11 };
+/** The chapel's white stretch limo at the kerb out front (the scene builds it from the town's sedan): its length, how
+ *  far up the street of the chapel's middle it stands (m: its middle; toward the strip's start), its size as the
+ *  guard's box. It's the set's own car (a block, `car: 'set'`): the town parks none of its sedans within a few metres
+ *  of it (they stood in it: the user, 2026-10-16, "a bunch of cars that are smushed into each other"). */
+export const LIMO = { len: 8.6, at: -4.6, h: 1.5, d: 1.8 };
 /** The filler lots between the businesses: frontage (m), storeys (one on the right's run `lowRun` m up to the tiki
  *  bar's corner, so its roof sign stands over its neighbours from up the street; `end` past the chapel), and the
  *  narrowest gap left as an alley (m). */
@@ -100,6 +105,10 @@ export interface Verse3Plan {
  *  and paint its signs in full colour, which pulled the eye off the lines' neon (the user, 2026-10-15: "the whites
  *  especially are really pulling our attention away from the pinks ... desaturate the rest"), so the scene builds
  *  these fronts (scenes/sets/verse3.ts) from the same geometry with the strip's own muted glass and signs. */
+/** Where the limo stands along the road (m), by the chapel's place and side (LIMO.at is toward the strip's start, on
+ *  the chapel's side whichever it is). */
+export const limoS = (chapelS: number, side: number) => chapelS + LIMO.at * (side < 0 ? 1 : -1);
+
 export function lotBlock(route: SetContext['route'], L: Lot, i: number): Block {
   const lateral = L.side * (STREET.front + L.d / 2), lift = route.frameAt(L.s).pos.y + 0.4;
   return { s: L.s, lateral, w: L.w, h: L.h, d: L.d, color: hash(i, 311), bare: true, prop: true, matrix: boxAt(route, L.s, lateral, L.d, L.h + lift, L.w, -lift) };
@@ -249,6 +258,11 @@ export const VERSE3: SetPiece = {
     // ---- the buildings: the guard's boxes; the scene builds their fronts (the town's, look/facades.ts, in the strip's
     // own night colours) ----
     const blocks: Block[] = lots.map((L, i) => lotBlock(route, L, i));
+    // the limo at the kerb before the chapel (the town's parked cars keep off it: blocks.ts, a set's block at the kerb)
+    {
+      const chapel = signs.find((g) => g.theme === 'chapel')!, s = limoS(chapel.s, chapel.side), lateral = chapel.side * PARKED.lateral;
+      blocks.push({ s, lateral, w: LIMO.len, h: LIMO.h, d: LIMO.d, color: 0, prop: true, car: 'set', matrix: boxAt(route, s, lateral, LIMO.d, LIMO.h, LIMO.len) });
+    }
     // (the town keeps off the strip: its fronts are these)
     const clear = [-1, 1].map((side) => ({ side, a: span[0] - 2, b: (side > 0 ? rightEnd : span[1]) + 2 }));
     const openings = [-1, 1].map((side) => ({ side, a: cross[0], b: cross[1] }));
