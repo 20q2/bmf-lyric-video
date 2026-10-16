@@ -11,12 +11,13 @@
 //   "He 'bout all that action, call him Mr. Handle It"  its vinyl banner under its sign board, the man himself beside
 //                                               it: a fibreglass giant on the sidewalk, a wrench over his shoulder
 //   "You know I'm hella different… trickin' on"  the chicken spot's big roof sign, the chicken standing on it, from below
-//   "I can be your ride or die…"               a hand car wash's sign, an ad: the words flush left, the suds right
+//   "I can be your ride or die…"               a hand car wash's '60s sign in its lot: the words flush left on its board,
+//                                               its mascot right, a breaking wave over it
 //   "Trust me, boy, I'm good in every hood"     their own car, from in front: the windshield banner, the hood
 //   "Trickin', finna fall in backwards"         a whip round behind, low: TRICKIN' on their plate, the rest on bumper
 //                                               stickers, as the car lays back on its hydraulics
-//   "I'm just tryna show you… my man"          his giant mural on the end wall of a building up the street, the car
-//                                               driving on toward it (into chorus 3)
+//   "I'm just tryna show you… my man"          a big painted billboard up the street, on the sand where the coast
+//                                               begins, the car driving on toward it (into chorus 3)
 // Pure.
 import * as THREE from 'three';
 import { type Carrier, type Kind, LAYOUT, STREET, carMatrix, glideTake, layout, lookFrom, rideAt } from '../carriers';
@@ -71,10 +72,15 @@ export const SHOTS = {
   banner: { back: 5.5, lateral: 2.0, y: 2.4, end: 2 },
   sign: { back: 12.5, lateral: ROAD_HALF + 2, y: 3, end: 3 },
 };
-/** The car wash on the right: its sign (off the road, its centre's height; passed this far through its line), its
- *  board round the words (its width; header over them, footer under, the margin on the left; the suds right of them;
- *  m), the camera upstream on the sidewalk; its building. */
-export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 1.8, y: 3.6, through: 0.5, board: { w: 5.8, head: 0.8, gap: 0.15, foot: 0.55, pad: 0.25 }, eye: { back: 5.6, lateral: ROAD_HALF + 0.3, y: 1.4, toRoad: 0.6, down: 0.3 } };
+/** The car wash on the right: its sign (off the road's centre, its board's centre's height; passed this far through its
+ *  line), its board round the words (its width; header over them, footer under, the margin on the left; the suds right
+ *  of them; m), the camera upstream on the sidewalk (back of the sign, off the road's centre, up; its aim off the
+ *  board's centre toward the road and up, taking in the wave over it); its building.
+ *  (The sign stands in the wash's lot behind the sidewalk, its road-side edge 0.2 m past the sidewalk's back. Its
+ *  board ran from 1.1 m out over the road to the sidewalk's back at 1.6 m up: the traffic's heads and the passers-by
+ *  walked into it. The camera stands back far enough for the whole cabinet and its wave over the top of its stand, the
+ *  type ~60 px.) */
+export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 6.35, y: 4.4, through: 0.5, board: { w: 5.8, head: 0.8, gap: 0.15, foot: 0.55, pad: 0.25 }, eye: { back: 9.0, lateral: ROAD_HALF + 2.4, y: 2.6, toRoad: 1.0, up: 0.3 } };
 /** On their car (its frame: x its left, y up, z forward): the windshield banner, the hood's lettering; their plate
  *  between the tail lights, the bumper stickers on the rear bumper either side (sized from the van's: `scale`); the
  *  camera high in front, and low behind. */
@@ -86,11 +92,15 @@ export const ON_CAR = {
   // (behind: room under the stickers for the tail dropping as it lays back)
   front: new THREE.Vector3(0, 2.6, 4.4), behind: new THREE.Vector3(0, 1.0, -5), behindAim: new THREE.Vector3(0, 0.48, -2.7),
 };
-/** The giant mural of him at the end of the street: where the car is when its line ends (m short of it), off to the
- *  left, its centre's height, turned toward the coming car, its size and its words' share of it; its building (how
- *  much bigger than the mural, deep); the camera waits in the street before it (m short of it, off the road's centre,
- *  up), the car driving up into the frame. */
-export const GIANT = { short: 20, lateral: -15.5, y: 7.5, turn: (35 * Math.PI) / 180, w: 22, h: 12, text: 0.62, building: { margin: 1.4, d: 12 }, eye: { short: 24, lateral: 3, up: 2.4 } };
+/** The big painted billboard at the end of the street, on the sand where the coast begins: where the car is when its
+ *  line ends (m short of it), off to the left, its face's centre's height, turned toward the coming car, its face's
+ *  size and its words' share of it; the camera waits in the street before it (m short of it, off the road's centre,
+ *  up), the car driving up into the frame.
+ *  (It was a mural on the end wall of a building standing on the boardwalk — "it's in the middle of, like, the
+ *  boardwalk, and someone's about to walk into it", the user, 2026-10-16. Now a billboard on its own steel on the
+ *  sand: its near leg ~5 m past the boardwalk's sand-side edge, its face up on its legs from 4.2 m, its frame, catwalk and
+ *  lamps clear of the boardwalk overhead too.) */
+export const GIANT = { short: 20, lateral: -21, y: 9.45, turn: (35 * Math.PI) / 180, w: 22, h: 10.5, text: 0.62, eye: { short: 19, lateral: -1.5, up: 2.2 } };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
 export interface Verse2Plan {
@@ -107,7 +117,7 @@ export interface Verse2Plan {
   sign: Face;
   wash: { s: number; board: Face };
   giant: Face;
-  /** Its building. */
+  /** Its face and frame, up on its legs (the guard's block). */
   giantBlock: Block;
   /** The chicken spot's floor (its height: it stands level on the falling road). */
   chickenFloor: number;
@@ -249,7 +259,7 @@ export const VERSE2: SetPiece = {
     // (the words' column: the board's left, under its header)
     const textP = boardP.clone().addScaledVector(wAlong, -W.board.w / 2 + W.board.pad + LAYOUT.carwash.w / 2).addScaledVector(UP, boardH / 2 - W.board.head - W.board.gap - wH / 2);
     const wash = stack('carwash', phs[5]!, textP, wn).items.map(({ ph, lay, center }) => add('carwash', ph, ws, center, wn, UP.clone(), lay));
-    const WE = W.eye, washShot = lookFrom(atRoad(ws - WE.back, WE.lateral, WE.y), boardP.clone().addScaledVector(right(ws), -WE.toRoad).addScaledVector(UP, -WE.down));
+    const WE = W.eye, washShot = lookFrom(atRoad(ws - WE.back, WE.lateral, WE.y), boardP.clone().addScaledVector(right(ws), -WE.toRoad).addScaledVector(UP, WE.up));
     hold(wash, () => washShot, 'cut');
 
     // ---- their car, from in front: the windshield banner, the hood's lettering ----
@@ -270,20 +280,20 @@ export const VERSE2: SetPiece = {
     ];
     hold(rear, (t) => lookFrom(inCar(ON_CAR.behind, t), inCar(ON_CAR.behindAim, t)), 'whip');
 
-    // ---- the giant mural of him at the end of the street, on its building's end wall, the car driving on toward it ----
+    // ---- the big painted billboard at the end of the street, on the sand, the car driving on toward it ----
     const G = GIANT, gl = lines[8]!, gs = carS(gl.end) + G.short, gf = route.frameAt(gs);
     const gn = flat(gf.fwd).negate().multiplyScalar(Math.cos(G.turn)).addScaledVector(flat(gf.right), Math.sin(G.turn)).normalize();
     const gP = atRoad(gs, G.lateral, G.y), gUp = uprightFor(gn);
     const glays = phs[8]!.map((ph) => layout('giant', ph.text, ph.solo)), gH = glays.reduce((a, l) => a + l.h, 0);
     let gtop = gH / 2;
-    // (its words on the left of it, his portrait on the right: the prop paints it)
+    // (its words on the left of it, the painting on the right: the prop paints it)
     const gAlong = gUp.clone().cross(gn).normalize(), textX = -G.w / 2 + (G.w * G.text) / 2;
     const giant = phs[8]!.map((ph, i) => { const L = glays[i]!, c = gP.clone().addScaledVector(gUp, gtop - L.h / 2).addScaledVector(gAlong, textX); gtop -= L.h; return add('giant', ph, gs, c, gn, gUp.clone(), L, { ad: 'him' }); });
     const giantShot = lookFrom(atRoad(gs - G.eye.short, G.eye.lateral, G.eye.up), gP.clone().addScaledVector(gAlong, -2));
     hold(giant, () => giantShot, 'whip');
-    // (its building: the mural on its end wall, down to the ground)
-    const GB = G.building, gbw = G.w + 2 * GB.margin, gbh = G.y + G.h / 2 + GB.margin, gB = gP.clone().addScaledVector(gn, -GB.d / 2 - 0.05), gLat = gB.clone().sub(gf.pos).dot(gf.right);
-    const giantBlock: Block = { s: gs, lateral: gLat, w: gbw, h: gbh, d: GB.d, color: 0.5, bare: true, prop: true, matrix: new THREE.Matrix4().makeBasis(gAlong, UP, gn).scale(new THREE.Vector3(gbw, gbh, GB.d)).setPosition(gB.x, ground(gs) + gbh / 2, gB.z) };
+    // (its face and its frame, up on its legs: the guard sees them as a block; the legs and the catwalk are the prop's)
+    const gbw = G.w + 1, gbh = G.h + 1, gbd = 1, gB = gP.clone().addScaledVector(gn, -gbd / 2), gLat = gB.clone().sub(gf.pos).dot(gf.right);
+    const giantBlock: Block = { s: gs, lateral: gLat, w: gbw, h: gbh, d: gbd, color: 0.5, bare: true, prop: true, matrix: new THREE.Matrix4().makeBasis(gAlong, UP, gn).scale(new THREE.Vector3(gbw, gbh, gbd)).setPosition(gB) };
 
     // the car wash's building on the right (the guard sees it); the town keeps off the chicken spot's block (and the far
     // side, where its takes stand), the car wash and his mural's

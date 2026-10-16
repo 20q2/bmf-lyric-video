@@ -356,8 +356,10 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       box(booth, 2, 2.4, 2, 0, 1.2, 0, cream); box(booth, 2.4, 0.15, 2.4, 0, 2.47, 0, blue);
       // its sign on a pole by the booth, to the traffic coming along the road: the standard parking sign — a white P
       // on a blue square in a white border — over a plate with BEACH PARKING (painted: it takes the light like the
-      // booth); a grey sheet-metal back
-      const SIGN = { w: 2.0, sq: 2.0, plate: 0.8, top: 5.7 }, postH = SIGN.top + 0.05, sy = SIGN.top - SIGN.sq / 2, py = SIGN.top - SIGN.sq - 0.05 - SIGN.plate / 2;
+      // booth); a grey sheet-metal back. A street sign's size on a street sign's 3 m pole: a 0.75 m P, 1.2 m in all
+      // (2 m square on a 5.7 m pole, it stood as big as the arch's lettering in the wide — "it's like the same size as
+      // the lyrics", the user, 2026-10-16)
+      const SIGN = { w: 0.75, sq: 0.75, plate: 0.42, top: 3.0 }, postH = SIGN.top + 0.05, sy = SIGN.top - SIGN.sq / 2, py = SIGN.top - SIGN.sq - 0.05 - SIGN.plate / 2;
       box(booth, 0.1, postH, 0.1, 0, postH / 2, -2.2, toon({ color: WORLD.post }));
       box(booth, SIGN.w + 0.06, SIGN.sq + SIGN.plate + 0.11, 0.04, 0, (SIGN.top + py - SIGN.plate / 2) / 2, -2.27, toon({ color: '#8e949a' }));
       const pTex = canvasTex(512, 512, (c) => {
@@ -366,12 +368,14 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
         c.strokeStyle = '#ffffff'; c.lineWidth = 10; c.beginPath(); c.roundRect(44, 44, 424, 424, 18); c.stroke();
         c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `bold 400px "${F.sign(700)}"`; c.fillText('P', 256, 276);
       });
-      const plateTex = canvasTex(512, 204, (c) => {
-        c.fillStyle = '#ffffff'; c.beginPath(); c.roundRect(0, 0, 512, 204, 24); c.fill();
-        c.strokeStyle = '#1d5bb8'; c.lineWidth = 10; c.beginPath(); c.roundRect(14, 14, 484, 176, 14); c.stroke();
-        c.fillStyle = '#1d5bb8'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `bold 74px "${F.sign(700)}"`;
-        (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '6px';
-        c.fillText('BEACH', 256, 66); c.fillText('PARKING', 256, 146, 450);
+      // (its canvas in the plate's own proportions: the letters not stretched)
+      const plateTex = canvasTex(512, Math.round((512 * SIGN.plate) / SIGN.w), (c) => {
+        const ph = c.canvas.height;
+        c.fillStyle = '#ffffff'; c.beginPath(); c.roundRect(0, 0, 512, ph, 24); c.fill();
+        c.strokeStyle = '#1d5bb8'; c.lineWidth = 10; c.beginPath(); c.roundRect(14, 14, 484, ph - 28, 14); c.stroke();
+        c.fillStyle = '#1d5bb8'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `bold 92px "${F.sign(700)}"`;
+        (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '4px';
+        c.fillText('BEACH', 256, ph * 0.33, 450); c.fillText('PARKING', 256, ph * 0.69, 450);
       });
       // (faces toward -z: the traffic coming along the road; 1.5 cm proud of the back)
       plane(booth, SIGN.w, SIGN.sq, 0, sy, -2.305, paint(pTex, { transparent: true })).rotation.y = Math.PI;
@@ -449,14 +453,20 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     box(pg, 3.6, 1.2, 0.05, -1.2, base + 1.7, -SH.back + 0.01, toon({ color: '#2c2630' })); // its window
     box(pg, 3.8, 0.1, 0.55, -1.2, base + 1.05, -SH.back + 0.27, toon({ color: '#f4efe4' }));
     plane(pg, 2.4, 0.5, 2.2, base + 2.4, -SH.back + 0.02, paint(signFace('RENTALS', 512, 104, '#fbf1d8', '#d81e2c', F.sign(700), 0.62, 0.14)));
-    // the rack of boards beside it: upright, nose up, each its own colours
-    const BC = ['#f2b134', '#e23d5a', '#ffffff', '#2fa3c4', '#3cb27a', '#f47a2a', '#ff6fa8'];
-    for (let j = 0; j < 7; j++) {
+    // the rack of boards on its front, right of the counter under RENTALS: upright, nose up, leaning back on its rail,
+    // each its own colours. (It ran on past the shack's end from the sign's edge, and with the shack toed to the road
+    // its far boards stood in the boardwalk — "the rack of surfboards is clipping into the boardwalk", the user,
+    // 2026-10-16. On the shack's own front it ends 2.4 m short of the boardwalk's sand-side edge.)
+    const BC = ['#f2b134', '#e23d5a', '#ffffff', '#2fa3c4', '#3cb27a', '#f47a2a'], RX = [0.95, 3.55], rackZ = -SH.back + 0.18;
+    for (let j = 0; j < BC.length; j++) {
       const sb = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), toon({ color: BC[j]! }));
-      sb.scale.set(0.27, 1.15, 0.05); sb.position.set(P.w / 2 + 0.9 + j * 0.62, base + 1.15, -0.4); sb.rotation.z = 0.05 * (j % 2 ? 1 : -1); pg.add(sb);
+      sb.scale.set(0.27, 1.0, 0.05); sb.position.set(RX[0] + (j * (RX[1] - RX[0])) / (BC.length - 1), base + 1.0, rackZ + 0.17 + (j % 2) * 0.06);
+      sb.rotation.set(-0.1, 0, 0.04 * (j % 2 ? 1 : -1)); pg.add(sb);
     }
-    box(pg, 4.6, 0.1, 0.1, P.w / 2 + 2.75, base + 1.0, -0.6, toon({ color: '#3a2a24' }));
-    for (const x of [P.w / 2 + 0.5, P.w / 2 + 5.0]) box(pg, 0.1, 1.4, 0.1, x, base + 0.7, -0.6, toon({ color: '#3a2a24' }));
+    const rackM = toon({ color: '#3a2a24' });
+    box(pg, RX[1] - RX[0] + 0.5, 0.1, 0.1, (RX[0] + RX[1]) / 2, base + 1.15, rackZ, rackM); // its rail, the boards' backs on it
+    box(pg, RX[1] - RX[0] + 0.5, 0.12, 0.3, (RX[0] + RX[1]) / 2, base + 0.06, rackZ + 0.2, rackM); // its foot rail, the tails in it
+    for (const x of [RX[0] - 0.25, RX[1] + 0.25]) box(pg, 0.1, 1.2, 0.1, x, base + 0.6, rackZ, rackM);
     // its feather flag
     box(pg, 0.05, 3.6, 0.05, -P.w / 2 - 0.8, base + 1.8, 0.4, toon({ color: '#3a2a24' }));
     const flag = plane(pg, 0.7, 2.6, -P.w / 2 - 0.45, base + 2.2, 0.4, paint(canvasTex(64, 256, (c) => { c.fillStyle = '#d81e2c'; c.fillRect(0, 0, 64, 256); c.fillStyle = '#fbf1d8'; c.font = `bold 44px "${F.sign(700)}"`; c.textAlign = 'center'; for (const [i, ch] of [...'SURF'].entries()) c.fillText(ch, 32, 56 + i * 52); }), { side: THREE.DoubleSide }));

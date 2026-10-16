@@ -4,14 +4,18 @@
 // false front and sign board, awnings, windows onto the shop floor with posters taped in them: the carriers; its stock
 // out on the sidewalk, its banner tied up under the board, Mr. Handle It himself on his plinth, winking as he's named);
 // the fried chicken spot past it, open and busy, the big sign on its roof ringed with bulbs and the chicken standing on it;
-// the hand car wash on the right (its sign an ad: HAND WASH over the words, suds and a shining car right of them, the
-// price under; its bays); his giant mural on the end wall of its building. The lyrics are the carriers. Browser only (canvas).
+// the hand car wash on the right (its '60s sign in its lot: the words' board in a bulb-ringed bezel, a breaking wave
+// over it with HAND WASH across it, its mascot and a finned sedan right of the words, a $9.99 starburst, on braced
+// columns over a planter; its bays); the big painted billboard on the sand up the street, on its legs, its catwalk,
+// lamps and ladder. The lyrics are the carriers. Browser only (canvas).
 import * as THREE from 'three';
 import { wallMaterial } from '../../look/walls';
 import { facadeMeshes, facades } from '../../look/facades';
 import type { Block } from '../../drive/blocks';
 import type { Drive } from '../../drive/drive';
 import { GIANT, SHACK, type Verse2Plan, WASH } from '../../drive/sets/verse2';
+import { LAYOUT } from '../../drive/carriers';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF } from '../../drive/route';
 import { CORNER_WALK, SIDEWALKS } from '../../drive/world';
 import { WORLD, toon } from '../../look/toon';
@@ -374,29 +378,92 @@ function bulbs(g: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, n: number,
   for (let i = 0; i <= n; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), ms[(phase0 + i) % ms.length]!); s.position.copy(a.clone().lerp(b, i / n)); g.add(s); }
 }
 
-/** The mural on the end wall up the street: a painting, not his campaign's ad (the user: "lazy") — a sunset in flat
- *  bands over a row of palms, a lowrider in the foreground, the sun behind; the words (the carriers') on its left,
- *  where the sky is plain. */
-function mural(c: CanvasRenderingContext2D, W: number, H: number, text: number) {
+/** The billboard's face up the street, `wM` m wide: a sign painter's bulletin, not his campaign's ad (the user:
+ *  "lazy") — a sunset in flat bands, the sun striped as it sets into the sea, its glitter on the water, palms
+ *  crossing over it, a candy lowrider laid low on the front; the words (the carriers') on its left, where the sky is
+ *  plain. Painted on steel sheets: their seams and bolts show, rust runs from the bolts, the sun has faded its top
+ *  and the weather dirtied its foot. */
+function mural(c: CanvasRenderingContext2D, W: number, H: number, text: number, wM: number) {
   const bands = ['#2b1b4e', '#7a3a7e', '#d9567a', '#f28a5a', '#f6b34a', '#ffd27a'];
-  bands.forEach((col, i) => { c.fillStyle = col; c.fillRect(0, (H * i) / bands.length - 1, W, H / bands.length + 2); });
-  const x0 = W * text, cx = x0 + (W - x0) * 0.5, horizon = H * 0.72;
-  c.fillStyle = '#fff1c8'; c.beginPath(); c.arc(cx, horizon - H * 0.02, H * 0.2, 0, Math.PI * 2); c.fill(); // the sun
-  c.fillStyle = '#5a2a4e'; c.fillRect(0, horizon, W, H - horizon); // the ground, dark
-  c.fillStyle = '#2a1830'; // the palms, from the words' edge across
-  for (let k = 0; k < 7; k++) {
-    const px = x0 + (W - x0) * (0.05 + k * 0.15), lean = (k % 2 ? 1 : -1) * 0.06, h = H * (0.45 + 0.12 * ((k * 0.37) % 1)), top = horizon - h;
-    c.beginPath(); c.moveTo(px - 8, horizon); c.lineTo(px + 8, horizon); c.lineTo(px + 6 + lean * h, top); c.lineTo(px - 6 + lean * h, top); c.closePath(); c.fill();
-    for (let f = 0; f < 7; f++) { const a = -Math.PI * 0.85 + (f / 6) * Math.PI * 0.7; c.save(); c.translate(px + lean * h, top); c.rotate(a); c.beginPath(); c.ellipse(H * 0.07, 0, H * 0.075, H * 0.016, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+  const horizon = H * 0.7, front = H * 0.85, x0 = W * text, cx = x0 + (W - x0) * 0.5, px = W / wM;
+  bands.forEach((col, i) => { c.fillStyle = col; c.fillRect(0, (horizon * i) / bands.length - 1, W, horizon / bands.length + 2); });
+  // the sun, half down into the sea, striped across its lower half
+  {
+    const r = H * 0.26, sun = document.createElement('canvas'); sun.width = Math.ceil(2 * r); sun.height = Math.ceil(r);
+    const s = sun.getContext('2d')!, g = s.createLinearGradient(0, 0, 0, r); g.addColorStop(0, '#fff6d8'); g.addColorStop(1, '#ffc35a');
+    s.fillStyle = g; s.beginPath(); s.arc(r, r, r, Math.PI, 0); s.fill();
+    s.globalCompositeOperation = 'destination-out';
+    for (let k = 0; k < 6; k++) { const y = r * (0.42 + k * 0.1), t = r * (0.012 + k * 0.011); s.fillRect(0, y, 2 * r, t); }
+    c.drawImage(sun, cx - r, horizon - r);
   }
-  // the lowrider, low in the foreground, its candy red and whitewalls
-  const cw = (W - x0) * 0.55, ch = cw * 0.22, lx = cx - cw / 2, ly = H * 0.86;
-  c.fillStyle = '#c8102e'; c.beginPath(); c.roundRect(lx, ly - ch, cw, ch, ch * 0.3); c.fill(); c.beginPath(); c.roundRect(lx + cw * 0.28, ly - ch * 1.7, cw * 0.42, ch * 0.8, ch * 0.3); c.fill();
-  c.fillStyle = '#1d2026'; c.fillRect(lx + cw * 0.31, ly - ch * 1.6, cw * 0.36, ch * 0.55);
-  for (const wx of [lx + cw * 0.22, lx + cw * 0.78]) { c.fillStyle = '#1d2026'; c.beginPath(); c.arc(wx, ly, ch * 0.42, 0, Math.PI * 2); c.fill(); c.fillStyle = '#f4efe4'; c.beginPath(); c.arc(wx, ly, ch * 0.28, 0, Math.PI * 2); c.fill(); c.fillStyle = '#aaa498'; c.beginPath(); c.arc(wx, ly, ch * 0.14, 0, Math.PI * 2); c.fill(); }
-  c.fillStyle = '#aaa498'; c.fillRect(lx - cw * 0.02, ly - ch * 0.35, cw * 1.04, ch * 0.1);
-  // weathering: the paint worn in patches
-  c.fillStyle = 'rgba(90,42,78,0.12)'; for (let k = 0; k < 40; k++) { const u = (k * 0.618) % 1, v = (k * 0.381) % 1; c.beginPath(); c.ellipse(u * W, v * H, W * 0.03 * (0.5 + ((k * 0.7) % 1)), H * 0.02, u * 3, 0, Math.PI * 2); c.fill(); }
+  // the sea to the front, the sun's glitter on it, dashes narrowing to the horizon
+  const sea = c.createLinearGradient(0, horizon, 0, front); sea.addColorStop(0, '#4a2f72'); sea.addColorStop(1, '#2e1d52'); c.fillStyle = sea; c.fillRect(0, horizon, W, front - horizon);
+  c.fillStyle = '#ffd27a';
+  for (let k = 0; k < 14; k++) { const u = k / 13, y = horizon + 6 + (front - horizon - 14) * u * u, w = H * (0.22 - 0.1 * u) * (0.6 + 0.4 * ((k * 0.618) % 1)), dx = (((k * 0.381) % 1) - 0.5) * H * 0.08; c.fillRect(cx + dx - w / 2, y, w, 3 + 6 * u); }
+  c.fillStyle = '#f4b6c2'; c.fillRect(0, horizon - 1, W, 3); // (the horizon's line)
+  // the promenade along the front, its kerb
+  c.fillStyle = '#2a1830'; c.fillRect(0, front, W, H - front); c.fillStyle = '#7a3a7e'; c.fillRect(0, front, W, H * 0.012);
+  // the palms: curved trunks with their rings, drooping fronds; two crossing
+  c.fillStyle = '#1e1028'; c.strokeStyle = '#1e1028'; c.lineCap = 'round';
+  const palm = (bx: number, h: number, lean: number) => {
+    const tx = bx + lean * h, ty = front - h, mx = bx + lean * h * 0.15, my = front - h * 0.55;
+    const at = (u: number) => [(1 - u) * (1 - u) * bx + 2 * u * (1 - u) * mx + u * u * tx, (1 - u) * (1 - u) * front + 2 * u * (1 - u) * my + u * u * ty] as const;
+    const half = (u: number) => H * (0.012 - 0.005 * u);
+    c.beginPath();
+    for (let k = 0; k <= 24; k++) { const [x, y] = at(k / 24); c.lineTo(x - half(k / 24), y); }
+    for (let k = 24; k >= 0; k--) { const [x, y] = at(k / 24); c.lineTo(x + half(k / 24), y); }
+    c.closePath(); c.fill();
+    // (its rings, faint)
+    c.save(); c.strokeStyle = 'rgba(120,70,110,0.45)'; c.lineWidth = 2;
+    for (let k = 1; k < 24; k++) { const u = k / 24, [x, y] = at(u); c.beginPath(); c.moveTo(x - half(u) * 0.8, y); c.lineTo(x + half(u) * 0.8, y + 2); c.stroke(); }
+    c.restore();
+    for (let f = 0; f < 9; f++) {
+      const a = -Math.PI + (f / 8) * Math.PI + (f % 2 ? 0.08 : -0.08), L = H * (0.13 + 0.04 * ((f * 0.37) % 1)), droop = Math.abs(Math.cos(a)) * L * 0.55;
+      const ex = tx + Math.cos(a) * L, ey = ty + Math.sin(a) * L * 0.55 + droop;
+      c.lineWidth = H * 0.016; c.beginPath(); c.moveTo(tx, ty); c.quadraticCurveTo(tx + Math.cos(a) * L * 0.55, ty + Math.sin(a) * L * 0.7 - L * 0.12, ex, ey); c.stroke();
+      for (let j = 1; j < 6; j++) { const u = j / 6, qx = tx + (ex - tx) * u, qy = ty + (ey - ty) * u - L * 0.12 * Math.sin(Math.PI * u); c.lineWidth = H * 0.006; c.beginPath(); c.moveTo(qx, qy); c.lineTo(qx + Math.cos(a + 1.4) * L * 0.12, qy + L * 0.13); c.stroke(); c.beginPath(); c.moveTo(qx, qy); c.lineTo(qx + Math.cos(a - 1.4) * L * 0.12, qy + L * 0.13); c.stroke(); }
+    }
+  };
+  const span = W - x0;
+  palm(x0 + span * 0.12, H * 0.62, 0.1); palm(x0 + span * 0.3, H * 0.74, -0.16); palm(x0 + span * 0.36, H * 0.56, 0.2);
+  palm(x0 + span * 0.78, H * 0.7, -0.12); palm(x0 + span * 0.92, H * 0.6, 0.08);
+  // the lowrider on the front, laid low, candy red, its chrome, whitewalls on wire wheels
+  {
+    const cw = span * 0.62, k = cw / 300, lx = cx - cw / 2, ly = H * 0.925;
+    const P = (x: number, y: number) => [lx + x * k, ly - y * k] as const;
+    const poly = (pts: readonly (readonly [number, number])[]) => { c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(...P(x, y)) : c.moveTo(...P(x, y)))); c.closePath(); };
+    c.fillStyle = 'rgba(10,4,14,0.55)'; c.beginPath(); c.ellipse(...P(150, 2), 160 * k, 7 * k, 0, 0, Math.PI * 2); c.fill();
+    const candy = c.createLinearGradient(0, ly - 60 * k, 0, ly); candy.addColorStop(0, '#ff3a52'); candy.addColorStop(0.5, '#c8102e'); candy.addColorStop(1, '#6e0818');
+    poly([[2, 10], [0, 22], [6, 30], [80, 34], [104, 58], [190, 60], [214, 36], [286, 36], [300, 46], [298, 24], [294, 10]]); c.fillStyle = candy; c.fill();
+    c.fillStyle = '#1d2026'; poly([[110, 36], [124, 54], [150, 55], [150, 36]]); c.fill(); poly([[156, 36], [156, 55], [184, 56], [204, 37]]); c.fill();
+    c.fillStyle = 'rgba(255,240,220,0.35)'; poly([[118, 40], [128, 52], [134, 52], [124, 40]]); c.fill();
+    c.fillStyle = '#e8e2d6'; poly([[10, 22], [290, 26], [290, 29], [10, 25]]); c.fill(); // (its chrome spear)
+    poly([[-4, 8], [16, 8], [16, 16], [-4, 15]]); c.fill(); poly([[284, 8], [304, 8], [304, 15], [284, 16]]); c.fill();
+    for (const wx of [62, 240]) {
+      const [x, y] = P(wx, 12), r = 15 * k;
+      c.fillStyle = '#16131a'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#f4efe4'; c.beginPath(); c.arc(x, y, r * 0.72, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#9a968e'; c.beginPath(); c.arc(x, y, r * 0.5, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#e8e2d6'; c.lineWidth = Math.max(1, r * 0.06);
+      for (let s = 0; s < 12; s++) { const a = (s / 12) * Math.PI * 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); c.stroke(); }
+    }
+  }
+  // the steel sheets: their seams (~1.2 m apart), the bolts along the top and foot, rust run down from some
+  const sheet = Math.max(1, Math.round(wM / 1.2)), sw = W / sheet;
+  for (let k = 1; k < sheet; k++) {
+    const x = k * sw;
+    c.fillStyle = 'rgba(20,10,25,0.32)'; c.fillRect(x - 1.5, 0, 3, H);
+    c.fillStyle = 'rgba(255,240,220,0.12)'; c.fillRect(x + 1.5, 0, 2, H);
+  }
+  for (let k = 0; k <= sheet; k++) for (const y of [H * 0.02, H * 0.5, H * 0.98]) {
+    const x = Math.min(W - 4, Math.max(4, k * sw));
+    c.fillStyle = 'rgba(30,20,30,0.5)'; c.beginPath(); c.arc(x, y, 3.5, 0, Math.PI * 2); c.fill();
+    if (((k * 7 + Math.round(y)) % 5) === 0) { const run = c.createLinearGradient(0, y, 0, y + H * (0.08 + 0.12 * ((k * 0.618) % 1))); run.addColorStop(0, 'rgba(120,55,30,0.32)'); run.addColorStop(1, 'rgba(120,55,30,0)'); c.fillStyle = run; c.fillRect(x - 3, y, 6, H * 0.2); }
+  }
+  // the weather: the top faded by the sun, the paint worn in patches, the foot dirtied
+  const fade = c.createLinearGradient(0, 0, 0, H * 0.5); fade.addColorStop(0, 'rgba(255,236,220,0.1)'); fade.addColorStop(1, 'rgba(255,236,220,0)'); c.fillStyle = fade; c.fillRect(0, 0, W, H * 0.5);
+  c.fillStyle = 'rgba(255,236,220,0.05)'; for (let k = 0; k < 40; k++) { const u = (k * 0.618) % 1, v = (k * 0.381) % 1; c.beginPath(); c.ellipse(u * W, v * H, px * 0.6 * (0.5 + ((k * 0.7) % 1)), px * 0.25, u * 3, 0, Math.PI * 2); c.fill(); }
+  const dirt = c.createLinearGradient(0, H, 0, H * 0.9); dirt.addColorStop(0, 'rgba(40,22,30,0.35)'); dirt.addColorStop(1, 'rgba(40,22,30,0)'); c.fillStyle = dirt; c.fillRect(0, H * 0.9, W, H * 0.1);
 }
 
 export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
@@ -937,40 +1004,211 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(rg);
   }
 
-  // ---- the car wash on the right: its sign an ad on two posts (HAND WASH over the words, suds and a shining car right
-  // of them, the price under), its building's blue roof edge and its bays, open to the road, suds at the entrance ----
+  // ---- the car wash on the right: its sign a '60s roadside cabinet in its lot (the user, 2026-10-16: "pretty good
+  // contrast-wise… maybe you could facelift it a little bit more"). The words' blue board as it was, in a red enamel
+  // bezel ringed with chasing bulbs; over it a breaking wave, HAND WASH across it in a sign-painter's italic, bulbs
+  // along its crest; Sudsy the droplet, the wash's mascot, on the roof of a finned sedan right of the words, a sponge
+  // in his hand; a $9.99 starburst off its corner; on two steel columns braced over a brick planter, floodlights in the
+  // planter. Its building's blue roof edge and its bays, open to the road, suds at the entrance ----
   {
     const Wb = plan.wash.board, g = onPanel(Wb), drop = Wb.center.y - route.frameAt(plan.wash.s).pos.y, B = WASH.board;
-    const pxm = 1024 / Wb.w, H = Math.round(Wb.h * pxm), head = B.head * pxm, foot = B.foot * pxm;
+    const w = Wb.w, h = Wb.h, R = 0.25, L = w / 2 + R, top = h / 2 + R; // (the bezel round the board: its half-width, half-height)
+    const NAVY = '#0b3a66', RED = '#d8262e', CREAM = '#fff4dc', YEL = '#ffd65a', BLUE = '#1f8fd6';
+    /** A rounded rectangle centred on the origin. */
+    const rrect = (rw: number, rh: number, r: number) => {
+      const s = new THREE.Shape(), x = -rw / 2, y = -rh / 2;
+      s.moveTo(x + r, y); s.lineTo(x + rw - r, y); s.quadraticCurveTo(x + rw, y, x + rw, y + r); s.lineTo(x + rw, y + rh - r);
+      s.quadraticCurveTo(x + rw, y + rh, x + rw - r, y + rh); s.lineTo(x + r, y + rh); s.quadraticCurveTo(x, y + rh, x, y + rh - r);
+      s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+      return s;
+    };
+    const extrude = (s: THREE.Shape, depth: number, z0: number) => new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 6 }).translate(0, 0, z0);
+    /** Bulbs at these points (in g, at z): each takes the chase's phase in turn, one mesh a phase. */
+    const bulbRun = (pts: readonly THREE.Vector2[], z: number, phase0 = 0) => {
+      const per: THREE.BufferGeometry[][] = [[], [], []];
+      pts.forEach((p, i) => per[(phase0 + i) % 3]!.push(new THREE.SphereGeometry(0.055, 8, 6).translate(p.x, p.y, z)));
+      per.forEach((gs, k) => { if (gs.length) g.add(new THREE.Mesh(mergeGeometries(gs, false)!, chase[k]!)); });
+    };
+
+    // the board's face: the words' column on the left (the carriers), Sudsy and the car on the right
+    const pxm = 1024 / w, H = Math.round(h * pxm), head = B.head * pxm, foot = B.foot * pxm, inner = H - head - foot;
+    const right = (B.pad + LAYOUT.carwash.w + 0.15) * pxm;
     const ad = canvasTex(1024, H, (c) => {
-      c.fillStyle = '#1f8fd6'; c.fillRect(0, 0, 1024, H);
-      // suds: bubbles of every size, thick right of the words, a few drifting behind them
+      c.fillStyle = BLUE; c.fillRect(0, 0, 1024, H);
+      c.lineJoin = 'round'; c.lineCap = 'round';
+      // the car, a '59 sedan side on (design units: 300 long, its wheels' feet at 0), and Sudsy on its roof
+      const x0 = right + 4, cw = Math.min(300, 1024 - x0 - 70), k = cw / 300, yb = H - foot - 26;
+      const P = (x: number, y: number) => [x0 + x * k, yb - y * k] as const;
+      const poly = (pts: readonly (readonly [number, number])[]) => { c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(...P(x, y)) : c.moveTo(...P(x, y)))); c.closePath(); };
+      const roof = yb - 82 * k, s = Math.min(96, (roof - head - 26) / 2.6), mx = x0 + 150 * k, my = roof - 1.3 * s;
+      // a soft sunburst behind him (faint: the words read over it)
+      c.fillStyle = 'rgba(255,255,255,0.07)';
+      for (let i = 0; i < 18; i++) { const a0 = (i / 18) * Math.PI * 2; c.beginPath(); c.moveTo(mx, my); c.arc(mx, my, 1500, a0, a0 + Math.PI / 18); c.closePath(); c.fill(); }
+      // suds: bubbles of every size round him, a few drifting behind the words
       const bub = (x: number, y: number, r: number) => {
         c.fillStyle = 'rgba(255,255,255,0.22)'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
         c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = Math.max(2, r * 0.08); c.stroke();
         c.fillStyle = 'rgba(255,255,255,0.9)'; c.beginPath(); c.ellipse(x - r * 0.35, y - r * 0.4, r * 0.22, r * 0.12, -0.6, 0, Math.PI * 2); c.fill();
       };
-      const right = (B.pad + 3.4 + 0.15) * pxm, inner = H - head - foot;
-      for (let k = 0; k < 26; k++) bub(right + ((k * 0.618) % 1) * (1024 - right), head + ((k * 0.381) % 1) * inner, 14 + 48 * ((k * 0.73) % 1));
-      for (let k = 0; k < 7; k++) bub(((k * 0.29) % 1) * right, head + ((k * 0.57) % 1) * inner, 10 + 16 * ((k * 0.41) % 1));
-      // the shining car among them
-      const cx = right + (1024 - right) * 0.5, cy = H - foot - 70;
-      c.fillStyle = '#ffffff'; c.beginPath(); c.roundRect(cx - 120, cy - 30, 240, 50, 18); c.fill(); c.beginPath(); c.roundRect(cx - 70, cy - 70, 130, 50, 20); c.fill();
-      c.fillStyle = '#0b3a66'; for (const wx of [-70, 70]) { c.beginPath(); c.arc(cx + wx, cy + 22, 24, 0, Math.PI * 2); c.fill(); }
-      c.fillStyle = '#ffd65a';
-      for (const [sx, sy, sr] of [[cx - 150, cy - 80, 20], [cx + 140, cy - 60, 14], [cx + 40, cy - 110, 16]] as const) {
-        c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4, r = i % 2 ? sr * 0.3 : sr; c.lineTo(sx + r * Math.cos(a), sy + r * Math.sin(a)); } c.fill();
+      for (let i = 0; i < 18; i++) bub(right + ((i * 0.618) % 1) * (1024 - right), head + 24 + ((i * 0.381) % 1) * (inner - 48), 9 + 30 * ((i * 0.73) % 1));
+      for (let i = 0; i < 7; i++) bub(((i * 0.29) % 1) * right, head + ((i * 0.57) % 1) * inner, 8 + 14 * ((i * 0.41) % 1));
+      // the car: white, a red spear down its side, chrome bumpers, whitewalls, its fin up at the tail
+      c.strokeStyle = NAVY; c.lineWidth = 5;
+      poly([[4, 12], [0, 24], [3, 37], [12, 44], [92, 50], [122, 81], [196, 82], [226, 54], [280, 57], [300, 76], [298, 40], [295, 12]]);
+      c.fillStyle = '#ffffff'; c.fill(); c.stroke();
+      c.lineWidth = 3; c.fillStyle = '#9fd8f5';
+      poly([[100, 52], [126, 77], [157, 78], [157, 52]]); c.fill(); c.stroke();
+      poly([[164, 52], [164, 78], [192, 79], [215, 54]]); c.fill(); c.stroke();
+      c.fillStyle = RED; poly([[26, 29], [276, 38], [292, 47], [276, 45], [26, 36]]); c.fill();
+      c.fillStyle = '#c9d3dc'; poly([[-4, 12], [16, 12], [16, 24], [-4, 22]]); c.fill(); c.stroke(); poly([[284, 12], [304, 12], [304, 22], [284, 24]]); c.fill(); c.stroke();
+      for (const wx of [64, 236]) {
+        const [cx, cy] = P(wx, 15), r = 17 * k;
+        c.fillStyle = '#16131a'; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#ffffff'; c.beginPath(); c.arc(cx, cy, r * 0.66, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#c9d3dc'; c.beginPath(); c.arc(cx, cy, r * 0.38, 0, Math.PI * 2); c.fill();
       }
-      // HAND WASH across the top, the price along the foot (the signs' face)
-      c.fillStyle = '#ffd65a'; c.fillRect(0, 0, 1024, head);
-      c.fillStyle = '#0b3a66'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), head * 0.62); c.fillText('HAND WASH', 512, head * 0.54);
+      // sparkles off its chrome
+      c.fillStyle = YEL;
+      for (const [sx, sy, sr] of [[22, 70, 15], [262, 104, 12], [300, 92, 9], [60, 96, 9]] as const) {
+        const [px, py] = P(sx, sy);
+        c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4, r = (i % 2 ? 0.28 : 1) * sr; c.lineTo(px + r * Math.cos(a), py + r * Math.sin(a)); } c.fill();
+      }
+      // Sudsy: a droplet in white gloves, red sneakers on the roof, waving, a yellow sponge in his other hand
+      const lw = Math.max(4, s * 0.07);
+      c.strokeStyle = NAVY; c.lineWidth = lw;
+      for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(mx + sx * 0.28 * s, my + 0.9 * s); c.lineTo(mx + sx * 0.36 * s, my + 1.22 * s); c.stroke(); }
+      c.fillStyle = RED; for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(mx + sx * 0.44 * s, my + 1.24 * s, 0.2 * s, 0.09 * s, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
+      c.beginPath(); c.moveTo(mx - 0.72 * s, my + 0.35 * s); c.quadraticCurveTo(mx - 1.1 * s, my + 0.2 * s, mx - 1.2 * s, my - 0.35 * s); c.stroke();
+      c.beginPath(); c.moveTo(mx + 0.72 * s, my + 0.4 * s); c.lineTo(mx + 1.1 * s, my + 0.1 * s); c.stroke();
+      c.save(); c.translate(mx + 1.26 * s, my - 0.02 * s); c.rotate(-0.35);
+      c.fillStyle = YEL; c.beginPath(); c.roundRect(-0.32 * s, -0.21 * s, 0.64 * s, 0.42 * s, 0.1 * s); c.fill(); c.lineWidth = lw * 0.7; c.stroke();
+      c.fillStyle = '#e0a526'; for (const [hx, hy] of [[-0.17, -0.06], [0.05, 0.08], [0.18, -0.09], [-0.05, -0.12]] as const) { c.beginPath(); c.arc(hx * s, hy * s, 0.045 * s, 0, Math.PI * 2); c.fill(); }
+      c.restore();
+      c.lineWidth = lw;
+      const body = c.createLinearGradient(mx - 0.8 * s, my - s, mx + 0.8 * s, my + s); body.addColorStop(0, '#ffffff'); body.addColorStop(1, '#b8ecff');
+      c.beginPath(); c.moveTo(mx, my - 1.25 * s);
+      c.bezierCurveTo(mx + 0.3 * s, my - 0.75 * s, mx + 0.8 * s, my - 0.3 * s, mx + 0.8 * s, my + 0.25 * s);
+      c.arc(mx, my + 0.25 * s, 0.8 * s, 0, Math.PI);
+      c.bezierCurveTo(mx - 0.8 * s, my - 0.3 * s, mx - 0.3 * s, my - 0.75 * s, mx, my - 1.25 * s);
+      c.fillStyle = body; c.fill(); c.stroke();
+      c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(mx - 0.4 * s, my - 0.2 * s, 0.11 * s, 0.25 * s, 0.45, 0, Math.PI * 2); c.fill();
+      for (const [gx, gy] of [[mx - 1.2 * s, my - 0.4 * s], [mx + 1.08 * s, my + 0.12 * s]] as const) { c.fillStyle = '#ffffff'; c.beginPath(); c.arc(gx, gy, 0.17 * s, 0, Math.PI * 2); c.fill(); c.stroke(); }
+      for (const sx of [-1, 1]) {
+        const ex = mx + sx * 0.27 * s, ey = my + 0.08 * s;
+        c.fillStyle = '#ffffff'; c.lineWidth = lw * 0.6; c.beginPath(); c.ellipse(ex, ey, 0.15 * s, 0.21 * s, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+        c.fillStyle = NAVY; c.beginPath(); c.arc(ex + 0.04 * s, ey + 0.04 * s, 0.085 * s, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#ffffff'; c.beginPath(); c.arc(ex + 0.07 * s, ey, 0.03 * s, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.moveTo(ex - 0.13 * s, ey - 0.27 * s); c.quadraticCurveTo(ex, ey - 0.38 * s, ex + 0.13 * s, ey - 0.27 * s); c.stroke();
+        c.fillStyle = 'rgba(255,110,140,0.45)'; c.beginPath(); c.arc(mx + sx * 0.5 * s, my + 0.4 * s, 0.1 * s, 0, Math.PI * 2); c.fill();
+      }
+      c.lineWidth = lw * 0.7; c.fillStyle = '#7a1020';
+      c.beginPath(); c.moveTo(mx - 0.34 * s, my + 0.4 * s); c.quadraticCurveTo(mx, my + 0.88 * s, mx + 0.34 * s, my + 0.4 * s); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#ff7a96'; c.beginPath(); c.ellipse(mx, my + 0.58 * s, 0.13 * s, 0.06 * s, 0, 0, Math.PI * 2); c.fill();
+      // the header: SUDSY'S, its band's foot scalloped; the services along the foot (the signs' face)
+      c.fillStyle = YEL; c.fillRect(0, 0, 1024, head);
+      for (let x = 0; x < 1024; x += 32) { c.beginPath(); c.arc(x + 16, head - 1, 16, 0, Math.PI); c.fill(); }
+      c.fillStyle = NAVY; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), head * 0.6);
+      (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${Math.round(head * 0.08)}px`;
+      c.fillText("★ SUDSY'S ★", 512, head * 0.52);
+      (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
       c.fillRect(0, H - foot, 1024, foot);
-      c.fillStyle = '#ffffff'; c.font = font(F.sign(600), foot * 0.5); c.fillText('$9.99  ·  INSIDE & OUT  ·  OPEN 7 DAYS', 512, H - foot * 0.46, 990);
-      c.strokeStyle = '#ffffff'; c.lineWidth = 10; c.strokeRect(5, 5, 1014, H - 10);
+      c.fillStyle = '#ffffff'; c.font = font(F.sign(600), foot * 0.46); c.fillText('INSIDE & OUT  ·  HAND DRIED  ·  OPEN 7 DAYS', 470, H - foot * 0.46, 860);
     });
-    plane(g, Wb.w, Wb.h, 0, 0, -0.02, pic(ad));
-    box(g, Wb.w + 0.2, Wb.h + 0.2, 0.14, 0, 0, -0.11, toon({ color: '#0b3a66' }));
-    for (const px of [-Wb.w / 3, Wb.w / 3]) box(g, 0.22, drop - Wb.h / 2, 0.22, px, -(drop + Wb.h / 2) / 2, -0.2, dark);
+    plane(g, w, h, 0, 0, -0.02, pic(ad));
+    // the cabinet: a cream box, the red bezel proud of its face round the board, bulbs round the bezel
+    part(g, extrude(rrect(2 * L, 2 * top, 0.45), 0.42, -0.47), CREAM);
+    const ring = rrect(2 * L, 2 * top, 0.45); ring.holes.push(rrect(w, h, 0.16));
+    part(g, extrude(ring, 0.12, -0.05), RED);
+    bulbRun(rrect(w + R, h + R, 0.3).getSpacedPoints(64).slice(0, 64), 0.11);
+
+    // the wave over it: its crest rising to the right and breaking, its tube open on the right; HAND WASH across it
+    const CX = 1.75, base = top - 0.12;
+    const crestPts: [number, number][] = [[-L, 0]];
+    for (let i = 0; i <= 20; i++) { const x = -L + ((CX + L) * i) / 20; crestPts.push([x, 1.0 + 0.55 * Math.pow((x + L) / (CX + L), 1.7)]); }
+    const lip = crestPts.length; // (the crest's top edge runs to here, over the curl to its front)
+    crestPts.push([2.25, 1.62], [2.7, 1.53], [2.98, 1.27], [2.92, 1.01], [2.68, 0.95], [2.52, 1.09], [2.6, 0.85], [2.85, 0.75], [L, 0.7], [L, 0]);
+    const crestShape = new THREE.Shape(crestPts.map(([x, y]) => new THREE.Vector2(x, y)));
+    part(g, extrude(crestShape, 0.26, -0.36).translate(0, base, 0), '#1a93ad');
+    const CT = 1.7, pxc = 1024 / (2 * L), Hc = Math.round(CT * pxc);
+    const X = (x: number) => (x + L) * pxc, Y = (y: number) => (CT - y) * pxc;
+    const crestTex = canvasTex(1024, Hc, (c) => {
+      c.lineJoin = 'round'; c.lineCap = 'round';
+      c.beginPath(); crestPts.forEach(([x, y], i) => (i ? c.lineTo(X(x), Y(y)) : c.moveTo(X(x), Y(y)))); c.closePath();
+      const sea = c.createLinearGradient(0, 0, 0, Hc); sea.addColorStop(0, '#6fdcea'); sea.addColorStop(1, '#1689a8'); c.fillStyle = sea; c.fill();
+      c.save(); c.clip();
+      // water lines across it, the tube's swirl, the foam along the crest, its outline inside the edge
+      c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 5;
+      for (const [a, b, y] of [[-2.9, -1.2, 0.3], [-0.6, 1.4, 0.18], [1.9, 2.9, 0.38]] as const) { c.beginPath(); c.moveTo(X(a), Y(y)); c.lineTo(X(b), Y(y)); c.stroke(); }
+      c.strokeStyle = 'rgba(11,58,102,0.55)'; c.lineWidth = 7; c.beginPath(); c.arc(X(2.62), Y(1.21), 0.26 * pxc, Math.PI * 0.9, Math.PI * 2.3); c.stroke();
+      c.strokeStyle = '#ffffff'; c.lineWidth = 0.2 * pxc; c.beginPath(); crestPts.slice(1, lip + 3).forEach(([x, y], i) => (i ? c.lineTo(X(x), Y(y)) : c.moveTo(X(x), Y(y)))); c.stroke();
+      c.fillStyle = '#ffffff';
+      for (let i = 1; i < lip + 2; i++) { const [x, y] = crestPts[i]!; c.beginPath(); c.arc(X(x), Y(y - 0.1), 0.07 * pxc, 0, Math.PI * 2); c.fill(); }
+      c.strokeStyle = NAVY; c.lineWidth = 12; c.beginPath(); crestPts.forEach(([x, y], i) => (i ? c.lineTo(X(x), Y(y)) : c.moveTo(X(x), Y(y)))); c.closePath(); c.stroke();
+      c.restore();
+      // HAND WASH: a sign-painter's italic, red in a white keyline over a navy drop (the sign's own face: not the
+      // lyrics' heavy Archivo)
+      const text = 'Hand Wash', tx = X(-0.65), ty = Y(0.28);
+      let size = 0.78 * pxc; c.font = font(F.bodoni(700, { italic: true }), size);
+      const fit = (3.7 * pxc) / c.measureText(text).width; if (fit < 1) { size *= fit; c.font = font(F.bodoni(700, { italic: true }), size); }
+      c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+      c.fillStyle = NAVY; c.fillText(text, tx + size * 0.05, ty + size * 0.05);
+      c.strokeStyle = '#ffffff'; c.lineWidth = size * 0.13; c.strokeText(text, tx, ty);
+      c.fillStyle = RED; c.fillText(text, tx, ty);
+    });
+    plane(g, 2 * L, CT, 0, base + CT / 2, -0.09, pic(crestTex, { alphaTest: 0.5 }));
+    // bulbs along its crest, over the curl
+    {
+      const edge = crestPts.slice(1, lip + 3).map(([x, y]) => new THREE.Vector2(x, base + y - 0.1)), pts: THREE.Vector2[] = [];
+      let carry = 0;
+      for (let i = 1; i < edge.length; i++) {
+        const a = edge[i - 1]!, b = edge[i]!, len = a.distanceTo(b);
+        for (let d = carry; d < len; d += 0.3) pts.push(a.clone().lerp(b, d / len));
+        carry = (carry - len) % 0.3; if (carry < 0) carry += 0.3;
+      }
+      bulbRun(pts.filter((p) => p.x > -L + 0.15), -0.05, 1);
+    }
+    // the starburst off its lower corner: ONLY $9.99
+    {
+      const n = 14, ro = 0.8, ri = 0.58, bx = w / 2 + 0.35, by = -h / 2 + 0.45, star = new THREE.Shape();
+      for (let i = 0; i < 2 * n; i++) {
+        const a = Math.PI / 2 + (i * Math.PI) / n, r = i % 2 ? ri : ro;
+        if (i) star.lineTo(r * Math.cos(a), r * Math.sin(a)); else star.moveTo(r * Math.cos(a), r * Math.sin(a));
+      }
+      part(g, extrude(star, 0.16, 0.14).translate(bx, by, 0), YEL);
+      const burst = canvasTex(512, 512, (c) => {
+        const S = 256 / ro, at = (r: number, a: number) => [256 + r * S * Math.cos(a), 256 - r * S * Math.sin(a)] as const;
+        const path = (k: number) => { c.beginPath(); for (let i = 0; i < 2 * n; i++) { const a = Math.PI / 2 + (i * Math.PI) / n; c.lineTo(...at((i % 2 ? ri : ro) * k, a)); } c.closePath(); };
+        path(1); c.fillStyle = RED; c.fill();
+        path(0.88); c.fillStyle = YEL; c.fill();
+        c.fillStyle = NAVY; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = font(F.sign(700), 58); c.fillText('ONLY', 256, 182);
+        c.fillStyle = RED; c.font = font(F.sign(700), 100); c.fillText('$9.99', 256, 282, 300);
+      });
+      plane(g, 2 * ro, 2 * ro, bx, by, 0.31, pic(burst, { alphaTest: 0.5 }));
+    }
+
+    // its stand: two steel columns up into the cabinet, a rail across under it and an X between them, on footings in a
+    // brick planter, shrubs in it and two floodlights turned up at the face
+    const ground = -drop, colX = 1.75, cz = -0.26, under = -top + 0.05, brace = -top - 0.45, coping = ground + 0.55;
+    for (const x of [-colX, colX]) {
+      tcyl(g, 0.13, under - ground + 0.3, x, (under + 0.3 + ground) / 2, cz, '#178a9c', 14);
+      tbox(g, 0.36, 0.06, 0.36, x, coping + 0.03, cz, '#5a646c'); // (its base plate on the planter's coping)
+    }
+    tcyl(g, 0.07, 2 * colX, 0, brace, cz, '#178a9c').rotation.z = Math.PI / 2;
+    tbox(g, 2 * colX, 0.08, 0.1, 0, under - 0.04, cz, '#178a9c'); // (the cabinet's channel on them)
+    {
+      const y0 = coping + 0.25, dy = brace - y0, len = Math.hypot(2 * colX, dy);
+      for (const sx of [-1, 1]) tcyl(g, 0.04, len, 0, (y0 + brace) / 2, cz, '#178a9c', 8).rotation.z = -sx * Math.atan2(2 * colX, dy);
+    }
+    tbox(g, 4.6, 0.5, 1.1, 0, ground + 0.25, cz, '#9c4a32'); // the planter
+    tbox(g, 4.72, 0.06, 1.22, 0, coping - 0.02, cz, '#d9cfbf');
+    for (const [x, r] of [[-1.05, 0.3], [-0.25, 0.36], [0.6, 0.28], [1.2, 0.24]] as const) tball(g, r, x, coping + r * 0.55, cz - 0.1, '#3f7a3a');
+    for (const x of [-1.25, 1.25]) tbox(g, 0.34, 0.22, 0.28, x, coping + 0.17, cz + 0.42, '#2a2a30');
+    fuse(g);
+    for (const x of [-1.25, 1.25]) {
+      const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.16), lampMaterial('#fff1c8', GLOW.lamp, 0.9));
+      lens.position.set(x, coping + 0.29, cz + 0.36); lens.rotation.x = -2.0; g.add(lens);
+    }
     root.add(g);
     // (its building is the drive's block: here its blue roof edge and its bays, open to the road)
     const b = onRoad(plan.wash.s + WASH.building.ds, WASH.building.lateral), blue = toon({ color: '#1f8fd6' });
@@ -994,15 +1232,73 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     }
   }
 
-  // ---- his giant mural, painted on the end wall of its building: his portrait on the right (its words: the carriers) ----
+  // ---- the big painted billboard on the sand at the end of the street (its words: the carriers): a hand-painted
+  // bulletin on its steel sheets, a cream frame round it; up on three I-beam legs, kicker braces back to their
+  // footings, X-bracing between the legs; a catwalk along its foot with its rail and brackets, gooseneck lamps out
+  // over it, a caged ladder up from the sand at its far end; the sign company's plate on the frame ----
   {
-    const G = plan.giant, wall = onPanel(G), Bk = plan.giantBlock, GB = GIANT.building;
-    const art = canvasTex(2048, Math.round((2048 * G.h) / G.w), (c) => mural(c, c.canvas.width, c.canvas.height, GIANT.text));
+    const G = plan.giant, wall = onPanel(G), above = G.center.y - route.frameAt(plan.giantBlock.s).pos.y;
+    const art = canvasTex(2048, Math.round((2048 * G.h) / G.w), (c) => mural(c, c.canvas.width, c.canvas.height, GIANT.text, G.w));
+    // (lit by its lamps at dusk: its paint as painted, the low sun behind it)
     plane(wall, G.w, G.h, 0, 0, 0, pic(art));
-    // (the building: its end wall round the mural, down to the ground; a parapet along its top)
-    const above = G.center.y - route.frameAt(Bk.s).pos.y;
-    box(wall, Bk.w, Bk.h, GB.d, 0, Bk.h / 2 - above, -GB.d / 2 - 0.05, toon({ color: '#e3907a' }));
-    box(wall, Bk.w + 0.3, 0.5, 0.5, 0, Bk.h - above + 0.25, -0.2, toon({ color: '#c46f5c' }));
+    const hw = G.w / 2, hh = G.h / 2, ground = -above, STEEL = '#59616b', FRAME = '#efe4cc', RAIL = '#c9c2b0', CONC = '#b9b1a3';
+    /** A strut from a to b (in the wall's frame), `t` thick. */
+    const strut = (a: THREE.Vector3, b: THREE.Vector3, t: number, color: string) => {
+      const d = b.clone().sub(a), q = new THREE.Quaternion().setFromUnitVectors(UP, d.clone().normalize());
+      part(wall, new THREE.BoxGeometry(t, d.length(), t).applyQuaternion(q), color, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+    };
+    // the face's steel behind it, the stringers across its back, the frame round its edge (proud of it, over its edges)
+    tbox(wall, G.w, G.h, 0.2, 0, 0, -0.12, '#6d756f');
+    for (const y of [-hh + 1, 0, hh - 1]) { tbox(wall, G.w, 0.4, 0.08, 0, y, -0.45, STEEL); tbox(wall, G.w, 0.06, 0.3, 0, y + 0.17, -0.33, STEEL); tbox(wall, G.w, 0.06, 0.3, 0, y - 0.17, -0.33, STEEL); }
+    for (const s of [-1, 1]) { tbox(wall, G.w + 0.9, 0.45, 0.32, 0, s * (hh + 0.2), 0.0, FRAME); tbox(wall, 0.45, G.h, 0.32, s * (hw + 0.2), 0, 0.0, FRAME); }
+    for (const s of [-1, 1]) { tbox(wall, G.w + 0.04, 0.06, 0.03, 0, s * (hh - 0.03), 0.17, '#7a2a3a'); tbox(wall, 0.06, G.h + 0.04, 0.03, s * (hw - 0.03), 0, 0.17, '#7a2a3a'); } // (its pinstripe)
+    // three I-beam legs from their footings up the face's back, each kicked back to a footing behind
+    const legs = [-7.5, 0, 7.5], lz = -0.85, bottom = -hh - 0.42;
+    for (const x of legs) {
+      const len = hh - 0.5 - ground, cy = (hh - 0.5 + ground) / 2;
+      tbox(wall, 0.08, len, 0.5, x, cy, lz, STEEL);
+      for (const dz of [-0.25, 0.25]) tbox(wall, 0.42, len, 0.05, x, cy, lz + dz, STEEL);
+      tbox(wall, 1.0, 0.5, 1.0, x, ground + 0.2, lz, CONC);
+      strut(new THREE.Vector3(x, bottom + 2.2, lz - 0.3), new THREE.Vector3(x, ground + 0.4, lz - 4.6), 0.26, STEEL);
+      tbox(wall, 0.9, 0.45, 0.9, x, ground + 0.18, lz - 4.6, CONC);
+    }
+    // X-bracing between them under the face, and a tie across
+    for (let i = 1; i < legs.length; i++) {
+      const a = legs[i - 1]! + 0.25, b = legs[i]! - 0.25, y0 = ground + 1.0, y1 = bottom - 0.4;
+      strut(new THREE.Vector3(a, y0, lz), new THREE.Vector3(b, y1, lz), 0.12, STEEL);
+      strut(new THREE.Vector3(a, y1, lz), new THREE.Vector3(b, y0, lz), 0.12, STEEL);
+    }
+    tbox(wall, legs[2]! - legs[0]!, 0.16, 0.16, 0, bottom - 0.3, lz, STEEL);
+    // the catwalk along its foot: its grating, the brackets under it, its rail
+    const deck = bottom - 0.12, dz0 = 0.12, dz1 = 1.2, dzc = (dz0 + dz1) / 2;
+    tbox(wall, G.w + 0.8, 0.06, dz1 - dz0, 0, deck, dzc, '#8a8f8f');
+    for (let x = -hw; x <= hw + 0.01; x += G.w / 8) {
+      tbox(wall, 0.08, 0.14, dz1 - dz0 + 0.3, x, deck - 0.1, dzc - 0.15, STEEL);
+      strut(new THREE.Vector3(x, deck - 0.12, dz1 - 0.1), new THREE.Vector3(x, deck - 1.0, -0.3), 0.08, STEEL);
+    }
+    for (let x = -hw - 0.35; x <= hw + 0.36; x += (G.w + 0.7) / 10) tbox(wall, 0.05, 1.05, 0.05, x, deck + 0.53, dz1 - 0.03, RAIL);
+    for (const y of [0.55, 1.05]) tbox(wall, G.w + 0.75, 0.05, 0.05, 0, deck + y, dz1 - 0.03, RAIL);
+    tbox(wall, G.w + 0.75, 0.12, 0.02, 0, deck + 0.09, dz1 - 0.02, RAIL); // (its toe board)
+    // gooseneck lamps out from the rail, their heads turned up at the face
+    const heads: number[] = [];
+    for (let k = 0; k < 7; k++) {
+      const x = -hw + 1.6 + (k * (G.w - 3.2)) / 6; heads.push(x);
+      strut(new THREE.Vector3(x, deck + 1.0, dz1), new THREE.Vector3(x, deck + 1.35, dz1 + 0.75), 0.06, '#2a2a30');
+      strut(new THREE.Vector3(x, deck + 1.35, dz1 + 0.75), new THREE.Vector3(x, deck + 1.25, dz1 + 1.05), 0.06, '#2a2a30');
+      const hd = new THREE.BoxGeometry(0.6, 0.2, 0.38).rotateX(-0.75);
+      part(wall, hd, '#2a2a30', x, deck + 1.3, dz1 + 1.12);
+    }
+    // the caged ladder up from the sand at its far end to the catwalk
+    {
+      const lx = -hw - 0.75, lzz = 0.7, top = deck + 1.1;
+      for (const dx of [-0.22, 0.22]) tbox(wall, 0.05, top - ground, 0.05, lx + dx, (top + ground) / 2, lzz, RAIL);
+      for (let y = ground + 0.3; y < top; y += 0.3) tbox(wall, 0.44, 0.03, 0.03, lx, y, lzz, RAIL);
+      for (let y = ground + 2.4; y < top; y += 0.8) part(wall, new THREE.TorusGeometry(0.38, 0.022, 4, 12, Math.PI), RAIL, lx, y, lzz + 0.02).rotation.set(Math.PI / 2, 0, 0);
+      tbox(wall, 0.8, 0.06, 1.0, lx + 0.1, deck, 0.65, '#8a8f8f'); // (a landing off the catwalk's end)
+    }
+    fuse(wall);
+    // the sign company's plate on the frame's foot
+    plane(wall, 2.6, 0.3, hw - 2.4, -hh - 0.2, 0.17, paint(signFace('PACIFIC OUTDOOR', 1024, 118, '#3a2a30', FRAME, F.sign(700), 0.6, 0.18)));
     root.add(wall);
   }
 
