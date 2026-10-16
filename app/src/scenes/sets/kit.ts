@@ -131,10 +131,96 @@ function loftBody(L: number, half: (z: number) => number, top: (z: number) => nu
   return g;
 }
 
-/** A side profile (z, y points) extruded across x `w` wide, its edges rounded by `r`, centred on x = 0. */
-function profileSlab(pts: [number, number][], w: number, r: number): THREE.BufferGeometry {
-  const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([z, y]) => new THREE.Vector2(z, y))), { depth: w - 2 * r, bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 2, curveSegments: 2 });
-  return g.rotateY(-Math.PI / 2).translate((w - 2 * r) / 2, 0, 0);
+// (a convex polygon in a face's own plane: (u, v), anticlockwise)
+type P2 = [number, number];
+/** `p` drawn in by `d[i]` m along each edge i (p[i] to p[i + 1]): each edge's line moved in, the corners where they meet. */
+function inset(p: P2[], d: number | number[]): P2[] {
+  const n = p.length, dd = (i: number) => (typeof d === 'number' ? d : d[i]!);
+  const line = (i: number) => {
+    const [ax, ay] = p[i]!, [bx, by] = p[(i + 1) % n]!, l = Math.hypot(bx - ax, by - ay), nx = -(by - ay) / l, ny = (bx - ax) / l;
+    return { x: ax + nx * dd(i), y: ay + ny * dd(i), dx: (bx - ax) / l, dy: (by - ay) / l };
+  };
+  return p.map((_, i) => {
+    const a = line((i + n - 1) % n), b = line(i), den = a.dx * b.dy - a.dy * b.dx;
+    const k = ((b.x - a.x) * b.dy - (b.y - a.y) * b.dx) / den;
+    return [a.x + a.dx * k, a.y + a.dy * k] as P2;
+  });
+}
+/** The part of `p` between u0 and u1 (its corners less any that coincide). */
+function sliceU(p: P2[], u0: number, u1: number): P2[] {
+  const clip = (q: P2[], keep: (u: number) => boolean, at: number) => q.flatMap((a, i) => {
+    const b = q[(i + 1) % q.length]!, out: P2[] = [];
+    if (keep(a[0])) out.push(a);
+    if (keep(a[0]) !== keep(b[0])) { const k = (at - a[0]) / (b[0] - a[0]); out.push([at, a[1] + (b[1] - a[1]) * k]); }
+    return out;
+  });
+  const q = clip(clip(p, (u) => u >= u0, u0), (u) => u <= u1, u1);
+  return q.filter((a, i) => { const b = q[(i + 1) % q.length]!; return Math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-4; });
+}
+
+/** A sedan's greenhouse as one geometry, its paint, chrome and glass in its vertices (as tinted() parts are, to fuse
+ *  with them): four flat faces on a ring round the belt (half `hb` wide, at `yb`, a little under the belt line so it
+ *  sits down into the body's shoulders) drawn in to the roof's (`hr`, at `roof`) — a raked windshield from `zA` up to
+ *  the roof's front `zRf`, the back light from `zC` up to its back `zRr`, the sides leaning in between. On each, the
+ *  glass is inset from the face's edges, so what's left round it is the body's paint: the A pillars wrap the
+ *  windshield's corners, the C pillars are broad sails, the sides' glass split by `panes - 1` B pillars; a thin chrome
+ *  reveal runs round every pane, following its edges. (It was a dark slab with pillars of boxes stuck on its flanks,
+ *  standing off the glass at the angles of its slopes: up close, odd diagonal fins — the user, 2026-10-16.) */
+function greenhouse(o: { hb: number; hr: number; yb: number; belt: number; roof: number; zA: number; zRf: number; zRr: number; zC: number; panes: number; paint: string; chrome: string; glass: [low: string, high: string] }): { geo: THREE.BufferGeometry; pillars: number[] } {
+  const pos: number[] = [], col: number[] = [], pillars: number[] = [], V3 = THREE.Vector3;
+  const C = (c: string) => new THREE.Color(c), paint = C(o.paint), chrome = C(o.chrome), gLow = C(o.glass[0]), gHigh = C(o.glass[1]);
+  // (a face: its plane's origin and axes, which way is out; each triangle wound to face out)
+  interface Face { O: THREE.Vector3; U: THREE.Vector3; V: THREE.Vector3; out: THREE.Vector3; h: number }
+  const at = (f: Face, [u, v]: P2) => f.O.clone().addScaledVector(f.U, u).addScaledVector(f.V, v);
+  const tri = (f: Face, a: P2, b: P2, c: P2, colour: (q: P2) => THREE.Color) => {
+    let A = at(f, a), B = at(f, b), Cc = at(f, c), qa = a, qb = b, qc = c;
+    if (B.clone().sub(A).cross(Cc.clone().sub(A)).dot(f.out) < 0) { [B, Cc] = [Cc, B]; [qb, qc] = [qc, qb]; }
+    for (const [p, q] of [[A, qa], [B, qb], [Cc, qc]] as const) { pos.push(p.x, p.y, p.z); const k = colour(q); col.push(k.r, k.g, k.b); }
+  };
+  const fan = (f: Face, p: P2[], colour: (q: P2) => THREE.Color) => { for (let i = 1; i < p.length - 1; i++) tri(f, p[0]!, p[i]!, p[i + 1]!, colour); };
+  const ring = (f: Face, outer: P2[], inner: P2[], colour: THREE.Color) => outer.forEach((a, i) => {
+    const j = (i + 1) % outer.length;
+    tri(f, a, outer[j]!, inner[j]!, () => colour); tri(f, a, inner[j]!, inner[i]!, () => colour);
+  });
+  const flat = (c: THREE.Color) => () => c;
+  // (glass: darker low, the sky's light in it toward the top)
+  const glass = (f: Face) => (q: P2) => gLow.clone().lerp(gHigh, Math.min(1, Math.max(0, q[1] / f.h)));
+  const REVEAL = 0.022;
+  // (a pane of glass in its chrome reveal)
+  const pane = (f: Face, p: P2[]) => { const g = inset(p, REVEAL); ring(f, p, g, chrome); fan(f, g, glass(f)); };
+  // (the windshield's and the back light's lines carried down from the belt to the ring)
+  const run = (z0: number, z1: number) => (z0 - z1) / (o.roof - o.belt), zAb = o.zA + (o.belt - o.yb) * run(o.zA, o.zRf), zCb = o.zC + (o.belt - o.yb) * run(o.zC, o.zRr);
+  const rise = o.roof - o.yb, upTo = (y: number, slant: number) => ((y - o.yb) * slant) / rise; // (a height as a distance up a face)
+
+  // the sides: the glass inset from the belt, the A pillar, the roof's edge, the sail; split by the B pillars
+  for (const s of [1, -1]) {
+    const Ls = Math.hypot(o.hb - o.hr, rise), f: Face = { O: new V3(s * o.hb, o.yb, 0), U: new V3(0, 0, 1), V: new V3(s * (o.hr - o.hb), rise, 0).divideScalar(Ls), out: new V3(s, 0, 0), h: Ls };
+    const outer: P2[] = [[zCb, 0], [zAb, 0], [o.zRf, Ls], [o.zRr, Ls]];
+    const frame = inset(outer, [upTo(o.belt + 0.03, Ls), 0.05, 0.045, 0.24]);
+    ring(f, outer, frame, paint);
+    const lo = Math.min(...frame.map((q) => q[0])), hi = Math.max(...frame.map((q) => q[0])), B = 0.075;
+    const cuts = Array.from({ length: o.panes - 1 }, (_, k) => lo + ((hi - lo) * (k + 1)) / o.panes);
+    if (s > 0) pillars.push(...cuts);
+    const edges = [lo, ...cuts.flatMap((c) => [c - B / 2, c + B / 2]), hi];
+    for (let k = 0; k < edges.length; k += 2) pane(f, sliceU(frame, edges[k]!, edges[k + 1]!));
+    for (const c of cuts) fan(f, sliceU(frame, c - B / 2, c + B / 2), flat(paint));
+  }
+  // the windshield and the back light: the glass inset from the cowl or the deck, the pillars, the roof's edge
+  for (const [zb, zr, out, side] of [[zAb, o.zRf, 1, 0.055], [zCb, o.zRr, -1, 0.09]] as const) {
+    const Lw = Math.hypot(rise, zr - zb), f: Face = { O: new V3(0, o.yb, zb), U: new V3(1, 0, 0), V: new V3(0, rise, zr - zb).divideScalar(Lw), out: new V3(0, 0.5, out), h: Lw };
+    const outer: P2[] = [[-o.hb, 0], [o.hb, 0], [o.hr, Lw], [-o.hr, Lw]];
+    const frame = inset(outer, [upTo(o.belt + 0.015, Lw), side, 0.05, side]);
+    ring(f, outer, frame, paint);
+    pane(f, frame);
+  }
+  // the roof
+  const roof: Face = { O: new V3(0, o.roof, 0), U: new V3(1, 0, 0), V: new V3(0, 0, 1), out: UP, h: 1 };
+  fan(roof, [[-o.hr, o.zRr], [o.hr, o.zRr], [o.hr, o.zRf], [-o.hr, o.zRf]], flat(paint));
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return { geo: g, pillars };
 }
 
 /** A background car for the world's traffic and curbs: a '60s sedan, nose along +z, its base on the ground at y 0.
@@ -146,7 +232,7 @@ function profileSlab(pts: [number, number][], w: number, r: number): THREE.Buffe
  *  ~1.28 m tall, `length` long. Its parts tinted and fused: a body and four wheels. */
 export function sedan(opts: { color: string; length?: number; low?: boolean }): THREE.Group {
   const g = new THREE.Group(), L = opts.length ?? 4.6, hl = L / 2, W = 1.78, hw = W / 2;
-  const paint = opts.color, dark = '#1d2026', chrome: string = WORLD.chrome, glass = '#26303c', lamp = '#f4efd8', tail = '#b8161a', white = '#ece8dc';
+  const paint = opts.color, dark = '#1d2026', chrome: string = WORLD.chrome, lamp = '#f4efd8', tail = '#b8161a', white = '#ece8dc';
   const box = tbox, cyl = tcyl; // (tinted parts: fused below)
   const drop = opts.low ? 0.12 : 0;
   const body = new THREE.Group(); body.position.y = -drop; if (opts.low) body.rotation.x = 0.02; // (parked low, nose down)
@@ -165,24 +251,31 @@ export function sedan(opts: { color: string; length?: number; low?: boolean }): 
   };
   const bottom = (z: number) => { let y = 0.3; for (const zw of [wz, -wz]) { const dz = z - zw; if (Math.abs(dz) < arch) y = Math.max(y, 0.3 + Math.sqrt(arch * arch - dz * dz)); } return y; };
   add(loftBody(L, half, top, bottom), paint);
-  // the greenhouse: dark glass on the belt, under the roof (in the body's colour, a touch proud) on its pillars
-  const gw = W - 0.26, gr = 0.07, sideX = gw / 2;
-  add(profileSlab([[zA, belt - 0.03], [zRf, roof - gr], [zRr, roof - gr], [zC, belt - 0.03]], gw, gr), glass);
-  add(profileSlab([[zRf + 0.06, roof - 0.07], [zRr - 0.06, roof - 0.07], [zRr - 0.06, roof - 0.01], [zRf + 0.06, roof - 0.01]], gw - 0.1, 0.06), paint);
-  // (a pillar: a strip from (z0, y0) to (z1, y1) on each side, its width along the glass)
-  const pillar = (z0: number, y0: number, z1: number, y1: number, wide: number) => {
-    const len = Math.hypot(z1 - z0, y1 - y0), a = Math.atan2(y1 - y0, z1 - z0);
-    for (const s of [1, -1]) { const p = box(body, 0.03, wide, len + 0.04, s * (sideX + gr - 0.005), (y0 + y1) / 2, (z0 + z1) / 2, paint); p.rotation.x = -a; }
+  // the greenhouse: the glass in its chrome reveals, the pillars and the roof in the body's paint (greenhouse()); a
+  // long car (a limo) gets more side windows
+  const panes = Math.max(2, Math.round((zA - zC) / 1.05)), hb = hw - 0.13;
+  const gh = greenhouse({ hb, hr: hb - 0.13, yb: belt - 0.08, belt, roof, zA, zRf, zRr, zC, panes, paint, chrome: '#d6d1c6', glass: ['#161c24', '#4a5a6e'] });
+  body.add(new THREE.Mesh(gh.geo, tintedMat())); // (already tinted: fused with the rest below)
+  const zB = gh.pillars[gh.pillars.length - 1]!; // (the front doors' rear edge)
+  // the doors' seams and handles, the chrome spear down each flank (where the side runs straight), each on the flank's
+  // curve at its height (at the body's full width they stood off its shoulders and its foot, dark rods in the air)
+  const flank = (y: number) => { // (the body's half-width at height y, mid-car: loftBody's section)
+    const yc = (belt + 0.3) / 2, q = Math.min(1, Math.abs(y - yc) / (belt - yc)), sn = q ** 2.5;
+    return hw * Math.pow(Math.sqrt(1 - sn * sn), 0.4) * (1 - 0.08 * (y > yc ? q : 0));
   };
-  pillar(zA, belt, zRf, roof - 0.02, 0.07); // A
-  pillar(zRr, roof - 0.02, zC, belt, 0.26); // C (wide: the sedan's sail)
-  const zB = (zRf + zRr) / 2 + 0.05;
-  for (const s of [1, -1]) box(body, 0.03, roof - belt, 0.08, s * (sideX + gr - 0.005), (roof + belt) / 2 - 0.01, zB, paint); // B
-  // the doors' seams and handles, the chrome spear down each flank (where the side runs straight)
   for (const s of [1, -1]) {
-    for (const z of [zA - 0.12, zB, zRr - 0.2]) box(body, 0.012, belt - 0.4, 0.014, s * (hw + 0.004), (belt + 0.4) / 2, z, dark);
-    for (const z of [zB + 0.12, zRr - 0.08]) box(body, 0.02, 0.025, 0.12, s * (hw + 0.01), belt - 0.07, z, chrome);
-    box(body, 0.015, 0.035, 2 * (hl - 0.45), s * (hw + 0.006), 0.64, 0, chrome);
+    // (a seam: a dark ribbon 1.4 cm wide laid on the flank from the sill up to the shoulder)
+    for (const z of [zA + 0.02, zB, zRr - 0.05]) {
+      const ys = Array.from({ length: 9 }, (_, i) => 0.42 + (0.4 * i) / 8), p: number[] = [];
+      ys.slice(1).forEach((y1, i) => {
+        const y0 = ys[i]!, x0 = s * (flank(y0) + 0.003), x1 = s * (flank(y1) + 0.003), a = z - 0.007 * s, b = z + 0.007 * s;
+        p.push(x0, y0, a, x1, y1, a, x1, y1, b, x0, y0, a, x1, y1, b, x0, y0, b);
+      });
+      const seam = new THREE.BufferGeometry(); seam.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); seam.computeVertexNormals();
+      part(body, seam, dark);
+    }
+    for (const z of [zB + 0.11, zRr + 0.06]) box(body, 0.02, 0.025, 0.12, s * (flank(0.79) + 0.006), 0.79, z, chrome);
+    box(body, 0.015, 0.035, 2 * (hl - 0.45), s * (flank(0.64) + 0.004), 0.64, 0, chrome);
   }
   // the nose: quad round lamps in chrome rings either side of a dark grille barred in chrome; the bumper below
   for (const x of [0.62, 0.4, -0.4, -0.62]) {
@@ -195,8 +288,11 @@ export function sedan(opts: { color: string; length?: number; low?: boolean }): 
   // the tail: lamps in long chrome bezels, the plate between them
   for (const x of [0.56, -0.56]) { box(body, 0.36, 0.13, 0.03, x, 0.7, -hl + 0.005, chrome); box(body, 0.32, 0.09, 0.03, x, 0.7, -hl - 0.006, tail); }
   box(body, 0.3, 0.15, 0.02, 0, 0.56, -hl - 0.004, white);
-  // the mirrors on the doors' tops
-  for (const s of [1, -1]) { box(body, 0.03, 0.03, 0.08, s * (hw + 0.03), belt + 0.03, zA - 0.2, chrome); box(body, 0.06, 0.08, 0.12, s * (hw + 0.07), belt + 0.08, zA - 0.2, chrome); }
+  // the mirrors on the doors' tops: a stalk, a round head facing back
+  for (const s of [1, -1]) {
+    box(body, 0.16, 0.02, 0.04, s * (hb + 0.05), belt + 0.04, zA - 0.1, chrome);
+    cyl(body, 0.045, 0.05, s * (hb + 0.13), belt + 0.075, zA - 0.1, chrome, 10).rotation.x = Math.PI / 2;
+  }
   // the wheels in their arches, standing a little proud of the flanks; each on a pivot at its hub: a tyre, its
   // whitewall, a chrome cap with five dark spokes (a plain disc turning reads as standing still), rolled by how far the
   // car has moved (rollSedans)

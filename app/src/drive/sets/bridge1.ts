@@ -13,8 +13,8 @@
 //   2 "Tryna make it last", "Blowin' money fast, we might crash": high over the oncoming lane, the sign ahead, the two
 //     of them sliding in under the lens on "last"; the eye drops in low behind them as they pull away past the next
 //     piece, then lifts and pushes on down the bore — the signals turning red ahead, the car's tail lights far down it.
-//   3 "Tryna make it last": low on the right walkway, the car passing the lens and on under the sign; then the eye
-//     rises and follows them out toward the night in the mouth.
+//   3 "Tryna make it last": low on the right walkway, the car passing the lens and on under the sign and out toward
+//     the night in the mouth; the eye never turns after them: it drifts on as it was to the cut.
 // Pure.
 import * as THREE from 'three';
 import { type Carrier, layout } from '../carriers';
@@ -121,15 +121,22 @@ export const BRIDGE1: SetPiece = {
       panels.push({ s, face: { center: at([s, 0, PANEL.y]), normal: n.clone(), up: UP.clone(), w: W, h: H } });
     };
     // one take: every phrase in it framed by the same curve through its keyframes (a phrase's own shot within the take
-    // moves nowhere: the take carries on); cut to at its first phrase
+    // moves nowhere: the take carries on); cut to at its first phrase. It eases from rest at its first key and to rest
+    // at its last, unless `drift`: then it's already moving at the first as it moves to it, and carries on so through
+    // the last (each end's segment carried on a second beyond it: the cubic's ends' slopes are theirs)
     const takes: { t0: number; phs: Phrase[]; eye: (t: number) => THREE.Vector3 }[] = [];
-    const take = (phs: Phrase[], keys: Key[]) => {
+    const take = (phs: Phrase[], given: Key[], drift = false) => {
+      const past = (a: Key, b: Key, t: number): Key => {
+        const u = (t - a.t) / (b.t - a.t), m = (p: Bore, q: Bore) => p.map((v, i) => v + (q[i]! - v) * u) as unknown as Bore;
+        return { t, eye: m(a.eye, b.eye), at: m(a.at, b.at) };
+      };
+      const n = given.length, keys = drift ? [past(given[0]!, given[1]!, given[0]!.t - 1), ...given, past(given[n - 2]!, given[n - 1]!, given[n - 1]!.t + 1)] : given;
       const ts = keys.map((k) => k.t), curve = (pick: (k: Key) => Bore) => [0, 1, 2].map((i) => monotone(ts, keys.map((k) => pick(k)[i]!)));
       const eye = curve((k) => k.eye), aim = curve((k) => k.at);
       const eyeAt = (t: number) => at([eye[0]!(t), eye[1]!(t), eye[2]!(t)]);
       const to: Target = (t) => poseFrom(eyeAt(t), at([aim[0]!(t), aim[1]!(t), aim[2]!(t)]));
       phs.forEach((ph, i) => frames.set(carriers.find((c) => c.phrase === ph)!.id, { to, move: i ? 'snap' : 'cut' }));
-      takes.push({ t0: keys[0]!.t, phs, eye: eyeAt });
+      takes.push({ t0: given[0]!.t, phs, eye: eyeAt });
     };
     const W0 = -TUNNEL.halfW; // (aims on the left wall's face)
 
@@ -174,16 +181,18 @@ export const BRIDGE1: SetPiece = {
     }
 
     // ---- take 3, the second sign: low on the right walkway short of it, the car passing the lens on its left and
-    // driving on under the sign toward the exit's night; then the eye rises and follows them out
+    // driving on under the sign and away out of the bore toward the exit's night. The eye drifts down the walkway at a
+    // walk, looking the one way, from the cut to the cut — after the line too, as the voice fades and she takes her
+    // breath for verse 3 (it rose and swung round after them on the way out: the user, 2026-10-16, "it would look
+    // better if the camera didn't pivot and it just continued on its original trajectory")
     {
-      const S = signLines[1]!, sS = carS(S.line.end) + PANEL.ahead;
+      const S = signLines[1]!, sS = carS(S.line.end) + PANEL.ahead, T0 = S.phs[0]!.start - 0.05;
       sign(S.phs, sS);
-      take(S.phs, [
-        { t: S.phs[0]!.start - 0.05, eye: [sS - 15, 5.2, 1.5], at: [sS, -0.5, 3.4] },
-        { t: S.line.end, eye: [sS - 14, 5.2, 1.5], at: [sS, -0.5, 3.4] },
-        { t: S.line.end + 0.8, eye: [sS - 11, 4, 2.2], at: [sS + 14, 0.5, 2.6] },
-        { t: st.end, eye: [sS + 4, 2.8, 2.6], at: [sS + 45, 0.5, 2] },
-      ]);
+      const pace = 1 / (S.line.end - T0), key = (t: number): Key => {
+        const d = pace * (t - T0);
+        return { t, eye: [sS - 15 + d, 5.2, 1.5], at: [sS + d, -0.5, 3.4] };
+      };
+      take(S.phs, [key(T0), key(S.line.end), key(st.end)], true);
     }
 
     // the signals down the bore, clear of the mouths and the signs; red on the word "crash"

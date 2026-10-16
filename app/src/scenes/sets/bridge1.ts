@@ -8,6 +8,7 @@
 // the wall tagged round the lyric pieces (small, unreadable, never over a piece) and water-stained from the haunch; and
 // a concrete headwall at each portal with the tunnel's name and its date. Browser only (canvas).
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Drive } from '../../drive/drive';
 import { type Bridge1Plan, FANS, ONCOMING, SIGNALS } from '../../drive/sets/bridge1';
 import { HEADWALL, TUNNEL } from '../../drive/tunnel';
@@ -16,7 +17,7 @@ import { boxAt } from '../../drive/blocks';
 import { hash } from '../../engine/util';
 import { WORLD, toon } from '../../look/toon';
 import { F, font } from '../../engine/type';
-import { box, canvasTex, pic, plane, roadFrame, sedan, signFace } from './kit';
+import { box, canvasTex, paint as painted, pic, plane, roadFrame, sedan, signFace } from './kit';
 
 /** The exit's haze: veils this far back from the mouth (m), each adding this much of EXIT_GLOW. */
 const EXIT_HAZE: readonly [number, number][] = [[2, 0.1], [6, 0.06], [12, 0.03]];
@@ -30,8 +31,10 @@ const POINTS = { first: 40, every: 84, boards: 28 };
 /** Tags on the walls: one tried every `step` m a side, kept at this share, thicker within `near` m of a piece; none
  *  within `clear` m of a lyric piece's face (the paint stays the focus). */
 const TAGS = { step: 0.8, keep: 0.55, near: 16, clear: 0.35 };
-/** The tunnel's name and its date, cast in its headwalls. */
-const NAME = 'MT. SOMEWHERE TUNNEL', BUILT = 'A.D. 1937';
+/** The tunnel's name and its date, cast in its headwalls. The date's an Easter egg: the song's year (BMF came out in
+ *  December 2024, on SOS Deluxe: Lana — the user, 2026-10-16: "maybe it'd be cute to put that date there instead"). */
+const SONG_YEAR = 2024;
+const NAME = 'MT. SOMEWHERE TUNNEL', BUILT = `A.D. ${SONG_YEAR}`;
 
 export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.bridge1 as Bridge1Plan | undefined;
@@ -395,8 +398,8 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
       for (const x of [-(jamb + 0.9), jamb + 0.9, -(Hw.half - 0.6), Hw.half - 0.6]) { box(g, 1.1, Hw.top + 0.5, 0.35, x, (Hw.top + 0.5) / 2, Hw.proud + 0.15, crete); box(g, 1.3, 0.3, 0.45, x, Hw.top + 0.6, Hw.proud + 0.15, crete); }
       box(g, 2 * Hw.half, 0.25, 0.2, 0, Hw.top - 0.4, Hw.proud + 0.1, crete);
       box(g, 7, 0.5, Hw.proud, 0, Hw.top + 0.25, z, crete); box(g, 4, 0.45, Hw.proud, 0, Hw.top + 0.7, z, crete);
-      plane(g, 9.4, 1.18, 0, lintelTop + 0.95, Hw.proud + 0.01, pic(nameTex));
-      plane(g, 3.2, 0.8, 0, Hw.top + 0.25, Hw.proud + 0.01, pic(dateTex));
+      plane(g, 9.4, 1.18, 0, lintelTop + 0.95, Hw.proud + 0.01, painted(nameTex));
+      plane(g, 3.2, 0.8, 0, Hw.top + 0.25, Hw.proud + 0.01, painted(dateTex));
       // wall lanterns either side of the bore
       for (const side of [-1, 1]) { box(g, 0.3, 0.45, 0.3, side * (jamb + 0.9), 4.2, Hw.proud + 0.5, dark); box(g, 0.22, 0.3, 0.22, side * (jamb + 0.9), 4.18, Hw.proud + 0.5, lit(2.2, 1.5, 0.7)); }
     }
@@ -408,10 +411,15 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
     const paints = ['#2a3f5a', '#d8d2c4', '#1c1c22', '#7a7a80', '#3d5a3a', '#5a4a6e']; // (no reds: the hero's is the one red car; no yellows: under sodium they glare)
     const head = lit(4, 3.6, 2.8), tail = lit(3, 0.25, 0.2);
     plan.oncoming.forEach((enter, k) => {
-      const g = sedan({ color: paints[k % paints.length]!, length: 4.4 + 0.5 * hash(k, 91) });
+      // (the lamps on its nose and tail, wherever they are: it was 4.6 m for every car, the lamps of a short one
+      // standing off its nose in the air, a long one's buried in it)
+      const L = 4.4 + 0.5 * hash(k, 91), g = sedan({ color: paints[k % paints.length]!, length: L });
       g.matrixAutoUpdate = false; g.visible = false;
-      const L = 4.6;
-      for (const x of [0.62, -0.62]) { box(g, 0.24, 0.12, 0.05, x, 0.62, L / 2 + 0.03, head); box(g, 0.26, 0.09, 0.05, x, 0.62, -L / 2 - 0.03, tail); }
+      // (lit over the sedan's own: its four round headlamps, its two tail lamps — the boxes that were here, one over
+      // each outer pair, read as blocks stuck on its nose up close; each set one mesh)
+      const lamps = (at: number[][], geo: () => THREE.BufferGeometry) => mergeGeometries(at.map(([x, y, z]) => geo().translate(x!, y!, z!)))!;
+      g.add(new THREE.Mesh(lamps([0.62, 0.4, -0.4, -0.62].map((x) => [x, 0.64, L / 2 + 0.02]), () => new THREE.CylinderGeometry(0.066, 0.066, 0.02, 10).rotateX(Math.PI / 2)), head));
+      g.add(new THREE.Mesh(lamps([0.56, -0.56].map((x) => [x, 0.7, -L / 2 - 0.025]), () => new THREE.BoxGeometry(0.32, 0.09, 0.02)), tail));
       root.add(g);
       cars.push({ g, enter });
     });
