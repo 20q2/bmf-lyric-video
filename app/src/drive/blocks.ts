@@ -39,7 +39,7 @@ const FOOTPRINT = [-0.5, -0.25, 0, 0.25, 0.5].flatMap((x) => [-0.5, -0.25, 0, 0.
 
 /** A box standing by the road: a building (the town's), or concrete (a set-piece's structure: a viaduct's deck, its
  *  piers); `lateral` and `w` across the road, `d` along it. */
-export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean; /** No awnings: its front carries murals. */ bare?: boolean; /** Built by its set-piece's props, or as a parked car (world.ts leaves it out of the town: the guard still sees it). */ prop?: boolean; /** A car parked at the kerb (world.ts builds it as a sedan; it stands on the road by design). */ car?: boolean }
+export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean; /** No awnings: its front carries murals. */ bare?: boolean; /** Built by its set-piece's props, or as a parked car (world.ts leaves it out of the town: the guard still sees it). */ prop?: boolean; /** A car parked at the kerb (world.ts builds it as a sedan; it stands on the road by design). */ car?: boolean; /** A corner's: its end at this side of its box's z (−1, +1) faces a cross street, its storefront round it (look/facades.ts). */ corner?: -1 | 1 }
 
 /** Parking at the left kerb (the far lane's: the right lane is the car's own, and the road is a lane each way): a spot
  *  every `every` m, none within `clear` m of a lyric's carrier or a set-piece's opening (a cross street, a driveway). */

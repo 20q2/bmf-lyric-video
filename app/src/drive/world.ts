@@ -5,9 +5,9 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import { WORLD, toon } from '../look/toon';
 import { F } from '../engine/type';
-import { GLOW, glowMaterial, lampMaterial, nightGlass, withWindows } from '../look/night';
+import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
 import { wallMaterial } from '../look/walls';
-import { SHOPS, facades, signAtlas } from '../look/facades';
+import { SHOPS, facadeMeshes, facades, signAtlas } from '../look/facades';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALM, palmVariant } from '../look/palms';
 import { IMPALA, impalaHull, wireWheel } from '../look/impala';
@@ -369,10 +369,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   // the town's buildings (blocks.ts: the guard checks them too)
   const towns = drive.blocks.filter((b) => !b.concrete && !b.prop), concrete = drive.blocks.filter((b) => b.concrete && !b.prop);
   // (each a street front: look/facades.ts — its body, storefront, windows, sign and cornice, inside its box)
-  const town = facades(towns), fronts = new THREE.Group();
-  fronts.add(new THREE.Mesh(town.walls, toon({ vertexColors: true })), new THREE.Mesh(town.trim, toon({ vertexColors: true })));
-  fronts.add(new THREE.Mesh(town.glass, nightGlass()), new THREE.Mesh(town.signs, new THREE.MeshBasicMaterial({ map: signAtlas() })));
-  g.add(named(fronts, 'blocks'));
+  g.add(named(facadeMeshes(facades(towns)), 'blocks'));
   // (a set-piece's concrete: a viaduct's deck and piers)
   const crete = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#b9ada0' }), Math.max(1, concrete.length));
   concrete.forEach((b, i) => crete.setMatrixAt(i, b.matrix));

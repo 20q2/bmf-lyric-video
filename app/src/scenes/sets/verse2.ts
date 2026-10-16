@@ -7,6 +7,8 @@
 // price under; its bays); his giant mural on the end wall of its building. The lyrics are the carriers. Browser only (canvas).
 import * as THREE from 'three';
 import { wallMaterial } from '../../look/walls';
+import { facadeMeshes, facades } from '../../look/facades';
+import type { Block } from '../../drive/blocks';
 import type { Drive } from '../../drive/drive';
 import { GIANT, SHACK, type Verse2Plan, WASH } from '../../drive/sets/verse2';
 import { ROAD_HALF } from '../../drive/route';
@@ -17,9 +19,8 @@ import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, s
 import { glassTex } from './chorus1';
 
 /** Slauson, the side street (m, along it from the main road's edge): its fronts from `from` to `len` (out into the
- *  haze), their depth, the sidewalk's width. */
-const SLAUSON = { from: 22, len: 700, depth: 14, walk: 3 };
-const SLAUSON_SHOPS = ['LIQUOR', 'TIRES', 'BEAUTY SUPPLY', 'TACOS', 'LAUNDROMAT', 'CHECKS CASHED', 'DONUTS', 'BARBER', 'AUTO PARTS', 'CHURCH OF GOD', 'NAILS', 'UPHOLSTERY', 'PHARMACY', 'BAIL BONDS', 'MARKET', 'RECORDS', 'INSURANCE', 'SHOE REPAIR'];
+ *  haze), their depth, the sidewalk's width; an awning's height at the wall, how far it reaches out, its fall. */
+const SLAUSON = { from: 22, len: 700, depth: 14, walk: 3, awning: { y: 2.95, out: 1.4, fall: 0.2 } };
 
 /** The chicken: white, a red comb and wattle, an orange beak, its tail; standing at (0, y, 0) of g, facing +z. */
 function chicken(g: THREE.Object3D, y: number, k = 1) {
@@ -39,6 +40,10 @@ function chicken(g: THREE.Object3D, y: number, k = 1) {
 const SHOPPER = { t0: 80, v: 1.1, z: 3.6 };
 // ---- the hardware store's pieces (the user, 2026-10-14: "make this like the coolest hardware store we've ever seen") ----
 const HW = { orange: '#d9651f', deep: '#a84e18', cream: '#fff3dc', navy: '#1f2a44', ink: '#16131a', steel: '#c9c4b8', tile: '#8e3420', frame: '#2a2a30' };
+/** The paint cans' colours, in the windows and on the sidewalk: house paint's — putty, greige, off-white, slate, a
+ *  dusty blue, sage, a muted brick (the user, 2026-10-15: in primaries, row on row, "it kind of looks like library
+ *  books"). */
+const CANS = ['#b9b2a2', '#8f897c', '#e2dccd', '#6f777a', '#7f8f99', '#8d9682', '#9a6f62'];
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** A rod (a limb, a rope, a handle) from a to b in g: radius r at a, r2 at b. */
 function limb(g: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, r: number, m: THREE.Material, r2 = r) {
@@ -140,15 +145,21 @@ function interior(c: CanvasRenderingContext2D, W: number, H: number, seed: numbe
     else if (kind === 3) { c.beginPath(); c.arc(x + 15, y + 18, 13, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(x + 15, y + 18, 7, 0, Math.PI * 2); c.stroke(); } // a coil of rope
     else { c.fillStyle = '#9a9aa2'; c.fillRect(x + 12, y, 7, (p1 - p0) * 0.62); c.fillStyle = col; c.fillRect(x + 10, y + (p1 - p0) * 0.4, 11, (p1 - p0) * 0.3); } // a screwdriver
   }
-  // the gondolas: three shelves of stock
+  // the gondolas: three shelves of stock — gallon cans of house paint, their lids and labels, in runs of a colour with
+  // gaps between and a carton now and then (a shop's shelves, not a display: the user, 2026-10-15)
   c.fillStyle = '#3a2e2a'; c.fillRect(0, H * 0.52, W, H * 0.48);
   for (let row = 0; row < 3; row++) {
-    const top = H * (0.54 + row * 0.15), base = top + H * 0.13;
-    for (let i = 0, x = 0; x < W; i++) {
-      const pw = 14 + 22 * r(row * 300 + i), ph = H * (0.06 + 0.06 * r(row * 300 + i + 7)), col = ['#c8102e', '#f6c445', '#2b78a6', '#f7f4ec', '#d9651f', '#3a7a4a', '#8a5a32'][Math.floor(r(row * 300 + i + 3) * 7)]!;
-      c.fillStyle = col; c.fillRect(x, base - ph, pw - 3, ph);
-      if (r(row * 300 + i + 11) < 0.5) { c.fillStyle = 'rgba(255,255,255,0.45)'; c.fillRect(x, base - ph, pw - 3, ph * 0.18); } // a paint can's lid
-      x += pw;
+    const top = H * (0.54 + row * 0.15), base = top + H * 0.13, ch = H * 0.085, cw = ch * 0.9;
+    for (let i = 0, x = 4; x < W - cw; i++) {
+      const k = row * 300 + i, kind = r(k + 3);
+      if (kind < 0.18) { x += cw * (1 + 2 * r(k + 5)); continue; } // a gap on the shelf
+      if (kind < 0.3) { const bw = cw * 2.2, bh = ch * 1.15; c.fillStyle = '#a88a64'; c.fillRect(x, base - bh, bw - 3, bh); c.fillStyle = 'rgba(60,40,24,0.35)'; c.fillRect(x, base - bh + bh * 0.42, bw - 3, 3); x += bw; continue; } // a carton
+      const col = CANS[Math.floor(r(Math.floor(k / 4) + 77) * CANS.length)]!; // (a run of a colour)
+      c.fillStyle = col; c.fillRect(x, base - ch, cw - 4, ch);
+      c.fillStyle = '#c9c4b8'; c.fillRect(x - 1, base - ch - 3, cw - 2, 4); // its lid's rim
+      c.fillStyle = 'rgba(246,240,226,0.7)'; c.fillRect(x, base - ch * 0.62, cw - 4, ch * 0.3); // its label
+      c.fillStyle = 'rgba(30,24,22,0.25)'; c.fillRect(x + cw - 9, base - ch, 5, ch); // its shade
+      x += cw;
     }
     c.fillStyle = '#7a6a5a'; c.fillRect(0, base, W, H * 0.018);
   }
@@ -230,31 +241,39 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     // a street, not a strip into the void (the user, 2026-10-15: at 80 s "the road ... goes out into the nothingness"):
     // level ground under the blocks either side, sidewalks, storefronts wall to wall behind the corner lots out into
     // the haze, power poles with their wires, street lamps, cars parked at the kerbs
+    // (its fronts are the town's street fronts, look/facades.ts — a storefront, framed windows, a frieze and cornice, a
+    // coping round the roof — on the town's shared materials. They were boxes printed with the walls' window grid,
+    // which ran from each box's middle through every wall, from below the ground to past the roof: at 82 s, the corner
+    // seen end-on behind the SLAUSON blade, "their window textures are clipping into the sides and tops, and it looks
+    // really bad", the user, 2026-10-15. And each its own materials, fascia and canvas sign: some 300 draws.)
     const ground = toon({ color: '#b39a7a' }), walkM = toon({ color: '#cbbba7' }), dark = toon({ color: WORLD.post });
+    const lotWall = toon({ color: '#d9cdb8' }), awnings = ['#c8202e', '#2b78a6', '#e0a526'].map((color) => toon({ color })), fronts: Block[] = [];
     for (const side of [-1, 1]) {
       const zs = side * (C.w / 2), zw = zs + side * S.walk / 2;
       box(st, S.len - S.from + 40, 8, S.depth + 60, ROAD_HALF + (S.from + S.len) / 2, -4 - 0.06, zs + side * (S.walk + (S.depth + 60) / 2), ground); // the blocks' ground, down out of sight
       box(st, S.len - S.from + 20, 0.16, S.walk, ROAD_HALF + (S.from + S.len) / 2, 0.08, zw, walkM); // the sidewalk
-      // the fronts: varied widths and heights, a fascia with the shop's name, an awning on some, a lot now and then
-      let x = ROAD_HALF + S.from, k = 0;
+      // the fronts: varied widths and heights, an awning on some, a lot now and then
+      let x = ROAD_HALF + S.from, k = 0, built = 0;
       while (x < S.len - 20) {
         const r = (n: number) => { const v = Math.sin((k + 1) * 12.9898 * (side + 3) + n * 78.233) * 43758.5453; return v - Math.floor(v); };
-        const w = 9 + 13 * r(1), h = 4 + (r(2) < 0.3 ? 7 * r(3) : 3 * r(3)), zc = zs + side * (S.walk + S.depth / 2);
-        if (r(4) < 0.12) { // a lot: a low wall along the walk, a sign on a pole
-          box(st, w - 1, 0.9, 0.3, x + w / 2, 0.45, zs + side * (S.walk + 0.2), toon({ color: '#d9cdb8' }));
+        // (the first building from the corner, past a lot if one's on it, two storeys, its shop round its end: the nearest
+        // building as the street's named, its end to the camera — look/facades.ts)
+        const corner = built === 0 && r(4) >= 0.12, w = 9 + 13 * r(1), zc = zs + side * (S.walk + S.depth / 2);
+        const h = corner ? 7.6 + 1.6 * r(3) : 4 + (r(2) < 0.3 ? 7 * r(3) : 3 * r(3));
+        if (r(4) < 0.12) { // a lot: a low wall along the walk
+          box(st, w - 1, 0.9, 0.3, x + w / 2, 0.45, zs + side * (S.walk + 0.2), lotWall);
         } else {
-          const col = WORLD.stucco[Math.floor(r(5) * WORLD.stucco.length)]!;
-          const b = box(st, w - 0.4, h + 6, S.depth, x + w / 2, (h - 6) / 2, zc, wallMaterial(col, new THREE.Vector3(w - 0.4, h + 6, S.depth), 0));
-          b.rotation.y = 0; // (its front along Slauson: the wall material puts windows on every wall above the ground floor)
-          const front = zs + side * (S.walk - 0.02), fy = Math.min(h - 0.6, 3.6);
-          const fascia = ['#7a2a36', '#1f4f5a', '#3d2f5a', '#7a5a22', '#2a4a2a'][Math.floor(r(6) * 5)]!;
-          box(st, w - 1.2, 0.7, 0.2, x + w / 2, fy, front + side * 0.08, toon({ color: fascia }));
-          const nm = SLAUSON_SHOPS[(k * 3 + (side > 0 ? 1 : 0)) % SLAUSON_SHOPS.length]!;
-          const sign = plane(st, Math.min(w - 2, 6.5), 0.5, x + w / 2, fy, front - side * 0.04, name(nm, Math.min(w - 2, 6.5), 0.5, '#fff6e0', fascia));
-          if (side > 0) sign.rotation.y = Math.PI; // (the far side's fronts face back across the street)
-          box(st, w - 2, 2.2, 0.06, x + w / 2, 1.4, front + side * 0.03, toon({ color: '#2a3340' })); // its glass
-          if (r(7) < 0.45) { const aw = box(st, w - 1.4, 0.08, 1.4, x + w / 2, 2.85, front - side * 0.7, toon({ color: ['#c8202e', '#2b78a6', '#e0a526'][Math.floor(r(8) * 3)]! })); aw.rotation.x = side * 0.2; }
+          // its box in the street's frame (x down Slauson, z across it), 6 m down into the ground under it; facadeOf's
+          // +x, its front, toward the street (on the near side, its lateral −1, mirrored)
+          const m = new THREE.Matrix4().makeBasis(V3(0, 0, -1), V3(0, 1, 0), V3(1, 0, 0)).scale(V3(S.depth, h + 6, w - 0.4)).setPosition(x + w / 2, (h - 6) / 2, zc);
+          fronts.push({ s: 1000 * (side + 3) + x, lateral: side, w: w - 0.4, h, d: S.depth, color: r(5), matrix: m, ...(corner ? { corner: -1 as const } : {}) });
+          if (r(7) < 0.45) {
+            const A = S.awning, front = zs + side * S.walk;
+            const aw = box(st, w - 1.4, 0.08, A.out, x + w / 2, A.y, front - side * A.out / 2, awnings[Math.floor(r(8) * 3)]!);
+            aw.rotation.x = -side * A.fall; // (its outer edge the lower)
+          }
         }
+        if (r(4) >= 0.12) built++;
         x += w; k++;
       }
       // power poles along the near side and street lamps along the far side, every few lots
@@ -275,6 +294,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
         car.position.set(cx, 0, zs - side * 1.1); car.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; st.add(car);
       }
     }
+    st.add(facadeMeshes(facades(fronts)));
   }
 
   // ---- the A-frames: a chalkboard each (the carriers), its wooden frame, its legs and back board to the ground ----
@@ -306,20 +326,20 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     skin(D[0], D[1], dh, wTop); // over the door
     for (const [a, b] of wins) { skin(a, b, 0, wBot, tile); box(g, b - a + 0.1, 0.06, 0.16, (a + b) / 2, wBot + 0.03, 0.05, steel); } // the tiled stall risers, a sill
     box(g, w + 0.08, 0.35, 0.06, 0, 0.175, 0.02, toon({ color: HW.deep })); // the base course
-    // the windows: the shop floor at the back of their depth, a display riser in each with its stock, bunting along the
-    // top, a dark storefront frame
+    // the windows: the shop floor at the back of their depth, a display riser in each with a few cans on it, a dark
+    // storefront frame
+    const canM = CANS.map((color) => toon({ color }));
     Sh.windows.forEach((a, i) => {
       const cx = X(a), shop = canvasTex(1024, Math.round((1024 * W.h) / W.w), (c) => interior(c, c.canvas.width, c.canvas.height, i + 1));
       plane(g, W.w, W.h, cx, W.y, -R + 0.01, pic(shop));
       box(g, W.w - 0.1, 0.12, 0.34, cx, wBot + 0.06, -0.2, toon({ color: '#5a3a2a' }));
-      // (low: the posters stand over them)
-      for (let k = 0; k < 6; k++) cyl(g, 0.12, 0.17, cx - W.w / 2 + 0.4 + (k % 4) * 0.27 + (k >= 4 ? 0.14 : 0), wBot + 0.21 + (k >= 4 ? 0.17 : 0), -0.2, toon({ color: ['#c8102e', '#2b78a6', '#f6c445', '#f7f4ec'][(k + i) % 4]! }));
-      box(g, 0.55, 0.26, 0.26, cx + W.w / 2 - 0.6, wBot + 0.25, -0.22, toon({ color: i ? '#2b78a6' : '#c8102e' }));
-      box(g, 0.3, 0.04, 0.04, cx + W.w / 2 - 0.6, wBot + 0.42, -0.22, ink);
-      plane(g, W.w - 0.1, 0.26, cx, wTop - 0.2, -0.08, pic(canvasTex(1024, 40, (c) => {
-        c.strokeStyle = '#3a2e2a'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 3); c.lineTo(1024, 3); c.stroke();
-        for (let k = 0; k < 24; k++) { c.fillStyle = ['#c8102e', '#f6c445', '#fff3dc', '#2b78a6'][k % 4]!; c.beginPath(); c.moveTo(k * 42.7 + 2, 3); c.lineTo(k * 42.7 + 40, 3); c.lineTo(k * 42.7 + 21, 38); c.closePath(); c.fill(); }
-      }), { transparent: true }));
+      // a few cans on it at one end, two and one on top (low: the posters stand over them). (Six in primaries, a toolbox
+      // and bunting along the head were a display: "it doesn't need to be a whole display in the front", the user,
+      // 2026-10-15)
+      for (let k = 0; k < 3; k++) {
+        const kx = cx - W.w / 2 + 0.45 + (k % 2) * 0.27 + (k === 2 ? 0.135 : 0), ky = wBot + 0.21 + (k === 2 ? 0.17 : 0);
+        cyl(g, 0.12, 0.17, kx, ky, -0.2, canM[(k + i * 2) % canM.length]!); cyl(g, 0.122, 0.015, kx, ky + 0.085, -0.2, steel);
+      }
       for (const y of [wTop - 0.04, wBot + 0.04]) box(g, W.w, 0.08, 0.08, cx, y, -0.04, frame);
       for (const x of [cx - W.w / 2 + 0.04, cx + W.w / 2 - 0.04]) box(g, 0.08, W.h, 0.08, x, W.y, -0.04, frame);
     });
@@ -425,26 +445,32 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       });
       const p = plane(g, ew, eh, -w / 2 - 0.012, 0.5 + eh / 2, -0.7 - ew / 2, pic(mural)); p.rotation.y = -Math.PI / 2;
     }
-    // painted on the front left of the banner: a paint can tipped, its paint running down to the word
+    // on the front left of the banner, a sign painter's board: a paint can tipped, its paint running down to the word.
+    // (It was lettered straight onto the wall: "it should have a backdrop on it, so it's not painted directly onto the
+    // brick", the user, 2026-10-15 — a navy board in an orange frame, screwed to the wall: navy, as the pole's reader.)
     {
-      const pw = 4.4, ph = 2.4;
-      plane(g, pw, ph, X(3.4), Sh.banner.y, 0.012, pic(canvasTex(1024, Math.round((1024 * ph) / pw), (c) => {
+      const pw = 4.4, ph = 2.4, px = X(3.4), py = Sh.banner.y;
+      box(g, pw + 0.18, ph + 0.18, 0.08, px, py, 0.04, toon({ color: HW.deep })); // its frame
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) cyl(g, 0.035, 0.02, px + sx * (pw / 2 - 0.1), py + sy * (ph / 2 - 0.1), 0.09, steel).rotation.x = Math.PI / 2; // its screws
+      plane(g, pw, ph, px, py, 0.081, pic(canvasTex(1024, Math.round((1024 * ph) / pw), (c) => {
         const Wc = c.canvas.width, Hc = c.canvas.height;
-        c.save(); c.translate(Wc * 0.2, Hc * 0.32); c.rotate(0.5); // the can, tipped toward the word
+        c.fillStyle = HW.navy; c.fillRect(0, 0, Wc, Hc);
+        c.strokeStyle = HW.cream; c.lineWidth = 5; c.strokeRect(22, 22, Wc - 44, Hc - 44);
+        c.save(); c.translate(Wc * 0.2, Hc * 0.34); c.rotate(0.5); c.scale(0.85, 0.85); // the can, tipped toward the word
         c.fillStyle = '#c8102e'; c.fillRect(-90, -110, 180, 220); c.fillStyle = '#9a9aa2'; c.fillRect(-96, -122, 192, 22); c.fillRect(-96, 104, 192, 14);
         c.fillStyle = HW.cream; c.fillRect(-70, -40, 140, 80); c.fillStyle = HW.navy; c.font = font(F.sign(700), 34); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('HANDLE', 0, -12); c.fillText('IT', 0, 22);
         c.restore();
         // its paint pouring out and running in drips along the top of the word
-        c.fillStyle = HW.orange; c.beginPath(); c.moveTo(Wc * 0.31, Hc * 0.2); c.quadraticCurveTo(Wc * 0.375, Hc * 0.22, Wc * 0.375, Hc * 0.5); c.lineTo(Wc * 0.345, Hc * 0.5); c.quadraticCurveTo(Wc * 0.345, Hc * 0.28, Wc * 0.3, Hc * 0.25); c.closePath(); c.fill();
+        c.fillStyle = HW.orange; c.beginPath(); c.moveTo(Wc * 0.31, Hc * 0.22); c.quadraticCurveTo(Wc * 0.375, Hc * 0.24, Wc * 0.375, Hc * 0.5); c.lineTo(Wc * 0.345, Hc * 0.5); c.quadraticCurveTo(Wc * 0.345, Hc * 0.3, Wc * 0.3, Hc * 0.27); c.closePath(); c.fill();
         c.beginPath(); c.moveTo(Wc * 0.3, Hc * 0.47);
-        for (let x = Wc * 0.3; x <= Wc * 0.96; x += 8) c.lineTo(x, Hc * (0.47 - 0.012 * Math.sin(x * 0.03)));
-        c.lineTo(Wc * 0.96, Hc * 0.53); c.lineTo(Wc * 0.3, Hc * 0.53); c.closePath(); c.fill();
-        for (let k = 0; k < 9; k++) { const x = Wc * (0.33 + k * 0.07), l = Hc * (0.03 + 0.08 * ((k * 0.61) % 1)); c.beginPath(); c.roundRect(x, Hc * 0.5, 22, l, 11); c.fill(); }
+        for (let x = Wc * 0.3; x <= Wc * 0.93; x += 8) c.lineTo(x, Hc * (0.47 - 0.012 * Math.sin(x * 0.03)));
+        c.lineTo(Wc * 0.93, Hc * 0.53); c.lineTo(Wc * 0.3, Hc * 0.53); c.closePath(); c.fill();
+        for (let k = 0; k < 9; k++) { const x = Wc * (0.33 + k * 0.066), l = Hc * (0.03 + 0.07 * ((k * 0.61) % 1)); c.beginPath(); c.roundRect(x, Hc * 0.5, 22, l, 11); c.fill(); }
         c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.fillStyle = 'rgba(31,42,68,0.25)'; c.font = font(F.sign(700), Hc * 0.27); c.fillText('PAINT', Wc * 0.665 + 8, Hc * 0.78 + 8, Wc * 0.62);
-        c.fillStyle = HW.navy; c.fillText('PAINT', Wc * 0.665, Hc * 0.78, Wc * 0.62);
-        c.font = font(F.sign(600), Hc * 0.075); c.fillText('MIXED WHILE U WAIT', Wc * 0.665, Hc * 0.95, Wc * 0.62);
-      }), { transparent: true }));
+        c.fillStyle = 'rgba(0,0,0,0.3)'; c.font = font(F.sign(700), Hc * 0.25); c.fillText('PAINT', Wc * 0.645 + 7, Hc * 0.76 + 7, Wc * 0.56);
+        c.fillStyle = HW.cream; c.fillText('PAINT', Wc * 0.645, Hc * 0.76, Wc * 0.56);
+        c.fillStyle = '#f6c445'; c.font = font(F.sign(600), Hc * 0.07); c.fillText('MIXED WHILE U WAIT', Wc * 0.645, Hc * 0.9, Wc * 0.56);
+      })));
     }
     box(g, 0.06, 0.5, Sh.d, -w / 2 - 0.03, 0.25, -Sh.d / 2, toon({ color: HW.deep }));
     cyl(g, 0.07, h, w / 2 - 0.12, h / 2, 0.06, toon({ color: '#d9d0c0' })); // a downpipe at its far corner
@@ -476,8 +502,8 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
           else { box(hd, 0.4, 0.07, 0.1, 0, 0, 0, toon({ color: HW.orange })); box(hd, 0.38, 0.14, 0.08, 0, 0.1, 0, toon({ color: '#e0b060' })); }
         });
       }
-      // a pyramid of gallon cans, 4-3-2-1
-      { let k = 0; for (let row = 0; row < 4; row++) for (let i = 0; i < 4 - row; i++, k++) { const cx = X(10.75) + (i - (3 - row) / 2) * 0.3, y = 0.11 + row * 0.22; cyl(g, 0.13, 0.2, cx, y, 0.75, toon({ color: ['#c8102e', '#2b78a6', '#f6c445', '#f7f4ec', '#2f7a5a'][k % 5]! })); cyl(g, 0.132, 0.02, cx, y + 0.1, 0.75, steel); } }
+      // a pyramid of gallon cans, 3-2-1, in house paint's colours
+      { let k = 0; for (let row = 0; row < 3; row++) for (let i = 0; i < 3 - row; i++, k++) { const cx = X(10.75) + (i - (2 - row) / 2) * 0.3, y = 0.11 + row * 0.22; cyl(g, 0.13, 0.2, cx, y, 0.75, canM[(k * 3) % canM.length]!); cyl(g, 0.132, 0.02, cx, y + 0.1, 0.75, steel); } }
       // the hose rack: green, orange and yellow coils on a low rail
       { const rx = X(15.3); for (const s of [-1, 1]) box(g, 0.06, 1.0, 0.06, rx + s * 0.9, 0.5, 0.95, frame); box(g, 1.9, 0.05, 0.05, rx, 0.98, 0.95, frame);
         ['#2f7a5a', HW.orange, '#f6c445', '#2f7a5a'].forEach((col, k) => { for (const r of [0.13, 0.18, 0.23]) { const coil = new THREE.Mesh(new THREE.TorusGeometry(r, 0.022, 6, 20), toon({ color: col })); coil.position.set(rx - 0.6 + k * 0.4, 0.98 - r, 0.98 + r * 0.1); g.add(coil); } }); }

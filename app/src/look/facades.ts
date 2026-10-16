@@ -2,22 +2,28 @@
 //   - a stucco body standing a hand's width behind its box's front;
 //   - in that depth, its storefront (glass bays, a door, a base course, a sign band with a shop's name) or, on low
 //     apartments, a carport's dark mouth;
-//   - its upper floors' windows (frames, sills; on its two ends too);
-//   - pilasters up the taller ones, and a cornice.
+//   - its upper floors' windows (frames, sills; on its two ends too, set into ends standing a little in from its box's);
+//   - pilasters up the taller ones, a frieze band and a cornice along the front, a coping round the rest of its roof.
 // Every part stays inside the block's box, which is what the guard checks (tests/town.test.ts). Seeded by the block's
-// place. The geometry is pure (bun builds it under test); world.ts gives it materials, and the sign atlas is drawn in
-// the browser (signAtlas).
+// place. The geometry is pure (bun builds it under test); facadeMeshes gives it its materials, shared, and the sign
+// atlas is drawn in the browser (signAtlas).
+// The ends' frames, the roofline and a corner's storefront came with the user's note on the buildings close to the
+// camera (2026-10-15: "I don't think all the buildings need fidelity improved significantly, but at least the ones
+// that are close to the camera sure as hell do").
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash } from '../engine/util';
-import { WORLD } from './toon';
+import { WORLD, toon } from './toon';
 import { F, font } from '../engine/type';
+import { nightGlass } from './night';
 import type { Block } from '../drive/blocks';
 
 /** How deep the front's detail is (m: the body stands this far behind the box's front); the storefront (its glass's
  *  top, the sign band, a bay's width); the floors above (their height, a window's width, height, the gap between);
- *  the cornice's height; the pilasters from this height up (m). */
-export const FACADE = { depth: 0.3, shop: { top: 3.0, band: [3.15, 3.95] as [number, number], bay: 3.2 }, floor: 3.3, win: { w: 1.3, h: 1.7, gap: 1.3 }, cornice: 0.55, pilasters: 14 };
+ *  the cornice's height; the pilasters from this height up; how far the ends stand in from the box's (room for their
+ *  windows' frames and sills: their panes were bare glass flush on the wall), the coping round the roof's other edges
+ *  (its height, its width) (m). */
+export const FACADE = { depth: 0.3, shop: { top: 3.0, band: [3.15, 3.95] as [number, number], bay: 3.2 }, floor: 3.3, win: { w: 1.3, h: 1.7, gap: 1.3 }, cornice: 0.55, pilasters: 14, end: 0.18, coping: [0.3, 0.32] as [number, number] };
 /** The shops' names (the signs' face, F.sign: never the lyrics'), and how many the atlas holds a row. */
 export const SHOPS = ['LIQUOR', 'DONUTS', 'TACOS', 'TIRES', 'BEAUTY SUPPLY', 'CHECKS CASHED', 'LAUNDROMAT', 'PAWN', 'WIGS', 'BAIL BONDS', 'PHO', 'MARKET', 'NAILS', 'DENTIST', 'INCOME TAX', 'RECORDS'] as const;
 const ATLAS_COLS = 4;
@@ -47,10 +53,12 @@ class Parts {
     g.setAttribute('lit', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(lit ? 1 : 0), 1));
     this.glass.push(g);
   }
-  /** A shop's sign on its band, facing +x, its texture the atlas's cell `k` (turned back on a mirrored front, so its
-   *  name reads the right way round). */
-  sign(w: number, h: number, x: number, y: number, z: number, k: number) {
-    const g = new THREE.PlaneGeometry(w, h); g.rotateY(Math.PI / 2); g.translate(x, y, z);
+  /** A shop's sign on its band, facing +x (or along ±z: a corner's end), its texture the atlas's cell `k` (turned back
+   *  on a mirrored front, so its name reads the right way round). */
+  sign(w: number, h: number, x: number, y: number, z: number, k: number, facing: 'x' | 'z+' | 'z-' = 'x') {
+    const g = new THREE.PlaneGeometry(w, h);
+    if (facing === 'x') g.rotateY(Math.PI / 2); else if (facing === 'z-') g.rotateY(Math.PI);
+    g.translate(x, y, z);
     const uv = g.getAttribute('uv'), rows = Math.ceil(SHOPS.length / ATLAS_COLS), cx = k % ATLAS_COLS, cy = Math.floor(k / ATLAS_COLS);
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (cx + (this.mirrored ? 1 - uv.getX(i) : uv.getX(i))) / ATLAS_COLS, 1 - (cy + 1 - uv.getY(i)) / rows);
     this.signs.push(g);
@@ -85,10 +93,10 @@ export function facadeOf(b: Block): FacadeGeometry {
   const P = new Parts(stucco, trimC, side < 0);
   // (the ground: the road's level is its box's bottom plus its lift; the facade starts at the road)
   const g0 = H - b.h;
-  // the body, behind the front's depth
-  P.box('walls', D - A.depth, H, W - 0.02, -A.depth / 2, H / 2, 0);
+  // the body, behind the front's depth, its ends a little in from the box's
+  P.box('walls', D - A.depth, H, W - 2 * A.end, -A.depth / 2, H / 2, 0);
   // the ground floor: a storefront (bays of glass, a door, a base course, the sign band), or a carport on low apartments
-  const apartments = b.h <= 9 && r(2) > 0.72, xf = body;
+  const apartments = b.h <= 9 && r(2) > 0.72 && !b.corner, xf = body;
   if (!apartments) {
     const n = Math.max(1, Math.floor((W - 1) / A.shop.bay)), bw = (W - 1) / n, door = Math.floor(r(3) * n);
     for (let i = 0; i < n; i++) {
@@ -100,6 +108,21 @@ export function facadeOf(b: Block): FacadeGeometry {
     const [b0, b1] = A.shop.band;
     P.box('trim', 0.16, b1 - b0, W - 0.4, xf + 0.08, g0 + (b0 + b1) / 2, 0);
     P.sign(Math.min(W * 0.62, 9), (b1 - b0) * 0.78, xf + 0.165, g0 + (b0 + b1) / 2, (r(4) - 0.5) * W * 0.2, Math.floor(r(5) * SHOPS.length));
+    // a corner's: its storefront turns the corner, glass bays along its end to the cross street, the band and its sign
+    // round with it (seen end-on from the cross street, its end was a blank wall)
+    if (b.corner) {
+      const c = b.corner, ze = c * (W / 2 - A.end), facing = c > 0 ? 'z+' : 'z-', x1 = body - 0.5, x0 = -D / 2 + 1.2;
+      const m = Math.max(1, Math.floor((x1 - x0) / A.shop.bay)), bw = (x1 - x0) / m;
+      for (let i = 0; i < m; i++) {
+        const x = x1 - bw * (i + 0.5);
+        P.pane(bw - 0.24, A.shop.top - 0.45, x, g0 + 0.35 + (A.shop.top - 0.45) / 2, ze + c * 0.02, facing, r(200 + i) > 0.45);
+        P.box('trim', 0.12, A.shop.top, 0.12, x - bw / 2, g0 + A.shop.top / 2, ze + c * 0.06);
+      }
+      P.box('trim', 0.12, A.shop.top, 0.12, x1 + 0.06, g0 + A.shop.top / 2, ze + c * 0.06); // its corner post
+      P.box('trim', x1 - x0, 0.35, 0.08, (x0 + x1) / 2, g0 + 0.175, ze + c * 0.04); // the base course
+      P.box('trim', body + 0.16 - (x0 - 0.3), b1 - b0, 0.16, (body + 0.16 + x0 - 0.3) / 2, g0 + (b0 + b1) / 2, ze + c * 0.08);
+      P.sign(Math.min((x1 - x0) * 0.62, 9), (b1 - b0) * 0.78, (x0 + x1) / 2, g0 + (b0 + b1) / 2, ze + c * 0.165, Math.floor(r(5) * SHOPS.length), facing);
+    }
   } else {
     P.pane(Math.min(W * 0.5, 7), 2.4, xf + 0.02, g0 + 1.2, (r(6) - 0.5) * W * 0.3, 'x', false); // the carport's dark mouth
   }
@@ -118,12 +141,18 @@ export function facadeOf(b: Block): FacadeGeometry {
       P.box('trim', 0.08, A.win.h, 0.08, xf + 0.04, y, z + A.win.w / 2 + 0.04);
       P.box('trim', 0.16, 0.1, A.win.w + 0.3, xf + 0.08, y - A.win.h / 2 - 0.05, z); // its sill
     }
-    // its ends: a column of windows each (in the depth behind the front's detail)
-    const e = across(D - A.depth - 1);
+    // its ends: a row of windows each (in the depth behind the front's detail), framed and silled as the front's are
+    // (they were bare panes flush on the wall: dark stickers, seen end-on)
+    const e = across(D - A.depth - 1), ez = W / 2 - A.end;
     for (let i = 0; i < e; i++) {
       const x = body - 0.8 - A.win.w / 2 - i * pitch;
       if (x - A.win.w / 2 < -D / 2 + 0.4) break;
-      for (const sz2 of [1, -1] as const) P.pane(A.win.w, A.win.h, x, y, sz2 * (W / 2 - 0.005), sz2 > 0 ? 'z+' : 'z-', r(300 + k * 41 + i + (sz2 > 0 ? 0 : 7)) > 0.55);
+      for (const sz2 of [1, -1] as const) {
+        P.pane(A.win.w, A.win.h, x, y, sz2 * (ez + 0.005), sz2 > 0 ? 'z+' : 'z-', r(300 + k * 41 + i + (sz2 > 0 ? 0 : 7)) > 0.55);
+        P.box('trim', A.win.w + 0.16, 0.08, 0.08, x, y + A.win.h / 2 + 0.04, sz2 * (ez + 0.04));
+        for (const j of [-1, 1]) P.box('trim', 0.08, A.win.h, 0.08, x + j * (A.win.w / 2 + 0.04), y, sz2 * (ez + 0.04));
+        P.box('trim', A.win.w + 0.3, 0.1, 0.16, x, y - A.win.h / 2 - 0.05, sz2 * (ez + 0.08)); // its sill
+      }
     }
   }
   // pilasters up the taller ones, a cornice along the top of the front
@@ -132,6 +161,12 @@ export function facadeOf(b: Block): FacadeGeometry {
     for (let i = 0; i <= m; i += 2) P.box('trim', 0.2, H - A.cornice - y0, 0.4, xf + 0.1, (y0 + H - A.cornice) / 2, (i - m / 2) * pitch);
   }
   P.box('trim', A.depth, A.cornice, W, front - A.depth / 2, H - A.cornice / 2, 0);
+  // under the cornice a frieze band across the front; round the roof's other three edges a coping, so its roofline
+  // reads as a parapet's, not a box's edge
+  P.box('trim', 0.12, 0.16, W - 2 * A.end, body + 0.06, H - A.cornice - 0.35, 0);
+  const [ch, cw] = A.coping;
+  for (const sz2 of [1, -1]) P.box('trim', D - A.depth, ch, cw, -A.depth / 2, H - ch / 2, sz2 * (W / 2 - cw / 2));
+  P.box('trim', cw, ch, W - 2 * cw, -D / 2 + cw / 2, H - ch / 2, 0);
   const out = { walls: merged(P.walls), trim: merged(P.trim), glass: merged(P.glass), signs: merged(P.signs) };
   // (mirrored on the road's left: its triangles' winding turned back, so their fronts face out)
   for (const g of Object.values(out)) { if (side < 0) flipWinding(g); g.applyMatrix4(local); }
@@ -144,8 +179,24 @@ export function facades(blocks: readonly Block[]): FacadeGeometry {
   return { walls: merged(all.map((f) => f.walls)), trim: merged(all.map((f) => f.trim)), glass: merged(all.map((f) => f.glass)), signs: merged(all.map((f) => f.signs)) };
 }
 
-/** The shops' signs, a cell each (browser only: a canvas). */
+/** The street fronts' materials, made once and shared (the town's, and a set's own fronts: scenes/sets/verse2.ts) —
+ *  one vertex-coloured toon for the walls and the trim, the glass, the signs (browser only: the atlas). */
+let shared: { body: THREE.Material; glass: THREE.Material; signs: THREE.Material } | undefined;
+/** A facade's meshes in a group, on the shared materials (browser only). */
+export function facadeMeshes(f: FacadeGeometry): THREE.Group {
+  shared ??= { body: toon({ vertexColors: true }), glass: nightGlass(), signs: new THREE.MeshBasicMaterial({ map: signAtlas() }) };
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(f.walls, shared.body), new THREE.Mesh(f.trim, shared.body), new THREE.Mesh(f.glass, shared.glass), new THREE.Mesh(f.signs, shared.signs));
+  return g;
+}
+
+/** The shops' signs, a cell each, drawn once (browser only: a canvas). (The town drew it twice: once for the fronts,
+ *  once for the rooftop signs.) */
+let atlas: THREE.CanvasTexture | undefined;
 export function signAtlas(): THREE.CanvasTexture {
+  return (atlas ??= drawSignAtlas());
+}
+function drawSignAtlas(): THREE.CanvasTexture {
   const cw = 512, ch = 112, rows = Math.ceil(SHOPS.length / ATLAS_COLS), cv = document.createElement('canvas');
   cv.width = cw * ATLAS_COLS; cv.height = ch * rows;
   const c = cv.getContext('2d')!;
