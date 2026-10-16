@@ -1,6 +1,6 @@
 // The sky over the song: golden hour to night (spec §3). Keyed by song time: the colour at the zenith and at the
-// horizon, how high the sun stands (it sets as the coast road ends, just before the tunnel), and how far the stars
-// are out. The sky dome draws it in poster bands (look/skydome.ts); the world's fog fades into the horizon colour;
+// horizon, how high the sun stands (golden hour held over the beach, it sets unseen in the tunnel), and how far the
+// stars are out. The sky dome draws it in poster bands (look/skydome.ts); the world's fog fades into the horizon colour;
 // the sun's and the sky's light follow it. Pure.
 import * as THREE from 'three';
 
@@ -10,9 +10,15 @@ export const SKY_KEYS: readonly [number, string, string, number][] = Object.free
   [30, '#EE8A55', '#FFD08E', 17],
   [60, '#DA6A5E', '#FFB97C', 12],
   [90, '#B04E78', '#FF9A6A', 4],
-  // (the sun touches the sea at 112 s: inside chorus 3's arch shot, 109-112.4)
-  [112, '#7C3A7E', '#F7745F', 0],
-  [125, '#4B2A6E', '#D9567A', -5],
+  // chorus 3, the coast (105.6-120.6): the warm golden hour held over the beach, the sun just clear of the sea (the
+  // user, 2026-10-16: it "is setting very quickly in this beach scene ... keep the lighting in this nice warm orange")
+  [105.6, '#8E417C', '#F98162', 1.1636],
+  // "He's so fly" (116.4), the plane going by: the light starts to drop, the sun touching the sea as the car goes in
+  [116.4, '#8E417C', '#F98162', 1.1636],
+  [120.6, '#7C3A7E', '#F7745F', 0],
+  // the bridge, in the tunnel (120.6-135.6): the sun sets while the bore hides the sky; from 132, the far mouth in
+  // view, the night is as it was (this key lies on the line the old 125 s and 140 s keys drew: the night is unchanged)
+  [132, '#3D2360', '#BB4C7B', -7.333],
   [140, '#261A4C', '#8E3D7C', -10],
   [165, '#110D2E', '#3F2560', -16],
   [182, '#07061A', '#221A44', -20],
@@ -68,6 +74,8 @@ export const AIR_KEYS: readonly [number, number, number, string, number][] = Obj
   [60, 120, 1200, '#F0A07A', 0.2],
   [75, 80, 900, '#E88F8A', 0.25],
   [105, 120, 1300, '#FF9A6A', 0.3],
+  [116.4, 120, 1300, '#FF9A6A', 0.3], // (the sea haze held till the plane, as the light is)
+  [132, 138, 985, '#9E4D7A', 0.165], // (on the old 105 s-135 s line: the far mouth and the night as they were)
   [135, 140, 950, '#8E3D7C', 0.15],
   [182, 140, 900, '#3F2560', 0.15],
 ]);

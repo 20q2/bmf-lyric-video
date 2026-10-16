@@ -1,8 +1,9 @@
 // Chorus 3, the coast road (flow plan §5): the ritual by the sea, wide, the car small against it.
 //   "The boy from South of somewhere came walking in"   the beach town's welcome arch over the road, its lettering
 //        band the lyric (WELCOME TO is the arch's own header). It stands before his first board, so the film's first
-//        true wide looks down the whole chorus through it: sea left, the sun kissing the water (sky.ts puts it on the
-//        horizon at 112 s), the car passing under early in the line and shrinking beyond, framed by the arch
+//        true wide looks down the whole chorus through it: sea left, the sun low over the water (sky.ts holds it just
+//        clear of the horizon till the chorus's end), the car passing under early in the line and shrinking beyond,
+//        framed by the arch
 //   "And I can't keep my panties from dropping"          the beach itself, in one take that cranes up and on along the
 //        sand toward the pier (the user, 2026-10-14: the white boards on the beach were "atrocious… hardly legible…
 //        so much white space"; "writing in the sand or towels with writing on them or the surfing stands"):

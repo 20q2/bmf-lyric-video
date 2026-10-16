@@ -13,7 +13,7 @@ import { ARCH, type Chorus3Plan } from '../../drive/sets/chorus3';
 import { BEACH, SEA, SHOULDER } from '../../drive/world';
 import { BLOCKS } from '../../drive/blocks';
 import { printedGround } from '../../look/ground';
-import { SUN_AZ_DEG, COAST_T } from '../../drive/sky';
+import { SUN_AZ_DEG, COAST_T, type SkyState, skyStateAt } from '../../drive/sky';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { PALM, palmVariant } from '../../look/palms';
@@ -599,6 +599,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
   const ON = [99, 124] as const, on = (t: number) => t > ON[0] && t < ON[1]; // (the coast's props move only while it's seen)
   /** The edge of ON the props were last posed at, while it's not seen. */
   let held = NaN;
+  const sky: SkyState = { zenith: new THREE.Color(), horizon: new THREE.Color(), sunElev: 0, stars: 0 };
   return {
     group: root,
     update(t) {
@@ -607,9 +608,9 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       if (on(t)) held = NaN;
       else { const edge = t <= ON[0] ? ON[0] + 1e-3 : ON[1] - 1e-3; if (held !== edge) { this.update(edge); held = edge; } }
       far.visible = t < farUntil;
-      // the glitter burns while the sun is low on the water, and goes with it
-      const gm = glitter.material as THREE.MeshBasicMaterial;
-      gm.opacity = smooth(99, 104, t) * (1 - smooth(112.5, 117, t));
+      // the glitter burns while the sun is low on the water, and goes with it (drive/sky.ts: it sets after the chorus)
+      const gm = glitter.material as THREE.MeshBasicMaterial, e = (skyStateAt(t, sky).sunElev * 180) / Math.PI;
+      gm.opacity = smooth(99, 104, t) * smooth(-0.5, 1, e);
       glitter.visible = gm.opacity > 0.01;
       if (!on(t)) return;
       // the waves: each set rolls in from out past the break to the sand over a period, thinning as it runs up
