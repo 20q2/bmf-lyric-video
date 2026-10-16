@@ -1,8 +1,8 @@
 // Chorus 4, up into the hills (flow plan §8): the ritual's last and biggest.
 //   "Young and he fine and he tall and he handsome"   his biggest campaign: a giant painted board on the uphill side,
 //        the car driving up into the frame and past it (verse 2's mural, outgrown)
-//   "Talkin' so fine, I might hold it for ransom"      stays on its gantries — hijacked with ransom-note lettering
-//        pasted over the route sign (carrierart.ts)
+//   "Talkin' so fine, I might hold it for ransom"      stays on its gantries, plain green route signs (the drive's
+//        own; the ransom-note lettering pasted over them was reverted)
 //   "Put it in drive, I'm not shy, I might let ya"     an insert inside the car: the line across the head unit, and
 //        the shift indicator's D flaring on the word "drive" (look/dash.ts, scenes/sets/chorus4.ts)
 //   "Cruise all night"                                 the giant hillside letters (the drive's own, carriers.ts)

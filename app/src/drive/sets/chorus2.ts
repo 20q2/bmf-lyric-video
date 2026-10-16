@@ -7,8 +7,7 @@
 //   "The boy West side of Compton came…"     one big freeway sign, three panels across the lanes, the car rushing under
 // And the SLAUSON exit sign at the end, where the car comes off into the neighbourhood (verse 2). Pure.
 import * as THREE from 'three';
-import { type Carrier, type Kind, ROAD_TAKE, layout, lineTake, lookFrom } from '../carriers';
-import type { Target } from '../shots';
+import { type Carrier, type Kind, layout, lineTake, lookFrom } from '../carriers';
 import { TEXT_SHARE } from '../ads';
 import { type Phrase, phraseOf, phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
@@ -70,18 +69,6 @@ export function trafficS(T: Chorus2Plan['traffic'][number], t: number): number {
 /** The pace (m/s): the freeway's; easing off for "…panties from dropping" (its road paint, read in one take high ahead
  *  of the car: at freeway speed its phrases lie too far apart to hold), from this long before it, back up after it. */
 export const PACE = { freeway: 26, easy: 15, off: 0.9, offRamp: 0.7, on: 0.1, onRamp: 1.2 };
-/** "…panties from dropping" on the road paint in one steady move, in place of the drive's road take (carriers.ts
- *  roadTake: its aim eased through each phrase and caught up between, nearly still, then racing, then still again —
- *  the user, 2026-10-15: "a kind of staggered camera panning … just kept it smooth. Keep the camera moving down along
- *  the highway at a little bit of a slower rate than our car is, so our car slowly comes into view"). High ahead of
- *  the car looking back down the road, as the drive's is, but travelling on at one constant pace, `pace` of the car's
- *  over the line, through the phrases' middles (fit to them at ROAD_TAKE.at of each); the car gains on it the whole
- *  line, coming down out of the frame's top toward the lens. From `dist` m (further back than the drive's: the frame
- *  holds the road from the car to the phrase ahead), this steeply (radians: nearly overhead, steeper than the drive's,
- *  so the phrase up toward the frame's top, further off, still reads big enough), aimed `toward` m back toward the car.
- *  (Tight: the guard's frame margin and type size leave the car coming in from the top only about a third of the way
- *  down by the line's end — the paint lies just ahead of where the car is as each phrase ends.) */
-export const DROP_TAKE = { pace: 0.7, dist: 39, pitch: 1.4, toward: -2 };
 /** The two cars beside his as the dropping line is sung (the second and third of the traffic: the first is behind,
  *  out of the take), speeding up through it, each its own way, so they pull away from him and on down the frame apart
  *  (the user, 2026-10-15: "accelerated the cars to the left of our car, within the camera's view … so they're not
@@ -185,17 +172,6 @@ export const CHORUS2: SetPiece = {
       gantryS, panels, exitS: carS(st.end - EXIT.before) + 40, traffic,
       lanes: { a: s0, b: s1, edge: FREEWAY_EDGE, merge: 45 },
     };
-    // the dropping line's road paint (the drive places it): one steady move down the road, slower than the car
-    const dropTake = (run: readonly Carrier[]): Target | undefined => {
-      if (run[0]!.kind !== 'road') return undefined;
-      const T0 = run[0]!.phrase.start, T1 = run[run.length - 1]!.phrase.end, v = DROP_TAKE.pace * (carS(T1) - carS(T0)) / (T1 - T0);
-      const keys = run.map((c) => [c.phrase.start + (c.phrase.end - c.phrase.start) * ROAD_TAKE.at, c.s] as const);
-      const tm = keys.reduce((a, [t]) => a + t, 0) / keys.length, sm = keys.reduce((a, [t, s]) => a + s - v * (t - tm), 0) / keys.length;
-      return (t) => {
-        const f = route.frameAt(sm + v * (t - tm) + DROP_TAKE.toward), grade = Math.asin(Math.max(-1, Math.min(1, f.fwd.y)));
-        return { tx: f.pos.x, ty: f.pos.y + 0.03, tz: f.pos.z, dist: DROP_TAKE.dist, yaw: Math.atan2(f.fwd.x, f.fwd.z), pitch: DROP_TAKE.pitch - grade, roll: 0 };
-      };
-    };
-    return { carriers, frames, clear: [{ side: -1, a: s0, b: s1 }], blocks, plan, take: dropTake };
+    return { carriers, frames, clear: [{ side: -1, a: s0, b: s1 }], blocks, plan };
   },
 };

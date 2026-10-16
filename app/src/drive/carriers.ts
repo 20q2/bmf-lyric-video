@@ -28,6 +28,7 @@ import * as THREE from 'three';
 import { OBB } from 'three/addons/math/OBB.js';
 import { hash } from '../engine/util';
 import { LENS, type Pose, fitSign, linePose } from './camera';
+import { LEAD, SNAP_S } from './shots';
 import type { Motion } from './motion';
 import type { Phrase } from './phrases';
 import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
@@ -124,7 +125,7 @@ export const PATTERNS: Record<string, readonly Kind[]> = {
   chorus3: ['sky'], // (its set owns the arch's line and the beach's; the campaign's line is his boards, the fly line the sky)
   bridge1: ['tunnel'],
   // (verse3 has no pattern: its set-piece owns every line, sets/verse3.ts)
-  chorus4: ['road', 'gantry', 'sky', 'hill'], // (its set owns the campaign's line — his biggest board, on the hillside — and the drive insert's)
+  chorus4: ['road', 'gantry', 'sky', 'hill'], // (its set owns the campaign's line — his biggest board, on the hillside — and the drive insert's: its 'road' and 'sky' stand in for them, so no line of it is road paint)
   // (the outro has no pattern: no lines are shown past AUDIBLE — the end is the scene's own)
 };
 /** A fast line moves to the road's left (so it can pair); which face it takes there, cycled line by line. */
@@ -600,30 +601,38 @@ export function lineTake(cs: readonly Carrier[], previews: readonly boolean[]): 
     return lookFrom(eye, aim);
   };
 }
-/** A line painted on the road, in one take (the user, 2026-10-13: hopping from phrase to phrase was "clippy"): high
- *  ahead of the car, looking back down the road at it, travelling on with it the whole line. Each phrase lies where
- *  the car is as it ends (it must never drive over one being sung), so they follow the car's pace; the aim runs through
- *  each phrase's middle a little before its middle moment (seen from high ahead, a phrase sliding up toward the car
- *  shrinks: it leaves the frame's top sooner than its foot). Each phrase slides up the screen toward the car as it's sung, the next
- *  rising into the frame below it (top to bottom), and the car drives on toward the lens, over each once it's sung. */
-export const ROAD_TAKE = { dist: 30, pitch: 1.1, toward: -3, ease: 0.1, at: 0.4 };
-export function roadTake(cs: readonly Carrier[], route: Route): (t: number) => Pose {
+/** A line painted on the road, in one steady move (the user, 2026-10-13: hopping from phrase to phrase was "clippy";
+ *  2026-10-15, of an aim eased through each phrase and catching up between — nearly still, then racing, then still
+ *  again: "a kind of staggered camera panning … just kept it smooth. Keep the camera moving down along the highway at
+ *  a little bit of a slower rate than our car is, so our car slowly comes into view"; chorus 2's first, then chorus
+ *  1's). High ahead of the car looking back down the road, travelling on at one constant pace, `pace` of the car's
+ *  over the line, fit through the phrases' middles (least squares, at `at` of each: seen from high ahead, a phrase
+ *  sliding up toward the car shrinks, leaving the frame's top sooner than its foot). Each phrase lies where the car is
+ *  as it ends (it must never drive over one being sung), so the car gains on the take the whole line, coming down out
+ *  of the frame's top toward the lens; each phrase slides up the screen as it's sung, the next rising into the frame
+ *  below it (top to bottom). From `dist` m (far enough back that the frame holds the road from the car to the phrase
+ *  ahead), this steeply (radians: nearly overhead, so the phrase toward the frame's top, further off, still reads big
+ *  enough), aimed `toward` m back toward the car. (Tight: the guard's frame margin and type size leave the car only
+ *  about a quarter of the way down the frame by the line's end.) A line whose phrases drift further across the take
+ *  than that frame holds inside `safe` of it (NDC; chorus 1's: its phrases longer and further apart than chorus 2's)
+ *  stands back just far enough to hold them, its aim shifted no further from `toward` than they need. */
+export const ROAD_TAKE = { pace: 0.7, dist: 39, pitch: 1.4, toward: -2, at: 0.4, safe: 0.88 };
+export function roadTake(cs: readonly Carrier[], route: Route, carS: (t: number) => number): (t: number) => Pose {
+  const T0 = cs[0]!.phrase.start, T1 = cs[cs.length - 1]!.phrase.end, v = (ROAD_TAKE.pace * (carS(T1) - carS(T0))) / (T1 - T0);
   const keys = cs.map((c) => [c.phrase.start + (c.phrase.end - c.phrase.start) * ROAD_TAKE.at, c.s] as const);
-  const slope = keys.length > 1 ? (keys[keys.length - 1]![1] - keys[0]![1]) / (keys[keys.length - 1]![0] - keys[0]![0]) : 0;
-  // (where along the road the aim is at t: through each phrase's middle at its middle moment, easing — a third of its
-  // speed through each phrase, catching up between: never still, never a jump — and steady at that pace before and
-  // after)
-  const E = ROAD_TAKE.ease, ease = (u: number) => E * u + (1 - E) * u * u * (3 - 2 * u);
-  const sAt = (t: number) => {
-    if (t <= keys[0]![0]) return keys[0]![1] + E * slope * (t - keys[0]![0]);
-    for (let k = 1; k < keys.length; k++) if (t <= keys[k]![0]) { const [t0, s0] = keys[k - 1]!, [t1, s1] = keys[k]!; return s0 + (s1 - s0) * ease((t - t0) / (t1 - t0)); }
-    const [tl, sl] = keys[keys.length - 1]!;
-    return sl + E * slope * (t - tl);
-  };
+  const tm = keys.reduce((a, [t]) => a + t, 0) / keys.length, sm = keys.reduce((a, [t, s]) => a + s - v * (t - tm), 0) / keys.length;
+  const aimS = (t: number) => sm + v * (t - tm);
+  // (how far on past the aim each phrase lies while it's sung, along the road: furthest, its far edge, as its cue
+  // lands; nearest, its near edge, as it ends)
+  const far = Math.max(...cs.map((c) => c.s + c.h / 2 - aimS(c.phrase.start - LEAD + SNAP_S))), near = Math.min(...cs.map((c) => c.s - c.h / 2 - aimS(c.phrase.end)));
+  // (the road the frame holds inside `safe` either side of its aim, per metre back: up toward the car, and down toward
+  // the lens — less: nearer, the road is seen bigger)
+  const { pitch: p, safe } = ROAD_TAKE, k = safe * Math.tan((LENS.fov * Math.PI) / 360);
+  const up = k / (Math.sin(p) - k * Math.cos(p)), down = k / (Math.sin(p) + k * Math.cos(p));
+  const dist = Math.max(ROAD_TAKE.dist, (far - near) / (up + down)), toward = Math.min(near + up * dist, Math.max(far - down * dist, ROAD_TAKE.toward));
   return (t) => {
-    // (aimed a little toward the lens of the phrase's middle: the frame reaches further up the road, toward the car)
-    const s = sAt(t) + ROAD_TAKE.toward, f = route.frameAt(s), grade = Math.asin(Math.max(-1, Math.min(1, f.fwd.y)));
-    return { tx: f.pos.x, ty: f.pos.y + 0.03, tz: f.pos.z, dist: ROAD_TAKE.dist, yaw: Math.atan2(f.fwd.x, f.fwd.z), pitch: ROAD_TAKE.pitch - grade, roll: 0 };
+    const f = route.frameAt(aimS(t) + toward), grade = Math.asin(Math.max(-1, Math.min(1, f.fwd.y)));
+    return { tx: f.pos.x, ty: f.pos.y + 0.03, tz: f.pos.z, dist, yaw: Math.atan2(f.fwd.x, f.fwd.z), pitch: p - grade, roll: 0 };
   };
 }
 /** A line on one kind of sign elsewhere (paint, signs, gantries, the tunnel's lettering) in one take: each phrase's own
