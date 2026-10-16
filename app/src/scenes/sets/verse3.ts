@@ -818,18 +818,12 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
           c.strokeText('TARZAN & JANE', 512, 160, 980);
         }));
         wash(fg, W + 6, H + 5, 0, 0, -0.3, PINK, 0.14);
-        // a thatched hat over its name, and a carved tiki standing up its left side from the roof, its eyes lit
+        // a thatched hat over its name (a carved tiki stood up its left side from the roof, its eyes lit: a dark column
+        // ten metres tall and under a metre wide, it read as a chimney with lights on it — the user, 2026-10-16: "it has
+        // like a chimney thing to the left of it ... left over from a different time". The tikis by its door say it.)
         const hat = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, W + 2.4, 3), thatch);
         hat.rotation.z = Math.PI / 2; hat.scale.set(1, 1, 0.6); hat.position.set(0, H / 2 + 2.75, -0.2); fg.add(hat);
         for (let k = 0; k < 9; k++) { const f = box(fg, 0.12, 0.9, 0.05, -W / 2 - 0.9 + (k * (W + 1.8)) / 8, H / 2 + 2.2, 0.55, thatch); f.rotation.z = (k % 2 ? 0.15 : -0.15); } // its fringe
-        const tx = -W / 2 - 1.15, ty0 = groundY + lot.h, th = H / 2 + 0.6 - ty0;
-        box(fg, 0.9, th, 0.8, tx, ty0 + th / 2, -0.3, toon({ color: '#5a3e24' }));
-        for (let k = 0; k < 3; k++) {
-          const y = H / 2 - 0.6 - k * 2.6;
-          box(fg, 1.05, 0.25, 0.9, tx, y + 0.55, -0.25, toon({ color: '#4a2e18' })); // its brow
-          for (const ex of [-0.22, 0.22]) neon(fg, 0.22, 0.22, tx + ex, y + 0.2, 0.15, canvasTex(64, 64, (c) => { c.fillStyle = C.orange; c.beginPath(); c.arc(32, 32, 26, 0, Math.PI * 2); c.fill(); }), { peak: 1.1 });
-          box(fg, 0.6, 0.18, 0.1, tx, y - 0.45, 0.16, toon({ color: '#a89c88' })); // its teeth
-        }
         // the torches at the kerb, either side of its door
         for (const x of [-lot.w / 2 + 0.8, lot.w / 2 - 0.8]) {
           cyl(g, 0.08, 2.6, x, 1.3, 2.4, bamboo);

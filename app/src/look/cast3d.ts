@@ -278,6 +278,10 @@ const LEFT_PALM = new THREE.Vector3(-1, 0, 0);
  *  rises (radians about it: from palm down on her thigh to palm forward, up — it rose palm back, toward her face, a
  *  hand on backwards: the user, 2026-10-16). */
 const ELBOW = { rest: -1.3, up: 2.7, raised: -0.25, turn: -Math.PI };
+/** The bottom of the outro's pump (cast.ts PUMP): her upper arm down this far from up (radians about z, out over the
+ *  door), the elbow bent the other way this far, so her forearm stays up beside her head as the elbow drops — a fist
+ *  pump. (Bent forward at the elbow instead, her forearm reached out over the windshield: a reach, not a pump.) */
+const PUMP_POSE = { shoulder: 0.65, elbow: 0.85 };
 /** His right arm (his frame): its bones (m, shoulder to elbow to wrist, his left arm's build — the user, 2026-10-15:
  *  laid out straight along the bench's top it read "super fucking long"); its rest along the bench's top behind her
  *  (the wrist, and which way the elbow points); and round her shoulders at the end. */
@@ -322,13 +326,14 @@ function reach(upper: THREE.Object3D, W: THREE.Vector3, pole: THREE.Vector3, pal
 
 /** Poses the two of them (in the car's body, by name) for the moment: her arm up, her look to him, his nod; and at the
  *  end her lean into him — over on the bench and in, her head on his shoulder — and his arm round her. */
-export function poseCast(body: THREE.Object3D, c: { herArm: number; herLook: number; hisNod: number; lean: number; hold: number; steer: number }) {
+export function poseCast(body: THREE.Object3D, c: { herArm: number; herPump: number; herLook: number; hisNod: number; lean: number; hold: number; steer: number }) {
   const her = body.getObjectByName('her')!, him = body.getObjectByName('him')!, L = LEAN_POSE;
   // his wheel turned a touch, his left hand going with it on the rim
   const wheel = body.getObjectByName('steering'), left = him.getObjectByName('hisLeftArm');
   if (wheel) wheel.rotation.z = c.steer;
   if (left) { const { U, F, pole } = left.userData as { U: number; F: number; pole: THREE.Vector3 }; reach(left, wheelWrist(left.position, him.position.x, c.steer).W, pole, LEFT_PALM, U, F, 'hisLeftForearm'); }
-  body.getObjectByName('herArm')!.rotation.set(0, 0, -2.7 * c.herArm);
+  const herArm = body.getObjectByName('herArm')!;
+  herArm.rotation.set(0, 0, -ELBOW.up * c.herArm + PUMP_POSE.shoulder * c.herPump); herArm.userData.pump = c.herPump;
   // (about her hip: the hip stays on the bench where she's slid to, her shoulders and head come over toward him)
   const slide = ease(c.lean, L.slideIn), a = -L.tilt * ease(c.lean, L.tiltIn), settle = ease(c.lean, L.headIn);
   her.rotation.set(0, 0, a);
@@ -512,7 +517,8 @@ export function buildHer(mats: Mats): THREE.Group {
   }
   // her right arm (the door's side, -x) on its pivot: hanging from the shoulder, the forearm forward along her thigh;
   // as the scene swings it up its elbow straightens (worked out from the swing as the world's matrices update: the
-  // scene sets only the arm's turn); her bangles at the wrist
+  // scene sets only the arm's turn, and in the outro's pump how far into it she is, userData.pump); her bangles at the
+  // wrist
   const S = V(-F.shoulder.x, F.shoulder.y, F.shoulder.z), arm = new THREE.Group(); arm.name = 'herArm'; arm.position.copy(S); g.add(arm);
   part(arm, tube([V(0.035, 0.035, -0.005), V(0, 0, 0), V(0.006, -0.13, 0.01), V(0.012, -0.27, 0.02)], [0.045, 0.043, 0.037, 0.03]), mats);
   const elbow = new THREE.Group(); elbow.position.set(0.012, -0.27, 0.02); arm.add(elbow);
@@ -521,9 +527,10 @@ export function buildHer(mats: Mats): THREE.Group {
   hand(wrist, mats, V(0, 0, 0), V(0, -1, 0), V(0, 0, -1), V(1, 0, 0), 0.86, 0.35, 0.14);
   for (const y of [-0.2, -0.214]) { const b = part(elbow, new THREE.TorusGeometry(0.026, 0.0035, 6, 24), mats, 'gold'); b.position.set(0, y, 0); b.rotation.x = Math.PI / 2 + (y + 0.207) * 8; }
   arm.updateMatrixWorld = function (force?: boolean) {
-    const u = Math.min(1, Math.max(0, -this.rotation.z / ELBOW.up));
+    const pump = (this.userData.pump as number | undefined) ?? 0;
+    const u = Math.min(1, Math.max(0, (-this.rotation.z + PUMP_POSE.shoulder * pump) / ELBOW.up));
     const e = u * u * (3 - 2 * u);
-    elbow.rotation.x = ELBOW.rest + (ELBOW.raised - ELBOW.rest) * e;
+    elbow.rotation.set(ELBOW.rest + (ELBOW.raised - ELBOW.rest) * e, 0, -PUMP_POSE.elbow * pump);
     wrist.rotation.y = ELBOW.turn * e;
     THREE.Group.prototype.updateMatrixWorld.call(this, force);
   };

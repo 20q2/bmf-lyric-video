@@ -32,7 +32,7 @@ void main() {
   vec3 d = normalize(vDir);
   float h = max(d.y, 0.0);
   // the gradient, printed in bands (their edges anti-aliased)
-  float g = pow(h, 0.42), b = g * bands, aa = fwidth(b);
+  float g = pow(h, 0.42), b = g * bands, aa = max(fwidth(b), 1e-5);
   float q = (floor(b) + smoothstep(1.0 - aa, 1.0, fract(b))) / bands;
   q = mix(q, g, stars); // by night the bands melt into one gradient (seen looking up they'd ring the frame)
   vec3 c = mix(horizon, zenith, q);
@@ -45,13 +45,18 @@ void main() {
   c += gq * sunColor * 0.35;
   // the mountains: two printed ranges on the horizon on the far side from the sea (the far one hazed toward the sky,
   // the near one darker); their ridges noise round the compass (sampled on a circle: no seam)
-  if (mountains > 0.0 && d.y > -0.02) {
+  // (every derivative here is taken outside any branch on the pixel's own direction: taken inside one, the quads
+  // straddling its edge got garbage — a NaN the bloom drew out into a white line blinking along the mountains' foot,
+  // where they met the ground, behind the city at 172 s and by the motel at 180 s; the branches are on uniforms only,
+  // the direction's limits as factors)
+  float pa = max(fwidth(d.y), 1e-5) * 1.2;
+  if (mountains > 0.0) {
     vec2 fd2 = normalize(d.xz + 1e-5), md = normalize(mountainDir.xz + 1e-5);
-    float face = smoothstep(-0.35, 0.15, dot(fd2, md)), pa = fwidth(d.y) * 1.2;
+    float face = smoothstep(-0.35, 0.15, dot(fd2, md)), foot = step(-0.02, d.y);
     float far1 = (0.02 + 0.1 * fbm(fd2 * 2.5 + vec2(2.7))) * face, near1 = (0.008 + 0.06 * fbm(fd2 * 5.5 + vec2(8.3, 3.1))) * face;
     vec3 farC = mix(horizon, zenith, 0.45) * 0.92, nearC = mix(horizon, zenith, 0.7) * 0.62;
-    c = mix(c, farC, smoothstep(far1 + pa, far1 - pa, d.y) * step(0.001, far1) * mountains);
-    c = mix(c, nearC, smoothstep(near1 + pa, near1 - pa, d.y) * step(0.001, near1) * mountains);
+    c = mix(c, farC, smoothstep(far1 + pa, far1 - pa, d.y) * step(0.001, far1) * mountains * foot);
+    c = mix(c, nearC, smoothstep(near1 + pa, near1 - pa, d.y) * step(0.001, near1) * mountains * foot);
   }
   // the low sun's rays: printed wedges fanning out round it, turning slowly
   if (rays > 0.0 && d.y > 0.0) {
@@ -63,13 +68,13 @@ void main() {
     c += sunColor * 0.09 * wedge * reach * rays;
   }
   // the sun (above the horizon)
-  float ang = acos(clamp(dot(d, sunDir), -1.0, 1.0)), px = fwidth(ang);
+  float ang = acos(clamp(dot(d, sunDir), -1.0, 1.0)), px = max(fwidth(ang), 1e-5);
   c = mix(c, sunColor * sunHDR, smoothstep(sunR + px, sunR - px, ang) * step(0.0, d.y));
   // clouds: flat printed shapes in the low sky, drifting, two tones (lit on the sun's side), passing over the sun
-  if (clouds > 0.0 && d.y > 0.0) {
-    vec2 cp = d.xz / (d.y + 0.1) * 0.55 + vec2(time * 0.006, 0.0);
+  if (clouds > 0.0) {
+    vec2 cp = d.xz / (max(d.y, 0.0) + 0.1) * 0.55 + vec2(time * 0.006, 0.0);
     // (lobed: a finer noise carves the edges into puffs, and a darker rim lines them — plain fbm read as soft smears)
-    float n = fbm(cp) + 0.16 * (fbm(cp * 2.7 + 5.0) - 0.5), na = fwidth(n) * 1.5;
+    float n = fbm(cp) + 0.16 * (fbm(cp * 2.7 + 5.0) - 0.5), na = max(fwidth(n), 1e-5) * 1.5;
     float cover = smoothstep(0.56 - na, 0.56 + na, n) * smoothstep(0.01, 0.06, d.y) * (1.0 - smoothstep(0.3, 0.6, d.y));
     float rim = cover - smoothstep(0.585 - na, 0.585 + na, n);
     vec3 fd = normalize(vec3(d.x, 0.0, d.z) + 1e-4), fs = normalize(vec3(sunDir.x, 0.0, sunDir.z) + 1e-4);
@@ -79,14 +84,14 @@ void main() {
   }
   // the moon, once the sun's down: a pale disc, its seas printed darker, in a soft halo — a wide faint one and a close
   // brighter one (the damp air round it)
-  if (moon > 0.0 && d.y > 0.0) {
-    float am = acos(clamp(dot(d, moonDir), -1.0, 1.0)), pm = fwidth(am);
-    c += vec3(0.62, 0.68, 0.95) * moon * (0.06 * exp(-am * 4.0) + 0.2 * exp(-am * 14.0) + 0.3 * exp(-am * 45.0));
+  if (moon > 0.0) {
+    float am = acos(clamp(dot(d, moonDir), -1.0, 1.0)), pm = max(fwidth(am), 1e-5), up = step(0.0, d.y);
+    c += vec3(0.62, 0.68, 0.95) * moon * up * (0.06 * exp(-am * 4.0) + 0.2 * exp(-am * 14.0) + 0.3 * exp(-am * 45.0));
     vec3 mx = normalize(cross(moonDir, vec3(0.0, 1.0, 0.0)) + 1e-5), my = cross(mx, moonDir);
     vec2 mp = vec2(dot(d, mx), dot(d, my)) / moonR;
     float seas = smoothstep(0.52, 0.6, fbm(mp * 1.3 + vec2(3.1, 7.7)));
     vec3 disc = mix(vec3(0.95, 0.95, 1.0) * 1.45, vec3(0.66, 0.68, 0.82) * 1.15, seas);
-    c = mix(c, disc, smoothstep(moonR + pm, moonR - pm, am) * moon);
+    c = mix(c, disc, smoothstep(moonR + pm, moonR - pm, am) * moon * up);
   }
   // stars: one in some cells of a grid over the sky, twinkling
   if (stars > 0.0 && d.y > 0.02) {
