@@ -10,7 +10,7 @@ import { Route, type RouteFrame } from './route';
 import { SETTLE, dwellFor, emphasisOf } from './phrases';
 import { LEAD, SNAP_S, SWOOP_S, type Shot, type Target, beatAtOrAfter, director, resolveAt } from './shots';
 import * as THREE from 'three';
-import { AUDIBLE, type Stretch, motionFor, resolveStretches } from './stretches';
+import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
 import { REVEAL_S } from './dissolve';
 import { type Block, blocksOf } from './blocks';
@@ -55,15 +55,17 @@ export const LANE = 1.9;
 /** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
  *  its first shot stands (m). */
 export const SIGN_SHOT = { dist: 7.5, push: 0.5, over: 3 };
-/** The end, after the last line: on a beat at least `after` s past it (and no later than `before` s ahead of the fade
- *  out of hearing), the camera glides down behind the two of them, low over their shoulders (m behind the car's centre,
- *  up off the road: `back`, `up` [from, to]), lingers there while she leans into him, then from `from` of the way to
- *  the end card eases slowly back and up to the poster: the two of them in silhouette in the car, the hill sign on
- *  the left, the city and the moon over downtown on the right. High enough to see them over the bench's back (her
- *  head on his shoulder, his arm round her), low enough that the city's lights stand over the wall above them (craned
- *  high, they sank onto the grey lot). Looking out with them, aimed m ahead of where the car parks, off to its side,
- *  under its level. */
-export const END = { after: 0.8, before: 0.6, back: [3.6, 6.8] as [number, number], up: [2.3, 2.9] as [number, number], from: 0.42, look: 300, side: -10, under: 28 };
+/** The end: one take, from the cut to the last line ("Cruise all night", the hill sign across the canyon, seen from
+ *  behind the car as it climbs the last of the road) to the end card — the camera falls back from the car the whole way
+ *  and never comes back in: easing in from that line's framing, it pulls back and up from the car rolling to its stop
+ *  in the turnout (m behind the car's centre, up off the road: from where the line's framing has it, to `back`, `up`),
+ *  as she leans into him and his arm comes round her, out to the poster: the two of them in silhouette in the car, the
+ *  hill sign on the left, the city and the moon over downtown on the right. The aim pans from the line's (the sign) to
+ *  the view they parked for: m ahead of where the car parks, off to its side, under its level. Its pull (`pull`: the
+ *  power of its ease-in) still moving at the cut; the pan eased in and out. (It was a glide out to the overlook's
+ *  chase, a glide back in low over their shoulders, a hold there, and a crane back out: "the camera work is a little
+ *  bit janky" — the user, 2026-10-16: "if we just continued panning outwards, like, from the start".) */
+export const END = { back: 20, up: 4.4, pull: 1.8, look: 300, side: -10, under: 12 };
 /** The end: the cut to the motel (s, a half-beat after the last line has been read), and the fade out (s). */
 export const FINALE = { endCard: 179.2, fade: [180.9, 181.6] as [number, number] };
 
@@ -235,26 +237,29 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const signShot: Target = (t) => lookFrom(sign.center.clone().addScaledVector(sign.normal, SIGN_SHOT.dist - SIGN_SHOT.push * Math.min(1, Math.max(0, t - endCardAt) / SIGN_SHOT.over)).add(new THREE.Vector3(0, -0.8, 0)), sign.center);
   shots.push(...setShots);
   for (const o of setShots) own.add(o);
-  // after the last line (the song fading out of hearing), the scene alone: the view they parked for — the hill sign
-  // across the canyon, CRUISE ALL NIGHT over the city's lights — from just behind them, then a slow crane up and away;
-  // then the motel's sign
-  const lastLine = carriers[carriers.length - 1]!.phrase, park = carFrame(audio.duration), pf = flat(park.fwd), pr = flat(park.right);
-  const away = beatAtOrAfter(audio, Math.max(lastLine.end + END.after, AUDIBLE - END.before));
-  // (the eye rides with the car as it rolls the last metres to a stop; the aim holds on the view)
+  // from the cut to the last line to the end card, the scene alone (the song fading out of hearing): the view they
+  // parked for — the hill sign across the canyon, CRUISE ALL NIGHT over the city's lights — the camera falling back
+  // from the car all the way (END); then the motel's sign
+  const last = phraseShots[phraseShots.length - 1]!, t0 = resolveAt(last.at), from = last.to(t0), f0 = carFrame(t0);
+  const e0 = eyeOf(from).sub(f0.pos), back0 = -e0.dot(flat(f0.fwd)), side0 = e0.dot(flat(f0.right)), up0 = e0.y;
+  const aim0 = new THREE.Vector3(from.tx, from.ty, from.tz), park = carFrame(audio.duration), pf = flat(park.fwd), pr = flat(park.right);
   const view = park.pos.clone().addScaledVector(pf, END.look).addScaledVector(pr, END.side).add(new THREE.Vector3(0, -END.under, 0));
-  const crane: Target = (t) => {
-    const u = Math.min(1, Math.max(0, (t - away) / (FINALE.endCard - away) - END.from) / (1 - END.from)), e = u * u * (3 - 2 * u), f = carFrame(t);
-    return lookFrom(f.pos.clone().addScaledVector(flat(f.fwd), -(END.back[0] + (END.back[1] - END.back[0]) * e)).add(new THREE.Vector3(0, END.up[0] + (END.up[1] - END.up[0]) * e, 0)), view);
+  const pull: Target = (t) => {
+    const u = Math.min(1, Math.max(0, (t - t0) / (FINALE.endCard - t0))), e = u ** END.pull, a = u * u * (3 - 2 * u), f = carFrame(t);
+    const back = back0 * (END.back / back0) ** e; // (by ratio: it falls back at an even rate to the eye)
+    const eye = f.pos.clone().addScaledVector(flat(f.fwd), -back).addScaledVector(flat(f.right), side0 * (1 - e)).add(new THREE.Vector3(0, up0 + (END.up - up0) * e, 0));
+    return lookFrom(eye, aim0.clone().lerp(view, a));
   };
-  const scene: Shot = { at: away, to: crane, move: 'glide' };
+  // (the last line's own shot cuts straight onto the take: at its cut the take is that line's framing)
+  last.to = pull;
   const endCard: Shot = { at: endCardAt, to: signShot, move: 'cut' };
-  shots.push(scene, endCard); own.add(scene); own.add(endCard);
+  shots.push(endCard); own.add(endCard);
   // a stretch's glide gives way to the phrases' own shots: it may not start within 0.3 s of one, nor while a phrase is
   // still being read (its reading window)
-  const kept = shots.filter((s) => own.has(s) || (![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
+  const kept = shots.filter((s) => own.has(s) || (resolveAt(s.at) < t0 && ![...own].some((l) => Math.abs(resolveAt(l.at) - resolveAt(s.at)) < 0.3)
     && !reading.some(([a, b]) => resolveAt(s.at) >= a - 0.3 && resolveAt(s.at) < b)));
   const camera = director(audio, kept, chaseOf(stretches[0]!));
   const blocks = blocksOf(route, motion, stretches, carriers, tunnels, clears, setBlocks, openings);
-  const lastShot = phraseShots[phraseShots.length - 1], lastCut = lastShot ? resolveAt(lastShot.at) : null;
+  const lastCut = t0;
   return { stretches, motion, route, carriers, tunnels, blocks, openings, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans, reading: reading.map(([a, b], i) => ({ a, b, words: carriers[i]!.phrase.words.length })) };
 }

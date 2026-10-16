@@ -8,7 +8,11 @@
 //   - searchlights from two lots in the city sweeping the sky (a premiere somewhere);
 //   - a mist lying in the canyon and over the plain, lit warm from under by the city (the user, 2026-10-15: "make it
 //     look just like really nice at the end").
-// Downtown's tallest towers wear lit crowns and setbacks; every tall one a blinking red beacon.
+//   - between the streets, the houses: dim porch and window lights scattered through every lit block (the user,
+//     2026-10-16: "its fidelity improved just a little bit"), and a smaller cluster of mid-rise towers off downtown;
+//   - a soft haze over the brightest parts: warm glows lying over downtown, midtown and the busiest blocks.
+// Downtown's tallest towers wear lit crowns and setbacks; every tall one a blinking red beacon; their windows lit warm,
+// white or cool, a floor lit right across here and there.
 // HDR points, so the city glitters in the bloom; the towers toon-dark silhouettes against the glow. The lights switch
 // on in a wave as the car parks, rolling out from the overlook to the horizon, and twinkle. On the outro's "we might
 // crash" (sung after the song has faded out of hearing: the end is the scene's own) they go out block by block, the
@@ -24,7 +28,19 @@ import { toon } from './toon';
 export const CITY = { plain: 196, near: 300, far: 5200, half: 3800, street: 85, step: 14, waveAt: 165.6, wave: 1800, glow: 3.6, freeways: 7, spread: 1.5, die: 0.3, freewayLag: 1.5 };
 /** Downtown: how far ahead and to the right (m), its towers (how many, within this radius, their heights) and the glow
  *  over it; the boulevards (how many each way). */
-export const DOWNTOWN = { ahead: 1700, right: 520, towers: 22, radius: 320, h: [55, 190] as [number, number], glow: 0.4, boulevards: [11, 7] as [number, number] };
+export const DOWNTOWN = { ahead: 1700, right: 520, towers: 30, radius: 320, h: [55, 190] as [number, number], glow: 0.4, boulevards: [11, 7] as [number, number],
+  /** its few tallest, landmarks near its middle (how many, their heights) */
+  landmarks: 3, tall: [195, 235] as [number, number] };
+/** Midtown: a smaller cluster of mid-rise towers out on the plain between the hill and downtown (m ahead, right; how
+ *  many, within this radius, their heights). */
+export const MIDTOWN = { ahead: 2800, right: -60, towers: 12, radius: 230, h: [35, 95] as [number, number] };
+/** The houses between the streets: lights a block (fewest far out, most round downtown), how bright (a share of a
+ *  street light's: a texture between the streets rather than more glitter). */
+export const HOMES = { least: 3, most: 9, dim: 0.55 };
+/** The haze lying over the brightest parts: how many glows besides downtown's and midtown's, how big (m), how bright. */
+export const HAZE = { n: 90, size: [160, 420] as [number, number], glow: 0.07 };
+/** Each freeway's cars (two lanes each way), and its lamps down both sides this far apart (m). */
+export const FREEWAY = { cars: 1800, lamps: 45 };
 /** The searchlights: where they stand (m ahead of the parked car, right of it), how long their beams reach, how wide
  *  they open, how bright; their sweep (radians off the vertical, how far either way, how fast). */
 export const SEARCH = { at: [[1350, 320], [1950, -380]] as [number, number][], len: 1600, r: 26, glow: 0.3, tilt: 0.42, sweep: 0.55, rate: 0.33 };
@@ -76,6 +92,28 @@ void main() {
   gl_FragColor = vec4(vColor * glow, a);
 }`;
 
+/** The haze's glows: big soft discs, sized in metres (no least size: they're never small), coming up with the wave
+ *  and going with their part of the city in the blackout. */
+const HAZE_VERT = /* glsl */ `
+attribute float size; attribute float wake; attribute float sleep;
+uniform float t, scale, offAt, die;
+varying float vA;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = clamp(size * 1400.0 / length(mv.xyz), 2.0, 900.0) * scale;
+  gl_Position = projectionMatrix * mv;
+  vA = smoothstep(wake, wake + 2.0, t) * (1.0 - smoothstep(offAt + sleep, offAt + sleep + die, t));
+}`;
+const HAZE_FRAG = /* glsl */ `
+uniform float glow, night;
+varying float vA;
+void main() {
+  vec2 d = gl_PointCoord - 0.5;
+  float a = exp(-dot(d, d) * 14.0) - exp(-3.5);
+  if (a <= 0.0) discard;
+  gl_FragColor = vec4(vec3(1.0, 0.56, 0.3) * glow * a * vA * night, 1.0);
+}`;
+
 export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Vector3, ground: number, offAt = 1e7, plainFrom = 0): { group: THREE.Group; update(t: number, eye: THREE.Vector3, scale: number): void } {
   const pos: number[] = [], col: number[] = [], size: number[] = [], wake: number[] = [], dir: number[] = [], move: number[] = [], sleep: number[] = [], blink: number[] = [];
   const F = fwd.clone().setY(0).normalize(), R = right.clone().setY(0).normalize();
@@ -109,6 +147,20 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
       }
     }
   }
+  // the houses: dim lights scattered through each lit block between its streets (porches, windows, a TV's blue)
+  const homeC: [number, number, number][] = [[1, 0.78, 0.5], [1, 0.86, 0.66], [1, 0.66, 0.36], [0.62, 0.74, 1]];
+  for (let k = -80; k <= 80; k++) {
+    for (let bj = -64; bj <= 64; bj++) {
+      const mid = at.clone().addScaledVector(gR, (k + 0.5) * CITY.street).addScaledVector(gF, (bj + 0.5) * CITY.street);
+      if (!inside(mid) || dark(k, bj)) continue;
+      const n = Math.round(HOMES.least + (HOMES.most - HOMES.least) * Math.exp(-mid.distanceTo(D) / 1400) * (0.6 + 0.8 * hash(k, bj, 81)));
+      for (let i = 0; i < n; i++) {
+        const p = mid.clone().addScaledVector(gR, (hash(k, bj, i, 82) - 0.5) * CITY.street * 0.78).addScaledVector(gF, (hash(k, bj, i, 83) - 0.5) * CITY.street * 0.78);
+        const r = hash(k, bj, i, 84), c = homeC[r < 0.4 ? 0 : r < 0.7 ? 1 : r < 0.93 ? 2 : 3]!;
+        put(p, [c[0] * HOMES.dim, c[1] * HOMES.dim, c[2] * HOMES.dim], 0.5 + 0.6 * hash(k, bj, i, 85), undefined, undefined, CITY.spread * hash(k, bj, 7), 0, ground + 0.4);
+      }
+    }
+  }
   // the boulevards: long bright rows of sodium, close-set, running right out to the edge
   for (const [n, along, across] of [[DOWNTOWN.boulevards[0], gF, gR], [DOWNTOWN.boulevards[1], gR, gF]] as const) {
     for (let b = 0; b < n; b++) {
@@ -125,30 +177,43 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   // (clear of the haze from the cut to the last line: black against the glow, lit or dark; before it, in the haze like
   // everything else — unhazed, they hung as black blocks in the coast's sky at 106 s, 2026-10-15)
   const towerMat = toon({ color: '#0e0b16', fog: false }), hazedMat = toon({ color: '#0e0b16' }), crowns: THREE.Mesh[] = [], blocks: THREE.Mesh[] = [];
-  for (let i = 0; i < DOWNTOWN.towers; i++) {
-    const a = hash(i, 41) * Math.PI * 2, r = DOWNTOWN.radius * Math.sqrt(hash(i, 42));
-    const c = D.clone().addScaledVector(F, r * Math.cos(a)).addScaledVector(R, r * Math.sin(a));
-    const h = DOWNTOWN.h[0] + (DOWNTOWN.h[1] - DOWNTOWN.h[0]) * hash(i, 43) ** 1.6 * (1 - r / DOWNTOWN.radius * 0.5), w = 22 + 24 * hash(i, 44), d = 22 + 24 * hash(i, 45);
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), towerMat); blocks.push(tower);
-    tower.position.set(c.x, ground + h / 2, c.z); tower.rotation.y = grid; group.add(tower);
-    // windows: columns up each face, some floors dark
-    const faces: [THREE.Vector3, number][] = [[gF, d / 2], [gF.clone().negate(), d / 2], [gR, w / 2], [gR.clone().negate(), w / 2]];
-    for (const [nrm, half] of faces) {
-      const along = nrm.clone().cross(new THREE.Vector3(0, 1, 0)), span = nrm === gF || nrm.equals(gF.clone().negate()) ? w : d;
-      for (let x = -span / 2 + 3; x < span / 2 - 2; x += 5.5) for (let y = 6; y < h - 4; y += 4.2) {
-        if (hash(i, x, y) > 0.55) continue;
-        const p = c.clone().addScaledVector(nrm, half + 0.5).addScaledVector(along, x);
-        put(p, hash(i, y, 46) < 0.8 ? white : cool, 1.9, undefined, undefined, CITY.spread * hash(i, Math.floor(y / 12), 47), 0, ground + y);
+  const warm: [number, number, number] = [1, 0.8, 0.55];
+  // (a cluster's towers round its middle `M`; `seed` keeps the clusters' hashes apart — downtown's are as they were)
+  const towers = (M: THREE.Vector3, count: number, radius: number, hs: [number, number], seed: number, tallest: [number, number] = hs, landmarks = 0) => {
+    for (let i = 0; i < count + landmarks; i++) {
+      const lm = i >= count, a = hash(i, 41 + seed) * Math.PI * 2, r = (lm ? 0.4 : 1) * radius * Math.sqrt(hash(i, 42 + seed));
+      const c = M.clone().addScaledVector(F, r * Math.cos(a)).addScaledVector(R, r * Math.sin(a));
+      const h = lm ? tallest[0] + (tallest[1] - tallest[0]) * hash(i, 50 + seed) : hs[0] + (hs[1] - hs[0]) * hash(i, 43 + seed) ** 1.6 * (1 - r / radius * 0.5);
+      const w = lm ? 17 + 9 * hash(i, 44 + seed) : 22 + 24 * hash(i, 44 + seed), d = lm ? 17 + 9 * hash(i, 45 + seed) : 22 + 24 * hash(i, 45 + seed); // (the landmarks slim)
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), towerMat); blocks.push(tower);
+      tower.position.set(c.x, ground + h / 2, c.z); tower.rotation.y = grid; group.add(tower);
+      // windows: columns up each face, some floors dark, a floor here and there lit right across; each tower's light
+      // its own (warm, white or cool), a window off it here and there
+      const tint = hash(i, 51 + seed), own = tint < 0.35 ? warm : tint < 0.8 ? white : cool;
+      const faces: [THREE.Vector3, number][] = [[gF, d / 2], [gF.clone().negate(), d / 2], [gR, w / 2], [gR.clone().negate(), w / 2]];
+      for (const [nrm, half] of faces) {
+        const along = nrm.clone().cross(new THREE.Vector3(0, 1, 0)), span = nrm === gF || nrm.equals(gF.clone().negate()) ? w : d;
+        for (let y = 6; y < h - 4; y += 4.2) {
+          const full = hash(i, y, 52 + seed) < 0.06;
+          for (let x = -span / 2 + 3; x < span / 2 - 2; x += 5.5) {
+            if (!full && hash(i, x, y) > 0.55) continue;
+            const p = c.clone().addScaledVector(nrm, half + 0.5).addScaledVector(along, x), odd = hash(i, x, y, 53 + seed);
+            put(p, odd < 0.12 ? (own === warm ? white : warm) : own, 1.9, undefined, undefined, CITY.spread * hash(i, Math.floor(y / 12), 47), 0, ground + y);
+          }
+        }
+      }
+      if (h > 80) put(c, [1, 0.12, 0.08], 2.2, undefined, undefined, CITY.spread, 0.2 + 0.6 * hash(i, 48 + seed), ground + h + 2);
+      // the tallest: a setback on top and a lit crown round it (a band of light, white or teal)
+      if (h > 130) {
+        const top = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 14, d * 0.7), towerMat); blocks.push(top); top.position.set(c.x, ground + h + 7, c.z); top.rotation.y = grid; group.add(top);
+        const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7 + 0.6, 2.2, d * 0.7 + 0.6), lampMaterial(hash(i, 49 + seed) < 0.5 ? '#bff4ff' : '#fff1d8', 2.4, 0.2));
+        crown.position.set(c.x, ground + h + 11.5, c.z); crown.rotation.y = grid; group.add(crown); crowns.push(crown);
       }
     }
-    if (h > 80) put(c, [1, 0.12, 0.08], 2.2, undefined, undefined, CITY.spread, 0.2 + 0.6 * hash(i, 48), ground + h + 2);
-    // the tallest: a setback on top and a lit crown round it (a band of light, white or teal)
-    if (h > 130) {
-      const top = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 14, d * 0.7), towerMat); blocks.push(top); top.position.set(c.x, ground + h + 7, c.z); top.rotation.y = grid; group.add(top);
-      const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7 + 0.6, 2.2, d * 0.7 + 0.6), lampMaterial(hash(i, 49) < 0.5 ? '#bff4ff' : '#fff1d8', 2.4, 0.2));
-      crown.position.set(c.x, ground + h + 11.5, c.z); crown.rotation.y = grid; group.add(crown); crowns.push(crown);
-    }
-  }
+  };
+  towers(D, DOWNTOWN.towers, DOWNTOWN.radius, DOWNTOWN.h, 0, DOWNTOWN.tall, DOWNTOWN.landmarks);
+  const Mt = at.clone().addScaledVector(F, MIDTOWN.ahead).addScaledVector(R, MIDTOWN.right);
+  towers(Mt, MIDTOWN.towers, MIDTOWN.radius, MIDTOWN.h, 100);
   // the plain the city stands on, dark between its lights (moonlit, it read pale through them, and with the lights out
   // as a flat lavender sea: the haze is the mist's); from the foot of the lookout's slope out. Laid from `plainFrom`
   // (the cut to the last line): earlier, other sections look out over this ground
@@ -168,12 +233,17 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
     const a = 0.5 + 1.1 * hash(f, 9), cross = gR.clone().multiplyScalar(Math.cos(a)).addScaledVector(gF, Math.sin(a)).normalize();
     const mid = at.clone().addScaledVector(F, CITY.near + 300 + 2600 * hash(f, 10)).addScaledVector(R, (hash(f, 11) - 0.5) * 2200);
     const len = 5600, start = mid.clone().addScaledVector(cross, -len / 2), side = cross.clone().cross(new THREE.Vector3(0, 1, 0));
-    for (let i = 0; i < 1100; i++) {
+    for (let i = 0; i < FREEWAY.cars; i++) {
       // (two lanes each way: white coming, red going, the outer lane a little slower)
       const lane = i % 2, outer = Math.floor(i / 2) % 2;
       const p0 = start.clone().addScaledVector(side, (lane ? 1 : -1) * (5 + 4 * outer));
       const d = lane ? cross : cross.clone().negate(), s0 = lane ? p0 : p0.clone().addScaledVector(cross, len);
       put(s0, lane ? white : [1, 0.15, 0.1], lane ? 1.9 : 1.6, d, [hash(f, i, 12) * len, 24 + 8 * hash(f, i, 13) - 5 * outer, len], CITY.freewayLag + CITY.spread * hash(f, i, 14));
+    }
+    // its lamps down both sides: an amber ribbon either side of the traffic
+    for (let x = 0; x < len; x += FREEWAY.lamps) for (const sd of [-1, 1]) {
+      const p = start.clone().addScaledVector(cross, x + 6 * hash(f, x, 15)).addScaledVector(side, sd * 15);
+      if (inside(p)) put(p, amber, 1.1, undefined, undefined, CITY.freewayLag + CITY.spread * hash(f, Math.floor(x / 300), 16), 0, ground + 1.5);
     }
   }
   // a plane or two, blinking, crossing the sky slowly
@@ -193,6 +263,25 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
     put(on(-24), [1, 0.2, 0.15], 6, d, [phase, speed, len], 1e6, 0.1, y + 4);
     put(on(-16), [0.3, 1, 0.4], 4.5, d, [phase, speed, len], 1e6, 0, y);
   }
+  // the haze: soft warm glows lying over downtown, midtown and here and there over the busiest blocks (lifted most of
+  // their own size off the plain, so the plain doesn't cut them)
+  const hz: number[] = [], hzSize: number[] = [], hzWake: number[] = [], hzSleep: number[] = [];
+  const glowAt = (p: THREE.Vector3, sz: number, k: number) => { const a = p.clone().sub(at).dot(F); hz.push(p.x, ground + sz * 0.42, p.z); hzSize.push(sz); hzWake.push(CITY.waveAt + Math.max(0, a) / CITY.wave + 0.3); hzSleep.push(CITY.spread * hash(k, 91)); };
+  for (let k = 0; k < 7; k++) glowAt(D.clone().addScaledVector(F, (hash(k, 92) - 0.5) * 500).addScaledVector(R, (hash(k, 93) - 0.5) * 700), 420 + 200 * hash(k, 94), k);
+  for (let k = 0; k < 3; k++) glowAt(Mt.clone().addScaledVector(R, (k - 1) * 220), 320, 10 + k);
+  for (let k = 0; k < HAZE.n; k++) {
+    const p = at.clone().addScaledVector(F, CITY.near + 300 + (CITY.far - CITY.near - 300) * hash(k, 95) ** 0.8).addScaledVector(R, (hash(k, 96) - 0.5) * 2 * CITY.half * 0.7);
+    if (!inside(p) || hash(k, 97) > 0.4 + 0.6 * Math.exp(-p.distanceTo(D) / 1500)) continue;
+    glowAt(p, HAZE.size[0] + (HAZE.size[1] - HAZE.size[0]) * hash(k, 98), 20 + k);
+  }
+  const hg = new THREE.BufferGeometry();
+  hg.setAttribute('position', new THREE.Float32BufferAttribute(hz, 3));
+  hg.setAttribute('size', new THREE.Float32BufferAttribute(hzSize, 1));
+  hg.setAttribute('wake', new THREE.Float32BufferAttribute(hzWake, 1));
+  hg.setAttribute('sleep', new THREE.Float32BufferAttribute(hzSleep, 1));
+  const hu = { t: { value: 0 }, scale: { value: 1 }, night: NIGHT, glow: { value: HAZE.glow }, offAt: { value: offAt }, die: { value: 1.2 } };
+  const haze = new THREE.Points(hg, new THREE.ShaderMaterial({ vertexShader: HAZE_VERT, fragmentShader: HAZE_FRAG, uniforms: hu, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false }));
+  haze.frustumCulled = false; group.add(haze);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -224,7 +313,7 @@ export function buildCity(at: THREE.Vector3, fwd: THREE.Vector3, right: THREE.Ve
   return {
     group,
     update(t, eye, scale) {
-      u.t.value = t; u.on.value = t; u.eye.value.copy(eye); u.scale.value = scale;
+      u.t.value = t; u.on.value = t; u.eye.value.copy(eye); u.scale.value = scale; hu.t.value = t; hu.scale.value = scale;
       // (the city's own light: it comes up with the wave and goes with the blackout — the searchlights, the crowns and
       // the mist it lights with it)
       const lit = Math.min(1, Math.max(0, (t - CITY.waveAt) / 2)) * (1 - Math.min(1, Math.max(0, (t - offAt - CITY.spread) / 1.2)));

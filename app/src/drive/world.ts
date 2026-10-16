@@ -883,9 +883,33 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
  *  toward the overlook, how far it runs on to the city's side and the other, the ground this far under the letters'
  *  feet, a gentle roll in it; its mesh's extent and offset; the mast on its ridge (along, height). */
 export const HILLSIDE = { ridge: 45, across: 60, right: 120, left: 320, under: 1.5, roll: 0.06, w: 860, d: 420, x: -130, z: -60, mast: { x: -70, h: 30 },
-  /** The floodlights' wash on the slope: its patch (deep, centred), brightest this far in front of the letters, how far it
-   *  falls off, how bright. */
-  wash: { d: 50, z: 3, z0: 1, fall: 8, glow: 0.08 } };
+  /** The floodlights' wash on the slope: brightest this far in front of the letters, how far it falls off down and up
+   *  the slope (m), how far along the letters it runs (a share of their width) and how bright; its warm white. */
+  wash: { z0: 1, fall: 8, along: 0.6, glow: 0.08, color: [1, 0.9, 0.78] } };
+
+/** The hill's ground lit by its floodlights (in its own frame, the sign's: x along the letters, z toward the overlook),
+ *  per pixel: added light falling off smoothly from the letters' feet, to nothing, along and across the slope. */
+function floodWash<T extends THREE.MeshToonMaterial>(m: T, w: number): T {
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey(), W = HILLSIDE.wash, f = (v: number) => v.toFixed(4);
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+varying vec2 vWash;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vWash = transformed.xz;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec2 vWash;`)
+      .replace('#include <opaque_fragment>', `{
+  float wx = vWash.x / ${f(w * W.along)}, wz = (vWash.y - ${f(W.z0)}) / ${f(W.fall)};
+  outgoingLight += vec3(${W.color.map(f).join(', ')}) * ${f(W.glow)} * exp(-pow(wx * wx, 3.0)) * exp(-wz * wz);
+}
+#include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => `${key}floodWash${w.toFixed(2)}`;
+  return m;
+}
 
 /** A carrier with its face's texture: a board on posts (a sign, a billboard), a street blade on its pole, a gantry over
  *  the road, a building with the face on its front (a wall, a shop's fascia, neon), paint on the road, or writing in the
@@ -999,18 +1023,11 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
       geo.computeVertexNormals();
       // (in chaparral, darker and clear of the haze: by moonlight its plain ground read as a pale dune — the user,
       // 2026-10-15)
-      const hill = new THREE.Mesh(geo, scrubGround(toon({ color: '#5a4b4c', fog: false }), '#1d241f', 0.09)); hill.name = 'mound'; g.add(hill);
-      // the floodlights' wash on the slope round the letters (they're lit from below, the Hollywood sign's way): the
-      // hill's skin under them again, a hand over it, added light fading out from the letters' feet
-      const wash = new THREE.PlaneGeometry(c.w * 1.3, H.wash.d, Math.round(c.w / 4), Math.round(H.wash.d / 2)).rotateX(-Math.PI / 2).translate(0, 0, H.wash.z);
-      const wp = wash.attributes.position!, wc: number[] = [];
-      for (let i = 0; i < wp.count; i++) {
-        const x = wp.getX(i), z = wp.getZ(i), k = H.wash.glow * Math.exp(-((x / (c.w * 0.6)) ** 6)) * Math.exp(-(((z - H.wash.z0) / H.wash.fall) ** 2));
-        wp.setY(i, rise(x, z) + 0.25);
-        wc.push(k, k * 0.9, k * 0.78);
-      }
-      wash.setAttribute('color', new THREE.Float32BufferAttribute(wc, 3));
-      g.add(new THREE.Mesh(wash, new THREE.MeshBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false })));
+      // the floodlights' wash on the slope round the letters (they're lit from below, the Hollywood sign's way): added
+      // light fading out from the letters' feet, worked out per pixel in the hill's own shader. (It was a second skin
+      // over the slope, its light in its corners: between them the hill's own polygons poked through it, and its ends
+      // stopped dead — hard vertical lines cut across the light, the user, 2026-10-16.)
+      const hill = new THREE.Mesh(geo, floodWash(scrubGround(toon({ color: '#5a4b4c', fog: false }), '#1d241f', 0.09), c.w)); hill.name = 'mound'; g.add(hill);
       const n = c.rows[0]!.length, cell = c.w / n, steel = grey(WORLD.post);
       [...c.rows[0]!].forEach((ch, i) => {
         if (ch === ' ') return;
