@@ -4,7 +4,7 @@ import { expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { makeDrive } from '../src/drive/drive';
 import { ROAD_HALF } from '../src/drive/route';
-import { ROAD_START } from '../src/drive/world';
+import { ROAD_START, placeSignHits, placeSpots } from '../src/drive/world';
 import { facadeOf } from '../src/look/facades';
 import { audio, lyrics } from './data';
 
@@ -46,4 +46,13 @@ test('every facade stays inside its block: the box the guard checks', () => {
     }
   });
   expect(out).toEqual([]);
+});
+
+test("the places' signs stand clear of the buildings, near the lines that name them", () => {
+  const bad: string[] = [];
+  for (const p of placeSpots(drive)) {
+    if (placeSignHits(drive, p.pos, p.face, drive.route.frameAt(p.s).pos.y)) bad.push(`${p.name} at s=${p.s.toFixed(0)}: in a building`);
+    if (p.s - p.want > 40) bad.push(`${p.name}: ${(p.s - p.want).toFixed(0)} m on from its line`);
+  }
+  expect(bad).toEqual([]);
 });

@@ -707,19 +707,55 @@ export const PLACES: readonly [RegExp, string, string, boolean][] = [
   [/slauson/i, 'SLAUSON AV', 'NEXT RIGHT', false],
   [/south of somewhere/i, 'SOUTH OF', 'DETROIT', true],
 ];
-const PLACE_SIGN = { after: 45, coastAfter: 24, lateral: 12, w: 11, h: 5.2, y: 5 };
-function placeSigns(drive: Drive): THREE.Group {
-  const g = new THREE.Group(), { route, motion } = drive;
+/** A place sign (m): how far past where the car is as its line ends it stands (on the coast, sooner), how far off the
+ *  road's centre, its board's size and its centre's height; and how much further on it may be moved to stand clear of
+ *  the lyrics' faces and the town's buildings (`step` at a time) — if it can't be, it isn't put up (the user,
+ *  2026-10-16: South Detroit's, pushed 270 m on past verse 1's faces to stand in a building by the burger stand at
+ *  53 s, "left behind from a previous iteration ... shoved and clipping into a building"). */
+const PLACE_SIGN = { after: 45, coastAfter: 24, lateral: 12, w: 11, h: 5.2, y: 5, reach: 36, step: 6 };
+export interface PlaceSpot { name: string; sub: string; sprayed: boolean; /** Where its line ends (s) and where it'd stand then (m along the road). */ end: number; want: number; s: number; coast: boolean; pos: THREE.Vector3; face: THREE.Vector3 }
+/** Whether a place sign's board (and its legs, down to the ground) at `pos`, facing `face`, stands in a building. */
+export function placeSignHits(drive: Drive, pos: THREE.Vector3, face: THREE.Vector3, ground: number) {
+  const P = PLACE_SIGN, along = new THREE.Vector3(0, 1, 0).cross(face).normalize(), q = new THREE.Vector3();
+  return drive.blocks.some((b) => {
+    if (b.car) return false;
+    const inv = b.matrix.clone().invert();
+    for (let u = -P.w / 2; u <= P.w / 2 + 1e-6; u += 0.5) for (let y = ground + 0.2; y <= pos.y + P.h / 2; y += 1) {
+      q.copy(pos).addScaledVector(along, u).setY(y).applyMatrix4(inv);
+      if (Math.abs(q.x) < 0.5 && Math.abs(q.y) < 0.5 && Math.abs(q.z) < 0.5) return true;
+    }
+    return false;
+  });
+}
+/** The song's places' signs: where each stands (pure; the guard checks them: tests/town.test.ts). */
+export function placeSpots(drive: Drive): PlaceSpot[] {
+  const { route, motion } = drive, P = PLACE_SIGN, out: PlaceSpot[] = [];
   const lines = new Map<number, { text: string; end: number }>();
   for (const c of drive.carriers) { const l = lines.get(c.phrase.line); lines.set(c.phrase.line, { text: (l ? l.text + ' ' : '') + c.phrase.text, end: Math.max(l?.end ?? 0, c.phrase.end) }); }
   for (const [, l] of lines) {
     const place = PLACES.find(([re]) => re.test(l.text));
     if (!place) continue;
-    const [, name, sub, sprayed] = place, P = PLACE_SIGN;
+    const [, name, sub, sprayed] = place;
     // (on the coast, soon after the arch and on the beach side: the arch wide sees it whole)
     const onCoast = !!BLOCKS[drive.stretchAt(l.end).id]!.seaLeft;
-    let s = motion.distanceAt(l.end) + (onCoast ? P.coastAfter : P.after);
-    while (drive.carriers.some((c) => Math.abs(c.s - s) < (onCoast ? 10 : 16))) s += 6; // clear of the words' own faces
+    const want = motion.distanceAt(l.end) + (onCoast ? P.coastAfter : P.after);
+    for (let s = want; s <= want + P.reach; s += P.step) {
+      if (drive.carriers.some((c) => Math.abs(c.s - s) < (onCoast ? 10 : 16))) continue; // clear of the words' own faces
+      // (on the coast the sign stands on the beach side, where the towers' take looks: on the right it never came fully
+      // into a frame)
+      const coast = !!BLOCKS[drive.stretchAt(drive.stretches.find((x) => s < motion.distanceAt(x.end))?.start ?? 0).id]!.seaLeft, side = coast ? -1 : 1;
+      const f = route.frameAt(s), face = f.fwd.clone().negate().addScaledVector(f.right, -0.5 * side).setY(0).normalize(); // toward the oncoming car and the road
+      const pos = f.pos.clone().addScaledVector(f.right, side * (coast ? P.lateral - 3 : P.lateral)).add(new THREE.Vector3(0, P.y, 0));
+      if (placeSignHits(drive, pos, face, f.pos.y)) continue; // clear of the town's buildings
+      out.push({ name, sub, sprayed, end: l.end, want, s, coast, pos, face });
+      break;
+    }
+  }
+  return out;
+}
+function placeSigns(drive: Drive): THREE.Group {
+  const g = new THREE.Group(), P = PLACE_SIGN;
+  for (const { name, sub, sprayed, coast, pos, face } of placeSpots(drive)) {
     const cv = document.createElement('canvas'); cv.width = 768; cv.height = Math.round((768 * P.h) / P.w);
     const x = cv.getContext('2d')!, W = cv.width, H = cv.height;
     x.fillStyle = '#1f6b44'; x.fillRect(0, 0, W, H);
@@ -734,17 +770,13 @@ function placeSigns(drive: Drive): THREE.Group {
       x.font = `${H * 0.26}px "${F.bodoni(700, { italic: true })}"`; x.fillText('somewhere', 0, 0); x.restore();
     }
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-    // (on the coast the sign stands on the beach side, where the towers' take looks: on the right it never came fully
-    // into a frame)
-    const coast = !!BLOCKS[drive.stretchAt(drive.stretches.find((x) => s < motion.distanceAt(x.end))?.start ?? 0).id]!.seaLeft, side = coast ? -1 : 1;
-    const f = route.frameAt(s), face = f.fwd.clone().negate().addScaledVector(f.right, -0.5 * side).setY(0).normalize(); // toward the oncoming car and the road
     const sign = new THREE.Group();
     // (on the coast its paint is lit like the beach round it: unlit, its greens and whites glowed off the dusk sand —
     // the user, 2026-10-16)
     sign.add(new THREE.Mesh(new THREE.PlaneGeometry(P.w, P.h), coast ? toon({ map: tex }) : new THREE.MeshBasicMaterial({ map: tex })));
     for (const px of [-P.w / 2 + 0.6, P.w / 2 - 0.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, P.y + P.h / 2, 0.2), toon({ color: WORLD.post })); leg.position.set(px, (P.h / 2 - P.y) / 2, -0.12); sign.add(leg); } // (legs: the ground to the board's top)
     sign.matrixAutoUpdate = false;
-    sign.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(f.pos.clone().addScaledVector(f.right, side * (coast ? P.lateral - 3 : P.lateral)).add(new THREE.Vector3(0, P.y, 0)));
+    sign.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(pos);
     g.add(sign);
   }
   return g;
@@ -1063,6 +1095,31 @@ function drapedOnRoad(c: Carrier, mat: THREE.Material, route: Route): THREE.Mesh
   return new THREE.Mesh(geo, mat);
 }
 
+/** The floor shifter on the transmission hump between their knees (the user, 2026-10-16: "the car's console doesn't
+ *  have a gear shift ... look pretty nice from that view" — the shot over her shoulder onto her phone looks down on
+ *  it): the '64 SS's short console on the hump, its chrome-edged top plate with the P R N D L gate, a rubber boot,
+ *  a chrome stick raked back toward the bench, a chrome ball. (A column shifter, the bench car's own, would sit on his
+ *  side of the wheel, out of that shot.) Its places (m, the body's frame): the console's span along z and its top;
+ *  the stick's foot along z, its length and rake (radians back), the ball's radius. Merged: a mesh a material. */
+const SHIFTER = { z: [0.08, 0.5] as [number, number], w: 0.2, top: 0.86, foot: 0.3, stick: 0.2, rake: 0.3, ball: 0.026 };
+function buildShifter(body: THREE.Object3D, cabin: THREE.Material, trim: THREE.Material, rubber: THREE.Material) {
+  const S = SHIFTER, floorTop = IMPALA.cockpit.floor + 0.22, zl = S.z[1] - S.z[0], zm = (S.z[0] + S.z[1]) / 2;
+  const at = (g: THREE.BufferGeometry, x: number, y: number, z: number, rx = 0) => g.rotateX(rx).translate(x, y, z);
+  const mats = new Map<THREE.Material, THREE.BufferGeometry[]>([[cabin, []], [trim, []], [rubber, []]]);
+  const put = (m: THREE.Material, g: THREE.BufferGeometry) => mats.get(m)!.push(g.index ? g.toNonIndexed() : g);
+  put(cabin, at(new THREE.BoxGeometry(S.w, S.top - floorTop, zl), 0, (S.top + floorTop) / 2, zm)); // the console
+  put(trim, at(new THREE.BoxGeometry(S.w + 0.012, 0.008, zl + 0.012), 0, S.top + 0.002, zm)); // its chrome-edged top
+  put(cabin, at(new THREE.BoxGeometry(S.w - 0.03, 0.006, zl - 0.03), 0, S.top + 0.007, zm));
+  put(rubber, at(new THREE.BoxGeometry(0.026, 0.004, 0.17), 0.065, S.top + 0.011, zm + 0.02)); // the indicator's slot, on his side of the boot
+  for (let k = 0; k < 5; k++) put(trim, at(new THREE.BoxGeometry(0.018, 0.003, 0.008), 0.065, S.top + 0.014, zm + 0.09 - k * 0.035)); // its P R N D L ticks
+  put(rubber, at(new THREE.CylinderGeometry(0.018, 0.04, 0.05, 14), 0, S.top + 0.03, S.foot)); // the boot
+  const up = new THREE.Vector3(0, Math.cos(S.rake), -Math.sin(S.rake)), foot = new THREE.Vector3(0, S.top + 0.04, S.foot);
+  const mid = foot.clone().addScaledVector(up, S.stick / 2), knob = foot.clone().addScaledVector(up, S.stick);
+  put(trim, at(new THREE.CylinderGeometry(0.0075, 0.0095, S.stick, 10), mid.x, mid.y, mid.z, -S.rake)); // the stick
+  put(trim, at(new THREE.SphereGeometry(S.ball, 16, 12), knob.x, knob.y + S.ball * 0.6, knob.z)); // the ball
+  for (const [m, gs] of mats) { const o = new THREE.Mesh(mergeGeometries(gs), m); o.name = 'shifter'; body.add(o); }
+}
+
 /** The car: a '64 Impala convertible, the LA lowrider (nose +z): a long low body (its side profile extruded across its
  *  width, wheel arches cut), a chrome spear down the side, chrome bumpers, whitewalls with chrome caps, quad headlights
  *  and the triple round tail lights (they glow at night, the headlights throw beams); the two of them (look/cast3d.ts):
@@ -1136,6 +1193,7 @@ export function buildCar(): THREE.Group {
   // hull's bare inside in the head-unit shot)
   { const kick = 0.85 - IMPALA.cockpit.floor; box(Wd - 0.3, kick, 0.06, 0, IMPALA.cockpit.floor + kick / 2, 0.6, cabin); } // (up to the fascia's underside, under it: higher, it stood in front of the head unit)
   box(0.46, 0.22, cl - 0.4, 0, IMPALA.cockpit.floor + 0.11, cm, seat);
+  buildShifter(body, cabin, trim, toon({ color: '#16121a' }));
   box(0.5, 0.16, 0.012, -0.52, 1.07, 0.595, toon({ color: '#4a3542' })); // her glovebox
   { const btn = add(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 10), trim, -0.52, 1.07, 0.588); btn.rotation.x = Math.PI / 2; }
   for (const x of [0.8, -0.8]) { add(new THREE.TorusGeometry(0.04, 0.007, 6, 16), trim, x, 1.14, 0.59); add(new THREE.CircleGeometry(0.036, 16), dark, x, 1.14, 0.592).rotation.y = Math.PI; }

@@ -32,6 +32,7 @@ import { LEAD, SNAP_S } from './shots';
 import type { Motion } from './motion';
 import type { Phrase } from './phrases';
 import { SETTLE, type Solo, dwellFor, phrasesOf } from './phrases';
+import { REVEAL_S } from './dissolve';
 import type { Route, RouteFrame } from './route';
 import type { Stretch } from './stretches';
 import type { Line } from '../engine/lyrics';
@@ -94,8 +95,10 @@ export interface Carrier {
   ad?: Ad;
   /** Riding in the car (the radio, her phone), or on a vehicle `ahead` m in front of it in its lane (the bus, the van
    *  they follow): where it is in that frame (x its left, y up from the road, z forward); `center`, `normal` and `up`
-   *  are where it is as its phrase starts (rideAt). */
-  ride?: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; ahead?: number };
+   *  are where it is as its phrase starts (rideAt). `rise`: it moves up its face by `dy` (m) as each `after` comes in
+   *  (over that one's reveal: riseAt) — her texts, a conversation anchored at its foot, each new bubble rising into
+   *  place and pushing the ones before it up; `pos` is where it ends, once they all have. */
+  ride?: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; ahead?: number; rise?: { after: Carrier; dy: number }[] };
   /** Not there before `from`, gone from `until` (s): its prop comes and goes (the van closing in, the bus turning off,
    *  her phone in her hand). */
   from?: number;
@@ -109,10 +112,18 @@ export interface Carrier {
 
 /** The car's frame as a matrix: x its left, y up, z forward, at its position on the road. */
 export const carMatrix = (f: RouteFrame) => new THREE.Matrix4().makeBasis(f.right.clone().negate(), f.up, f.fwd).setPosition(f.pos);
-/** Where a riding carrier is when the car's frame is f. */
-export function rideAt(c: Carrier, f: RouteFrame): Pick<Carrier, 'center' | 'normal' | 'up'> {
-  const m = carMatrix(f), n = new THREE.Matrix3().setFromMatrix4(m);
-  return { center: c.ride!.pos.clone().applyMatrix4(m), normal: c.ride!.normal.clone().applyMatrix3(n).normalize(), up: c.ride!.up.clone().applyMatrix3(n).normalize() };
+/** How far a riding carrier is still short of its place up its face at t (m, ≤ 0): each rise still to come, eased
+ *  out over its `after`'s reveal (an iMessage thread's push). */
+export function riseAt(c: Pick<Carrier, 'ride'>, t: number) {
+  let dy = 0;
+  for (const r of c.ride?.rise ?? []) { const u = Math.min(1, Math.max(0, (t - r.after.reveal) / REVEAL_S)); dy -= r.dy * (1 - u) * (1 - u) * (1 - u); }
+  return dy;
+}
+/** Where a riding carrier is when the car's frame is f (and, given t, risen as far as it has then: riseAt). */
+export function rideAt(c: Carrier, f: RouteFrame, t?: number): Pick<Carrier, 'center' | 'normal' | 'up'> {
+  const m = carMatrix(f), n = new THREE.Matrix3().setFromMatrix4(m), r = c.ride!;
+  const pos = t === undefined || !r.rise ? r.pos.clone() : r.pos.clone().addScaledVector(r.up, riseAt(c, t));
+  return { center: pos.applyMatrix4(m), normal: r.normal.clone().applyMatrix3(n).normalize(), up: r.up.clone().applyMatrix3(n).normalize() };
 }
 /** Where a carrier's centre is at t (a new vector: callers may change it). */
 export const centerAt = (c: Pick<Carrier, 'center' | 'vel' | 'phrase'>, t: number) => (c.vel ? c.center.clone().addScaledVector(c.vel, t - c.phrase.start) : c.center.clone());

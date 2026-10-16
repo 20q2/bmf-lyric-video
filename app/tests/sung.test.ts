@@ -124,7 +124,7 @@ const toPx = (v: THREE.Vector3) => new THREE.Vector2(((v.x + 1) / 2) * 1920, ((1
 function problems(c: Carrier, t: number): string[] {
   placeCamera(cam, drive.camera(t));
   if (c.vel) c = { ...c, center: centerAt(c, t) }; // a banner, where it has flown to
-  if (c.ride) c = { ...c, ...rideAt(c, drive.carFrame(t, c.ride.ahead)) }; // in the car, or on the vehicle ahead
+  if (c.ride) c = { ...c, ...rideAt(c, drive.carFrame(t, c.ride.ahead), t) }; // in the car, or on the vehicle ahead
   const out: string[] = [];
   for (const k of corners(c)) {
     const p = k.clone().project(cam);

@@ -43,12 +43,13 @@ export const STOP = { brake: 3, hold: 0.6, go: 3, goV: 13 };
  *  at its own line (its centre, m off the road's centre), where it comes down the street from (m) over `approach` s to
  *  arrive `arrive` s before the car stops, and when it pulls out (s before the car stops); the radius it turns into
  *  their lane on; its stop signs' place (m out from the street's corners) and height. */
-export const SIDE = { line: 0.3, half: 4.25, lane: 2, wait: 13, from: 40, approach: 6, arrive: 1.5, pull: 0.6, R: 7, sign: 0.6, signH: 2.2 };
+export const SIDE = { line: 0.3, half: 4.25, lane: 2, wait: 12.1, from: 40, approach: 6, arrive: 1.5, pull: 0.6, R: 7, sign: 0.6, signH: 2.2 };
 /** The bus they tailgate: it pulls out from its stop at the curb (`curb` m off the road's centre, accelerating at
- *  `accel`) into their lane `join` s before its line, `gap` m off their nose; its half-length; its tail ad's centre's
+ *  `accel`) into their lane `join` s before its line, `gap` m off their nose; its half-length (a 30 ft city bus: at
+ *  36 ft it was "very large" pulling out across the lens — the user, 2026-10-16; SIDE.wait keeps its nose at its line); its tail ad's centre's
  *  height; it turns off right `turnAfter` s after its line, `lead` m on and round a corner of radius R, gone `gone` s
  *  later. It's only there for the verse: at its stop from `early` s before the verse. */
-export const BUS = { curb: ROAD_HALF - 1.15, accel: 4, join: 0.5, gap: 2, half: 5.5, adY: 1.85, turnAfter: 0.35, lead: 2, R: 10, gone: 3, early: 3 };
+export const BUS = { curb: ROAD_HALF - 1.15, accel: 4, join: 0.5, gap: 2, half: 4.6, adY: 1.85, turnAfter: 0.35, lead: 2, R: 10, gone: 3, early: 3 };
 /** The van that was ahead of the bus: there once the bus has turned off (`appear` s after), `gap` m off their nose once
  *  it's closed in (at `close` m/s, by `by` s before its line); away `leave` s after its line, pulling ahead (accelerating
  *  at `accel` to `top` m/s quicker than them) on up the street for the rest of the verse — it vanished 4 s after it
@@ -75,6 +76,8 @@ export const AT = {
   /** The head unit's screen (cabin.ts), the lyric across its middle. */
   radio: HEAD_UNIT,
 };
+/** Her texts: how far below its place (a share of its height) a new bubble comes in from, rising into it. */
+export const TEXTS = { rise: 0.5 };
 /** The camera's places (in the car's frame where it rides with it; m). */
 export const EYE = {
   trailer: { back: 4.2, lateral: ROAD_HALF - 0.1, y: 1.15, toRoad: 0.7, down: 0.25 },
@@ -120,9 +123,9 @@ export interface Verse1Plan {
   visor: { down: number; up: number };
   phone: { pos: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number; held: [number, number][] };
   /** The Read receipt under her texts (he's seen them and said nothing): in each of her two threads (held[i]) from
-   *  `at` (s), under its last sent bubble — each bubble's underside (along the phone's up from its centre, m), its
-   *  phrase's start and its thread. */
-  read: { at: number[]; bubbles: { start: number; dy: number; thread: number }[] };
+   *  `at` (s), under its last sent bubble — each bubble's underside (along the phone's up from its centre, m, once
+   *  it's risen into place: riseAt), its phrase's start and its thread. */
+  read: { at: number[]; bubbles: { carrier: Carrier; start: number; dy: number; thread: number }[] };
   /** The one oncoming car (the other lane is a lane): where it passes them (m along the road) and when (s), coming
    *  on at `v` (m/s). */
   oncoming: { s0: number; t0: number; v: number };
@@ -267,6 +270,10 @@ export const VERSE1: SetPiece = {
     const reply = riding('phone', phs[7]!, AT.phone, phoneN, 0, { from: held[1]![0], until: held[1]![1] });
     reply.cs.forEach((c) => (c.received = true)); // (his reply: received, grey on the left — the user, 2026-10-13)
     hold(reply.cs, phoneShot, 'cut');
+    // each thread a conversation anchored at its foot, as a phone's is: a new bubble rises into place from the text
+    // field (TEXTS.rise of its height) and pushes the ones before it up by its own (the user, 2026-10-16: "messages
+    // kind of like slide in or like expand in"; carrierart.ts pops it up from its tail); where each ends is the stack's
+    for (const cs of [texts.cs, reply.cs]) cs.forEach((c, k) => (c.ride!.rise = [{ after: c, dy: TEXTS.rise * c.h }, ...cs.slice(k + 1).map((n) => ({ after: n, dy: n.h }))]));
 
     // the city: blocks along the street from the trailer on (before it they'd stand in chorus 1's sky), set back behind
     // the sidewalks; the cross street the bus turns into open; behind the burger stand, further back
@@ -283,7 +290,7 @@ export const VERSE1: SetPiece = {
 
     // the Read receipt: visible once her first text has landed (he's seen it and said nothing — then "but"); it sits
     // under the last sent bubble, so each bubble's underside in the car's frame
-    const under = (c: Carrier, thread: number) => ({ start: c.phrase.start, thread, dy: c.ride!.pos.clone().sub(AT.phone).dot(texts.up) - layout('phone', c.phrase.text, c.phrase.solo).h / 2 });
+    const under = (c: Carrier, thread: number) => ({ carrier: c, start: c.phrase.start, thread, dy: c.ride!.pos.clone().sub(AT.phone).dot(texts.up) - layout('phone', c.phrase.text, c.phrase.solo).h / 2 });
     const read = {
       at: [phs[2]![0]!.start + 0.9, (phs[7]![0]?.start ?? Infinity) + 0.9],
       bubbles: [...texts.cs.map((c) => under(c, 0)), ...reply.cs.map((c) => under(c, 1))],

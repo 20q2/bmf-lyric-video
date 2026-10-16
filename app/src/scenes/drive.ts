@@ -12,7 +12,7 @@ import { heftOf } from '../drive/heft';
 import { LENS, placeCamera } from '../drive/camera';
 import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
-import { type Carrier, FLY, centerAt } from '../drive/carriers';
+import { type Carrier, FLY, centerAt, riseAt } from '../drive/carriers';
 import { COAST_T, SUN_AZ_DEG, airAt, cloudsAt, daylight, raysAt, skyStateAt } from '../drive/sky';
 import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
@@ -53,6 +53,7 @@ const TUNNEL_LIGHT = { intensity: 30, reach: 13, lamps: 7, look: 16, search: 110
  *  angle, rad, and its soft edge). */
 const HEADLIGHT = { intensity: 45, ahead: 2.8, up: 0.75, reach: 45, angle: 0.5, penumbra: 0.7 };
 const TUNNEL_DARK = new THREE.Color('#120a05');
+const _rise = new THREE.Matrix4();
 /** A banner's plane is in the sky from this long before its line is revealed until this long after the line (s). */
 const BANNER_SKY = { before: 0.8, after: 4 };
 /** The skywriter flies on this long after its phrase (s), this fast along it and up (m/s). */
@@ -139,7 +140,7 @@ export default class DriveScene extends Scene {
   /** The set-pieces' props (scenes/sets/), moved each frame. */
   private sets: { group: THREE.Group; update(t: number, car: THREE.Object3D): void }[] = [];
   /** Carriers riding in the car (the radio), with their place in its frame. */
-  private riding: [THREE.Object3D, THREE.Matrix4, number][] = [];
+  private riding: [THREE.Object3D, THREE.Matrix4, number, Carrier][] = [];
   /** The red beacon on the hill sign's mast (it blinks). */
   private beacons: THREE.MeshBasicMaterial[] = [];
   /** The hills the climb runs up (world.ts), shown from the climb's first cut on: from the coast they'd stand in its
@@ -179,7 +180,7 @@ export default class DriveScene extends Scene {
     }
     for (const c of this.drive.carriers) if (c.ride) {
       const r = c.ride, local = new THREE.Matrix4().makeBasis(r.up.clone().cross(r.normal).normalize(), r.up, r.normal).setPosition(r.pos);
-      this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0]);
+      this.riding.push([this.placed.find(([k]) => k === c)![1], local, r.ahead ?? 0, c]);
     }
     for (const [k, set] of [buildIntro(this.drive), buildChorus1(this.drive), buildVerse1(this.drive), buildChorus2(this.drive), buildVerse2(this.drive), buildChorus3(this.drive), buildBridge1(this.drive), buildVerse3(this.drive), buildChorus4(this.drive)].entries()) if (set) { set.group.name = `set-${['intro', 'chorus1', 'verse1', 'chorus2', 'verse2', 'chorus3', 'bridge1', 'verse3', 'chorus4'][k]}`; this.sets.push(set); this.world.add(set.group); }
     // (debugging: ?hide=blocks,palms,... hides the world's named parts in the preview)
@@ -297,7 +298,10 @@ export default class DriveScene extends Scene {
     // the radio, in the car; the set-pieces' props, where they've moved to
     // (in the car, on its body: lifted, pitched and rolled with it on its hydraulics)
     const bodyM = new THREE.Matrix4().compose(new THREE.Vector3(0, lift, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(st.pitch, 0, st.roll)), new THREE.Vector3(1, 1, 1));
-    for (const [o, local, ahead] of this.riding) o.matrix.multiplyMatrices(ahead ? carMatrix(d.carFrame(t, ahead)) : carMatrix(cf).multiply(bodyM), local);
+    for (const [o, local, ahead, c] of this.riding) {
+      o.matrix.multiplyMatrices(ahead ? carMatrix(d.carFrame(t, ahead)) : carMatrix(cf).multiply(bodyM), local);
+      if (c.ride!.rise) o.matrix.multiply(_rise.makeTranslation(0, riseAt(c, t), 0)); // (her texts, pushed up as each new one comes in)
+    }
     for (const set of this.sets) set.update(t, this.car);
     rollSedans(); // (the traffic's wheels, by how far each car moved)
     (this.car.userData.dash as ReturnType<typeof buildDash> | undefined)?.update(t, this.ctx.audio.duration, d.motion.speedAt(t), f.a.kick);

@@ -551,18 +551,30 @@ export function buildHer(mats: Mats): THREE.Group {
 }
 
 const _hq = new THREE.Quaternion(), _hm = new THREE.Matrix4(), _X = new THREE.Vector3(), _Y = new THREE.Vector3(), _Z = new THREE.Vector3();
+/** Her phone resting in her left hand in her lap (verse 1, before she lifts it): tipped up toward her this much
+ *  (radians) off lying flat, its top forward. */
+const LAP_PHONE = { tilt: 0.3 };
+/** Where she holds her phone as it rests in her lap (her frame; a grip as holdPhone takes it): her hand where it lies
+ *  in her lap, the phone on her palm, its screen up. */
+export function lapGrip(m = new THREE.Matrix4()): THREE.Matrix4 {
+  const A = HER_ARM, c = Math.cos(LAP_PHONE.tilt), s = Math.sin(LAP_PHONE.tilt);
+  const X = V(-1, 0, 0), Y = V(0, s, c), Z = V(0, c, -s);
+  return m.makeBasis(X, Y, Z).setPosition(A.lap.clone().addScaledVector(Y, A.under).addScaledVector(Z, A.behind));
+}
 /** Her phone in her left hand (verse 1, scenes/sets/verse1.ts): `grip` is where she holds it, in the car's body — its
- *  foot's edge on its back, x across it, y up it, z out of its screen — and `u` how far her hand has come up to it from
- *  her lap (0..1, eased here). Set each frame (after poseCast: in her frame as she sits then). */
-export function holdPhone(body: THREE.Object3D, grip: THREE.Matrix4, u: number) {
+ *  foot's edge on its back, x across it, y up it, z out of its screen — `u` how far her hand has come to it from her
+ *  lap (0..1, eased here), and `lift` how far she's raised it from her lap (lapGrip) to her face (0..1: her elbow
+ *  swings out and down as it rises; by default with u). Set each frame (after poseCast: in her frame as she sits
+ *  then). */
+export function holdPhone(body: THREE.Object3D, grip: THREE.Matrix4, u: number, lift = u) {
   const her = body.getObjectByName('her'), upper = body.getObjectByName('herLeftArm'), hd = body.getObjectByName('herHand');
   if (!her || !upper || !hd) return;
-  const A = HER_ARM, e = Math.min(1, Math.max(0, u)), s = e * e * (3 - 2 * e);
+  const A = HER_ARM, e = Math.min(1, Math.max(0, u)), s = e * e * (3 - 2 * e), l = Math.min(1, Math.max(0, lift));
   her.updateMatrix();
   const m = _hm.copy(her.matrix).invert().multiply(grip), O = new THREE.Vector3().setFromMatrixPosition(m);
   m.extractBasis(_X, _Y, _Z);
   const W = O.addScaledVector(_Y, -A.under).addScaledVector(_Z, -A.behind);
-  reach(upper, A.lap.clone().lerp(W, s), A.lapPole.clone().lerp(A.phonePole, s), A.lapPalm.clone().lerp(_Z, s).normalize(), A.upper, A.fore, 'herLeftForearm');
+  reach(upper, A.lap.clone().lerp(W, s), A.lapPole.clone().lerp(A.phonePole, l * l * (3 - 2 * l)), A.lapPalm.clone().lerp(_Z, s).normalize(), A.upper, A.fore, 'herLeftForearm');
   // (the hand: straight on from the forearm in her lap; on the phone turned to it — palm to its back, fingers up it)
   const fore = upper.getObjectByName('herLeftForearm')!, onPhone = _hq.setFromRotationMatrix(_hm.makeBasis(_Z, _Y.clone().negate(), _X));
   const local = upper.quaternion.clone().multiply(fore.quaternion).invert().multiply(onPhone);

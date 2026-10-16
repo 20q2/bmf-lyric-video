@@ -1,12 +1,12 @@
 // Verse 1's props (drive/sets/verse1.ts places them and the lyrics on them): the speed trailer by the road; the bus
-// they tailgate, its tail ad, turning off right at a cross street (the light green, the crosswalks, the DONT WALK hand);
-// the van ahead, closing in; her phone in her hand; the burger stand with its menu board and its marquee on a pole;
+// they tailgate, its tail ad (and the channel's own on its side), turning off right at a cross street (the light
+// green, the crosswalks, the DONT WALK hand); the van ahead, closing in; her phone in her hand, lifted from her lap; the burger stand with its menu board and its marquee on a pole;
 // her visor (the car's own: look/dash.ts) flipping down; and the newsstand they pass behind the bus (./newsstand). (The
 // city's blocks are the drive's: blocks.ts.) Browser only (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
-import { carMatrix } from '../../drive/carriers';
+import { carMatrix, riseAt } from '../../drive/carriers';
 import { AT, BUS, PACE, SIDE, VAN, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
@@ -14,9 +14,10 @@ import { GLOW, lampMaterial } from '../../look/night';
 import { drawAd } from '../../look/adart';
 import { F, font } from '../../engine/type';
 import { TEXT_SHARE } from '../../drive/ads';
-import { sedan } from './kit';
+import { fuse, paint, sedan, tbox, tcyl } from './kit';
 import { buildNewsstand } from './newsstand';
-import { holdPhone } from '../../look/cast3d';
+import { holdPhone, lapGrip } from '../../look/cast3d';
+import { LEAD } from '../../drive/shots';
 
 const UP = new THREE.Vector3(0, 1, 0);
 type Panel = Verse1Plan['panels'][keyof Verse1Plan['panels']];
@@ -50,10 +51,67 @@ const moving = () => { const g = new THREE.Group(); g.matrixAutoUpdate = false; 
 /** Her phone's screen round the thread (m): its status bar and his name above, the text field below; the Read receipt's
  *  width, and its gap under the last bubble. */
 const PHONE = { top: 0.034, bottom: 0.022, receipt: { w: 0.07 } };
-/** Her hold on it (look/cast3d.ts holdPhone): her left hand on its foot this far in from its edge on her side (m), up
- *  from her lap over `reach` s before she's on it and back down after. */
-const HOLD = { inset: 0.045, reach: 0.5 };
+/** Her hold on it (look/cast3d.ts holdPhone): her left hand on its foot this far in from its edge on her side (m). It
+ *  rests in her hand in her lap through the verse (from the cut into it to the first cut once it's back down), and she
+ *  lifts it to her face over `lift` s, finished as she's on it, and lowers it after (the user, 2026-10-16: in the
+ *  mirror "it just kind of clips into existence. It'd be nice if she actually brought that up from somewhere"); in her
+ *  lap it's `small` of its size (it's drawn big for its close-up: full size it lay along her thigh like a tray). */
+const HOLD = { inset: 0.045, lift: 0.85, small: 0.55 };
 const P_GAP = 0.006;
+/** The ad on the bus's street side (m, its frame: x its left, z forward): its size, its centre's height and how far
+ *  forward of the middle (between the wheel arches, under the windows). */
+const SIDE_AD = { w: 4.1, h: 0.8, y: 1.5, z: 0.05 };
+/** The channel's ad (the user's Easter egg, 2026-10-16: "Lyrics by Desaign ... the spelling is intentional ...
+ *  because we use AI to make our videos"): a play button with a note on it, the wordmark with its AI picked out in
+ *  gold, the line under it, a wink at the end; in the film's dusk plums, so it sits in the street and never reads as
+ *  a lyric. */
+function drawSideAd(c: CanvasRenderingContext2D, W: number, H: number) {
+  const bg = c.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#1e1033'); bg.addColorStop(0.55, '#3d1a4a'); bg.addColorStop(1, '#7a2c52');
+  c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  // a sunset band sweeping across behind it all, and fine scan lines (a screen's)
+  const band = c.createLinearGradient(0, 0, W, 0);
+  band.addColorStop(0, 'rgba(240,138,90,0)'); band.addColorStop(0.5, 'rgba(240,138,90,0.28)'); band.addColorStop(1, 'rgba(246,179,74,0.5)');
+  c.fillStyle = band; c.beginPath(); c.moveTo(W * 0.3, H); c.lineTo(W * 0.42, 0); c.lineTo(W, 0); c.lineTo(W, H); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.035)'; for (let y = 0; y < H; y += 8) c.fillRect(0, y, W, 3);
+  // the badge: a play button in a sunset disc, an eighth note riding its rim
+  const cx = H * 0.62, cy = H * 0.5, r = H * 0.34;
+  const disc = c.createLinearGradient(cx - r, cy - r, cx + r, cy + r); disc.addColorStop(0, '#ff5a8a'); disc.addColorStop(1, '#f6b34a');
+  c.fillStyle = disc; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#fff6e8'; c.beginPath(); c.moveTo(cx - r * 0.3, cy - r * 0.45); c.lineTo(cx + r * 0.5, cy); c.lineTo(cx - r * 0.3, cy + r * 0.45); c.closePath(); c.fill();
+  const nx = cx + r * 0.95, ny = cy - r * 0.55;
+  c.fillStyle = '#fff6e8'; c.beginPath(); c.ellipse(nx, ny + r * 0.5, r * 0.2, r * 0.15, -0.4, 0, Math.PI * 2); c.fill();
+  c.fillRect(nx + r * 0.13, ny - r * 0.45, r * 0.07, r * 0.95);
+  c.beginPath(); c.moveTo(nx + r * 0.2, ny - r * 0.45); c.quadraticCurveTo(nx + r * 0.55, ny - r * 0.2, nx + r * 0.45, ny + r * 0.15); c.quadraticCurveTo(nx + r * 0.42, ny - r * 0.12, nx + r * 0.2, ny - r * 0.2); c.closePath(); c.fill();
+  // the wink at the end, a gold-ringed tag; the wordmark and its line fill the room between the badge and it
+  const tagW = H * 1.3, tagX = W - H * 0.25 - tagW / 2;
+  c.save(); c.translate(tagX, H * 0.5); c.rotate(-0.08);
+  c.strokeStyle = '#ffc94a'; c.lineWidth = H * 0.022; c.beginPath(); c.roundRect(-tagW / 2, -H * 0.22, tagW, H * 0.44, H * 0.22); c.stroke();
+  c.fillStyle = '#ffc94a'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.12);
+  c.fillText('yes, the AI', 0, -H * 0.065); c.fillText('is on purpose', 0, H * 0.085);
+  c.restore();
+  // the wordmark: "Lyrics by" in the film's Bodoni italic, Desaign bold, its "ai" gold with a spark over it (sized to
+  // the room it has)
+  const x0 = H * 1.3, room = tagX - tagW / 2 - H * 0.2 - x0, base = H * 0.57;
+  const serif = (k: number) => font(F.bodoni(700, { italic: true }), H * 0.28 * k), bold = (k: number) => font(F.archivo(100, 900), H * 0.4 * k);
+  c.font = serif(1); const lead = c.measureText('Lyrics by ').width; c.font = bold(1);
+  const k = Math.min(1, room / (lead + c.measureText('Desaign').width));
+  c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+  c.fillStyle = '#fff1dc'; c.font = serif(k); c.fillText('Lyrics by', x0, base);
+  let x = x0 + lead * k;
+  c.font = bold(k);
+  const part = (t: string, ink: string) => { c.fillStyle = ink; c.fillText(t, x, base); x += c.measureText(t).width; };
+  part('Des', '#fff1dc'); const ax = x; part('ai', '#ffc94a'); const aw = x - ax; part('gn', '#fff1dc');
+  const sx = ax + aw * 0.5, sy = base - H * 0.4 * k, sr = H * 0.065; // (the spark: a four-pointed star)
+  c.fillStyle = '#ffc94a'; c.beginPath();
+  for (let i = 0; i < 8; i++) { const a = (Math.PI / 4) * i, rr = i % 2 ? sr * 0.3 : sr; c.lineTo(sx + rr * Math.sin(a), sy - rr * Math.cos(a)); }
+  c.closePath(); c.fill();
+  // the line under it, letterspaced across the wordmark's width
+  const line = 'LYRIC VIDEOS, MADE WITH AI', span = x - x0;
+  c.fillStyle = 'rgba(255,241,220,0.88)'; c.font = font(F.archivo(100, 600), H * 0.11);
+  const plain = [...line].reduce((w, ch) => w + c.measureText(ch).width, 0), gap = Math.max(0, (span - plain) / (line.length - 1));
+  let lx = x0 + H * 0.01; for (const ch of line) { c.fillText(ch, lx, H * 0.82); lx += c.measureText(ch).width + gap; }
+}
 
 export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: number, car: THREE.Object3D): void } | null {
   const plan = drive.plans.verse1 as Verse1Plan | undefined;
@@ -136,42 +194,51 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(ped);
   }
 
-  // ---- the bus they tailgate: its tail ad (the lyric's rows over it), turning off at the cross street ----
+  // ---- the bus they tailgate: its tail ad (the lyric's rows over it), turning off at the cross street; on its street
+  // side, the one the lens sees as it pulls out across them, the channel's own ad (drawSideAd) ----
   const bus = moving();
   {
-    const body = toon({ color: '#ece6d6' }), stripe = toon({ color: '#e0682b' }), H = BUS.half;
-    box(bus, 2.5, 2.9, 2 * H, 0, 0.35 + 1.45, 0, body);
-    box(bus, 2.52, 0.18, 2 * H + 0.02, 0, 0.9, 0, stripe);
-    box(bus, 2.52, 0.9, 2 * H - 1.2, 0, 2.55, 0.3, black); // the windows down its sides
-    for (const z of [-H + 1.9, H - 1.7]) for (const x of [-1.15, 1.15]) wheel(bus, 0.5, x, z, black);
+    const BODY = '#ece6d6', INK = '#1b1820', H = BUS.half;
+    // (its shell tinted and fused: one mesh, not forty — it moves, so the batcher can't merge it)
+    tbox(bus, 2.5, 2.9, 2 * H, 0, 0.35 + 1.45, 0, BODY);
+    tbox(bus, 2.52, 0.18, 2 * H + 0.02, 0, 0.9, 0, '#e0682b');
+    tbox(bus, 2.52, 0.9, 2 * H - 1.2, 0, 2.55, 0.3, INK); // the windows down its sides
+    for (const z of [-H + 1.6, H - 1.5]) for (const x of [-1.15, 1.15]) tcyl(bus, 0.5, 0.28, x, 0.5, z, INK).rotation.z = Math.PI / 2;
     for (const x of [-1.05, 1.05]) plane(bus, 0.2, 0.3, x, 0.75, -H - 0.01, tail).rotation.y = Math.PI;
     // its back: the rear window over the ad, an amber route sign over that, the engine's louvres under it, a bumper, a
     // plate; an air-conditioning pod on the roof (QA: a bare box filling the frame for seconds)
     const glassM = toon({ color: '#28323c' });
     // (the window to y 3.03, the route sign's box over it from 3.05, both in front of the body: the sign's foot sat
     // inside the window's box — the user, 2026-10-14)
-    box(bus, 2.22, 0.64, 0.03, 0, 2.71, -H - 0.005, black);
+    tbox(bus, 2.22, 0.64, 0.03, 0, 2.71, -H - 0.005, INK);
     plane(bus, 2.1, 0.52, 0, 2.71, -H - 0.025, glassM).rotation.y = Math.PI;
     const route = canvasTex(512, 48, (c) => { c.fillStyle = '#120c06'; c.fillRect(0, 0, 512, 48); c.fillStyle = '#ffb000'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 34); c.fillText('210  CRENSHAW', 256, 26); });
-    box(bus, 1.7, 0.19, 0.03, 0, 3.14, -H - 0.005, black);
+    tbox(bus, 1.7, 0.19, 0.03, 0, 3.14, -H - 0.005, INK);
     plane(bus, 1.6, 0.15, 0, 3.14, -H - 0.025, new THREE.MeshBasicMaterial({ map: route, color: new THREE.Color(1.6, 1.6, 1.6) })).rotation.y = Math.PI;
-    for (let k = 0; k < 5; k++) box(bus, 1.5, 0.035, 0.03, 0, 1.0 + k * 0.08, -H - 0.01, black);
-    box(bus, 2.56, 0.28, 0.16, 0, 0.48, -H - 0.06, black);
+    for (let k = 0; k < 5; k++) tbox(bus, 1.5, 0.035, 0.03, 0, 1.0 + k * 0.08, -H - 0.01, INK);
+    tbox(bus, 2.56, 0.28, 0.16, 0, 0.48, -H - 0.06, INK);
     plane(bus, 0.5, 0.25, 0, 0.75, -H - 0.012, toon({ color: '#f2f1ea' })).rotation.y = Math.PI;
-    box(bus, 1.7, 0.32, 2.6, 0, 3.41, -H + 2.2, body);
+    tbox(bus, 1.7, 0.32, 2.2, 0, 3.41, -H + 1.9, BODY);
     const { w, h, pos } = plan.tailAd, share = TEXT_SHARE.bus ?? 0.8;
     const art = canvasTex(1024, Math.round((1024 * (h + 0.2)) / (w + 0.08)), (c) => drawAd(c, plan.busAd, c.canvas.width, c.canvas.height, share));
     plane(bus, w + 0.08, h + 0.2, 0, pos.y, -H - 0.02, new THREE.MeshBasicMaterial({ map: art })).rotation.y = Math.PI;
     // its front (seen now, as it pulls out of the side street toward the lens): the windshield in two panes, the route
     // over it lit amber, headlamps either side of a grille, a bumper, its mirrors on stalks
-    box(bus, 2.3, 1.45, 0.03, 0, 2.35, H + 0.005, black);
+    tbox(bus, 2.3, 1.45, 0.03, 0, 2.35, H + 0.005, INK);
     for (const x of [-0.56, 0.56]) plane(bus, 1.04, 1.3, x, 2.35, H + 0.025, glassM);
-    box(bus, 1.8, 0.24, 0.03, 0, 3.22, H + 0.005, black);
+    tbox(bus, 1.8, 0.24, 0.03, 0, 3.22, H + 0.005, INK);
     plane(bus, 1.7, 0.18, 0, 3.22, H + 0.025, new THREE.MeshBasicMaterial({ map: route, color: new THREE.Color(1.6, 1.6, 1.6) }));
-    for (const x of [-0.95, 0.95]) { box(bus, 0.34, 0.2, 0.04, x, 0.95, H + 0.01, black); plane(bus, 0.28, 0.14, x, 0.95, H + 0.035, toon({ color: '#f4efd8' })); }
-    box(bus, 1.1, 0.34, 0.03, 0, 0.95, H + 0.01, black);
-    box(bus, 2.56, 0.28, 0.16, 0, 0.48, H + 0.06, black);
-    for (const x of [-1.4, 1.4]) { box(bus, 0.05, 0.05, 0.5, x, 2.6, H - 0.1, black); box(bus, 0.08, 0.36, 0.2, x * 1.04, 2.4, H + 0.12, black); }
+    const lens = toon({ color: '#f4efd8' });
+    for (const x of [-0.95, 0.95]) { tbox(bus, 0.34, 0.2, 0.04, x, 0.95, H + 0.01, INK); plane(bus, 0.28, 0.14, x, 0.95, H + 0.035, lens); }
+    tbox(bus, 1.1, 0.34, 0.03, 0, 0.95, H + 0.01, INK);
+    tbox(bus, 2.56, 0.28, 0.16, 0, 0.48, H + 0.06, INK);
+    for (const x of [-1.4, 1.4]) { tbox(bus, 0.05, 0.05, 0.5, x, 2.6, H - 0.1, INK); tbox(bus, 0.08, 0.36, 0.2, x * 1.04, 2.4, H + 0.12, INK); }
+    // the ad on its street side, in the long frame bus ads come in (a "king"), between its wheels under the windows:
+    // its aluminium frame, the print in it a couple of cm proud of the panel, painted and lit as the bus is
+    const A = SIDE_AD, side = 1.25;
+    tbox(bus, 0.03, A.h + 0.1, A.w + 0.1, side + 0.005, A.y, A.z, '#b9b4aa');
+    plane(bus, A.w, A.h, side + 0.022, A.y, A.z, paint(canvasTex(2048, Math.round((2048 * A.h) / A.w), (c) => drawSideAd(c, c.canvas.width, c.canvas.height)))).rotation.y = Math.PI / 2;
+    fuse(bus);
     root.add(bus);
   }
 
@@ -221,10 +288,12 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
 
   // ---- her phone, in her hand: the screen's rows are the carriers; the phone round them; the Read receipt under the
   // last sent bubble (he's seen them and said nothing) ----
-  const phone = moving(), grip = new THREE.Matrix4();
+  const phone = moving(), grip = new THREE.Matrix4(), gripLocal = new THREE.Matrix4();
+  let slab!: THREE.Group;
   let receipt!: THREE.Mesh;
   {
-    const p = plan.phone, along = p.up.clone().cross(p.normal).normalize(), slab = new THREE.Group();
+    const p = plan.phone, along = p.up.clone().cross(p.normal).normalize();
+    slab = new THREE.Group();
     slab.matrixAutoUpdate = false;
     slab.matrix.makeBasis(along, p.up, p.normal).setPosition(p.pos);
     // (its screen: a status bar and his name over the thread, the text field under it; the bubbles are the carriers)
@@ -263,7 +332,9 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     // her hand on it — hers, her left, from her arm (the user, 2026-10-15: the phone's own hand "reads as floating"): at
     // its foot, on her side, the thumb round onto the text field (never over the thread); where, in the car's body
     // (the phone rides it as she does: the slab's frame, at its back's foot)
-    grip.copy(slab.matrix).multiply(new THREE.Matrix4().makeTranslation(p.w / 2 + 0.012 - HOLD.inset, -p.h / 2 - P.bottom - 0.015, -0.014));
+    gripLocal.makeTranslation(p.w / 2 + 0.012 - HOLD.inset, -p.h / 2 - P.bottom - 0.015, -0.014);
+    grip.copy(slab.matrix).multiply(gripLocal);
+    gripLocal.invert(); // (the phone from her grip on it)
     // the Read receipt: grey, small, right-aligned with the bubbles' right edge (carrierart.ts: 0.96 of the face's width)
     const readTex = canvasTex(512, 64, (c) => {
       c.fillStyle = '#8f96a8'; c.textAlign = 'right'; c.textBaseline = 'middle';
@@ -327,6 +398,13 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
   // ---- the newsstand up the street (the user's Easter egg: his other video's magazine on its racks) ----
   buildNewsstand(drive, root);
 
+  // her phone's time in her lap: from the cut into the verse to the first cut after it's back down at the end
+  const cuts = drive.shots.filter((x) => x.move === 'cut').map((x) => (typeof x.at === 'number' ? x.at : x.at.start - LEAD));
+  const last = plan.phone.held[plan.phone.held.length - 1]![1] + HOLD.lift;
+  const inLap: [number, number] = [Math.max(-Infinity, ...cuts.filter((c) => c <= plan.start)), Math.min(Infinity, ...cuts.filter((c) => c >= last))];
+  const LAP = lapGrip(), lap = new THREE.Matrix4(), now = new THREE.Matrix4(), _k = new THREE.Matrix4(), _one = new THREE.Vector3(1, 1, 1);
+  const _p0 = new THREE.Vector3(), _p1 = new THREE.Vector3(), _q0 = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _s = new THREE.Vector3();
+
   /** The bus at t: waiting at its stop, pulling out ahead of them into their lane, riding ahead of them until it
    *  turns, then on and round the corner into the cross street. */
   const busMatrix = (t: number): THREE.Matrix4 => {
@@ -373,19 +451,31 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       if (bus.visible) bus.matrix.copy(busMatrix(t));
       van.visible = vanThere(plan, t);
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));
-      // (on the car's body, as she is: lifted and rocked with it on its hydraulics, her hand on it)
-      const body = car.getObjectByName('body')!;
+      // (on the car's body, as she is: lifted and rocked with it on its hydraulics, in her hand: resting in her lap,
+      // lifted to her face and lowered again, eased; her hand on it all the while)
+      const body = car.getObjectByName('body')!, her = body.getObjectByName('her');
       body.updateMatrix();
       phone.matrix.multiplyMatrices(car.matrix, body.matrix);
-      phone.visible = plan.phone.held.some(([a, b]) => t >= a && t < b);
-      const up = plan.phone.held.reduce((m, [a, b]) => Math.max(m, Math.min(1, (t - a + HOLD.reach) / HOLD.reach, (b + HOLD.reach - t) / HOLD.reach)), 0);
-      holdPhone(body, grip, up);
+      phone.visible = t >= inLap[0] && t < inLap[1];
+      const u = plan.phone.held.reduce((m, [a, b]) => Math.max(m, Math.min(1, (t - a + HOLD.lift) / HOLD.lift, (b + HOLD.lift - t) / HOLD.lift)), 0);
+      const e = u < 0.5 ? 4 * u * u * u : 1 - 4 * (1 - u) * (1 - u) * (1 - u);
+      if (her && phone.visible) {
+        her.updateMatrix();
+        lap.multiplyMatrices(her.matrix, LAP);
+        lap.decompose(_p0, _q0, _s); grip.decompose(_p1, _q1, _s);
+        // (on a little arc: up off her lap before it comes forward to her face)
+        _p0.lerp(_p1, e).y += 0.05 * Math.sin(Math.PI * e);
+        now.compose(_p0, _q0.slerp(_q1, e), _one);
+        const k = HOLD.small + (1 - HOLD.small) * e;
+        slab.matrix.copy(now).multiply(_k.makeScale(k, k, k)).multiply(gripLocal);
+        holdPhone(body, now, 1, e);
+      } else holdPhone(body, grip, 0);
       // the Read receipt, under the last sent bubble of the thread on screen
       const thread = plan.phone.held.findIndex(([a, b]) => t >= a && t < b), sent = plan.read.bubbles.filter((b) => b.thread === thread && t >= b.start);
       // (not while her next text is up but not yet sent: it would sit between them)
       const drafting = drive.carriers.some((c) => c.kind === 'phone' && t >= c.reveal && t < c.phrase.start && t >= (c.from ?? -Infinity) && t < (c.until ?? Infinity));
       receipt.visible = thread === 0 && t >= plan.read.at[thread]! && sent.length > 0 && !drafting; // (the second thread is received: no receipt)
-      if (receipt.visible) receipt.position.y = sent[sent.length - 1]!.dy - P_GAP;
+      if (receipt.visible) { const last = sent[sent.length - 1]!; receipt.position.y = last.dy + riseAt(last.carrier, t) - P_GAP; }
       // their real speed, blinking with SLOW DOWN in turn on the trailer's readout
       const phase = Math.floor(t / 0.55) % 2;
       readout.planes.forEach((p, i) => (p.visible = i === phase));

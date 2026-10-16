@@ -60,6 +60,11 @@ const SOLO_MAX = 1.6;
 /** Faces that carry poster art until their lyric is revealed. */
 /** A word of emphasis punches up this much as it's sung, settling over `over` s; it fills this share of its row. */
 export const PUNCH = { scale: 0.2, over: 0.3, fill: 0.9 };
+/** A phone's text coming in (over its reveal, dissolve.ts REVEAL_S): scaled up from this share of its size at its
+ *  tail's corner, overshooting by about `over` before it settles; opaque by this share of the way. */
+const BUBBLE = { from: 0.3, over: 1.4, fade: 0.35 };
+/** 0 → 1, overshooting past 1 (by ~7% at over 1.4) and settling back. */
+const backOut = (u: number) => { const v = Math.min(1, Math.max(0, u)) - 1, k = BUBBLE.over; return 1 + (k + 1) * v * v * v + k * v * v; };
 /** The tunnel's graffiti (drawGraffiti), in em of its row: letters jittered in size (± size/2), tilt (± tilt/2 rad)
  *  and step (± step/2), a row's first letter `first` x, crowding each other by `track`, a row's slant (± slant/2);
  *  the cap height `rowFill` of its row, the row at most `wide` of the face; the strokes' widths (cloud, outline, the
@@ -326,8 +331,12 @@ export class CarrierArt {
 
   /** The phrase, karaoke word by word, at `alpha` (its reveal for faces without copy). */
   private drawWords(c: CanvasRenderingContext2D, t: number, TW: number, alpha: number) {
-    alpha *= 1 - (1 - STALE.to) * Math.round(staleAt(this.carrier, t) * 8) / 8; // (sung and read: dimmed back)
     const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height, pxPerM = W / carrier.w;
+    // (a text doesn't fade in: it pops up from its tail, `pop` of the way through its reveal — its rise into place and
+    // the push on the ones before it are the carrier's, carriers.ts riseAt)
+    const pop = style.bubble ? alpha : 1;
+    if (style.bubble) alpha = Math.min(1, pop / BUBBLE.fade);
+    alpha *= 1 - (1 - STALE.to) * Math.round(staleAt(this.carrier, t) * 8) / 8; // (sung and read: dimmed back)
     let em = carrier.em * pxPerM;
     c.font = font(style.family, em);
     const label = (w: Word) => (style.caps ? w.w.toUpperCase() : w.w);
@@ -360,7 +369,7 @@ export class CarrierArt {
     };
     // a sent text: the phrase is one message, its bubble on the right, its rows left-aligned in it (sized as settled,
     // so the bubble holds still while the word of emphasis punches)
-    let bubbleX = 0;
+    let bubbleX = 0, popped = false;
     if (style.bubble) {
       const widths = carrier.rows.map((row, r) => {
         if (r !== soloRow) return c.measureText(row).width;
@@ -369,6 +378,10 @@ export class CarrierArt {
       });
       const pad = em * 0.55, bw = Math.max(...widths) + 2 * pad, x0 = style.bubbleLeft ? TW * 0.04 : TW * 0.96 - bw;
       bubbleX = x0 + pad;
+      // (scaled up from its tail's corner, overshooting a touch and settling: the bubble and its words together)
+      const k = BUBBLE.from + (1 - BUBBLE.from) * backOut(pop), cx = style.bubbleLeft ? x0 : x0 + bw, cy = H * 0.93;
+      c.save(); popped = true;
+      c.translate(cx, cy); c.scale(k, k); c.translate(-cx, -cy);
       c.save(); c.shadowBlur = 0; c.globalAlpha = alpha; c.fillStyle = style.bubble;
       c.beginPath(); c.roundRect(x0, H * 0.07, bw, H * 0.86, Math.min(H * 0.43, em * 0.9)); c.fill();
       // its tail, at the foot of its outer corner
@@ -413,6 +426,7 @@ export class CarrierArt {
       }
       if (solo) c.font = font(style.family, em);
     });
+    if (popped) c.restore();
     c.globalAlpha = 1;
     c.shadowBlur = 0;
   }
