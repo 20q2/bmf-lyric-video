@@ -12,6 +12,7 @@ import type { Block } from '../../drive/blocks';
 import type { Drive } from '../../drive/drive';
 import { GIANT, SHACK, type Verse2Plan, WASH } from '../../drive/sets/verse2';
 import { ROAD_HALF } from '../../drive/route';
+import { CORNER_WALK, SIDEWALKS } from '../../drive/world';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { F, font } from '../../engine/type';
@@ -251,7 +252,8 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     for (const side of [-1, 1]) {
       const zs = side * (C.w / 2), zw = zs + side * S.walk / 2;
       box(st, S.len - S.from + 40, 8, S.depth + 60, ROAD_HALF + (S.from + S.len) / 2, -4 - 0.06, zs + side * (S.walk + (S.depth + 60) / 2), ground); // the blocks' ground, down out of sight
-      box(st, S.len - S.from + 20, 0.16, S.walk, ROAD_HALF + (S.from + S.len) / 2, 0.08, zw, walkM); // the sidewalk
+      const w0 = CORNER_WALK.to, w1 = ROAD_HALF + S.len + 10; // (on from the corner's own walk: drive/world.ts CORNER_WALK)
+      box(st, w1 - w0, 0.16, S.walk, (w0 + w1) / 2, 0.08, zw, walkM); // the sidewalk
       // the fronts: varied widths and heights, an awning on some, a lot now and then
       let x = ROAD_HALF + S.from, k = 0, built = 0;
       while (x < S.len - 20) {
@@ -474,10 +476,14 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     }
     box(g, 0.06, 0.5, Sh.d, -w / 2 - 0.03, 0.25, -Sh.d / 2, toon({ color: HW.deep }));
     cyl(g, 0.07, h, w / 2 - 0.12, h / 2, 0.06, toon({ color: '#d9d0c0' })); // a downpipe at its far corner
+    // (the stock, Mr. Handle It and his customers up on the sidewalk, which now runs back to the shop's front and round
+    // its corner — drive/world.ts CORNER_WALK: at the road's level they stood sunk in it)
+    const onWalk = new THREE.Group(); onWalk.position.y = SIDEWALKS.kerb; g.add(onWalk);
     // the stock on the sidewalk: a ladder against the corner pier, two wheelbarrows, a pallet of potting soil, a barrel of
     // rakes, shovels and brooms by the door (their heads up: bare handles read as cables — the user, 2026-10-14: "wires
     // plugged into a window"), a pyramid of paint, a rack of coiled hoses, the propane cage
     {
+      const g = onWalk;
       const alu = toon({ color: '#b8bcc4' }), wood = toon({ color: '#c9a97a' });
       { const lx = X(0.45); for (const s of [-1, 1]) limb(g, V3(lx + s * 0.22, 0, 0.95), V3(lx + s * 0.22, wTop - 0.4, 0.06), 0.03, alu); for (let k = 1; k < 9; k++) { const u = k / 9; box(g, 0.44, 0.04, 0.04, lx, u * (wTop - 0.4), 0.95 - u * 0.89, alu); } }
       const barrow = (a: number, z: number, rot: number, col: string) => {
@@ -519,11 +525,11 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       }
     }
     // Mr. Handle It on his plinth, past the banner, turned a little toward the coming street
-    { const man = new THREE.Group(); man.position.set(X(Sh.statue.at), 0, Sh.statue.out); man.rotation.y = -0.35; g.add(man); mrHandleIt(man); }
+    { const man = new THREE.Group(); man.position.set(X(Sh.statue.at), 0, Sh.statue.out); man.rotation.y = -0.35; onWalk.add(man); mrHandleIt(man); }
     // its customers (the cast's silhouettes): one looking up at him, one walking up the sidewalk with a gallon of paint
     // (both clear of the posters while they're read: right of them, out by the curb)
-    { const fan = walker(); fan.position.set(X(Sh.statue.at + 2.2), 0, 3.0); fan.rotation.y = Math.atan2(-2.2, Sh.statue.out - 3.0); g.add(fan);
-      shopper = walker(); shopper.rotation.y = -Math.PI / 2; g.add(shopper); shopperAt = (k) => X(Sh.len + 4 - k);
+    { const fan = walker(); fan.position.set(X(Sh.statue.at + 2.2), 0, 3.0); fan.rotation.y = Math.atan2(-2.2, Sh.statue.out - 3.0); onWalk.add(fan);
+      shopper = walker(); shopper.rotation.y = -Math.PI / 2; onWalk.add(shopper); shopperAt = (k) => X(Sh.len + 4 - k);
       cyl(shopper, 0.1, 0.17, 0, 0.72, 0.2, toon({ color: '#c8102e' })); }
     root.add(g);
   }

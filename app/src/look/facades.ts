@@ -95,8 +95,9 @@ export function facadeOf(b: Block): FacadeGeometry {
   const P = new Parts(stucco, trimC, side < 0);
   // (the ground: the road's level is its box's bottom plus its lift; the facade starts at the road)
   const g0 = H - b.h;
-  // the body, behind the front's depth, its ends a little in from the box's
-  P.box('walls', D - A.depth, H, W - 2 * A.end, -A.depth / 2, H / 2, 0);
+  // the body, behind the front's depth, its ends a little in from the box's; its roof a little under the coping's top
+  // (level with it, the two fought along the roof's edges)
+  P.box('walls', D - A.depth, H - A.coping[0] / 3, W - 2 * A.end, -A.depth / 2, (H - A.coping[0] / 3) / 2, 0);
   // the ground floor: a storefront (bays of glass, a door, a base course, the sign band), or a carport on low apartments
   const apartments = b.h <= 9 && r(2) > 0.72 && !b.corner, xf = body;
   if (!apartments) {
@@ -186,7 +187,12 @@ export function facades(blocks: readonly Block[]): FacadeGeometry {
 let shared: { body: THREE.Material; glass: THREE.Material; signs: THREE.Material } | undefined;
 /** A facade's meshes in a group, on the shared materials (browser only). */
 export function facadeMeshes(f: FacadeGeometry): THREE.Group {
-  shared ??= { body: toon({ vertexColors: true }), glass: nightGlass(), signs: new THREE.MeshBasicMaterial({ map: signAtlas() }) };
+  // (the panes stand a centimetre off their walls, the signs half that off their bands: past ~100 m that's under the
+  // depth buffer's step (near 0.1 m, far 3000 m), and the far blocks' windows flickered in and out of their walls — the
+  // user, 2026-10-16, the pastel green ones down the road at the start. A polygon offset pulls them forward by a few
+  // of the buffer's own steps, so it grows with the distance as the step does, and is nothing up close.)
+  const forward = { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 };
+  shared ??= { body: toon({ vertexColors: true }), glass: Object.assign(nightGlass(), forward), signs: new THREE.MeshBasicMaterial({ map: signAtlas(), ...forward }) };
   const g = new THREE.Group();
   g.add(new THREE.Mesh(f.walls, shared.body), new THREE.Mesh(f.trim, shared.body), new THREE.Mesh(f.glass, shared.glass), new THREE.Mesh(f.signs, shared.signs));
   return g;

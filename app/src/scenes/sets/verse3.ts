@@ -794,8 +794,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       const road = new THREE.Mesh(new THREE.PlaneGeometry(56, w), toon({ color: '#3a3444' })); road.rotation.x = -Math.PI / 2; road.position.y = 0.01; g.add(road);
       // (its own crosswalk across its mouth, along the main road's kerb)
       for (let k = 0; k < 9; k++) box(onRoad(mid, side * (ROAD_HALF + 1.6)), 2.6, 0.02, 0.5, 0, 0.02, -w / 2 + 0.9 + k * ((w - 1.8) / 8), toon({ color: '#9a94a0' }));
-      // the corners' kerbs
-      for (const s of [a, b]) box(onRoad(s, side * (ROAD_HALF + 28)), 56, 0.15, 0.3, 0, 0.075, 0, toon({ color: '#8a8090' }));
+      // (the corners' kerbs, their returns and the sidewalks round them are the town's: drive/world.ts CORNER_WALK)
     }
     for (const s of [a - 1.4, b + 1.4]) for (let k = 0; k < 9; k++) box(onRoad(s, -ROAD_HALF + 0.5 + k * 0.9), 0.5, 0.02, 2.2, 0, 0.02, 0, toon({ color: '#9a94a0' }));
     // the signals: on the left's near corner an arm out over the oncoming lane; on the right's, a head on its post

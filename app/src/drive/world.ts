@@ -50,13 +50,30 @@ const GROUND: Record<string, string> = { verse1: '#c99a7a', chorus2: '#b8a99a', 
 const PALMS = new Set(['intro', 'chorus1', 'chorus3']); // (none in verse 2: its take's camera rides where they'd stand; none on the Strip: its fronts stand where they would; on the coast, on the beach by the water)
 /** Kerbs and sidewalks along the town's streets (not the freeway, the coast, the tunnel or the hills): the kerb's
  *  height, the sidewalk's width (m) and its concrete; broken where a cross street opens (the set-pieces' openings). */
-const SIDEWALKS = { stretches: new Set(['intro', 'chorus1', 'verse1', 'verse2', 'verse3']), kerb: 0.15, width: 3, colour: '#cbbba7' };
+export const SIDEWALKS = { stretches: new Set(['intro', 'chorus1', 'verse1', 'verse2', 'verse3']), kerb: 0.15, width: 3, colour: '#cbbba7' };
 /** The town's back streets: the rows of buildings behind the street (blocks.ts BACK) front one of their own, and the
  *  ground between is parking (the user, 2026-10-15: past a board, "shops but no road or sidewalks just a flat orange
  *  plane"). Off the road's centre (m): the lots from the sidewalk's back to `lot`, a sidewalk to `road`, the back street
  *  to `walk`, its far sidewalk to the back row's fronts (BACK.from); the lots' bays every `bay` m, `bayLen` deep; none
  *  where the road turns tighter than `tight` m toward that side (the strips would fold). */
 const BACK_STREET = { lot: BACK.from - 12, road: BACK.from - 9.5, walk: BACK.from - 2.5, bay: 2.8, bayLen: 5, tight: 60, lotColour: '#6b5b66' };
+/** A cross street's corners (where a set-piece's opening cuts the sidewalk): the kerb's return round each (its radius,
+ *  m), a ramp down to the crossings at its apex (half its width along the kerb, its flares either side, how far it runs
+ *  back into the walk; m), and the sidewalk on round the corner along the cross street (its width the sidewalk's) to
+ *  the back street's; and the sidewalk carried back to a building's front where one stands up to `apron` m behind it,
+ *  across the alleys between them up to `join` m wide. */
+export const CORNER_WALK = { radius: 2.4, ramp: { half: 0.75, flare: 0.65, run: 1.4 }, apron: 3, join: 6, to: BACK_STREET.lot };
+
+/** Geometry in the road's frame: each vertex (s along it, lateral off its centre, height over its level), uv in metres
+ *  (along, out from the kerb: the sidewalks' tiles line up with the ribbons'); triangles by index. */
+function patch(route: Route, verts: readonly (readonly [number, number, number])[], tris: number[]): THREE.BufferGeometry {
+  const pos: number[] = [], uv: number[] = [];
+  for (const [s, l, y] of verts) { const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, l); pos.push(p.x, p.y + y, p.z); uv.push(s, Math.abs(l) - ROAD_HALF); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(tris);
+  g.computeVertexNormals();
+  return g;
+}
 
 /** A ribbon along the road from s0 to s1: at each sample, from (lateral a, height ya) to (lateral b, height yb) over the
  *  road's level; uv in metres (along, across). */
@@ -314,25 +331,84 @@ export function buildWorld(drive: Drive): THREE.Group {
   {
     const tex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d')!; c.fillStyle = SIDEWALKS.colour; c.fillRect(0, 0, 128, 128); c.fillStyle = 'rgba(60,40,50,0.35)'; c.fillRect(0, 0, 3, 128); c.fillRect(0, 0, 128, 2); const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 1.5, 1 / 1.5); t.colorSpace = THREE.SRGBColorSpace; return t; })();
     const walk = toon({ map: tex, side: THREE.DoubleSide }), kerb = toon({ color: '#b8a894', side: THREE.DoubleSide }), K = SIDEWALKS;
+    const B = BACK_STREET, lotM = toon({ color: B.lotColour, side: THREE.DoubleSide }), street = toon({ color: WORLD.asphalt, side: THREE.DoubleSide });
+    // (the concrete, the kerbs' faces and the corners' asphalt, each merged into one mesh at the end)
+    const walks: THREE.BufferGeometry[] = [], kerbs: THREE.BufferGeometry[] = [], asphalts: THREE.BufferGeometry[] = [];
     const spans: [number, number][] = [];
     for (const st of drive.stretches) if (K.stretches.has(st.id)) spans.push([st.k === 0 ? ROAD_START : motion.distanceAt(st.start), motion.distanceAt(st.end)]);
+    const inSpan = (s: number) => spans.some(([a, b]) => s >= a && s <= b);
+    const Cw = CORNER_WALK, R = Cw.radius, reach = Cw.to - ROAD_HALF, foot = -0.05; // (faces down past the verges' level)
+    /** A face standing along a path of (s, lateral) points, from `foot` up to each point's height. */
+    const face = (pts: [number, number, number][]) => {
+      const verts: [number, number, number][] = [], tris: number[] = [];
+      pts.forEach(([s, l, y], i) => { verts.push([s, l, foot], [s, l, y]); if (i) { const o = (i - 1) * 2; tris.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); } });
+      return patch(route, verts, tris);
+    };
+    /** A cross street's corner at the end `e` of its mouth (`dir`: the way out of it along the road) on a side: the
+     *  kerb's return round it, a ramp down to the crossings at its apex, and the sidewalk on round the corner and along
+     *  the cross street to the back street's (the corner buildings stood in their lots with the sidewalk cut off at
+     *  the street's mouth: the user, 2026-10-16, the barbershop at 16 s and the hardware store at 83 s). In (u, v): u
+     *  m from the mouth along the road, v m out from the road's kerb. */
+    const corner = (e: number, dir: number, side: number) => {
+      const at = (u: number, v: number, y: number): [number, number, number] => [e + dir * u, side * (ROAD_HALF + v), y];
+      const ramp = Cw.ramp, sm = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      // the return: a quarter circle round (R, R), a point at angle a and ρ from its centre at (R − ρ sin a, R − ρ cos a);
+      // the kerb's height, down to the road's at the apex (a = π/4) and back up the ramp's run and its flares
+      const arc = (a: number, rho: number) => at(R - rho * Math.sin(a), R - rho * Math.cos(a), K.kerb * (1 - (1 - sm(ramp.half, ramp.half + ramp.flare, Math.abs(a - Math.PI / 4) * R)) * Math.max(0, 1 - (R - rho) / ramp.run)));
+      const N = 18, rings = [R, R - ramp.run / 3, R - (2 * ramp.run) / 3, R - ramp.run, 0];
+      const verts: [number, number, number][] = [], tris: number[] = [];
+      for (let i = 0; i <= N; i++) for (const rho of rings) verts.push(arc((i / N) * (Math.PI / 2), rho));
+      for (let i = 0; i < N; i++) for (let j = 0; j < rings.length - 1; j++) { const o = i * rings.length + j, p = o + rings.length; tris.push(o, p, o + 1, p, p + 1, o + 1); }
+      walks.push(patch(route, verts, tris));
+      // the sidewalk on from the return round the corner, and along the cross street out to the back street's
+      walks.push(patch(route, [at(0, R, K.kerb), at(R, R, K.kerb), at(0, K.width, K.kerb), at(R, K.width, K.kerb)], [0, 1, 2, 1, 3, 2]));
+      walks.push(patch(route, [at(0, K.width, K.kerb), at(K.width, K.width, K.kerb), at(0, reach, K.kerb), at(K.width, reach, K.kerb)], [0, 1, 2, 1, 3, 2]));
+      // its kerb: round the return (down to nothing in the ramp) and up the cross street; its back to the lot, its end
+      kerbs.push(face([...Array.from({ length: N + 1 }, (_, i) => arc((i / N) * (Math.PI / 2), R)), at(0, reach, K.kerb)]));
+      kerbs.push(face([at(K.width, K.width, K.kerb), at(K.width, reach, K.kerb)]), face([at(K.width, reach, K.kerb), at(0, reach, K.kerb)]));
+      // the road where the return cuts the corner off
+      const fan: [number, number, number][] = [at(0, 0, 0.01), ...Array.from({ length: N + 1 }, (_, i) => { const p = arc((i / N) * (Math.PI / 2), R); return [p[0], p[1], 0.01] as [number, number, number]; })];
+      asphalts.push(patch(route, fan, Array.from({ length: N }, (_, i) => [0, i + 1, i + 2]).flat()));
+    };
     for (const side of [-1, 1]) {
       const cuts = drive.openings.filter((o) => o.side === side).sort((x, y) => x.a - y.a);
+      const r0 = side * ROAD_HALF, r1 = side * (ROAD_HALF + K.width);
       for (const [a0, b0] of spans) {
+        // (each run between the cuts stops short of a corner by the return's radius: the corner has its own)
         let a = a0;
         for (const o of [...cuts.filter((o) => o.b > a0 && o.a < b0), { a: b0, b: b0 }]) {
-          if (o.a - a > 1) {
-            const r0 = side * ROAD_HALF, r1 = side * (ROAD_HALF + K.width);
-            g.add(named(new THREE.Mesh(ribbon(route, a, o.a, r0, K.kerb, r1, K.kerb), walk), 'sidewalks'));
-            g.add(named(new THREE.Mesh(ribbon(route, a, o.a, r0, 0, r0, K.kerb), kerb), 'sidewalks'));
+          const s0 = a > a0 ? a + R : a, s1 = o.a < b0 ? o.a - R : o.a;
+          if (s1 - s0 > 1) {
+            walks.push(ribbon(route, s0, s1, r0, K.kerb, r1, K.kerb));
+            kerbs.push(ribbon(route, s0, s1, r0, 0, r0, K.kerb), ribbon(route, s0, s1, r1, foot, r1, K.kerb)); // (its back too: a lot's a step down)
           }
           a = Math.max(a, o.b);
+        }
+      }
+      for (const o of cuts) { if (inSpan(o.a - K.width)) corner(o.a, -1, side); if (inSpan(o.b + K.width)) corner(o.b, 1, side); }
+      // the sidewalk on back to the fronts of the buildings standing a little behind it (a set's shops, a few metres
+      // off the road: they stood behind a strip of parking lot), the gaps between them that are only an alley filled
+      // too; not round a corner (its own walk)
+      const fronts = drive.blocks
+        .filter((b) => !b.car && !b.concrete && Math.sign(b.lateral) === side)
+        .map((b) => ({ a: b.s - b.w / 2, b: b.s + b.w / 2, front: Math.abs(b.lateral) - b.d / 2 }))
+        .filter((p) => p.front - (ROAD_HALF + K.width) > 0.05 && p.front - (ROAD_HALF + K.width) <= Cw.apron)
+        .sort((x, y) => x.a - y.a);
+      const aprons = [...fronts];
+      for (let i = 1; i < fronts.length; i++) { const p = fronts[i - 1]!, q = fronts[i]!; if (q.a > p.b && q.a - p.b < Cw.join) aprons.push({ a: p.b, b: q.a, front: Math.min(p.front, q.front) }); }
+      for (const p of aprons) {
+        let pieces: [number, number][] = [[p.a, p.b]];
+        for (const o of cuts) pieces = pieces.flatMap(([x, y]): [number, number][] => [[x, Math.min(y, o.a - K.width)], [Math.max(x, o.b + K.width), y]]).filter(([x, y]) => y - x > 0.05);
+        for (const [x0, y0] of pieces) for (const [a1, b1] of spans) {
+          const x = Math.max(x0, a1), y = Math.min(y0, b1), f = side * p.front;
+          if (y - x < 0.05) continue;
+          walks.push(ribbon(route, x, y, r1, K.kerb, f, K.kerb));
+          kerbs.push(ribbon(route, x, y, f, foot, f, K.kerb), face([[x, r1, K.kerb], [x, f, K.kerb]]), face([[y, r1, K.kerb], [y, f, K.kerb]]));
         }
       }
     }
     // the back streets and the lots (BACK_STREET), where the rows behind stand: each side's runs broken at a turn too
     // tight for them, a tunnel, the sea; a cross street's asphalt carried through to the back street
-    const B = BACK_STREET, lotM = toon({ color: B.lotColour, side: THREE.DoubleSide }), street = toon({ color: WORLD.asphalt, side: THREE.DoubleSide });
     const paintM = toon({ color: WORLD.dash, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
     const marks: THREE.BufferGeometry[] = [];
     const tight = (s: number, side: number) => {
@@ -366,6 +442,11 @@ export function buildWorld(drive: Drive): THREE.Group {
               g.add(named(new THREE.Mesh(ribbon(route, a, o.a, side * (ROAD_HALF + K.width), 0.006, side * B.lot, 0.006), lotM), 'backstreets'));
               g.add(named(new THREE.Mesh(ribbon(route, a, o.a, side * B.lot, K.kerb, side * B.road, K.kerb), walk), 'backstreets'));
               g.add(named(new THREE.Mesh(ribbon(route, a, o.a, side * B.road, 0, side * B.road, K.kerb), kerb), 'backstreets'));
+              // (the near sidewalk's step down to the lot, and its ends at the cross streets: open, they showed the ground
+              // through under it)
+              kerbs.push(ribbon(route, a, o.a, side * B.lot, foot, side * B.lot, K.kerb));
+              if (a > ra) kerbs.push(face([[a, side * B.lot, K.kerb], [a, side * B.road, K.kerb]]));
+              if (o.a < rb) kerbs.push(face([[o.a, side * B.lot, K.kerb], [o.a, side * B.road, K.kerb]]));
               // (the bays: a row off the street's sidewalk and a row off the back street's)
               for (let s = a + 1; s + 0.2 < o.a; s += B.bay) for (const [x0, x1] of [[ROAD_HALF + K.width + 0.6, ROAD_HALF + K.width + 0.6 + B.bayLen], [B.lot - 0.6 - B.bayLen, B.lot - 0.6]] as const) marks.push(ribbon(route, s, s + 0.12, side * x0, 0.01, side * x1, 0.01));
             }
@@ -376,6 +457,7 @@ export function buildWorld(drive: Drive): THREE.Group {
       }
     }
     if (marks.length) g.add(named(new THREE.Mesh(mergeGeometries(marks), paintM), 'backstreets'));
+    for (const [gs, m] of [[walks, walk], [kerbs, kerb], [asphalts, street]] as const) if (gs.length) g.add(named(new THREE.Mesh(mergeGeometries(gs)!, m), 'sidewalks'));
   }
 
   // the town's buildings (blocks.ts: the guard checks them too)
