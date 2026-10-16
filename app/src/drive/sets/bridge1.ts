@@ -157,14 +157,18 @@ export const BRIDGE1: SetPiece = {
       const S = signLines[0]!, [C, D] = wallLines[1]!.phs as [Phrase, Phrase];
       const sS = carS(S.line.end) + PANEL.ahead;
       sign(S.phs, sS);
-      const sC = paint(C, 0, sS + 11), sD = paint(D, 1, sC + 42);
+      // (the move on to the next piece starts on C's last word and lands just before D is sung, at about the car's
+      // pace: it was crammed into the breath between them, a dash that arrived after "we": the user, 2026-10-16, "feels
+      // a little bit late and like it could be a little bit smoother")
+      const sC = paint(C, 0, sS + 11), sD = paint(D, 1, sC + 26), go = Math.max(C.start + 0.8, C.end - 0.45);
       const hi = { x: -2.8, y: 5.1 }, lo = { x: 3.5, y: 1.1 }, mid = { x: 3, y: 2.6 };
       take([...S.phs, C, D], [
         { t: S.phs[0]!.start - 0.05, eye: [sS - 13.5, hi.x, hi.y], at: [sS, 0, 3] },
         { t: S.line.end, eye: [sS - 12.5, hi.x, hi.y], at: [sS, 0, 3] },
-        { t: C.start + 0.25, eye: [sC - 16, lo.x, lo.y], at: [sC, W0, 3.3] },
-        { t: C.end, eye: [sC - 8, lo.x, lo.y + 0.4], at: [sC, W0, 3.3] },
-        { t: D.start + 0.2, eye: [sD - 14, mid.x, mid.y], at: [sD + 5, W0 + 2, 3] },
+        { t: C.start + 0.25, eye: [sC - 20, lo.x, lo.y], at: [sC, W0, 3.3] },
+        { t: go, eye: [sC - 9, lo.x, lo.y + 0.3], at: [sC, W0, 3.3] },
+        { t: C.end, eye: [sC - 5.5, lo.x - 0.2, lo.y + 0.6], at: [sC + 1, W0, 3.3] },
+        { t: D.start - 0.15, eye: [sD - 14, mid.x, mid.y], at: [sD + 5, W0 + 2, 3] },
         { t: D.end + 0.6, eye: [sD - 12.5, mid.x, mid.y], at: [sD + 5, W0 + 2, 3] },
       ]);
     }
