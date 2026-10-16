@@ -30,7 +30,7 @@ export interface StretchSpec {
 
 export const STRETCHES: readonly StretchSpec[] = Object.freeze([
   { id: 'intro', section: null, place: 'a red light on the corner by the pink motel', pace: { kind: 'set' }, turn: 0, rise: 0, chase: 'front3q' },
-  { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'cruise', v: 14 }, turn: 0, rise: 0, chase: 'hero' },
+  { id: 'chorus1', section: 'chorus1', place: 'the boulevard', pace: { kind: 'set' }, turn: 0, rise: 0, chase: 'hero' }, // (cruising, to the stop sign by verse 1's side street: sets/chorus1.ts)
   { id: 'verse1', section: 'verse1', place: 'city streets at speed, never stopping', pace: { kind: 'set' }, turn: 90, rise: 0, chase: 'front3q' },
   { id: 'chorus2', section: 'chorus2', place: 'the freeway', pace: { kind: 'set' }, turn: -20, rise: 6, chase: 'high' },
   { id: 'verse2', section: 'verse2', place: 'Slauson, the neighbourhood', pace: { kind: 'set' }, turn: -90, rise: -6, chase: 'side' },

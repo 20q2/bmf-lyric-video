@@ -9,6 +9,7 @@ import { phraseOf } from '../phrases';
 import { ROAD_HALF } from '../route';
 import { type Block, boxAt } from '../blocks';
 import type { Placed, SetContext, SetFrame, SetPiece } from './index';
+import { STOP } from './verse1';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
@@ -30,8 +31,22 @@ export interface Chorus1Plan {
   doors: number[];
 }
 
+/** Its cruise (m/s). */
+const CRUISE = 14;
+
 export const CHORUS1: SetPiece = {
   owns: (line) => CAMPAIGN.test(line.text),
+
+  // cruising the boulevard; at its end, the stop sign at verse 1's side street (sets/verse1.ts STOP): braking to the
+  // line, a moment there while the bus pulls out ahead of them, then away after it
+  speed(st, audio) {
+    const go = st.end - STOP.go, stop = go - STOP.hold;
+    return [
+      { t: st.start, v: CRUISE, ramp: 240 / audio.bpm },
+      { t: stop - STOP.brake, v: 0, ramp: STOP.brake },
+      { t: go, v: STOP.goV, ramp: STOP.go },
+    ];
+  },
 
   place(ctx: SetContext): Placed {
     const { st, route } = ctx;

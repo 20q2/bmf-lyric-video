@@ -6,7 +6,11 @@
 //            car on the road) and anything whose place changes between them — a matrix, an instanced mesh's
 //            instances, a skeleton, a geometry — moves; so does anything hidden at any of them: the sets' traffic and
 //            walkers are placed only while shown, and a window between two poses would never see them move (the
-//            intro's crossing truck was hidden at its load-time place). A subtree with nothing moving in it is still. Still subtrees
+//            intro's crossing truck was hidden at its load-time place); and so does anything the sets' code writes a
+//            place to at any pose, the same place or not (watched while posing): the roof chicken's hop at 93 s falls
+//            between two poses, but its code sets it back to its perch every other frame — judged still, it was
+//            merged into its shop and only its eyes hopped (the user, 2026-10-15). A subtree with nothing moving in it
+//            is still. Still subtrees
 //            are the parts (big ones split into their children); what moves is left to three's own culling. A light
 //            counts as moving (hidden, it would stop lighting what's seen), and so does a mesh three is told not to
 //            cull, unless it's instanced (its instances' bounds are known; another may be shaped in its shader).
@@ -52,6 +56,24 @@ export class Zones {
       out[26] = v;
       out[27] = o.visible ? 0 : NaN;
     };
+    // (watch every posed object's place for writes while posing: its position and scale behind a proxy, its rotation
+    // through the change hooks three keeps between it and the quaternion, its matrix's elements behind a proxy)
+    const unwatch: (() => void)[] = [];
+    for (const k of sampled) {
+      if (moves[k]) continue;
+      const o = nodes[k]!, flag = () => { moves[k] = 1; };
+      for (const key of ['position', 'scale'] as const) {
+        const v = o[key];
+        Object.defineProperty(o, key, { value: new Proxy(v, { set: (tgt, prop, val) => { flag(); (tgt as unknown as Record<string | symbol, unknown>)[prop] = val; return true; } }), configurable: true, enumerable: true });
+        unwatch.push(() => Object.defineProperty(o, key, { value: v, configurable: true, enumerable: true }));
+      }
+      const q = o.quaternion as THREE.Quaternion & { _onChangeCallback: () => void }, r = o.rotation as THREE.Euler & { _onChangeCallback: () => void };
+      const qcb = q._onChangeCallback, rcb = r._onChangeCallback;
+      q._onChange(() => { flag(); qcb(); }); r._onChange(() => { flag(); rcb(); });
+      const el = o.matrix.elements;
+      o.matrix.elements = new Proxy(el, { set: (tgt, prop, val) => { flag(); (tgt as unknown as Record<string | symbol, unknown>)[prop] = val; return true; } });
+      unwatch.push(() => { q._onChange(qcb); r._onChange(rcb); o.matrix.elements = el; });
+    }
     const first = new Float64Array(nodes.length * N), now = new Float64Array(N);
     times.forEach((t, j) => {
       pose(t);
@@ -63,6 +85,7 @@ export class Zones {
         for (let e = 0; e < N; e++) if (!(now[e] === first[b + e])) { moves[k] = 1; break; }
       }
     });
+    for (const u of unwatch) u();
     const index = new Map(nodes.map((o, k) => [o, k]));
     const still = new Map<THREE.Object3D, boolean>(), size = new Map<THREE.Object3D, number>();
     // (a merged mesh is new: still)

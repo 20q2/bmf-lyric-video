@@ -1,9 +1,11 @@
 import { expect, test } from 'bun:test';
 import { routeFor } from '../src/drive/drive';
 import { motionFor, resolveStretches } from '../src/drive/stretches';
+import { SETS } from '../src/drive/sets';
 import { audio, lyrics } from './data';
 
-const R = resolveStretches(audio, lyrics), motion = motionFor(R, audio), route = routeFor(R, motion);
+// (the motion as the drive has it, the set-pieces' own speed keys in: without them a stretch paced by its set has none)
+const R = resolveStretches(audio, lyrics), motion = motionFor(R, audio, (s) => SETS[s.id]?.speed?.(s, audio) ?? []), route = routeFor(R, motion);
 const deg = (r: number) => (r * 180) / Math.PI;
 
 test('the route starts at the origin heading +z, and runs on past where the car stops', () => {

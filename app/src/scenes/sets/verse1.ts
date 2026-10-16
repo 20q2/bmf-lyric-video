@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
 import { carMatrix } from '../../drive/carriers';
-import { AT, BUS, PACE, VAN, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
+import { AT, BUS, PACE, SIDE, VAN, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -162,7 +162,44 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     const { w, h, pos } = plan.tailAd, share = TEXT_SHARE.bus ?? 0.8;
     const art = canvasTex(1024, Math.round((1024 * (h + 0.2)) / (w + 0.08)), (c) => drawAd(c, plan.busAd, c.canvas.width, c.canvas.height, share));
     plane(bus, w + 0.08, h + 0.2, 0, pos.y, -H - 0.02, new THREE.MeshBasicMaterial({ map: art })).rotation.y = Math.PI;
+    // its front (seen now, as it pulls out of the side street toward the lens): the windshield in two panes, the route
+    // over it lit amber, headlamps either side of a grille, a bumper, its mirrors on stalks
+    box(bus, 2.3, 1.45, 0.03, 0, 2.35, H + 0.005, black);
+    for (const x of [-0.56, 0.56]) plane(bus, 1.04, 1.3, x, 2.35, H + 0.025, glassM);
+    box(bus, 1.8, 0.24, 0.03, 0, 3.22, H + 0.005, black);
+    plane(bus, 1.7, 0.18, 0, 3.22, H + 0.025, new THREE.MeshBasicMaterial({ map: route, color: new THREE.Color(1.6, 1.6, 1.6) }));
+    for (const x of [-0.95, 0.95]) { box(bus, 0.34, 0.2, 0.04, x, 0.95, H + 0.01, black); plane(bus, 0.28, 0.14, x, 0.95, H + 0.035, toon({ color: '#f4efd8' })); }
+    box(bus, 1.1, 0.34, 0.03, 0, 0.95, H + 0.01, black);
+    box(bus, 2.56, 0.28, 0.16, 0, 0.48, H + 0.06, black);
+    for (const x of [-1.4, 1.4]) { box(bus, 0.05, 0.05, 0.5, x, 2.6, H - 0.1, black); box(bus, 0.08, 0.36, 0.2, x * 1.04, 2.4, H + 0.12, black); }
     root.add(bus);
+  }
+
+  // ---- the side street the bus comes out of (by the speed trailer): stop signs at its corners and for their lane,
+  // white stop lines across their lane and the side street's ----
+  {
+    const f0 = route.frameAt(plan.sideS), fwd = new THREE.Vector3(f0.fwd.x, 0, f0.fwd.z).normalize(), right = new THREE.Vector3(f0.right.x, 0, f0.right.z).normalize();
+    const at = (along: number, lateral: number, y = 0) => f0.pos.clone().addScaledVector(fwd, along).addScaledVector(right, lateral).add(new THREE.Vector3(0, y, 0));
+    const face = canvasTex(256, 256, (c) => {
+      const oct = (r: number) => { c.beginPath(); for (let k = 0; k < 8; k++) { const a = (Math.PI / 8) * (2 * k + 1); c.lineTo(128 + r * Math.cos(a), 128 + r * Math.sin(a)); } c.closePath(); };
+      oct(126); c.fillStyle = '#ffffff'; c.fill(); oct(116); c.fillStyle = '#c8102e'; c.fill();
+      c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 74); c.fillText('STOP', 128, 134);
+    });
+    const faceM = new THREE.MeshBasicMaterial({ map: face, transparent: true, alphaTest: 0.5 }), backM = toon({ color: '#9a9aa0' }), post = toon({ color: '#7a7a80' });
+    // (a sign: its post, its face toward `toward` (flat, unit), its plain back)
+    const sign = (p: THREE.Vector3, toward: THREE.Vector3) => {
+      const g = new THREE.Group(); g.position.copy(p); g.lookAt(p.clone().add(toward)); root.add(g);
+      box(g, 0.07, SIDE.signH, 0.07, 0, SIDE.signH / 2, -0.04, post);
+      plane(g, 0.76, 0.76, 0, SIDE.signH, 0.005, faceM);
+      const back = plane(g, 0.76, 0.76, 0, SIDE.signH, -0.002, backM); back.rotation.y = Math.PI;
+    };
+    sign(at(-SIDE.half - SIDE.sign, ROAD_HALF + 0.6), fwd.clone().negate()); // theirs, at the line, facing them
+    sign(at(SIDE.half + SIDE.sign, ROAD_HALF + 3.4), right); // the side street's, facing the bus as it comes down
+    sign(at(SIDE.half + SIDE.sign, -(ROAD_HALF + 0.6)), fwd); // the oncoming lane's (a four-way stop)
+    const paint = new THREE.MeshBasicMaterial({ color: WORLD.dash, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+    const bar = (along: number, lateral: number, across: number, deep: number, y: number) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(across, deep).rotateX(-Math.PI / 2), paint); m.position.copy(at(along, lateral, y)); m.lookAt(m.position.clone().add(fwd)); m.rotateX(0); root.add(m); return m; };
+    bar(-SIDE.half - SIDE.line + 0.2, LANE, ROAD_HALF - 0.4, 0.4, 0.03); // theirs, across their lane
+    { const m = bar(SIDE.lane, ROAD_HALF + 3.3, 0.4, SIDE.half - 0.4, 0.045); m.position.copy(at(SIDE.lane, ROAD_HALF + 3.3, 0.045)); } // the side street's, across its lane
   }
 
   // ---- the van ahead of the bus: its back doors carry the stickers, its bumper the plate (the carriers) ----
@@ -294,10 +331,27 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
    *  turns, then on and round the corner into the cross street. */
   const busMatrix = (t: number): THREE.Matrix4 => {
     if (t < plan.joinAt) {
-      const tA = plan.joinV / BUS.accel, left = Math.min(tA, plan.joinAt - t), u = 1 - left / tA, e = u * u * (3 - 2 * u);
-      const s = drive.motion.distanceAt(plan.joinAt) + plan.busAhead - (plan.joinV * left - 0.5 * BUS.accel * left * left);
-      const f = route.frameAt(s), fwd = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize(), right = new THREE.Vector3(f.right.x, 0, f.right.z).normalize();
-      return new THREE.Matrix4().makeBasis(right.clone().negate(), UP, fwd).setPosition(f.pos.clone().addScaledVector(f.right, BUS.curb + (LANE - BUS.curb) * e));
+      // down the side street to its line, waiting there, then out: on along its turn into their lane, coming up to
+      // their speed (drive/sets/verse1.ts busRamp), eased onto its place a tailgate's length ahead of them as it joins
+      const f0 = route.frameAt(plan.sideS), fwd = new THREE.Vector3(f0.fwd.x, 0, f0.fwd.z).normalize(), right = new THREE.Vector3(f0.right.x, 0, f0.right.z).normalize();
+      const at = (along: number, lateral: number) => f0.pos.clone().addScaledVector(fwd, along).addScaledVector(right, lateral);
+      const pose = (p: THREE.Vector3, head: THREE.Vector3) => new THREE.Matrix4().makeBasis(UP.clone().cross(head).normalize(), UP, head).setPosition(p);
+      if (t < plan.busPull) {
+        const u = Math.min(1, Math.max(0, (plan.busArrive - t) / SIDE.approach));
+        return pose(at(SIDE.lane, SIDE.wait + (SIDE.from - SIDE.wait) * u * u), right.clone().negate());
+      }
+      const R = SIDE.R, straight = SIDE.wait - LANE - R, arc = (Math.PI / 2) * R, lane0 = plan.sideS + SIDE.lane + R;
+      const tau = t - plan.busPull, rb = plan.busRamp, v = plan.joinV, S = (x: number) => x * x * x - (x * x * x * x) / 2;
+      const own = tau < rb ? v * rb * S(tau / rb) : (v * rb) / 2 + v * (tau - rb);
+      const ride = straight + arc + drive.motion.distanceAt(t) + plan.busAhead - lane0;
+      const w = Math.min(1, Math.max(0, (t - (plan.joinAt - 1.5)) / 1.5)), d = own + (ride - own) * w * w * (3 - 2 * w);
+      if (d < straight) return pose(at(SIDE.lane, SIDE.wait - d), right.clone().negate());
+      if (d < straight + arc) {
+        const a = (d - straight) / R, C = at(SIDE.lane + R, LANE + R);
+        return pose(C.clone().addScaledVector(fwd, -R * Math.cos(a)).addScaledVector(right, -R * Math.sin(a)), fwd.clone().multiplyScalar(Math.sin(a)).addScaledVector(right, -Math.cos(a)).normalize());
+      }
+      const f = route.frameAt(lane0 + d - straight - arc), fw = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize();
+      return pose(f.pos.clone().addScaledVector(f.right, LANE), fw);
     }
     if (t <= plan.turnAt) return carMatrix(drive.carFrame(t, plan.busAhead));
     const f = drive.carFrame(plan.turnAt, plan.busAhead), fwd = new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize(), right = new THREE.Vector3(f.right.x, 0, f.right.z).normalize();
@@ -315,7 +369,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     group: root,
     update(t, car) {
       // (they're only there for the verse: the bus from its stop, the van once the bus is out of its way)
-      bus.visible = t >= plan.start - BUS.early && t < plan.turnAt + BUS.gone;
+      bus.visible = t >= plan.busArrive - SIDE.approach && t < plan.turnAt + BUS.gone;
       if (bus.visible) bus.matrix.copy(busMatrix(t));
       van.visible = vanThere(plan, t);
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));

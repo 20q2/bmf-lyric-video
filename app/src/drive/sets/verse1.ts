@@ -1,5 +1,8 @@
-// Verse 1, the city at speed (flow plan §2): the car never stops (the user: stopping "ruins the flow"). Its lyrics
-// ride on what it follows and what's in it, or stand where the camera watches it pass:
+// Verse 1, the city at speed (flow plan §2): the car never stops (the user: stopping "ruins the flow") — but for a moment
+// at a stop sign just before it, while the bus it then tails pulls out of the side street there, by the speed trailer,
+// and turns into their lane (the user, 2026-10-15: at ~28 s "a bus materializes out of nowhere"; "a side street next to
+// the speed limit sign ... a stop sign, which is why our car stops for a moment and it lets the bus come in and turn
+// right into our lane"). Its lyrics ride on what it follows and what's in it, or stand where the camera watches it pass:
 //   "Going too fast, don't hurt yourself"   a speed trailer by the road flashing it; the car rushes past the lens
 //   "I can't keep up with"                   the bus they're tailgating: its tail ad, from the back seat
 //   "…all the lies you tell yourself"        in the pause after "with" (the user's pick), up to her visor flipping
@@ -15,6 +18,7 @@ import * as THREE from 'three';
 import { type Carrier, type Kind, LAYOUT, carMatrix, layout, lookFrom, rideAt } from '../carriers';
 import { type Phrase, phraseOf, phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
+import { LANE } from '../drive';
 import { type ShotMove, LEAD, WHIP_S } from '../shots';
 import { adFor, type Ad } from '../ads';
 import { type Block, boxAt } from '../blocks';
@@ -29,17 +33,29 @@ const uprightFor = (n: THREE.Vector3) => UP.clone().addScaledVector(n, -n.dot(UP
 /** The car's half-length (m: world.ts CAR). */
 const CAR_HALF = 2.7;
 
-/** The pace (m/s, s): rushing past the trailer, then cruising with the traffic. */
-export const PACE = { rush: 16, rushRamp: 0.5, cruise: 11, ease: 1, easeBefore: 1.2 };
+/** The pace (m/s, s): rushing past the trailer (on from the stop sign), then cruising with the traffic. */
+export const PACE = { rush: 14, rushRamp: 0.6, cruise: 11, ease: 1, easeBefore: 1.2 };
+/** The stop at the end of chorus 1 (its speed keys: sets/chorus1.ts): braking over `brake` s to the stop line, there
+ *  `hold` s, then away over `go` s to `goV` m/s by the verse's start. */
+export const STOP = { brake: 3, hold: 0.6, go: 3, goV: 13 };
+/** The side street the bus comes out of, on the right, its mouth just past the car's stop line (`line` m past its
+ *  nose): its half-width; the bus's lane in it (m off its middle, toward the way the car's going), where the bus waits
+ *  at its own line (its centre, m off the road's centre), where it comes down the street from (m) over `approach` s to
+ *  arrive `arrive` s before the car stops, and when it pulls out (s before the car stops); the radius it turns into
+ *  their lane on; its stop signs' place (m out from the street's corners) and height. */
+export const SIDE = { line: 0.3, half: 4.25, lane: 2, wait: 13, from: 40, approach: 6, arrive: 1.5, pull: 0.6, R: 7, sign: 0.6, signH: 2.2 };
 /** The bus they tailgate: it pulls out from its stop at the curb (`curb` m off the road's centre, accelerating at
  *  `accel`) into their lane `join` s before its line, `gap` m off their nose; its half-length; its tail ad's centre's
  *  height; it turns off right `turnAfter` s after its line, `lead` m on and round a corner of radius R, gone `gone` s
  *  later. It's only there for the verse: at its stop from `early` s before the verse. */
 export const BUS = { curb: ROAD_HALF - 1.15, accel: 4, join: 0.5, gap: 2, half: 5.5, adY: 1.85, turnAfter: 0.35, lead: 2, R: 10, gone: 3, early: 3 };
 /** The van that was ahead of the bus: there once the bus has turned off (`appear` s after), `gap` m off their nose once
- *  it's closed in (at `close` m/s, by `by` s before its line); away `leave` s after its line (accelerating at `accel`),
- *  gone `gone` s later; its half-length; its back doors (bottom, top) and its stickers' middle; its plate's centre. */
-export const VAN = { appear: 1.2, gap: 3, close: 3, by: 0.7, leave: 0.3, accel: 6, gone: 4, half: 2.6, doors: [0.55, 2.35] as [number, number], stickersY: 1.55, plateY: 0.66 };
+ *  it's closed in (at `close` m/s, by `by` s before its line); away `leave` s after its line, pulling ahead (accelerating
+ *  at `accel` to `top` m/s quicker than them) on up the street for the rest of the verse — it vanished 4 s after it
+ *  left, still in the menu board's shot (the user, 2026-10-15: "just kind of disappears ... if it wants to pull ahead
+ *  ... so it's out of frame later, that's fine"); its half-length; its back doors (bottom, top) and its stickers'
+ *  middle; its plate's centre. */
+export const VAN = { appear: 1.2, gap: 3, close: 3, by: 0.7, leave: 0.3, accel: 3, top: 9, half: 2.6, doors: [0.55, 2.35] as [number, number], stickersY: 1.55, plateY: 0.66 };
 /** Where things stand: the speed trailer (where the car passes it, off the road, its display's height); the burger
  *  stand's menu board (passed as its line is sung, how far through) and its marquee (on along the road from the board,
  *  off the road, its centre's height). In the car (x its left, y up, z forward): her phone, the radio in the dash. */
@@ -90,7 +106,10 @@ export interface Verse1Plan {
   /** The cross street the bus turns into (its middle, m along the road); the verse's start; when the bus has joined
    *  their lane (and its speed then), starts to turn; when the van has closed in and when it leaves; the menu board
    *  (m along the road). */
-  crossS: number; start: number; joinAt: number; joinV: number; turnAt: number; closeBy: number; leaveAt: number; menuS: number;
+  crossS: number; start: number; end: number; joinAt: number;
+  /** The side street (its middle, m along the road), when the car's stopped at its line; the bus there: when it's
+   *  arrived at its line, pulls out, and how long it takes to come up to their speed (s). */
+  sideS: number; stopAt: number; busArrive: number; busPull: number; busRamp: number; joinV: number; turnAt: number; closeBy: number; leaveAt: number; menuS: number;
   busAd: Ad;
   panels: Record<'trailer' | 'menu' | 'marquee', Panel>;
   /** Where the bus and van ride, ahead of the car (m, centre to centre). */
@@ -111,9 +130,13 @@ export interface Verse1Plan {
 
 /** How far ahead of the car the van rides at t: further while the bus is between them, closing in to its gap; then
  *  away up the street. */
-export const vanAheadAt = (plan: Verse1Plan, t: number) => plan.vanAhead + Math.max(0, plan.closeBy - t) * VAN.close + 0.5 * VAN.accel * Math.max(0, t - plan.leaveAt) ** 2;
-/** Whether the van is there at t (from once the bus is out of its way until it's away up the street). */
-export const vanThere = (plan: Verse1Plan, t: number) => t >= plan.turnAt + VAN.appear && t < plan.leaveAt + VAN.gone;
+export const vanAheadAt = (plan: Verse1Plan, t: number) => {
+  const tau = Math.max(0, t - plan.leaveAt), ramp = VAN.top / VAN.accel;
+  const away = tau < ramp ? 0.5 * VAN.accel * tau * tau : 0.5 * VAN.accel * ramp * ramp + VAN.top * (tau - ramp);
+  return plan.vanAhead + Math.max(0, plan.closeBy - t) * VAN.close + away;
+};
+/** Whether the van is there at t (from once the bus is out of its way to the verse's end: far up the street by then). */
+export const vanThere = (plan: Verse1Plan, t: number) => t >= plan.turnAt + VAN.appear && t < plan.end;
 
 export const VERSE1: SetPiece = {
   speed(st) {
@@ -144,6 +167,14 @@ export const VERSE1: SetPiece = {
     const busAhead = CAR_HALF + BUS.gap + BUS.half, vanAhead = CAR_HALF + VAN.gap + VAN.half;
     const turnAt = l5.end + BUS.turnAfter, closeBy = l7.start - VAN.by, leaveAt = l7.end + VAN.leave, joinAt = l5.start - BUS.join;
     const crossS = carS(turnAt) + busAhead + BUS.lead + BUS.R;
+    // the side street the bus comes out of: its mouth at the car's stop line (where chorus 1's keys stop it); the bus
+    // pulls out as they come to the line, along its turn into their lane and on, coming up to their speed by the time
+    // it's to ride a tailgate's length ahead of them (`busRamp`: solved for that)
+    const stopAt = st.start - STOP.go - STOP.hold, sideS = carS(stopAt) + CAR_HALF + SIDE.line + SIDE.half;
+    const busPull = stopAt - SIDE.pull, busArrive = stopAt - SIDE.arrive, joinV = motion.speedAt(joinAt);
+    const busPath = (SIDE.wait - LANE - SIDE.R) + (Math.PI / 2) * SIDE.R, busLane0 = sideS + SIDE.lane + SIDE.R;
+    const busD = busPath + carS(joinAt) + busAhead - busLane0;
+    const busRamp = Math.min(joinAt - busPull, Math.max(1.5, (2 * (joinV * (joinAt - busPull) - busD)) / joinV));
     const menuS = carS(l9.start + (l9.end - l9.start) * AT.menu.through), trailerS = carS(AT.trailer.passAt);
     const atRoad = (s: number, lateral: number, y: number) => { const f = route.frameAt(s); return f.pos.clone().addScaledVector(f.right, lateral).addScaledVector(UP, y); };
     const right = (s: number) => flat(route.frameAt(s).right), fwd = (s: number) => flat(route.frameAt(s).fwd);
@@ -262,12 +293,14 @@ export const VERSE1: SetPiece = {
     const l8 = lines[4]!, passAt = (l8.start + l8.end) / 2;
     const oncoming = { s0: carS(passAt), t0: passAt, v: PACE.cruise };
     const plan: Verse1Plan = {
-      trailerS, crossS, start: st.start, joinAt, joinV: motion.speedAt(joinAt), turnAt, closeBy, leaveAt, menuS, busAd, panels, busAhead, vanAhead,
+      trailerS, crossS, start: st.start, end: st.end, joinAt, joinV, turnAt, sideS, stopAt, busArrive, busPull, busRamp, closeBy, leaveAt, menuS, busAd, panels, busAhead, vanAhead,
       tailAd: { pos: adPos, w: LAYOUT.bus.w, h: bus.H },
       visor: { down: visorDown, up: l6.start + 0.3 },
       phone: { pos: AT.phone.clone(), normal: phoneN, up: texts.up, w: LAYOUT.phone.w, h: Math.max(texts.H, reply.H) + 0.04, held },
       read, oncoming,
     };
-    return { carriers, frames, clear, blocks, plan, openings: [-1, 1].map((side) => ({ side, a: crossS - 4.25, b: crossS + 4.25 })) };
+    // (the side street's corners clear of the town's buildings, and its mouth open)
+    clear.push({ side: 1, a: sideS - SIDE.half - 12, b: sideS + SIDE.half + 12 });
+    return { carriers, frames, clear, blocks, plan, openings: [...[-1, 1].map((side) => ({ side, a: crossS - 4.25, b: crossS + 4.25 })), { side: 1, a: sideS - SIDE.half, b: sideS + SIDE.half }] };
   },
 };
