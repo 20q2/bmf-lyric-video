@@ -4,8 +4,9 @@
 // only (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
-import { type Chorus2Plan, GANTRY, MEDIAN, TRAIN, FREEWAY_EDGE, LANES, trafficS } from '../../drive/sets/chorus2';
-import { ROAD_HALF } from '../../drive/route';
+import { type Chorus2Plan, GANTRY, MEDIAN, TRAIN, FREEWAY_EDGE, LANES, WALL, laneEdge, trafficS } from '../../drive/sets/chorus2';
+import { ROAD_HALF, type Route } from '../../drive/route';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { F, font } from '../../engine/type';
@@ -22,6 +23,42 @@ const box = (g: THREE.Object3D, w: number, h: number, d: number, x: number, y: n
   const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b;
 };
 
+/** A run along the road, swept as one piece from s0 to s1 (sampled every `step` m): its middle `lateral` right of the
+ *  road's centre (or that at s), `w` across, from `y` to `y + h` over the road's surface, following its bends and its
+ *  grade; its two sides, its top and its ends (uv in metres: along, round). (Laid as boxes end to end, each tangent to
+ *  the road at its middle, the runs opened wedges on the outside of every bend and over every crest — the user,
+ *  2026-10-16, of the sound wall from overhead: "the wall pieces … aren't fully connected, so there's gaps".) */
+function sweep(route: Route, s0: number, s1: number, lateral: number | ((s: number) => number), w: number, h: number, y: number, step = 2): THREE.BufferGeometry {
+  const n = Math.max(2, Math.ceil((s1 - s0) / step) + 1), lat = typeof lateral === 'number' ? () => lateral : lateral;
+  // the section's corners (across, up), round from the inside foot; each face its own strip of vertices (sharp edges
+  // between them, smooth along the run)
+  const corners: [number, number][] = [[-w / 2, y], [-w / 2, y + h], [w / 2, y + h], [w / 2, y]];
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  const at = (f: ReturnType<Route['frameAt']>, l: number, [a, b]: [number, number]) => f.pos.clone().addScaledVector(f.right, l + a).addScaledVector(f.up, b);
+  const frames = Array.from({ length: n }, (_, i) => { const s = s0 + ((s1 - s0) * i) / (n - 1); return { s, f: route.frameAt(s) }; });
+  let round = 0;
+  for (let k = 0; k < 3; k++) {
+    const A = corners[k]!, B = corners[k + 1]!, o = pos.length / 3, len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    for (const { s, f } of frames) {
+      const l = lat(s);
+      for (const [c, v] of [[A, round], [B, round + len]] as const) { const p = at(f, l, c); pos.push(p.x, p.y, p.z); uv.push(s, v); }
+    }
+    // (wound to face out: from the inside foot up, over and down, along the road)
+    for (let i = 1; i < n; i++) { const a = o + (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    round += len;
+  }
+  // its ends
+  for (const [{ s, f }, dir] of [[frames[0]!, -1], [frames[n - 1]!, 1]] as const) {
+    const o = pos.length / 3, l = lat(s);
+    for (const c of corners) { const p = at(f, l, c); pos.push(p.x, p.y, p.z); uv.push(c[0], c[1]); }
+    idx.push(...(dir > 0 ? [o, o + 1, o + 2, o, o + 2, o + 3] : [o, o + 2, o + 1, o, o + 3, o + 2]));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  // (the ends' four corners are shared by their two triangles only: their normals come out flat)
+  g.computeVertexNormals();
+  return g;
+}
 
 export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.chorus2 as Chorus2Plan | undefined;
@@ -40,37 +77,36 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
   const onRoad = (s: number, lateral: number) => { const g = new THREE.Group(); g.matrixAutoUpdate = false; frameAt(s, lateral, g.matrix); root.add(g); return g; };
   const dark = toon({ color: WORLD.post }), concrete = toon({ color: '#b9ada0' }), steel = toon({ color: '#6d6a72' });
 
-  // along the left side, in 10 m pieces that follow the road: the median barrier, the tracks' ballast and rails
-  const STEP = 10, n = Math.ceil((plan.s1 - plan.s0) / STEP), piece = new THREE.Matrix4(), scale = new THREE.Matrix4();
-  const strip = (lateral: number, w: number, h: number, y: number, mat: THREE.Material) => {
-    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, n);
-    for (let k = 0; k < n; k++) {
-      frameAt(plan.s0 + (k + 0.5) * STEP, lateral, piece);
-      mesh.setMatrixAt(k, piece.multiply(scale.makeTranslation(0, y + h / 2, 0)).multiply(new THREE.Matrix4().makeScale(w, h, STEP + 0.05)));
-    }
-    root.add(mesh);
-  };
-  strip(MEDIAN.barrier, 0.6, MEDIAN.barrierH, 0, concrete);
+  // the runs along the road, each swept in one piece (sweep): the sound wall (the guard's blocks, drive/sets/chorus2.ts:
+  // as far as they reach), the median barrier, the tracks' ballast, their rails and the catenary's wire over them; and
+  // on the right, the barrier past the two more lanes, following the road's edge as the lanes merge in and out
+  const piece = new THREE.Matrix4(), runs = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const run = (lateral: number | ((s: number) => number), w: number, h: number, y: number, mat: THREE.Material, s0 = plan.s0, s1 = plan.s1) =>
+    (runs.get(mat) ?? runs.set(mat, []).get(mat)!).push(sweep(route, s0, s1, lateral, w, h, y));
+  run(WALL.face - WALL.d / 2, WALL.d, WALL.h, 0, concrete, plan.s0, plan.s0 + Math.ceil((plan.s1 - plan.s0) / WALL.seg) * WALL.seg);
+  run(MEDIAN.barrier, 0.6, MEDIAN.barrierH, 0, concrete);
+  run((s) => laneEdge(plan.lanes, s) + LANES.barrier / 2 + 0.2, LANES.barrier, 1.0, 0, concrete);
+  const ballast = toon({ color: '#7b6f68' });
+  run(MEDIAN.tracks, 4.2, 0.18, 0, ballast);
+  for (const x of [-0.75, 0.75]) run(MEDIAN.tracks + x, 0.08, 0.12, 0.18, steel);
+  run(MEDIAN.tracks, 0.04, 0.04, 5.6, steel);
+  for (const [mat, geos] of runs) root.add(new THREE.Mesh(mergeGeometries(geos)!, mat));
   // the right side: the two more lanes are the road's own ribbon (world.ts, plan.lanes); here the dashed lines along
-  // them and the barrier beyond
-  strip(FREEWAY_EDGE + LANES.barrier / 2 + 0.2, LANES.barrier, 1.0, 0, concrete);
+  // them
   for (const lateral of [ROAD_HALF, ROAD_HALF + LANES.w]) {
     const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.dash }), Math.ceil((plan.s1 - plan.s0 - 2 * plan.lanes.merge) / 9));
     for (let k = 0; k < dashes.count; k++) { frameAt(plan.s0 + plan.lanes.merge + k * 9 + 4.5, lateral, piece); dashes.setMatrixAt(k, piece.multiply(new THREE.Matrix4().makeTranslation(0, 0.025, 0)).multiply(new THREE.Matrix4().makeScale(0.15, 0.02, 3))); }
     root.add(dashes);
   }
-  strip(MEDIAN.tracks, 4.2, 0.18, 0, toon({ color: '#7b6f68' }));
-  for (const x of [-0.75, 0.75]) strip(MEDIAN.tracks + x, 0.08, 0.12, 0.18, steel);
-  // the catenary: a pole every 40 m between the tracks and the wall, the wire over the tracks; through the posters'
+  // the catenary: a pole every 40 m between the tracks and the wall (its wire's a run, above); through the posters'
   // run the poles keep their rhythm but stand at the boards' gaps, never over his face or the words
-  strip(MEDIAN.tracks, 0.04, 0.04, 5.6, steel);
-  const run = [plan.posters[0]! - 15, plan.posters[plan.posters.length - 1]! + 15];
+  const span = [plan.posters[0]! - 15, plan.posters[plan.posters.length - 1]! + 15];
   const poleAt = (s: number) => {
     const p = onRoad(s, MEDIAN.tracks - 2.6);
     box(p, 0.22, 6, 0.22, 0, 3, 0, steel);
     box(p, 2.8, 0.1, 0.1, -1.4, 5.8, 0, steel); // (its arm out over the tracks: to the road's right, the frame's -x)
   };
-  for (let s = plan.s0 + 20; s < plan.s1; s += 40) if (s <= run[0]! || s >= run[1]!) poleAt(s);
+  for (let s = plan.s0 + 20; s < plan.s1; s += 40) if (s <= span[0]! || s >= span[1]!) poleAt(s);
   for (let i = 1; i < plan.posters.length; i += 2) poleAt((plan.posters[i - 1]! + plan.posters[i]!) / 2);
 
   // the train: three cars, silver with a gold stripe, a dark band of windows, red lamps on the last

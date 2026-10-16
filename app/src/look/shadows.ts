@@ -7,7 +7,8 @@
 //   cascades  three maps, each a square in the light's frame round a point along the lens's view (12 m, 45 m and
 //             200 m either side): ~1 cm texels at the lens, the far one so whole blocks still cast. Each is snapped to
 //             its texels (no crawl as the camera moves); a pixel reads the finest map that holds it, blending into the
-//             next across a band at the edge.
+//             next across a band at the edge. A frame wholly on the ground (a top-down take) has the finest fitted
+//             round it instead, a rectangle in the light's frame (Cascades.fit).
 //   contact   hardening: a few taps at a few depths over the pixel find how far above it the blockers stand; the
 //             penumbra grows with that (the light a disc a few times the sun's): crisp at a car's tyres, soft at the
 //             far end of a building's long sunset shadow. Every tap follows the receiver's own plane (its depth slope
@@ -38,6 +39,13 @@ export const CASCADES = [
 ] as const;
 /** The cascades move out along the view at most this far (m) to where the frame's foot meets the ground. */
 const GROUND_REACH = 120;
+/** A frame wholly on the ground (a camera high over the road looking down: chorus 2's top-down take) has its finest map
+ *  fitted round it instead (Cascades.update): what it holds, from this far under the road to this far over it (m: the
+ *  dirt off an embankment's foot, up to the sound wall's and the catenary's tops), its sides rounded up to this (m:
+ *  they change in steps, not every frame, so the map's texels hold still), and the most it may span (m, half). */
+const TOP = { low: -8, high: 10, step: 1, most: 45 };
+/** The share of a map's side (uv) over which a pixel blends into the next one out (shadeLight's B). */
+const BLEND = 0.08;
 /** The maps' light stands this far back from a cascade's centre and sees this deep (m). */
 const RANGE = { back: 600, depth: 1500 };
 /** The light's apparent radius, as penumbra (m) per metre the blocker stands above (the sun's is ~0.0047: three times
@@ -57,7 +65,8 @@ const CELL = 5.5;
 
 /** Where the shadows' light comes from (world, unit, toward the light). */
 export const SHADE_DIR: THREE.IUniform<THREE.Vector3> = { value: new THREE.Vector3(0, 1, 0) };
-/** Per cascade: uv per metre across, depth per metre along the light, a texel (uv). */
+/** Per cascade: uv per metre across (the light's x), depth per metre along the light, a texel (uv), uv per metre up
+ *  (the light's y: the same but in the top-down fit, Cascades.update). */
 const SHADE_CASCADE: THREE.IUniform<THREE.Vector4[]> = { value: CASCADES.map(() => new THREE.Vector4()) };
 
 // (a Vogel disc: n points evenly over the unit disc)
@@ -77,8 +86,9 @@ const vec2 SHADE_PCF[ 16 ] = vec2[ 16 ]( ${disc(16)} );
 // mips, and a plain texture() in these loops needs the screen's derivatives, so Direct3D's compiler unrolled every one
 // of them — each material took ~0.4 s to compile, and playback froze while it did, 13 s at the first cut)
 float shadeTap( sampler2DShadow m, vec3 c, vec2 g, vec2 o, float dz ) { return textureGrad( m, vec3( c.xy + o, c.z + dot( g, o ) - dz ), vec2( 0.0 ), vec2( 0.0 ) ); }
-// the share of taps round c (radius r, uv) with something at least dz above them toward the light
-float shadeOver( sampler2DShadow m, vec3 c, vec2 g, float r, float dz ) {
+// the share of taps round c (radius r, uv: per axis, a map's texels needn't be square) with something at least dz above
+// them toward the light
+float shadeOver( sampler2DShadow m, vec3 c, vec2 g, vec2 r, float dz ) {
   float o = 1.0 - shadeTap( m, c, g, vec2( 0.0 ), dz );
   for ( int i = 0; i < 6; i ++ ) o += 1.0 - shadeTap( m, c, g, SHADE_SEARCH[ i ] * r, dz );
   return o / 7.0;
@@ -87,15 +97,14 @@ float shadeOver( sampler2DShadow m, vec3 c, vec2 g, float r, float dz ) {
 // the blockers stand high
 float shadeIn( sampler2DShadow m, vec3 c, vec4 k, float lift, vec2 gm ) {
   c.z -= lift * k.y;
-  vec2 g = gm / k.x;
-  float r = ${SOFT.search.toFixed(2)} * k.x;
+  vec2 g = gm / k.xw;
+  vec2 r = ${SOFT.search.toFixed(2)} * k.xw;
   float f0 = shadeOver( m, c, g, r, 0.15 * k.y );
   if ( f0 < 0.01 ) return 1.0;
   // (levels 6.5x apart: the blockers' height on a log scale, 0.15 m to ~40 m)
   float f1 = shadeOver( m, c, g, r, 1.0 * k.y ), f2 = shadeOver( m, c, g, r, 6.5 * k.y ), f3 = shadeOver( m, c, g, r, 42.0 * k.y );
   float above = 0.15 * pow( 6.5, ( f1 + f2 + f3 ) / f0 );
-  float pen = clamp( above * ${SOFT.tan.toFixed(4)}, ${SOFT.min.toFixed(3)}, ${SOFT.max.toFixed(2)} ) * k.x;
-  pen = max( pen, 1.2 * k.z );
+  vec2 pen = max( clamp( above * ${SOFT.tan.toFixed(4)}, ${SOFT.min.toFixed(3)}, ${SOFT.max.toFixed(2)} ) * k.xw, vec2( 1.2 * k.z ) );
   float s = 0.0;
   for ( int i = 0; i < 16; i ++ ) s += shadeTap( m, c, g, SHADE_PCF[ i ] * pen, 0.0 );
   // (a caster far off along the light — a headland a few hundred metres up the coast, under a sun a few degrees up —
@@ -110,13 +119,13 @@ vec2 shadeSlope() {
   vec3 dx = dFdx( vDirectionalShadowCoord[ 0 ].xyz ), dy = dFdy( vDirectionalShadowCoord[ 0 ].xyz );
   mat2 J = mat2( dx.x, dy.x, dx.y, dy.y );
   if ( abs( determinant( J ) ) < 1e-14 ) return vec2( 0.0 );
-  vec2 g = inverse( J ) * vec2( dx.z, dy.z ) * shadeCascade[ 0 ].x;
+  vec2 g = inverse( J ) * vec2( dx.z, dy.z ) * shadeCascade[ 0 ].xw;
   float cap = ${SOFT.slope.toFixed(1)} * shadeCascade[ 0 ].y, l = length( g );
   return l > cap ? g * ( cap / l ) : g;
 }
 // the finest cascade that holds this point, blended into the next across its edge
 float shadeLight( float lift, vec2 gm ) {
-  const float B = 0.08;
+  const float B = ${BLEND.toFixed(3)};
   vec3 c0 = vDirectionalShadowCoord[ 0 ].xyz, c1 = vDirectionalShadowCoord[ 1 ].xyz, c2 = vDirectionalShadowCoord[ 2 ].xyz;
   float e0 = shadeEdge( c0 );
   if ( e0 > B ) return shadeIn( directionalShadowMap[ 0 ], c0, shadeCascade[ 0 ], lift, gm );
@@ -157,6 +166,23 @@ float shadeLit = 1.0, printLit = 1.0;
 
 const DIR_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
 const DIR_SHADOW = /\n\s*#if defined\( USE_SHADOWMAP \) && \( UNROLLED_LOOP_INDEX < NUM_DIR_LIGHT_SHADOWS \)\n\s*directionalLightShadow = directionalLightShadows\[ i \];\n\s*directLight\.color \*= [^\n]*\n\s*#endif/;
+/** three's shadow coordinates chunk with a two-sided face's normal offset turned to the side the light is on. (Its
+ *  normal may point either way: a ribbon laid mirrored for the road's other side, `side *` its laterals, points down,
+ *  and the offset pushed its lookups under it, into its own shadow — the lots and sidewalks on the road's right printed
+ *  as shade wherever a map's texels were coarse, as the offset grows with them: chorus 1's lot at 20 s, the hardware
+ *  store's sidewalk at 85 s. The side away from the light takes no cast shadow (FORM), so the light's side is the one to
+ *  offset.) */
+function coordsChunk(): string {
+  const src = THREE.ShaderChunk.shadowmap_vertex, at = '\tvec4 shadowWorldPosition;\n';
+  if (!src.includes(at)) throw new Error('look/shadows: three.js shadow coordinates chunk changed');
+  return src.replace(at, `${at}
+	#if defined( USE_SHADOWMAP ) && defined( DOUBLE_SIDED ) && NUM_DIR_LIGHT_SHADOWS > 0
+		shadowWorldNormal *= dot( shadowWorldNormal, shadeDir ) < 0.0 ? -1.0 : 1.0;
+	#endif
+`);
+}
+const COORDS = coordsChunk();
+
 /** three's lights chunk with the directional lights' own shadow lookups gone (the maps' lights are dark, the sun and
  *  moon cast nothing), and their light masked by `lit` if given. Only the directional loop is touched: point and spot
  *  lights (the tunnel's sodium lamps, the headlights) light every material as three lights them. */
@@ -172,9 +198,12 @@ const CHUNK = { print: lightsChunk(), smooth: lightsChunk('shadeLit') };
 
 /** Patches a lit material's shader to take the cascades' shadows: printed (dots, solid core) or, for the hero's own
  *  light, smooth. Returns the fragment shader's source; the caller adds its tone after the lights if it prints. */
-export function shadePatch(sh: { uniforms: Record<string, THREE.IUniform>; fragmentShader: string }, printed = true) {
+export function shadePatch(sh: { uniforms: Record<string, THREE.IUniform>; vertexShader: string; fragmentShader: string }, printed = true) {
   sh.uniforms.shadeCascade = SHADE_CASCADE;
   sh.uniforms.shadeDir = SHADE_DIR;
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nuniform vec3 shadeDir;')
+    .replace('#include <shadowmap_vertex>', COORDS);
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>\n${PARS}`)
     .replace('#include <lights_fragment_begin>', printed ? CHUNK.print : CHUNK.smooth);
@@ -183,6 +212,8 @@ export function shadePatch(sh: { uniforms: Record<string, THREE.IUniform>; fragm
 /** The cascades' lights: add `objects` to the scene, `update` each frame. */
 export class Cascades {
   readonly lights = CASCADES.map(() => new THREE.DirectionalLight(0xffffff, 0));
+  /** Each map's half-width and half-height (m, in the light's frame). */
+  private halves = CASCADES.map((c) => [c.half, c.half] as [number, number]);
   /** The lens's view this frame, and the way to the light. */
   private view = new THREE.Frustum();
   private toLight = new THREE.Vector3(0, 1, 0);
@@ -203,15 +234,23 @@ export class Cascades {
         sphere.applyMatrix4(o.matrixWorld);
         return sphere.radius >= least && box.intersectsSphere(sphere) && this.sees(sphere);
       };
-      const h = CASCADES[i]!.half, texel = (2 * h) / size;
       l.castShadow = true;
       l.shadow.mapSize.set(size, size);
-      Object.assign(l.shadow.camera, { left: -h, right: h, top: h, bottom: -h, near: 1, far: RANGE.depth });
-      l.shadow.camera.updateProjectionMatrix();
+      Object.assign(l.shadow.camera, { near: 1, far: RANGE.depth });
       l.shadow.bias = -SOFT.bias / (RANGE.depth - 1);
-      l.shadow.normalBias = SOFT.normal * texel;
-      SHADE_CASCADE.value[i]!.set(1 / (2 * h), 1 / (RANGE.depth - 1), 1 / size, 0);
+      this.shape(i, CASCADES[i]!.half, CASCADES[i]!.half, true);
     });
+  }
+  /** Map i's box: hx either side across the light, hy up and down. */
+  private shape(i: number, hx: number, hy: number, force = false) {
+    const h = this.halves[i]!;
+    if (!force && h[0] === hx && h[1] === hy) return;
+    h[0] = hx; h[1] = hy;
+    const l = this.lights[i]!;
+    Object.assign(l.shadow.camera, { left: -hx, right: hx, top: hy, bottom: -hy });
+    l.shadow.camera.updateProjectionMatrix();
+    l.shadow.normalBias = (SOFT.normal * 2 * Math.max(hx, hy)) / this.size;
+    SHADE_CASCADE.value[i]!.set(1 / (2 * hx), 1 / (RANGE.depth - 1), 1 / this.size, 1 / (2 * hy));
   }
   get objects(): THREE.Object3D[] { return this.lights.flatMap((l) => [l, l.target]); }
 
@@ -240,19 +279,54 @@ export class Cascades {
     const camUp = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
     const foot = view.clone().multiplyScalar(Math.cos((cam.fov * Math.PI) / 360)).addScaledVector(camUp, -Math.sin((cam.fov * Math.PI) / 360));
     const near = foot.y < -1e-3 ? Math.min(GROUND_REACH, ((cam.position.y - ground) / -foot.y) * foot.dot(view)) : 0;
+    // (and when the frame's head meets the ground too — the whole frame on the ground, nothing beyond it — no cascade
+    // stands past the middle of what's in frame: `ahead` took them on down the view under the road (the top-down take:
+    // the fine one 4 m under it, the middle one 30 m, the far one 140 m), and under a low sun, the light's frame near
+    // upright, a square centred under the ground holds the ground only toward its top edge. The finest is fitted round
+    // such a frame instead (fit, below); these keep the others on it)
+    const head = view.clone().multiplyScalar(Math.cos((cam.fov * Math.PI) / 360)).addScaledVector(camUp, Math.sin((cam.fov * Math.PI) / 360));
+    const reach = head.y < -1e-3 ? (near + ((cam.position.y - ground) / -head.y) * head.dot(view)) / 2 : Infinity;
     const lz = toLight.clone().normalize(), up = Math.abs(lz.y) > 0.99 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     const lx = up.cross(lz).normalize(), ly = lz.clone().cross(lx);
+    const fit = head.y < -1e-3 ? this.fit(cam, ground, lx, ly, lz) : null;
     this.lights.forEach((l, i) => {
-      const { half, ahead } = CASCADES[i]!, texel = (2 * half) / this.size, snap = (v: number) => Math.round(v / texel) * texel;
-      const c = cam.position.clone().addScaledVector(view, Math.max(0, near) + ahead);
+      const { half, ahead } = CASCADES[i]!;
+      if (i === 0) this.shape(0, fit ? fit.hx : half, fit ? fit.hy : half);
+      const [hx, hy] = this.halves[i]!, tx = (2 * hx) / this.size, ty = (2 * hy) / this.size;
+      const c = fit && i === 0 ? fit.c : cam.position.clone().addScaledVector(view, Math.min(Math.max(0, near) + ahead, reach));
       // (snapped to its texels in the light's frame: edges stay put as the camera moves. The three coordinates are
       // read before c is rebuilt: the old map's snap read them off the half-rebuilt vector, which threw its square tens
       // of metres off the view — why whole shots had no shadows)
-      const x = snap(c.dot(lx)), y = snap(c.dot(ly)), z = c.dot(lz);
+      const x = Math.round(c.dot(lx) / tx) * tx, y = Math.round(c.dot(ly) / ty) * ty, z = c.dot(lz);
       c.copy(lx).multiplyScalar(x).addScaledVector(ly, y).addScaledVector(lz, z);
       l.position.copy(c).addScaledVector(lz, RANGE.back);
       l.target.position.copy(c);
       l.updateMatrixWorld(); l.target.updateMatrixWorld();
     });
+  }
+
+  /** The finest map fitted round a frame wholly on the ground: the box in the light's frame round everything in view
+   *  from TOP.low to TOP.high over the ground, its centre (world) and its half-sides (m), or null if the frame doesn't
+   *  look down onto the ground all over or the box would be wider than TOP.most. (The square round a point on the view
+   *  holds a top-down frame poorly: under a low sun the ground's long run toward the light is a short one in the light's
+   *  frame, so most of a square's height is spent off it, and what's left is stretched along the ground — 6 cm texels
+   *  became 37 cm stairs on the ground and the sound wall's foot at 70 s. Fitted, the stretch is spent on the ground.) */
+  private fit(cam: THREE.PerspectiveCamera, ground: number, lx: THREE.Vector3, ly: THREE.Vector3, lz: THREE.Vector3) {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], r = new THREE.Vector3(), p = new THREE.Vector3();
+    for (const [nx, ny] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      r.set(nx, ny, 0.5).unproject(cam).sub(cam.position).normalize();
+      if (r.y > -1e-3) return null;
+      for (const h of [TOP.low, TOP.high]) {
+        const t = (cam.position.y - ground - h) / -r.y;
+        p.copy(cam.position).addScaledVector(r, Math.max(0, t));
+        [p.dot(lx), p.dot(ly), p.dot(lz)].forEach((v, k) => { lo[k] = Math.min(lo[k]!, v); hi[k] = Math.max(hi[k]!, v); });
+      }
+    }
+    // (padded past the band where it blends into the next map out: all of the frame reads this one alone)
+    const side = (k: number) => Math.ceil((hi[k]! - lo[k]!) / 2 / (1 - 2 * BLEND) / TOP.step) * TOP.step;
+    const hx = side(0), hy = side(1);
+    if (Math.max(hx, hy) > TOP.most) return null;
+    const c = lx.clone().multiplyScalar((lo[0]! + hi[0]!) / 2).addScaledVector(ly, (lo[1]! + hi[1]!) / 2).addScaledVector(lz, (lo[2]! + hi[2]!) / 2);
+    return { c, hx, hy };
   }
 }

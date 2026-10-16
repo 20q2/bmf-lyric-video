@@ -55,6 +55,12 @@ export interface Chorus2Plan {
    *  its surge, if it has one (SURGE): from `at` (s) it speeds up by `dv` (m/s) over `over` (s), and keeps that pace. */
   traffic: { s0: number; t0: number; v: number; lat: number; surge?: { at: number; dv: number; over: number } }[];
 }
+/** The road's right edge at s (m off its centre): out to the extra lanes' `edge` over [a, b], easing in and out over
+ *  `merge` (world.ts lays the road's ribbon to it; the barrier past the lanes follows it). */
+export function laneEdge(lanes: Chorus2Plan['lanes'], s: number): number {
+  const ease = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
+  return ROAD_HALF + (lanes.edge - ROAD_HALF) * ease((s - lanes.a) / lanes.merge) * ease((lanes.b - s) / lanes.merge);
+}
 /** Where a car of the traffic is along the road at t (m): at its own pace through where they pass it, plus whatever its
  *  surge has put on since it began (its speed eased up, smoothstep, so it never jerks). */
 export function trafficS(T: Chorus2Plan['traffic'][number], t: number): number {
@@ -145,9 +151,12 @@ export const CHORUS2: SetPiece = {
     const G = GANTRY.eye, sign = lookFrom(atRoad(gantryS - G.back, G.lateral, G.y), atRoad(gantryS, mid, GANTRY.bottom + 1.2));
     carriers.filter((c) => c.kind === 'freeway').forEach((c, i) => frames.set(c.id, { to: () => sign, move: i ? 'snap' : 'cut' }));
 
-    // the freeway's left side: the sound wall (concrete: the guard sees it) from before the posters to the stretch's end
-    // (ending short of where the freeway does: on past it, the wall stood blank behind verse 2's pole sign and corner —
-    // the user, 2026-10-14)
+    // the freeway's left side: the sound wall from before the posters to the stretch's end (ending short of where the
+    // freeway does: on past it, the wall stood blank behind verse 2's pole sign and corner — the user, 2026-10-14). Its
+    // blocks are the guard's (it sees the wall as concrete); the props sweep the wall itself along the road in one piece
+    // (scenes/sets/chorus2.ts: laid as these blocks, each tangent to the road at its middle, it opened wedges over the
+    // crests and round the bends — the user, 2026-10-16: "the wall pieces … aren't fully connected, so there's gaps
+    // between them")
     const s0 = p0 - WALL.before, s1 = carS(st.end) - 10, blocks: Block[] = [];
     /** A box on the road's surface following its grade (blocks.ts boxAt stands level: the wall's pieces stood in steps
      *  up the freeway's rise — the user, 2026-10-14). */
@@ -157,7 +166,7 @@ export const CHORUS2: SetPiece = {
     };
     for (let s = s0; s < s1; s += WALL.seg) {
       const m = s + WALL.seg / 2;
-      blocks.push({ s: m, lateral: WALL.face - WALL.d / 2, w: WALL.seg, h: WALL.h, d: WALL.d, color: 0, concrete: true, matrix: alongRoad(m, WALL.face - WALL.d / 2, WALL.d, WALL.h, WALL.seg + 0.05) });
+      blocks.push({ s: m, lateral: WALL.face - WALL.d / 2, w: WALL.seg, h: WALL.h, d: WALL.d, color: 0, concrete: true, prop: true, matrix: alongRoad(m, WALL.face - WALL.d / 2, WALL.d, WALL.h, WALL.seg + 0.05) });
     }
     const until = at + (s1 - tailS) / TRAIN.v;
     // slower traffic in the outside lanes, overtaken through the chorus; the two beside him as he eases off for the

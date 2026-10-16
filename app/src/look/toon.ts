@@ -22,7 +22,7 @@ export const SHADE_INK = new THREE.Color(0.5, 0.33, 0.37);
  *  (under a low sun that's next to all the light: the shade went near black, or where the ground got little direct
  *  light, barely showed and poles and the car seemed to hover). A patch for a toon material's shader: materials with
  *  their own patch call it first. */
-export function printShadows(sh: { uniforms: Record<string, THREE.IUniform>; fragmentShader: string }) {
+export function printShadows(sh: { uniforms: Record<string, THREE.IUniform>; vertexShader: string; fragmentShader: string }) {
   shadePatch(sh);
   sh.uniforms.printShade = PRINT_SHADE;
   sh.fragmentShader = sh.fragmentShader

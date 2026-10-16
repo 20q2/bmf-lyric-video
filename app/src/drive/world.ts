@@ -22,6 +22,7 @@ import { BACK, BLOCKS, boxAt } from './blocks';
 import { sedan } from '../scenes/sets/kit';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
+import { type Chorus2Plan, laneEdge } from './sets/chorus2';
 import { buildDash } from '../look/dash';
 import { buildCast } from '../look/cast3d';
 import { LOT, buildClimbHills, buildLookout, dressHill, scrubGround } from '../look/lookout';
@@ -274,9 +275,8 @@ export function buildWorld(drive: Drive): THREE.Group {
   g.add(named(base, 'base'));
   // (the freeway's extra lanes: the road's own ribbon widened to the right over chorus 2's stretch, merging in and
   // out — a strip laid beside it was shaded apart from it, the user, 2026-10-14)
-  const lanes = (drive.plans.chorus2 as { lanes?: { a: number; b: number; edge: number; merge: number } } | undefined)?.lanes;
-  const ease = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
-  const rightEdge = (s: number) => (lanes ? ROAD_HALF + (lanes.edge - ROAD_HALF) * ease((s - lanes.a) / lanes.merge) * ease((lanes.b - s) / lanes.merge) : ROAD_HALF);
+  const lanes = (drive.plans.chorus2 as Chorus2Plan | undefined)?.lanes;
+  const rightEdge = (s: number) => (lanes ? laneEdge(lanes, s) : ROAD_HALF);
   g.add(named(new THREE.Mesh(strip(route, -ROAD_HALF, rightEdge, 0, () => asphalt, end), lambert()), 'road'));
   // the centre line's dashes and the edge lines: paint laid on the road strip's own facets and drawn over them
   // (roadPaint) — a dash was a flat box tangent to the road at its middle, and on the climb to the overlook its ends sank
