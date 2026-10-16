@@ -61,56 +61,38 @@ const P_GAP = 0.006;
 /** The ad on the bus's street side (m, its frame: x its left, z forward): its size, its centre's height and how far
  *  forward of the middle (between the wheel arches, under the windows). */
 const SIDE_AD = { w: 4.1, h: 0.8, y: 1.5, z: 0.05 };
-/** The channel's ad (the user's Easter egg, 2026-10-16: "Lyrics by Desaign ... the spelling is intentional ...
- *  because we use AI to make our videos"): a play button with a note on it, the wordmark with its AI picked out in
- *  gold, the line under it, a wink at the end; in the film's dusk plums, so it sits in the street and never reads as
- *  a lyric. */
+/** The channel's ad (the user's Easter egg, 2026-10-16: "Lyrics by Desaign ... the spelling is intentional"): its
+ *  logo, the neon play button the user sent (an outlined triangle glowing red at its foot, violet up its back, blue
+ *  to cyan at its tip, on black), drawn here at the panel's size; the wordmark; the channel's handle under it ("the
+ *  big AI callout isn't super needed ... just a nice @LyricsByDesaign would suffice", the user, 2026-10-16). */
 function drawSideAd(c: CanvasRenderingContext2D, W: number, H: number) {
-  const bg = c.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#1e1033'); bg.addColorStop(0.55, '#3d1a4a'); bg.addColorStop(1, '#7a2c52');
+  const bg = c.createLinearGradient(0, 0, W, 0);
+  bg.addColorStop(0, '#05030a'); bg.addColorStop(0.6, '#120a22'); bg.addColorStop(1, '#22103a');
   c.fillStyle = bg; c.fillRect(0, 0, W, H);
-  // a sunset band sweeping across behind it all, and fine scan lines (a screen's)
-  const band = c.createLinearGradient(0, 0, W, 0);
-  band.addColorStop(0, 'rgba(240,138,90,0)'); band.addColorStop(0.5, 'rgba(240,138,90,0.28)'); band.addColorStop(1, 'rgba(246,179,74,0.5)');
-  c.fillStyle = band; c.beginPath(); c.moveTo(W * 0.3, H); c.lineTo(W * 0.42, 0); c.lineTo(W, 0); c.lineTo(W, H); c.closePath(); c.fill();
-  c.fillStyle = 'rgba(255,255,255,0.035)'; for (let y = 0; y < H; y += 8) c.fillRect(0, y, W, 3);
-  // the badge: a play button in a sunset disc, an eighth note riding its rim
+  // the logo: a rounded triangle, stroked with its colours round it (a conic sweep from its centre), a soft glow under
   const cx = H * 0.62, cy = H * 0.5, r = H * 0.34;
-  const disc = c.createLinearGradient(cx - r, cy - r, cx + r, cy + r); disc.addColorStop(0, '#ff5a8a'); disc.addColorStop(1, '#f6b34a');
-  c.fillStyle = disc; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
-  c.fillStyle = '#fff6e8'; c.beginPath(); c.moveTo(cx - r * 0.3, cy - r * 0.45); c.lineTo(cx + r * 0.5, cy); c.lineTo(cx - r * 0.3, cy + r * 0.45); c.closePath(); c.fill();
-  const nx = cx + r * 0.95, ny = cy - r * 0.55;
-  c.fillStyle = '#fff6e8'; c.beginPath(); c.ellipse(nx, ny + r * 0.5, r * 0.2, r * 0.15, -0.4, 0, Math.PI * 2); c.fill();
-  c.fillRect(nx + r * 0.13, ny - r * 0.45, r * 0.07, r * 0.95);
-  c.beginPath(); c.moveTo(nx + r * 0.2, ny - r * 0.45); c.quadraticCurveTo(nx + r * 0.55, ny - r * 0.2, nx + r * 0.45, ny + r * 0.15); c.quadraticCurveTo(nx + r * 0.42, ny - r * 0.12, nx + r * 0.2, ny - r * 0.2); c.closePath(); c.fill();
-  // the wink at the end, a gold-ringed tag; the wordmark and its line fill the room between the badge and it
-  const tagW = H * 1.3, tagX = W - H * 0.25 - tagW / 2;
-  c.save(); c.translate(tagX, H * 0.5); c.rotate(-0.08);
-  c.strokeStyle = '#ffc94a'; c.lineWidth = H * 0.022; c.beginPath(); c.roundRect(-tagW / 2, -H * 0.22, tagW, H * 0.44, H * 0.22); c.stroke();
-  c.fillStyle = '#ffc94a'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.12);
-  c.fillText('yes, the AI', 0, -H * 0.065); c.fillText('is on purpose', 0, H * 0.085);
-  c.restore();
-  // the wordmark: "Lyrics by" in the film's Bodoni italic, Desaign bold, its "ai" gold with a spark over it (sized to
-  // the room it has)
-  const x0 = H * 1.3, room = tagX - tagW / 2 - H * 0.2 - x0, base = H * 0.57;
-  const serif = (k: number) => font(F.bodoni(700, { italic: true }), H * 0.28 * k), bold = (k: number) => font(F.archivo(100, 900), H * 0.4 * k);
-  c.font = serif(1); const lead = c.measureText('Lyrics by ').width; c.font = bold(1);
-  const k = Math.min(1, room / (lead + c.measureText('Desaign').width));
-  c.textBaseline = 'alphabetic'; c.textAlign = 'left';
-  c.fillStyle = '#fff1dc'; c.font = serif(k); c.fillText('Lyrics by', x0, base);
-  let x = x0 + lead * k;
-  c.font = bold(k);
-  const part = (t: string, ink: string) => { c.fillStyle = ink; c.fillText(t, x, base); x += c.measureText(t).width; };
-  part('Des', '#fff1dc'); const ax = x; part('ai', '#ffc94a'); const aw = x - ax; part('gn', '#fff1dc');
-  const sx = ax + aw * 0.5, sy = base - H * 0.4 * k, sr = H * 0.065; // (the spark: a four-pointed star)
-  c.fillStyle = '#ffc94a'; c.beginPath();
-  for (let i = 0; i < 8; i++) { const a = (Math.PI / 4) * i, rr = i % 2 ? sr * 0.3 : sr; c.lineTo(sx + rr * Math.sin(a), sy - rr * Math.cos(a)); }
-  c.closePath(); c.fill();
-  // the line under it, letterspaced across the wordmark's width
-  const line = 'LYRIC VIDEOS, MADE WITH AI', span = x - x0;
-  c.fillStyle = 'rgba(255,241,220,0.88)'; c.font = font(F.archivo(100, 600), H * 0.11);
-  const plain = [...line].reduce((w, ch) => w + c.measureText(ch).width, 0), gap = Math.max(0, (span - plain) / (line.length - 1));
-  let lx = x0 + H * 0.01; for (const ch of line) { c.fillText(ch, lx, H * 0.82); lx += c.measureText(ch).width + gap; }
+  const A = [cx - r * 0.62, cy - r * 0.95], B = [cx + r * 0.98, cy], C = [cx - r * 0.62, cy + r * 0.95];
+  const g = c.createConicGradient(0, cx + r * 0.05, cy);
+  for (const [at, ink] of [[0, '#7fe6ff'], [0.12, '#9a7cf6'], [0.24, '#ff5ab0'], [0.33, '#ff1f3a'], [0.45, '#ff5ab4'], [0.58, '#c472f0'], [0.68, '#8a6cff'], [0.82, '#4a62ff'], [0.93, '#46c8ff'], [1, '#7fe6ff']] as const) g.addColorStop(at, ink);
+  const tri = () => { c.beginPath(); c.moveTo(A[0]!, A[1]!); c.lineTo(B[0]!, B[1]!); c.lineTo(C[0]!, C[1]!); c.closePath(); };
+  c.lineJoin = 'round'; c.strokeStyle = g;
+  c.save(); c.filter = `blur(${Math.round(H * 0.05)}px)`; c.globalAlpha = 1; c.lineWidth = H * 0.12; tri(); c.stroke(); c.restore();
+  c.lineWidth = H * 0.065; tri(); c.stroke();
+  c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = H * 0.016; tri(); c.stroke(); // (its hot core)
+  // the wordmark, "Lyrics by" in the film's Bodoni italic and Desaign bold, and the handle under it in the logo's
+  // colours; the two centred in the room right of the logo
+  const x0 = H * 1.3, room = W - x0 - H * 0.3;
+  const serif = (k: number) => font(F.bodoni(700, { italic: true }), H * 0.3 * k), bold = (k: number) => font(F.archivo(100, 900), H * 0.44 * k);
+  c.font = serif(1); const lead = c.measureText('Lyrics by ').width; c.font = bold(1); const tail = c.measureText('Desaign').width;
+  const k = Math.min(1, (room * 0.92) / (lead + tail)), wordW = (lead + tail) * k, left = x0 + (room - wordW) / 2, base = H * 0.55;
+  c.textBaseline = 'alphabetic'; c.textAlign = 'left'; c.fillStyle = '#f6f0ff';
+  c.font = serif(k); c.fillText('Lyrics by', left, base);
+  c.font = bold(k); c.fillText('Desaign', left + lead * k, base);
+  const handle = '@LyricsByDesaign';
+  c.font = font(F.archivo(100, 800), H * 0.17);
+  const hw = c.measureText(handle).width, hx = left + (wordW - hw) / 2;
+  const hg = c.createLinearGradient(hx, 0, hx + hw, 0); hg.addColorStop(0, '#ff7cc4'); hg.addColorStop(0.5, '#c09aff'); hg.addColorStop(1, '#8ae4ff');
+  c.fillStyle = hg; c.fillText(handle, hx, H * 0.82);
 }
 
 export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: number, car: THREE.Object3D): void } | null {
