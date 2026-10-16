@@ -209,13 +209,13 @@ const STRIP: Record<string, StripTrade> = {
   bail: { name: 'BAIL BONDS', sign: 'box', bg: '#28386a', ink: '#e4dcc4', sub: '24 HOURS · 555-0144', rooms: [20], window: ['OPEN 24', C.blue] },
   tacos: { name: 'TACOS', sign: 'box', bg: '#c49a3c', ink: '#561c1c', sub: 'BURRITOS · TORTAS', rooms: [29], window: ['OPEN', C.red], awning: ['#2a5a3a'] },
   arcade: { name: 'ARCADE', sign: 'neon', bg: '', ink: C.blue, icon: 'star', rooms: [30], blade: ['ARCADE', C.violet] },
-  pizza: { name: 'PIZZA', sign: 'neon', bg: '', ink: C.amber, icon: 'slice', rooms: [29], window: ['SLICES', C.orange], awning: ['#5a2a2a', '#a89878'] },
+  pizza: { name: "LUCA'S", sign: 'neon', bg: '', ink: C.amber, icon: 'slice', rooms: [29], window: ['PIZZERIA', C.orange], awning: ['#5a2a2a', '#a89878'] }, // (Luca's: the user's Easter egg, 2026-10-16, "sneaking it in somewhere")
   barber: { name: 'BARBER', sign: 'box', bg: '#d4ccbc', ink: '#2a3a6a', sub: 'CUTS · SHAVES · FADES', rooms: [9], window: ['OPEN', C.red], awning: ['#2a3a6a', '#a89878'] },
   coffee: { name: 'COFFEE', sign: 'neon', bg: '', ink: C.amber, icon: 'cup', rooms: [4], window: ['OPEN', C.red], awning: ['#3e3a30'] },
   shoes: { name: 'SHOE REPAIR', sign: 'box', bg: '#5a2a2a', ink: '#d8c8a0', sub: 'KEYS CUT · WHILE U WAIT', rooms: [5], closed: true },
 };
 /** The trades dealt to the lots in turn (checks to its own lot): none repeated within the last few on a side. */
-const DEAL = ['donuts', 'diner', 'records', 'tattoo', 'motel', 'laundry', 'lounge', 'psychic', 'bail', 'tacos', 'arcade', 'pizza', 'barber', 'coffee', 'shoes'];
+const DEAL = ['donuts', 'pizza', 'records', 'tattoo', 'motel', 'laundry', 'lounge', 'psychic', 'bail', 'tacos', 'arcade', 'diner', 'barber', 'coffee', 'shoes']; // (Luca's where the camera opens on the Strip, at its edge)
 /** Signs on a frame on a tall filler's roof, facing the street (where no view of the words crosses them). */
 const ROOF_WORDS = [['JAZZ', C.amber], ['BILLIARDS', C.teal], ['KARAOKE', C.violet], ['STEAKS · CHOPS', C.orange], ['BOWL', C.blue], ['DANCING', C.rose]] as const;
 
