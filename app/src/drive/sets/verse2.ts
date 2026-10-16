@@ -54,7 +54,9 @@ export const SHACK = {
   // top ran behind the fascia and its foot through the window's head — "the grand opening thing's clipping into other
   // stuff", the user, 2026-10-14; the windows wide enough to show the shop round their posters)
   shop: { from: 3, len: 23, face: -(ROAD_HALF + 5), d: 14, h: 7.9, windows: [4.4, 13.6], window: { w: 7, h: 2.5, y: 2.05 }, banner: { at: 11.5, y: 5.25 }, statue: { at: 17.9, out: 1.9 } },
-  chicken: { gap: 5, len: 15, d: 13, h: 4.6, sign: { at: 7.5, over: 1.4 } },
+  // (it stands level where the road falls ~5 cm a metre: its floor a step up from its apron at its door, the apron flush
+  // with the sidewalk, `kerb` over the grade; its foundation shows at its low end)
+  chicken: { gap: 5, len: 15, d: 13, h: 4.6, sign: { at: 7.5, over: 1.4 }, step: 0.15, kerb: 0.15 },
 };
 /** The takes (m): the pole sign's, from the right sidewalk back up the street (back of the sign, off the road's centre,
  *  up, drifting on, m/s); the corner's, from out along their facing (how far, how high): the first A-frame close, then
@@ -107,9 +109,13 @@ export interface Verse2Plan {
   giant: Face;
   /** Its building. */
   giantBlock: Block;
-  /** When the car lays back (the word "backwards"), and when the word "chickens" lands (the roof chicken hops). */
+  /** The chicken spot's floor (its height: it stands level on the falling road). */
+  chickenFloor: number;
+  /** When the car lays back (the word "backwards"), when the word "chickens" lands (the roof chicken hops), and when Mr.
+   *  Handle It winks (as he's named: "Handle"). */
   layBack: number;
   chickens: number;
+  wink: number;
 }
 
 export const VERSE2: SetPiece = {
@@ -229,12 +235,13 @@ export const VERSE2: SetPiece = {
     const shop: Block = { s: shopS, lateral: shopLat, w: Sh.len, h: Sh.h, d: Sh.d, color: 0.4, bare: true, prop: true, matrix: boxAt(route, shopS, shopLat, Sh.d, Sh.h, Sh.len) };
     // the chicken spot past it, the big sign on its roof with the chicken standing on it: "You know I'm hella
     // different | from them chickens | you been trickin' on"
-    const Ck = S.chicken, chicken0 = shop0 + Sh.len + Ck.gap, rS = chicken0 + Ck.sign.at, rN = right(rS), rH = phs[4]!.reduce((a, ph) => a + layout('roofsign', ph.text, ph.solo).h, 0);
-    const rP = atRoad(rS, Sh.face - 1.2, Ck.h + Ck.sign.over + rH / 2), roof = stack('roofsign', phs[4]!, rP, rN);
+    const Ck = S.chicken, chicken0 = shop0 + Sh.len + Ck.gap, chickenS = chicken0 + Ck.len / 2, lift = Ck.kerb + Ck.step, chickenFloor = ground(chickenS) + lift;
+    const rS = chicken0 + Ck.sign.at, rN = right(rS), rH = phs[4]!.reduce((a, ph) => a + layout('roofsign', ph.text, ph.solo).h, 0);
+    const rP = atRoad(rS, Sh.face - 1.2, lift + Ck.h + Ck.sign.over + rH / 2), roof = stack('roofsign', phs[4]!, rP, rN);
     const roofCs = roof.items.map(({ ph, lay, center }) => add('roofsign', ph, rS, center, rN, UP.clone(), lay));
     hold(roofCs, along(roofCs, SHOTS.sign), 'cut');
-    const chickenS = chicken0 + Ck.len / 2, chickenLat = Sh.face - Ck.d / 2;
-    const chicken: Block = { s: chickenS, lateral: chickenLat, w: Ck.len, h: Ck.h, d: Ck.d, color: 0.4, bare: true, prop: true, matrix: boxAt(route, chickenS, chickenLat, Ck.d, Ck.h, Ck.len) };
+    const chickenLat = Sh.face - Ck.d / 2;
+    const chicken: Block = { s: chickenS, lateral: chickenLat, w: Ck.len, h: Ck.h, d: Ck.d, color: 0.4, bare: true, prop: true, matrix: boxAt(route, chickenS, chickenLat, Ck.d, Ck.h, Ck.len, lift) };
 
     // ---- the car wash on the right: its sign an ad facing the traffic, the words flush left, the car rolling past ----
     const W = WASH, wl = lines[5]!, ws = carS(wl.start + (wl.end - wl.start) * W.through), wn = fwd(ws).negate(), wAlong = UP.clone().cross(wn).normalize();
@@ -290,13 +297,14 @@ export const VERSE2: SetPiece = {
       corner: { s: cornerS, w: S.corner.w, blade: bladeS },
       aframes, shop, windows: winS,
       banner: { center: bP, normal: bN, up: UP.clone(), w: LAYOUT.vinyl.w, h: banner.H },
-      chicken,
+      chicken, chickenFloor,
       sign: { center: rP, normal: rN, up: UP.clone(), w: LAYOUT.roofsign.w, h: rH },
       wash: { s: ws, board: { center: boardP, normal: wn, up: UP.clone(), w: W.board.w, h: boardH } },
       giant: { center: gP, normal: gn, up: gUp, w: G.w, h: G.h },
       giantBlock,
       layBack: lines[7]!.words.find((w) => /^backwards/i.test(w.w))?.start ?? lines[7]!.end,
       chickens: wordAt(4, /^chickens/i),
+      wink: wordAt(3, /^handle/i),
     };
     // (chorus 3's faces stand past his mural, and past where their own clear zone would take his building)
     return { carriers, frames, clear, blocks, plan, floor: gs + G.w + 45, openings: [{ side: -1, a: cornerS - S.corner.w / 2, b: cornerS + S.corner.w / 2 }] };

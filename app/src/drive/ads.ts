@@ -18,7 +18,7 @@ export const BRAND: Record<Ad, [brand: string, tagline: string]> = {
   heels: ['STILETTO', 'walk tall'], roses: ['ROSE BOWL', 'florist'], chain: ['ROPE & GOLD', '14k • since 1964'],
   record: ['SIDE B', 'records & tapes'], suitcase: ['JETSET', 'luggage for the road'], crown: ['ROYALE', 'for the ruler'],
   bandage: ['FIRST AID', 'for what hurts'], tape: ['TRUE MEASURE', 'tools'], keys: ['CRUISE RENTALS', 'keys in an hour'], heart: ['SWEETHEART', 'candy co.'],
-  sale: ['HANDLE IT HARDWARE', 'this week only'],
+  sale: ['HANDLED HARDWARE', 'this week only'],
 };
 
 /** A billboard's least height (m). */

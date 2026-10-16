@@ -1,8 +1,9 @@
-// Verse 2's props (drive/sets/verse2.ts): Handle It Hardware on the corner of Slauson — its tall pole sign at the curb
-// (its name over the lightbox, a giant wrench on top, the trades under it), the side street, chalk A-frames on the
-// sidewalk, the store itself (its false front and sign board, awnings, windows onto the shop floor with posters taped in
-// them: the carriers; its stock out on the sidewalk, its banner tied up under the board, Mr. Handle It himself on his
-// plinth); the fried chicken spot past it, the big sign on its roof ringed with bulbs and the chicken standing on it;
+// Verse 2's props (drive/sets/verse2.ts): Handled Hardware (Mr. Handle It's: "slightly less on the nose" than Handle It
+// Hardware, the user, 2026-10-16) on the corner of Slauson — its tall pole sign at the curb (its name over the lightbox,
+// a giant wrench on top, the trades under it), the side street, chalk A-frames on the sidewalk, the store itself (its
+// false front and sign board, awnings, windows onto the shop floor with posters taped in them: the carriers; its stock
+// out on the sidewalk, its banner tied up under the board, Mr. Handle It himself on his plinth, winking as he's named);
+// the fried chicken spot past it, open and busy, the big sign on its roof ringed with bulbs and the chicken standing on it;
 // the hand car wash on the right (its sign an ad: HAND WASH over the words, suds and a shining car right of them, the
 // price under; its bays); his giant mural on the end wall of its building. The lyrics are the carriers. Browser only (canvas).
 import * as THREE from 'three';
@@ -16,7 +17,7 @@ import { CORNER_WALK, SIDEWALKS } from '../../drive/world';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
 import { F, font } from '../../engine/type';
-import { ball, box, canvasTex, cyl, leftFront, onPanel, pic, plane, roadFrame, sedan, signFace, stride, walker } from './kit';
+import { UP, ball, box, canvasTex, cyl, fuse, leftFront, onPanel, paint, part, pic, plane, roadFrame, sedan, signFace, stride, tball, tbox, tcyl, walker } from './kit';
 import { glassTex } from './chorus1';
 
 /** Slauson, the side street (m, along it from the main road's edge): its fronts from `from` to `len` (out into the
@@ -104,12 +105,25 @@ function mrHandleIt(g: THREE.Object3D) {
   const head = ball(g, 0.45, 0, y0 + 4.84, 0.05, skin); head.scale.set(0.92, 1.08, 0.98);
   for (const s of [-1, 1]) ball(g, 0.1, s * 0.41, y0 + 4.8, 0.02, skin);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.018, 6, 14), gold); ring.position.set(-0.45, y0 + 4.66, 0.03); ring.rotation.y = Math.PI / 2; g.add(ring);
-  // his face: an eye open, the other winking under a lowered brow, a nose, a big grin
-  ball(g, 0.06, 0.16, y0 + 4.92, 0.42, ink);
-  box(g, 0.15, 0.035, 0.03, -0.16, y0 + 4.9, 0.425, ink).rotation.z = 0.12;
-  box(g, 0.2, 0.05, 0.04, 0.16, y0 + 5.06, 0.4, ink).rotation.z = -0.18;
-  box(g, 0.2, 0.05, 0.04, -0.16, y0 + 5.0, 0.41, ink).rotation.z = 0.05;
-  ball(g, 0.08, 0, y0 + 4.82, 0.47, skin);
+  // his face: big cartoon eyes, open (whites, pupils looking down at the street, lids with a dark line along their rims),
+  // brows, a nose, a big grin. His right eye (the near one from the street) winks as he's named: its lid comes down, his
+  // cheek lifts under it, its brow dips (the movers, returned; the user, 2026-10-16: "it should have its eyes open, and
+  // then it should give us a wink"). (He was painted mid-wink, an eye a dash.)
+  const white = toon({ color: '#f7f4ec' }), eyes: { lid: THREE.Mesh; brow: THREE.Mesh; cheek: THREE.Mesh }[] = [];
+  for (const s of [-1, 1]) {
+    const ex = s * 0.17, ey = y0 + 4.93, eye = new THREE.Group(); eye.position.set(ex, ey, 0.4); eye.rotation.y = s * 0.32; eye.scale.set(1, 1.25, 0.6); g.add(eye);
+    ball(eye, 0.11, 0, 0, 0, white);
+    ball(eye, 0.05, -0.025, -0.02, 0.095, ink).scale.z = 0.35; // (the pupil, a disc on the white: toward the street below, inside the shut lid)
+    // the lids: skin domes over its top and its foot, the upper's rim lined dark; the upper turns down to meet the lower
+    // (rotation.x: open LID.open, shut LID.shut), its line then a curve across the shut eye
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.125, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), skin); lid.name = 'lid'; lid.rotation.x = LID.open; eye.add(lid);
+    const under = new THREE.Mesh(new THREE.SphereGeometry(0.124, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), skin); under.rotation.x = 0.59; eye.add(under);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.125, 0.012, 6, 24), ink); rim.rotation.x = Math.PI / 2; lid.add(rim);
+    const brow = box(g, 0.22, 0.05, 0.08, ex, ey + 0.2, 0.36, ink); brow.rotation.z = -s * 0.12; brow.name = 'brow';
+    const cheek = ball(g, 0.1, ex - s * 0.02, ey - 0.17, 0.4, skin); cheek.scale.set(1.3, 0.8, 0.7); cheek.name = 'cheek';
+    eyes.push({ lid, brow, cheek });
+  }
+  ball(g, 0.08, 0, y0 + 4.8, 0.47, skin);
   const grin = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 6, 16, Math.PI), ink); grin.position.set(0, y0 + 4.72, 0.4); grin.rotation.z = Math.PI; grin.rotation.x = -0.3; g.add(grin);
   // his left fist on his hip
   const L0 = V3(-0.84, y0 + 4.02, 0), Le = V3(-1.34, y0 + 3.28, -0.06), Lh = V3(-0.7, y0 + 2.66, 0.14);
@@ -122,7 +136,12 @@ function mrHandleIt(g: THREE.Object3D) {
   lay(w, Rh.clone().addScaledVector(dir, -0.8), dir, V3(-0.3, 0, 1));
   g.add(w);
   ball(g, 0.21, Rh.x, Rh.y, Rh.z, skin);
+  return eyes[0]!; // (his right: the winking one)
 }
+/** His upper lids' turn (radians about their eye's x): open, and shut down onto the lower lid. */
+const LID = { open: -0.45, shut: 0.7 };
+/** His wink at `t` (s since it starts): how shut his eye is, 0..1 — down in 0.08 s, held 0.12, up in 0.16. */
+const winkAt = (t: number) => (t < 0 || t > 0.36 ? 0 : t < 0.08 ? Math.sin((Math.PI / 2) * (t / 0.08)) : t < 0.2 ? 1 : 0.5 + 0.5 * Math.cos((Math.PI * (t - 0.2)) / 0.16));
 
 /** The shop's floor through its window, lit warm: tubes in a dark ceiling, a pegboard wall hung with tools, gondolas
  *  of stock (paint cans, boxes, rope), an aisle sign; the glass's sheen over it. (Its windows were a dark grey slab.) */
@@ -172,6 +191,180 @@ function interior(c: CanvasRenderingContext2D, W: number, H: number, seed: numbe
   for (const [a, b] of [[0.08, 0.16], [0.22, 0.25], [0.55, 0.62], [0.68, 0.7]] as const) { c.beginPath(); c.moveTo(W * a, 0); c.lineTo(W * b, 0); c.lineTo(W * b - H * 0.6, H); c.lineTo(W * a - H * 0.6, H); c.closePath(); c.fill(); }
 }
 
+// ---- the chicken spot's pieces (the user, 2026-10-16: "I really like the fried chicken store ... improve the fidelity
+// of the building by a bit, add some smaller details. My vibe is that the place looks closed") ----
+/** The town's sidewalk (drive/world.ts SIDEWALKS): its width off the road's edge, its kerb's height. */
+const WALK = { width: 3, kerb: 0.15 };
+/** Quads (four corners each, counter-clockwise from outside) as one geometry, flat-shaded. */
+function quads(qs: readonly THREE.Vector3[][]): THREE.BufferGeometry {
+  const pos: number[] = [];
+  for (const [a, b, c, d] of qs) for (const p of [a, b, c, a, c, d]) pos.push(p!.x, p!.y, p!.z);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
+  return geo;
+}
+/** The chicken spot's customers' clothes (their own, not the passers-by's: kit's walker() dresses by its turn, and one
+ *  more here would re-dress every passer-by after). */
+const DINERS = [
+  { skin: '#6b4330', top: '#2f5d7c', legs: '#2a3550', shoes: '#f0ece2', hair: '#141012' },
+  { skin: '#d9a67e', top: '#d9a23a', legs: '#3a3a40', shoes: '#1a1618', hair: '#4a2e1a' },
+  { skin: '#8f5e40', top: '#3c6b4a', legs: '#6a5a46', shoes: '#5a3a26', hair: '#141012' },
+  { skin: '#4a2e22', top: '#b85a7a', legs: '#1e2228', shoes: '#f0ece2', hair: '#2a1a12' },
+];
+/** A customer, as kit's walker() builds a passer-by (tinted parts, fused): sitting on a seat `seat` high, hands forward
+ *  on the table (or standing, seat 0), facing +z, feet at y 0; eating a drumstick (his right hand up to his mouth) or
+ *  carrying a bucket. */
+function diner(look: number, seat = 0, hold?: 'eat' | 'bucket'): THREE.Group {
+  const P = DINERS[look % DINERS.length]!, g = new THREE.Group(), hip = seat ? seat + 0.08 : 0.88;
+  const cap = (to: THREE.Object3D, r: number, len: number, color: string, x: number, y: number, z: number, rx = 0, sx = 1, sz = 1) => { const m = part(to, new THREE.CapsuleGeometry(r, len, 3, 8).scale(sx, 1, sz), color, x, y, z); m.rotation.x = rx; return m; };
+  tbox(g, 0.3, 0.16, 0.2, 0, hip + 0.05, 0, P.legs); // the hips
+  for (const x of [-0.085, 0.085]) {
+    if (seat) { cap(g, 0.07, 0.3, P.legs, x, hip, 0.2, Math.PI / 2); cap(g, 0.06, hip - 0.2, P.legs, x, hip / 2, 0.4); tbox(g, 0.1, 0.07, 0.25, x, 0.035, 0.46, P.shoes); }
+    else { cap(g, 0.07, 0.66, P.legs, x, 0.46, 0); tbox(g, 0.1, 0.07, 0.25, x, 0.035, 0.05, P.shoes); }
+  }
+  const ty = hip + 0.36;
+  cap(g, 0.15, 0.34, P.top, 0, ty, 0, 0, 1.22, 0.72); // the torso
+  tcyl(g, 0.048, 0.1, 0, ty + 0.28, 0, P.skin, 10);
+  part(g, new THREE.SphereGeometry(0.105, 12, 9).scale(0.92, 1.08, 1), P.skin, 0, ty + 0.415, 0.005);
+  part(g, new THREE.SphereGeometry(0.11, 12, 9).scale(0.96, 0.74, 1), P.hair, 0, ty + 0.455, -0.018);
+  // the arms from the shoulders: forward to the table sitting, at the sides standing; the right up to the mouth eating
+  for (const [x, right] of [[0.205, false], [-0.205, true]] as const) {
+    const eat = right && hold === 'eat', sh = new THREE.Group(), el = new THREE.Group();
+    sh.position.set(x, ty + 0.17, 0); sh.rotation.x = eat ? -0.9 : seat ? -1.05 : right && hold === 'bucket' ? -0.15 : 0.08; g.add(sh);
+    el.position.set(0, -0.27, 0); el.rotation.x = eat ? -2.1 : seat ? -0.3 : 0; sh.add(el); // (the elbow: the forearm up to the mouth eating)
+    cap(sh, 0.05, 0.22, P.top, 0, -0.14, 0); cap(el, 0.04, 0.22, P.skin, 0, -0.12, 0); tball(el, 0.045, 0, -0.28, 0.01, P.skin);
+    if (eat) { part(el, new THREE.CapsuleGeometry(0.045, 0.06, 3, 8), '#c8742a', 0, -0.36, 0.03); tcyl(el, 0.012, 0.08, 0, -0.28, 0.03, '#f4ead2', 6); }
+    if (right && hold === 'bucket') { tcyl(el, 0.12, 0.2, 0, -0.45, 0.02, '#c8202e'); tcyl(el, 0.122, 0.05, 0, -0.41, 0.02, '#ffffff'); }
+    fuse(sh); fuse(el);
+  }
+  fuse(g);
+  return g;
+}
+/** A person seen through the shop's glass (canvas, `s` px a metre, the top of their head at `top`): head, shoulders,
+ *  body down past the bottom; from behind (hair over the head), or turned (`face` ±1: their face and their cap's brim
+ *  that way); in a cap. */
+function person(c: CanvasRenderingContext2D, x: number, top: number, s: number, o: { body: string; skin: string; hair: string; cap?: string; face?: number; arm?: number }) {
+  const hr = 0.115 * s, cy = top + hr;
+  c.fillStyle = o.body; c.beginPath(); c.roundRect(x - 0.24 * s, cy + hr * 1.25, 0.48 * s, 1.4 * s, 0.13 * s); c.fill();
+  if (o.arm) { c.strokeStyle = o.body; c.lineCap = 'round'; c.lineWidth = 0.1 * s; c.beginPath(); c.moveTo(x + o.arm * 0.15 * s, cy + hr * 1.8); c.lineTo(x + o.arm * 0.5 * s, cy + hr * 3.4); c.stroke(); c.fillStyle = o.skin; c.beginPath(); c.arc(x + o.arm * 0.52 * s, cy + hr * 3.45, 0.05 * s, 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = o.skin; c.fillRect(x - 0.05 * s, cy + hr * 0.5, 0.1 * s, hr * 0.9);
+  c.beginPath(); c.ellipse(x, cy, hr * 0.92, hr, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = o.hair; c.beginPath();
+  if (!o.face) c.ellipse(x, cy - hr * 0.05, hr * 0.95, hr * 0.98, 0, 0, Math.PI * 2);
+  else { c.ellipse(x - o.face * hr * 0.2, cy - hr * 0.3, hr * 0.85, hr * 0.75, 0, Math.PI * 0.9, Math.PI * 2.1); }
+  c.fill();
+  if (o.face) { c.fillStyle = o.skin; c.beginPath(); c.ellipse(x + o.face * hr * 0.85, cy + hr * 0.1, hr * 0.2, hr * 0.16, 0, 0, Math.PI * 2); c.fill(); } // the nose
+  if (o.cap) { c.fillStyle = o.cap; c.beginPath(); c.ellipse(x, cy - hr * 0.45, hr * 0.98, hr * 0.62, 0, Math.PI, Math.PI * 2); c.fill(); c.fillRect(x + (o.face ?? 0) * hr * 0.4 - hr * 0.55, cy - hr * 0.5, hr * 1.1 + Math.abs(o.face ?? 0) * hr * 0.5, hr * 0.18); }
+}
+/** The chicken spot through a window, lit: tubes in its ceiling, a band of tile; the counter under the menu board with
+ *  the staff behind it and two customers at it, the heat lamps' case of chicken on it (`side` 0), or the booths with
+ *  people eating, posters on the wall (1); a card taped in the glass; the glass's sheen as the shop glass's (chorus1
+ *  glassTex) over it, the awning's shade at its head. */
+function fryWindow(c: CanvasRenderingContext2D, W: number, H: number, side: number) {
+  const s = H / 2.2 * 0.85; // (px a metre, a little back from the glass)
+  const wall = c.createLinearGradient(0, 0, 0, H); wall.addColorStop(0, '#fff3cc'); wall.addColorStop(1, '#ffcf80');
+  c.fillStyle = wall; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#7a3a22'; c.fillRect(0, 0, W, H * 0.09);
+  for (let x = W * 0.04; x < W; x += W * 0.21) { c.fillStyle = '#fffbea'; c.fillRect(x, H * 0.05, W * 0.13, H * 0.024); }
+  for (let x = 0; x < W; x += 24) { c.fillStyle = (x / 24) % 2 ? '#e8d8b8' : '#c8202e'; c.fillRect(x, H * 0.5, 24, 12); } // the tile band
+  if (side === 0) {
+    // the menu board, lit: three panels, a header, a picture, its rows
+    const mx = W * 0.05, my = H * 0.13, mw = W * 0.9, mh = H * 0.3, pw = mw / 3;
+    c.save(); c.shadowColor = 'rgba(255,214,120,0.95)'; c.shadowBlur = 26; c.fillStyle = '#2a1212'; c.fillRect(mx, my, mw, mh); c.restore();
+    const items = [['2 PC MEAL', '3 PC MEAL', 'TENDERS', 'SANDWICH'], ['8 PC', '12 PC', '16 PC', 'FAMILY'], ['BISCUITS', 'FRIES', 'SLAW', 'MAC'] ];
+    ['MEALS', 'BUCKETS', 'SIDES'].forEach((t, k) => {
+      const px = mx + k * pw;
+      c.strokeStyle = '#ffcf4a'; c.lineWidth = 3; c.strokeRect(px + 7, my + 7, pw - 14, mh - 14);
+      c.fillStyle = '#ffcf4a'; c.font = font(F.sign(700), mh * 0.17); c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(t, px + 20, my + mh * 0.2, pw * 0.6);
+      c.fillStyle = '#f4ead2'; c.beginPath(); c.ellipse(px + pw * 0.77, my + mh * 0.62, pw * 0.15, mh * 0.13, 0, 0, Math.PI * 2); c.fill();
+      for (let j = 0; j < 3; j++) { c.fillStyle = j % 2 ? '#c8742a' : '#e09a3a'; c.beginPath(); c.ellipse(px + pw * (0.71 + j * 0.06), my + mh * (0.56 - (j % 2) * 0.05), pw * 0.05, mh * 0.08, 0.6, 0, Math.PI * 2); c.fill(); }
+      c.font = font(F.sign(600), mh * 0.1);
+      items[k]!.forEach((it, j) => { const yy = my + mh * (0.42 + j * 0.14); c.fillStyle = '#fff6e0'; c.fillText(it, px + 20, yy, pw * 0.36); c.fillStyle = '#ffcf4a'; c.fillText(`${(2.99 + k * 4 + j * 1.5).toFixed(2)}`, px + pw * 0.43, yy); });
+    });
+    // the staff behind the counter: red shirts, caps
+    person(c, W * 0.3, H * 0.46, s, { body: '#c8202e', skin: '#8f5e40', hair: '#141012', cap: '#c8202e', face: 1, arm: 1 });
+    person(c, W * 0.6, H * 0.48, s, { body: '#c8202e', skin: '#d9a67e', hair: '#4a2e1a', cap: '#c8202e', face: -1, arm: -1 });
+    // the counter: its steel top, its red front with a white stripe; the register; the heat lamps' case, chicken in it
+    c.fillStyle = '#d9d4cc'; c.fillRect(0, H * 0.7, W, H * 0.035);
+    c.fillStyle = '#b81f2a'; c.fillRect(0, H * 0.735, W, H * 0.3); c.fillStyle = '#f4ead2'; c.fillRect(0, H * 0.8, W, H * 0.035);
+    c.fillStyle = '#2a2a30'; c.fillRect(W * 0.43, H * 0.6, W * 0.07, H * 0.1); c.fillStyle = '#7ad0a0'; c.fillRect(W * 0.44, H * 0.61, W * 0.05, H * 0.035);
+    c.save(); c.shadowColor = 'rgba(255,150,60,0.9)'; c.shadowBlur = 22; c.fillStyle = '#ffb04a'; c.fillRect(W * 0.69, H * 0.56, W * 0.27, H * 0.14); c.restore();
+    for (let k = 0; k < 9; k++) { c.fillStyle = k % 2 ? '#c8742a' : '#e09a3a'; c.beginPath(); c.ellipse(W * (0.71 + k * 0.028), H * (0.665 - (k % 3) * 0.018), W * 0.018, H * 0.028, 0.5 + k, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(W * 0.69, H * 0.56, W * 0.27, H * 0.012);
+    // two customers at the counter, their backs to us, nearer (bigger), dark against the light
+    person(c, W * 0.18, H * 0.53, s * 1.15, { body: '#2f3a55', skin: '#4a2e22', hair: '#141012' });
+    person(c, W * 0.8, H * 0.55, s * 1.15, { body: '#5a2e3a', skin: '#b47c56', hair: '#2a1a12' });
+    // a card taped in the glass
+    c.fillStyle = '#fff6e0'; c.fillRect(W * 0.03, H * 0.8, W * 0.16, H * 0.14); c.fillStyle = '#c8202e'; c.textAlign = 'center'; c.font = font(F.sign(700), H * 0.05); c.fillText('NOW', W * 0.11, H * 0.845); c.fillText('HIRING', W * 0.11, H * 0.905, W * 0.15);
+  } else {
+    // posters on the wall (a bucket, the chicken himself), sconces
+    c.fillStyle = '#c8202e'; c.fillRect(W * 0.08, H * 0.16, W * 0.18, H * 0.27); c.fillStyle = '#fff6e0'; c.beginPath(); c.moveTo(W * 0.12, H * 0.22); c.lineTo(W * 0.22, H * 0.22); c.lineTo(W * 0.205, H * 0.38); c.lineTo(W * 0.135, H * 0.38); c.closePath(); c.fill();
+    c.fillStyle = '#c8202e'; for (let k = 0; k < 3; k++) c.fillRect(W * (0.135 + k * 0.03), H * 0.22, W * 0.013, H * 0.16);
+    c.fillStyle = '#f2c230'; c.fillRect(W * 0.62, H * 0.15, W * 0.22, H * 0.28); c.fillStyle = '#fff6e0'; c.beginPath(); c.arc(W * 0.73, H * 0.31, H * 0.08, 0, Math.PI * 2); c.fill(); c.beginPath(); c.arc(W * 0.76, H * 0.22, H * 0.045, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#d4202e'; c.fillRect(W * 0.755, H * 0.165, W * 0.012, H * 0.03); c.fillStyle = '#f29a1a'; c.beginPath(); c.moveTo(W * 0.778, H * 0.215); c.lineTo(W * 0.8, H * 0.225); c.lineTo(W * 0.778, H * 0.235); c.fill();
+    for (const x of [0.38, 0.5, 0.92]) { c.save(); c.shadowColor = 'rgba(255,230,160,1)'; c.shadowBlur = 30; c.fillStyle = '#fff6d8'; c.beginPath(); c.arc(W * x, H * 0.28, H * 0.035, 0, Math.PI * 2); c.fill(); c.restore(); }
+    // the booths: their backs, a table each, two eating at each, facing each other
+    for (const [bx, k] of [[0.27, 0], [0.73, 1]] as const) {
+      const cx = W * bx;
+      person(c, cx - W * 0.1, H * 0.47, s, { body: k ? '#3c6b4a' : '#e8dcc0', skin: k ? '#d9a67e' : '#6b4330', hair: '#141012', face: 1, arm: 1 });
+      person(c, cx + W * 0.1, H * 0.49, s, { body: k ? '#6a4a8a' : '#2f5d7c', skin: k ? '#4a2e22' : '#b47c56', hair: k ? '#2a1a12' : '#8a6a3a', face: -1, arm: -1 });
+      c.fillStyle = '#8a1a20'; c.fillRect(cx - W * 0.2, H * 0.6, W * 0.04, H * 0.4); c.fillRect(cx + W * 0.16, H * 0.6, W * 0.04, H * 0.4); // the booths' backs
+      c.fillStyle = '#c8202e'; c.fillRect(cx - W * 0.07, H * 0.71, W * 0.14, H * 0.03); c.fillStyle = '#5a5a60'; c.fillRect(cx - W * 0.008, H * 0.74, W * 0.016, H * 0.26);
+      c.fillStyle = '#c9c9cc'; c.fillRect(cx - W * 0.012, H * 0.67, W * 0.024, H * 0.04); c.fillStyle = '#ffffff'; c.fillRect(cx - W * 0.009, H * 0.66, W * 0.018, H * 0.012); // napkins
+      c.fillStyle = '#c8202e'; c.fillRect(cx + W * 0.025, H * 0.665, W * 0.03, H * 0.045); c.fillStyle = '#fff6e0'; c.fillRect(cx + W * 0.025, H * 0.68, W * 0.03, H * 0.01);
+    }
+    // a card taped in the glass
+    c.fillStyle = '#fff6e0'; c.fillRect(W * 0.8, H * 0.76, W * 0.17, H * 0.18); c.fillStyle = '#c8202e'; c.textAlign = 'center'; c.font = font(F.sign(700), H * 0.05);
+    c.fillText('2 PC + BISCUIT', W * 0.885, H * 0.82, W * 0.16); c.font = font(F.sign(700), H * 0.08); c.fillText('$2.99', W * 0.885, H * 0.9);
+  }
+  // the awning's shade at its head; the glass's sheen (the shop glass's streaks of sky)
+  const sh = c.createLinearGradient(0, 0, 0, H * 0.25); sh.addColorStop(0, 'rgba(60,24,12,0.45)'); sh.addColorStop(1, 'rgba(60,24,12,0)'); c.fillStyle = sh; c.fillRect(0, 0, W, H * 0.25);
+  for (const [a, b, al] of [[0.06, 0.2, 0.14], [0.27, 0.31, 0.09], [0.58, 0.68, 0.12], [0.74, 0.76, 0.08]] as const) {
+    c.fillStyle = `rgba(255,240,222,${al})`; c.beginPath(); c.moveTo(W * a, 0); c.lineTo(W * b, 0); c.lineTo(W * b - H * 0.8, H); c.lineTo(W * a - H * 0.8, H); c.closePath(); c.fill();
+  }
+}
+/** Through its door, propped open: the shop lit, a checked floor, the end of the counter, one waiting at it. */
+function fryDoorway(c: CanvasRenderingContext2D, W: number, H: number) {
+  const s = (W / 1.16) * 0.8;
+  const wall = c.createLinearGradient(0, 0, 0, H); wall.addColorStop(0, '#fff3cc'); wall.addColorStop(1, '#ffd08a');
+  c.fillStyle = wall; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#7a3a22'; c.fillRect(0, 0, W, H * 0.07); c.fillStyle = '#fffbea'; c.fillRect(W * 0.2, H * 0.04, W * 0.6, H * 0.018);
+  c.save(); c.shadowColor = 'rgba(255,214,120,0.95)'; c.shadowBlur = 16; c.fillStyle = '#2a1212'; c.fillRect(W * 0.45, H * 0.12, W * 0.6, H * 0.14); c.restore();
+  c.fillStyle = '#ffcf4a'; for (let k = 0; k < 3; k++) c.fillRect(W * 0.52, H * (0.15 + k * 0.035), W * 0.3, H * 0.012);
+  // the floor, red and cream checks going back
+  const f0 = H * 0.76;
+  for (let r = 0; r < 6; r++) {
+    const y0 = f0 + ((H - f0) * r * r) / 36, y1 = f0 + ((H - f0) * (r + 1) * (r + 1)) / 36, n = 6;
+    for (let k = -2; k < n + 2; k++) { c.fillStyle = (k + r) % 2 ? '#e8dcc0' : '#b81f2a'; c.fillRect((W * k) / n, y0, W / n + 1, y1 - y0 + 1); }
+  }
+  c.fillStyle = '#d9d4cc'; c.fillRect(W * 0.62, H * 0.5, W * 0.4, H * 0.025); c.fillStyle = '#b81f2a'; c.fillRect(W * 0.64, H * 0.525, W * 0.38, H * 0.25); c.fillStyle = '#f4ead2'; c.fillRect(W * 0.64, H * 0.58, W * 0.38, H * 0.025);
+  person(c, W * 0.35, H * 0.33, s, { body: '#d9a23a', skin: '#6b4330', hair: '#141012' });
+  c.fillStyle = '#2a3550'; c.fillRect(W * 0.35 - 0.2 * s, H * 0.33 + 0.86 * s, 0.4 * s, H * 0.8 - (H * 0.33 + 0.86 * s)); // (his jeans, down to the floor)
+}
+/** A neon OPEN: red letters in a blue border, glowing; on a clear ground. */
+function neonOpen(): THREE.CanvasTexture {
+  return canvasTex(512, 220, (c) => {
+    c.lineJoin = 'round';
+    c.save(); c.shadowColor = '#3ab8ff'; c.shadowBlur = 22; c.strokeStyle = '#7ad8ff'; c.lineWidth = 10; c.beginPath(); c.roundRect(20, 20, 472, 180, 40); c.stroke(); c.restore();
+    c.strokeStyle = '#e8f8ff'; c.lineWidth = 3; c.beginPath(); c.roundRect(20, 20, 472, 180, 40); c.stroke();
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 128);
+    c.save(); c.shadowColor = '#ff2a2a'; c.shadowBlur = 28; c.fillStyle = '#ff4a3a'; c.fillText('OPEN', 256, 116); c.restore();
+    c.strokeStyle = '#ffd8c8'; c.lineWidth = 3; c.strokeText('OPEN', 256, 116);
+  });
+}
+/** Grime for a wall `w` x `h` m (a clear canvas): dirt up from its foot, drips down from its head, smudges, a crack. */
+function grimeTex(W: number, H: number, w: number, h: number, seed: number): THREE.CanvasTexture {
+  return canvasTex(W, H, (c) => {
+    const r = (k: number) => { const v = Math.sin(seed * 51.3 + k * 12.9898) * 43758.5453; return v - Math.floor(v); }, px = W / w;
+    const foot = c.createLinearGradient(0, H, 0, H - Math.min(H, 0.8 * px)); foot.addColorStop(0, 'rgba(58,40,30,0.4)'); foot.addColorStop(1, 'rgba(58,40,30,0)');
+    c.fillStyle = foot; c.fillRect(0, 0, W, H);
+    if (h > 1) {
+      for (let k = 0; k < w * 3; k++) { const x = r(k) * W, l = (0.3 + 1.2 * r(k + 40)) * px, gr = c.createLinearGradient(0, 0, 0, l); gr.addColorStop(0, 'rgba(80,58,44,0.22)'); gr.addColorStop(1, 'rgba(80,58,44,0)'); c.fillStyle = gr; c.fillRect(x, 0, 2 + 4 * r(k + 80), l); }
+      for (let k = 0; k < w * 2; k++) { c.fillStyle = `rgba(90,70,55,${0.04 + 0.06 * r(k + 120)})`; c.beginPath(); c.ellipse(r(k + 160) * W, (0.3 + 0.6 * r(k + 200)) * H, (0.2 + 0.5 * r(k + 240)) * px, (0.1 + 0.3 * r(k + 280)) * px, r(k) * 3, 0, Math.PI * 2); c.fill(); }
+      c.strokeStyle = 'rgba(70,50,40,0.45)'; c.lineWidth = 1.5; c.beginPath(); let x = W * (0.05 + 0.2 * r(300)), y = H * 0.55; c.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (r(310 + k) - 0.3) * px * 0.25; y += px * 0.12; c.lineTo(x, y); } c.stroke();
+    }
+  });
+}
+
 /** A row of bulbs along a line in g (from a to b): each takes a material from `ms` in turn (the chase's phases). */
 function bulbs(g: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, n: number, ms: readonly THREE.Material[], phase0 = 0) {
   for (let i = 0; i <= n; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), ms[(phase0 + i) % ms.length]!); s.position.copy(a.clone().lerp(b, i / n)); g.add(s); }
@@ -218,7 +411,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   {
     const P = plan.pole, g = onPanel(P), drop = P.center.y - route.frameAt(P.s).pos.y;
     box(g, P.w + 0.4, P.h + 0.4, 0.5, 0, 0, -0.27, toon({ color: orange }));
-    plane(g, P.w + 0.4, 1.3, 0, P.h / 2 + 0.9, 0.0, name('HANDLE IT HARDWARE', P.w + 0.4, 1.3, '#fff6e0', orange));
+    plane(g, P.w + 0.4, 1.3, 0, P.h / 2 + 0.9, 0.0, name('HANDLED HARDWARE', P.w + 0.4, 1.3, '#fff6e0', orange));
     box(g, P.w + 0.4, 1.3, 0.5, 0, P.h / 2 + 0.9, -0.27, toon({ color: '#a84e18' }));
     // a giant wrench laid across its top, the store's mark (on two stubs to the header)
     const steel = toon({ color: HW.steel }), wdir = V3(1, 0.42, 0).normalize(), top = P.h / 2 + 1.55;
@@ -249,9 +442,20 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     // really bad", the user, 2026-10-15. And each its own materials, fascia and canvas sign: some 300 draws.)
     const ground = toon({ color: '#b39a7a' }), walkM = toon({ color: '#cbbba7' }), dark = toon({ color: WORLD.post });
     const lotWall = toon({ color: '#d9cdb8' }), awnings = ['#c8202e', '#2b78a6', '#e0a526'].map((color) => toon({ color })), fronts: Block[] = [];
+    // (the blocks' ground is level, in the corner's frame; the main road falls past the hardware store, ~1 m by the
+    // chicken spot. Level all the way along it, it came up out of the lot through the chicken spot's front at 93.6 s:
+    // "kind of like creeping up, and it's really weird to look at", the user, 2026-10-16. So it's level under
+    // Slauson's blocks and the hardware store, which stands on it, and beyond them down under the road's grade.)
+    const cf = route.frameAt(C.s), cFwd = V3(cf.fwd.x, 0, cf.fwd.z).normalize();
+    const alongMain = (s: number) => route.frameAt(s).pos.clone().sub(cf.pos).dot(cFwd); // (z in the corner's frame)
     for (const side of [-1, 1]) {
-      const zs = side * (C.w / 2), zw = zs + side * S.walk / 2;
-      box(st, S.len - S.from + 40, 8, S.depth + 60, ROAD_HALF + (S.from + S.len) / 2, -4 - 0.06, zs + side * (S.walk + (S.depth + 60) / 2), ground); // the blocks' ground, down out of sight
+      const zs = side * (C.w / 2), zw = zs + side * S.walk / 2, L = S.len - S.from + 40, Lx = ROAD_HALF + (S.from + S.len) / 2;
+      const zNear = S.walk, zFar = S.walk + S.depth + 60;
+      const zLevel = Math.max(S.walk + S.depth + 2, side > 0 ? alongMain(plan.shop.s + plan.shop.w / 2) - zs : 0);
+      let low = 0;
+      for (let z = zLevel; z <= zFar; z += 2) low = Math.min(low, route.frameAt(C.s + side * (Math.abs(zs) + z)).pos.y - cf.pos.y);
+      box(st, L, 8, zLevel - zNear, Lx, -4 - 0.06, zs + side * (zNear + zLevel) / 2, ground); // the blocks' ground, down out of sight
+      box(st, L, 8, zFar - zLevel, Lx, -4 - 0.12 + low, zs + side * (zLevel + zFar) / 2, ground); // (beyond them, under the grade)
       const w0 = CORNER_WALK.to, w1 = ROAD_HALF + S.len + 10; // (on from the corner's own walk: drive/world.ts CORNER_WALK)
       box(st, w1 - w0, 0.16, S.walk, (w0 + w1) / 2, 0.08, zw, walkM); // the sidewalk
       // the fronts: varied widths and heights, an awning on some, a lot now and then
@@ -313,7 +517,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   // banner tied up under the board, striped awnings over deep windows lit onto the shop floor (posters taped in them:
   // the carriers), a recessed glass door; its stock out on the sidewalk; Mr. Handle It himself on his plinth by the
   // banner; its end wall toward the corner painted as an ad ----
-  let roofChicken!: THREE.Group, shopper!: THREE.Group, shopperAt!: (walked: number) => number;
+  let roofChicken!: THREE.Group, shopper!: THREE.Group, shopperAt!: (walked: number) => number, wink!: ReturnType<typeof mrHandleIt>;
   {
     const B = plan.shop, Sh = SHACK.shop, g = front(B.s, Sh.face), w = B.w, h = Sh.h, X = (a: number) => a - w / 2, W = Sh.window;
     const cream = toon({ color: '#f7ecd6' }), ink = toon({ color: HW.ink }), frame = toon({ color: HW.frame }), tile = toon({ color: HW.tile }), steel = toon({ color: HW.steel });
@@ -381,7 +585,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       c.strokeStyle = HW.cream; c.lineWidth = 8; c.strokeRect(14, 14, Wc - 28, Hc - 28);
       c.fillStyle = HW.cream; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.font = font(F.sign(700), Hc * 0.62); (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${Hc * 0.08}px`;
-      c.fillText('HANDLE IT HARDWARE', Wc / 2, Hc * 0.54, Wc * 0.66);
+      c.fillText('HANDLED HARDWARE', Wc / 2, Hc * 0.54, Wc * 0.66);
       (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
       c.font = font(F.sign(600), Hc * 0.24); c.fillText('SINCE', Wc * 0.09, Hc * 0.36); c.font = font(F.sign(700), Hc * 0.36); c.fillText('1962', Wc * 0.09, Hc * 0.66);
       c.font = font(F.sign(600), Hc * 0.24); c.fillText('WE', Wc * 0.91, Hc * 0.36); c.font = font(F.sign(700), Hc * 0.3); c.fillText('FIX IT', Wc * 0.91, Hc * 0.66);
@@ -425,7 +629,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
         c.fillStyle = '#efe0bf'; c.fillRect(0, 0, Wc, Hc);
         c.fillStyle = HW.orange; c.fillRect(0, Hc * 0.6, Wc, Hc * 0.13);
         c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.fillStyle = HW.orange; c.font = font(F.sign(700), Hc * 0.24); c.fillText('HANDLE IT', Wc / 2, Hc * 0.2, Wc * 0.9);
+        c.fillStyle = HW.orange; c.font = font(F.sign(700), Hc * 0.24); c.fillText('HANDLED', Wc / 2, Hc * 0.2, Wc * 0.9);
         c.fillStyle = HW.navy; c.font = font(F.sign(700), Hc * 0.2); c.fillText('HARDWARE', Wc / 2, Hc * 0.43, Wc * 0.8);
         c.fillStyle = HW.cream; c.font = font(F.sign(700), Hc * 0.07); c.fillText('TOOLS · PAINT · KEYS · LUMBER · GARDEN', Wc / 2, Hc * 0.665, Wc * 0.92);
         // under the band a row of tools painted big (its lower half stands behind the A-frames: no words there)
@@ -460,7 +664,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
         c.strokeStyle = HW.cream; c.lineWidth = 5; c.strokeRect(22, 22, Wc - 44, Hc - 44);
         c.save(); c.translate(Wc * 0.2, Hc * 0.34); c.rotate(0.5); c.scale(0.85, 0.85); // the can, tipped toward the word
         c.fillStyle = '#c8102e'; c.fillRect(-90, -110, 180, 220); c.fillStyle = '#9a9aa2'; c.fillRect(-96, -122, 192, 22); c.fillRect(-96, 104, 192, 14);
-        c.fillStyle = HW.cream; c.fillRect(-70, -40, 140, 80); c.fillStyle = HW.navy; c.font = font(F.sign(700), 34); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('HANDLE', 0, -12); c.fillText('IT', 0, 22);
+        c.fillStyle = HW.cream; c.fillRect(-70, -40, 140, 80); c.fillStyle = HW.navy; c.font = font(F.sign(700), 34); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('HANDLED', 0, 6, 130);
         c.restore();
         // its paint pouring out and running in drips along the top of the word
         c.fillStyle = HW.orange; c.beginPath(); c.moveTo(Wc * 0.31, Hc * 0.22); c.quadraticCurveTo(Wc * 0.375, Hc * 0.24, Wc * 0.375, Hc * 0.5); c.lineTo(Wc * 0.345, Hc * 0.5); c.quadraticCurveTo(Wc * 0.345, Hc * 0.3, Wc * 0.3, Hc * 0.27); c.closePath(); c.fill();
@@ -525,7 +729,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       }
     }
     // Mr. Handle It on his plinth, past the banner, turned a little toward the coming street
-    { const man = new THREE.Group(); man.position.set(X(Sh.statue.at), 0, Sh.statue.out); man.rotation.y = -0.35; onWalk.add(man); mrHandleIt(man); }
+    { const man = new THREE.Group(); man.position.set(X(Sh.statue.at), 0, Sh.statue.out); man.rotation.y = -0.35; onWalk.add(man); wink = mrHandleIt(man); }
     // its customers (the cast's silhouettes): one looking up at him, one walking up the sidewalk with a gallon of paint
     // (both clear of the posters while they're read: right of them, out by the curb)
     { const fan = walker(); fan.position.set(X(Sh.statue.at + 2.2), 0, 3.0); fan.rotation.y = Math.atan2(-2.2, Sh.statue.out - 3.0); onWalk.add(fan);
@@ -549,34 +753,175 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(bn);
   }
   // ---- the chicken spot past it: its own thing (the user: a surprise for its one line) — cream walls, a red mansard
-  // roof with white stripes, FRIED CHICKEN on it, a striped awning over its windows, a bucket on a pole ----
+  // roof with white stripes, FRIED CHICKEN on it, a striped awning over its windows, a bucket on a pole. Open and busy
+  // (the user, 2026-10-16: "the place looks closed ... it just doesn't match the vibe"): its windows lit onto the
+  // counter, the staff, the menu board and the booths, a neon OPEN in one, OPEN LATE lit over its door, propped open,
+  // the light spilling out onto its apron; a picnic table out front with two eating at it, one on the bench under the
+  // other window, one coming out with a bucket; steam off the fryers' vent; a trash can, a newspaper box, grime. It
+  // stands level on the falling road (the drive's chickenFloor): its floor a step up from its apron at the door, the
+  // apron flush with the sidewalk down the grade, its foundation showing at its low end ----
+  let bucketSign!: THREE.Group;
+  const steam: THREE.Sprite[] = [], steamAt = new THREE.Vector3();
   {
     const B = plan.chicken, Ck = SHACK.chicken, Sh = SHACK.shop, g = front(B.s, Sh.face), w = B.w, h = Ck.h;
-    const cream = toon({ color: '#fff6e0' }), redM = toon({ color: red }), white = toon({ color: '#ffffff' });
+    g.matrix.elements[13] = plan.chickenFloor;
+    const inv = g.matrix.clone().invert();
+    const cream = toon({ color: '#fff6e0' }), redM = toon({ color: red }), white = toon({ color: '#ffffff' }), ink = toon({ color: '#1d2026' });
     box(g, w, h, Ck.d, 0, h / 2, -Ck.d / 2, wallMaterial('#fff6e0', new THREE.Vector3(w, h, Ck.d), 0, false));
+    // its apron: from its front to the sidewalk's back, flush with it, sampled along the road round its bend (in its
+    // frame); apronY, its top along its front
+    const edge: THREE.Vector3[] = [];
+    for (let s = B.s - w / 2 - 1.2; s <= B.s + w / 2 + 1.2 + 1e-6; s += 0.6) {
+      const f = route.frameAt(s);
+      edge.push(f.pos.clone().addScaledVector(f.right, -(ROAD_HALF + WALK.width)).addScaledVector(UP, WALK.kerb + 0.004).applyMatrix4(inv));
+    }
+    const apronY = (x: number) => {
+      const i = Math.min(edge.length - 1, Math.max(1, edge.findIndex((p) => p.x >= x))), a = edge[i - 1]!, b = edge[i]!;
+      return a.y + (b.y - a.y) * Math.min(1, Math.max(0, (x - a.x) / (b.x - a.x)));
+    };
+    const deep = Math.min(...edge.map((p) => p.y)) - WALK.kerb - 0.4, qs: THREE.Vector3[][] = [];
+    const inner = (p: THREE.Vector3) => V3(p.x, p.y, -0.05), down = (p: THREE.Vector3) => V3(p.x, deep, p.z);
+    for (let i = 0; i + 1 < edge.length; i++) { const a = edge[i]!, b = edge[i + 1]!; qs.push([inner(a), a, b, inner(b)], [a, down(a), down(b), b]); }
+    const e0 = edge[0]!, e1 = edge[edge.length - 1]!;
+    qs.push([inner(e0), down(inner(e0)), down(e0), e0], [e1, down(e1), down(inner(e1)), inner(e1)]);
+    part(g, quads(qs), '#c9b8a0');
+    tbox(g, w + 0.04, 0.02 - deep, Ck.d + 0.04, 0, (0.02 + deep) / 2, -Ck.d / 2, '#8f877b'); // its foundation
     // the mansard: a red band round the top, white stripes across it, a cap
     box(g, w + 0.6, 1.5, Ck.d + 0.6, 0, h - 0.4, -Ck.d / 2, redM);
     for (let x = -w / 2 + 0.9; x < w / 2; x += 1.8) box(g, 0.5, 1.52, 0.02, x, h - 0.4, 0.31, white);
     box(g, w + 0.8, 0.12, Ck.d + 0.8, 0, h + 0.4, -Ck.d / 2, cream);
     plane(g, 7, 0.9, 0, h - 0.4, 0.33, name('FRIED CHICKEN', 7, 0.9, '#fff6e0', red));
-    // its windows under a striped awning, the door, a step
-    const glass = pic(glassTex());
-    for (const wx of [-w / 2 + 3.5, w / 2 - 3.5]) { plane(g, 4.6, 2.2, wx, 2.0, 0.015, glass); box(g, 4.8, 0.1, 0.1, wx, 3.15, 0.04, cream); box(g, 4.8, 0.1, 0.1, wx, 0.85, 0.04, cream); }
-    for (let x = -w / 2 + 0.6; x < w / 2 - 0.3; x += 1.2) box(g, 1.2, 0.12, 1.3, x + 0.6, 3.35, 0.65, Math.round(x / 1.2) % 2 ? redM : white); // the awning, striped
-    box(g, 1.4, 2.6, 0.06, 0, 1.3, 0.03, toon({ color: '#1d2026' })); plane(g, 0.9, 1.4, 0, 1.6, 0.065, glass);
+    // its windows, lit onto the shop (the counter, the menu board and the staff in one, the booths in the other): their
+    // glass's sheen as it was, the light behind it; their sills and heads, a frame and a mullion; a neon OPEN in the first
+    const wins = [-w / 2 + 3.5, w / 2 - 3.5], WW = 4.6, WH = 2.2, WY = 2.0;
+    wins.forEach((wx, i) => {
+      plane(g, WW, WH, wx, WY, 0.015, pic(canvasTex(1024, Math.round((1024 * WH) / WW), (c) => fryWindow(c, c.canvas.width, c.canvas.height, i))));
+      box(g, 4.8, 0.1, 0.1, wx, 3.15, 0.04, cream); box(g, 4.8, 0.1, 0.1, wx, 0.85, 0.04, cream);
+      for (const x of [wx - WW / 2 + 0.03, wx, wx + WW / 2 - 0.03]) tbox(g, 0.06, WH, 0.05, x, WY, 0.04, '#2a2a30');
+    });
+    plane(g, 1.05, 0.45, wins[0]! + 1.25, 1.42, 0.04, pic(neonOpen(), { transparent: true, depthWrite: false }));
+    // the door, propped open on a wedge (glass in an aluminium frame, a push bar, a kick plate), the shop through it; a
+    // step up to it; OPEN LATE lit over it
+    tbox(g, 1.4, 2.22, 0.06, 0, 1.11, 0.03, '#1d2026');
+    plane(g, 1.16, 2.1, 0, 1.05, 0.062, pic(canvasTex(256, 464, (c) => fryDoorway(c, 256, 464))));
+    {
+      const leaf = new THREE.Group(); leaf.position.set(0.58, 0.02, 0.07); leaf.rotation.y = 1.68; g.add(leaf); // (its free edge out from the wall)
+      for (const [x, y, lw, lh] of [[-0.55, 0.06, 1.1, 0.12], [-0.55, 2.0, 1.1, 0.1], [-0.04, 1.03, 0.08, 2.06], [-1.06, 1.03, 0.08, 2.06]] as const) tbox(leaf, lw, lh, 0.05, x, y, 0, '#8a8c92');
+      tbox(leaf, 0.98, 0.26, 0.055, -0.55, 0.25, 0, '#b9bcc2');
+      tbox(leaf, 0.8, 0.04, 0.09, -0.55, 1.05, 0, '#d9dbe0');
+      const glassM = pic(glassTex());
+      for (const z of [0.027, -0.027]) { const p = plane(leaf, 0.94, 1.56, -0.55, 1.16, z, glassM); if (z < 0) p.rotation.y = Math.PI; }
+      fuse(leaf);
+      tbox(g, 0.1, 0.05, 0.16, 0.72, 0.025, 1.12, '#e0b030'); // the wedge
+    }
+    tbox(g, 1.9, 0.4, 0.5, 0, -0.2, 0.31, '#bfae96');
+    // (low over the door: from the street, the awning's valance hides the wall above 2.6 m)
+    tbox(g, 1.5, 0.36, 0.16, 0, 2.39, 0.08, red);
+    plane(g, 1.4, 0.3, 0, 2.39, 0.165, pic(signFace('OPEN LATE', 512, 110, '#fff6e0', '#e02a36', F.sign(700), 0.7, 0.1)));
+    tbox(g, 1.4, 0.36, 0.06, 0, 2.39, 0.03, '#1d2026'); // (the frame's head, up to it)
     for (const [a, b] of [[-w / 2, -0.75], [0.75, w / 2]] as const) box(g, b - a, 0.5, 0.06, (a + b) / 2, 0.25, 0.03, redM); // the red base, either side of the door (it ran through it: the user, 2026-10-14)
-    // the bucket sign on a pole by the road end, turning slowly
-    const bucket = new THREE.Group(); bucket.position.set(w / 2 - 1.2, h + 2.6, 0.4); g.add(bucket);
-    cyl(g, 0.12, h + 2.0, w / 2 - 1.2, (h + 2.0) / 2, 0.4, dark);
-    { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.8, 1.6, 16), redM); bucket.add(b); for (let k = 0; k < 8; k++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.62, 0.05), white); const a = (k / 8) * Math.PI * 2; st.position.set(Math.sin(a) * 0.9, 0, Math.cos(a) * 0.9); st.rotation.y = a; bucket.add(st); } const lid = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.12, 16), white); lid.position.y = 0.85; bucket.add(lid); }
-    drifting.push(Object.assign(new THREE.Mesh(), { userData: { bucket } }) as THREE.Mesh);
+    // its awning, one striped sheet along its front over the windows and the door, its valance lettered (it was a row of
+    // slabs, a ledge)
+    {
+      const aw = w - 0.6, P = 1.3, y1 = 3.42, y2 = 3.06, len = Math.hypot(P, y1 - y2);
+      const stripes = canvasTex(1024, 64, (c) => { for (let k = 0; k < 24; k++) { c.fillStyle = k % 2 ? '#fff6e0' : red; c.fillRect((k * 1024) / 24, 0, 1024 / 24 + 1, 64); } });
+      const sheet = plane(g, aw, len, 0, (y1 + y2) / 2, P / 2, toon({ map: stripes, side: THREE.DoubleSide })); sheet.rotation.x = -Math.atan2(P, y1 - y2);
+      const val = canvasTex(2048, 80, (c) => {
+        c.fillStyle = red; c.fillRect(0, 0, 2048, 58);
+        for (let k = 0; k < 48; k++) { c.beginPath(); c.arc(k * 42.67 + 21.3, 58, 21.3, 0, Math.PI); c.fill(); }
+        c.fillStyle = '#fff6e0'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 38);
+        for (const [x, t] of [[0.2, 'FRESH  ·  HOT  ·  CRISPY'], [0.5, 'CHICKEN  ·  BISCUITS  ·  SIDES'], [0.8, 'FRESH  ·  HOT  ·  CRISPY']] as const) c.fillText(t, 2048 * x, 31, 560);
+      });
+      plane(g, aw, 0.4, 0, y2 - 0.2, P, paint(val, { transparent: true, side: THREE.DoubleSide }));
+      for (const s of [-1, 0, 1]) if (s) limb(g, V3((s * aw) / 2, y1 - 0.8, 0), V3((s * aw) / 2, y2, P), 0.02, ink);
+    }
+    // the light out of the windows and the door, warm on the apron (lying on it, down its fall)
+    {
+      const spill = canvasTex(256, 128, (c) => { const gr = c.createRadialGradient(128, 0, 6, 128, 0, 150); gr.addColorStop(0, 'rgba(255,196,110,1)'); gr.addColorStop(1, 'rgba(255,196,110,0)'); c.fillStyle = gr; c.fillRect(0, 0, 256, 128); });
+      const spillM = new THREE.MeshBasicMaterial({ map: spill, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.4, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+      for (const [x, sw] of [[wins[0]!, 5.4], [0, 2.2], [wins[1]!, 5.4]] as const) {
+        const geo = new THREE.PlaneGeometry(sw, 1.9).rotateX(-Math.PI / 2).rotateZ(Math.atan((apronY(x + 1) - apronY(x - 1)) / 2));
+        const m = new THREE.Mesh(geo, spillM); m.position.set(x, apronY(x) + 0.012, 0.95); g.add(m);
+      }
+    }
+    // grime: dirt up from the ground, drips from under the mansard, smudges; on the front, the red base, the end wall
+    {
+      const gm = (tex: THREE.Texture) => paint(tex, { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+      const top = h - 1.15;
+      plane(g, w, top, 0, top / 2, 0.008, gm(grimeTex(1024, 236, w, top, 1)));
+      for (const [a, b] of [[-w / 2, -0.75], [0.75, w / 2]] as const) plane(g, b - a, 0.5, (a + b) / 2, 0.25, 0.062, gm(grimeTex(512, 32, b - a, 0.5, 2)));
+      const end = plane(g, Ck.d, top, -w / 2 - 0.008, top / 2, -Ck.d / 2, gm(grimeTex(1024, 272, Ck.d, top, 3))); end.rotation.y = -Math.PI / 2;
+    }
+    // its near end: a steel side door, a meter on its conduit, a wall light, an exhaust grille; a downpipe at the far
+    // corner of its front
+    {
+      const ex = -w / 2 - 0.03;
+      tbox(g, 0.06, 2.3, 1.12, ex, 1.15, -8.4, '#3a3a40'); tbox(g, 0.07, 2.16, 0.96, ex - 0.005, 1.08, -8.4, '#8a2a26'); tbox(g, 0.1, 0.04, 0.14, ex - 0.04, 1.05, -8.05, '#c9c4b8');
+      tbox(g, 0.2, 0.5, 0.34, ex - 0.07, 1.45, -3.2, '#9a9a96'); tcyl(g, 0.025, h - 2.9, ex - 0.04, 1.7 + (h - 2.9) / 2, -3.2, '#9a9a96', 6);
+      tbox(g, 0.14, 0.18, 0.28, ex - 0.04, 2.7, -8.4, '#2a2a30');
+      tbox(g, 0.05, 0.6, 1.0, ex - 0.01, 2.75, -11.2, '#6a6a6a');
+      for (let k = 0; k < 5; k++) tbox(g, 0.06, 0.04, 0.92, ex - 0.03, 2.53 + k * 0.11, -11.2, '#3a3a3a');
+      tcyl(g, 0.07, h - 0.6, w / 2 - 0.15, (h - 0.6) / 2, 0.1, '#d9d0c0');
+    }
+    // the fryers' vent up through the roof at the near end, its rain cap (its steam rises past the sign's left, up and
+    // away from the words)
+    {
+      const vx = -w / 2 + 1.1, vz = -5;
+      tcyl(g, 0.22, 2.0, vx, h + 0.9, vz, '#a39b8e'); tcyl(g, 0.36, 0.08, vx, h + 2.0, vz, '#7d766b');
+      for (const s of [-1, 1]) tbox(g, 0.03, 0.14, 0.03, vx + s * 0.18, h + 1.92, vz, '#7d766b');
+      steamAt.set(vx, h + 2.1, vz);
+      // (its puffs soft, pale against the sky, the sun through them: shaded as solid balls they read as smoke, then beads)
+      const puff = canvasTex(128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, 'rgba(255,248,240,1)'); gr.addColorStop(0.55, 'rgba(255,246,236,0.6)'); gr.addColorStop(1, 'rgba(255,244,232,0)'); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
+      for (let k = 0; k < 12; k++) { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, transparent: true, depthWrite: false })); m.name = 'steam'; g.add(m); steam.push(m); }
+    }
+    // out front: the picnic table before the first window, two eating at it (a bucket, cups, the napkins between them)
+    {
+      const tx = wins[0]! - 0.3, tz = 1.0, y = apronY(tx), leg = '#6a6a70';
+      tbox(g, 0.8, 0.05, 1.5, tx, y + 0.74, tz, red);
+      for (const sx of [-1, 1]) {
+        tbox(g, 0.3, 0.04, 1.5, tx + sx * 0.62, y + 0.44, tz, red);
+        for (const sz of [-1, 1]) { tbox(g, 0.05, 0.74, 0.05, tx + sx * 0.3, y + 0.37, tz + sz * 0.6, leg); tbox(g, 0.05, 0.44, 0.05, tx + sx * 0.62, y + 0.22, tz + sz * 0.6, leg); }
+      }
+      const top = y + 0.765;
+      tcyl(g, 0.11, 0.18, tx, top + 0.09, tz - 0.4, red); tcyl(g, 0.112, 0.05, tx, top + 0.11, tz - 0.4, '#ffffff');
+      for (let k = 0; k < 3; k++) tball(g, 0.05, tx - 0.04 + k * 0.04, top + 0.19, tz - 0.4 + (k % 2) * 0.03, k % 2 ? '#c8742a' : '#e09a3a');
+      for (const [x, z] of [[-0.2, 0.25], [0.2, 0.45]] as const) { tcyl(g, 0.04, 0.13, tx + x, top + 0.065, tz + z, '#ffffff'); tcyl(g, 0.041, 0.03, tx + x, top + 0.09, tz + z, red); }
+      tbox(g, 0.12, 0.14, 0.09, tx, top + 0.07, tz + 0.05, '#c9c9cc'); tbox(g, 0.1, 0.03, 0.07, tx, top + 0.15, tz + 0.05, '#ffffff'); // the napkin dispenser
+      for (const sx of [-1, 1]) { tbox(g, 0.24, 0.04, 0.17, tx + sx * 0.2, top + 0.02, tz + 0.1, red); tbox(g, 0.2, 0.012, 0.13, tx + sx * 0.2, top + 0.045, tz + 0.1, '#f4ead2'); }
+      const a = diner(0, 0.46), b = diner(1, 0.46, 'eat');
+      a.position.set(tx - 0.66, y, tz - 0.1); a.rotation.y = Math.PI / 2; b.position.set(tx + 0.66, y, tz + 0.15); b.rotation.y = -Math.PI / 2; g.add(a, b);
+    }
+    // the bench under the other window, one eating on it; one coming out of the door with a bucket
+    {
+      const bx = wins[1]! + 0.6, y = apronY(bx), seat = '#c8202e';
+      tbox(g, 1.7, 0.05, 0.4, bx, y + 0.45, 0.38, seat); tbox(g, 1.7, 0.3, 0.04, bx, y + 0.72, 0.17, seat);
+      for (const s of [-1, 1]) tbox(g, 0.05, 0.45, 0.36, bx + s * 0.75, y + 0.225, 0.38, '#3a3a40');
+      tbox(g, 0.12, 0.14, 0.09, bx + 0.65, y + 0.545, 0.38, '#c9c9cc'); tbox(g, 0.1, 0.03, 0.07, bx + 0.65, y + 0.625, 0.38, '#ffffff'); // napkins at its end
+      const c = diner(2, 0.46, 'eat'); c.position.set(bx - 0.25, y, 0.3); g.add(c);
+      const d = diner(3, 0, 'bucket'); d.position.set(-1.25, apronY(-1.25), 0.85); d.rotation.y = -0.6; g.add(d);
+    }
+    // a trash can by the door, a newspaper box at the near end
+    {
+      const y = apronY(2.1);
+      tcyl(g, 0.27, 0.85, 2.1, y + 0.425, 1.55, '#3d4a44'); part(g, new THREE.SphereGeometry(0.29, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.55, 1), '#2f3a35', 2.1, y + 0.85, 1.55);
+      tbox(g, 0.3, 0.12, 0.02, 2.1, y + 0.82, 1.83, '#141618');
+      const nx = -w / 2 - 0.6, ny = apronY(nx);
+      for (const s of [-1, 1]) tbox(g, 0.05, 0.4, 0.05, nx + s * 0.2, ny + 0.2, 1.5, '#2a2a30');
+      tbox(g, 0.52, 0.78, 0.44, nx, ny + 0.79, 1.5, '#2b5d9a'); tbox(g, 0.54, 0.12, 0.46, nx, ny + 1.2, 1.5, '#f2c230');
+      tbox(g, 0.42, 0.3, 0.02, nx, ny + 0.92, 1.725, '#e8e0c8'); tbox(g, 0.3, 0.04, 0.03, nx, ny + 0.72, 1.73, '#1d2026');
+    }
+    // the bucket sign on a pole by the road end, turning slowly (its pole down to the apron)
+    const px = w / 2 - 1.2, py = apronY(px);
+    bucketSign = new THREE.Group(); bucketSign.position.set(px, h + 2.6, 0.4); g.add(bucketSign);
+    cyl(g, 0.12, h + 2.0 - py, px, (h + 2.0 + py) / 2, 0.4, dark);
+    { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.8, 1.6, 16), redM); bucketSign.add(b); for (let k = 0; k < 8; k++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.62, 0.05), white); const a = (k / 8) * Math.PI * 2; st.position.set(Math.sin(a) * 0.9, 0, Math.cos(a) * 0.9); st.rotation.y = a; bucketSign.add(st); } const lid = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.12, 16), white); lid.position.y = 0.85; bucketSign.add(lid); }
+    fuse(g);
     root.add(g);
   }
   {
-    const B = plan.chicken, Ck = SHACK.chicken;
-    void B;
+    const Ck = SHACK.chicken;
     // the roof sign: its red frame, bulbs round it (chasing), legs down to the roof, the chicken standing on it
-    const R = plan.sign, rg = onPanel(R), legs = R.center.y - R.h / 2 - (route.frameAt(B.s).pos.y + Ck.h);
+    const R = plan.sign, rg = onPanel(R), legs = R.center.y - R.h / 2 - (plan.chickenFloor + Ck.h);
     box(rg, R.w + 0.5, R.h + 0.5, 0.35, 0, 0, -0.2, toon({ color: red }));
     const e = (R.w + 0.25) / 2, f = (R.h + 0.25) / 2;
     bulbs(rg, new THREE.Vector3(-e, f, 0.02), new THREE.Vector3(e, f, 0.02), 24, chase);
@@ -657,7 +1002,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     root.add(wall);
   }
 
-  const beat = drive.beats.length > 1 ? drive.beats[1]! - drive.beats[0]! : 0.47;
+  const beat = drive.beats.length > 1 ? drive.beats[1]! - drive.beats[0]! : 0.47, wink0 = { cheek: wink.cheek.position.y, brow: wink.brow.position.y };
   return {
     group: root,
     update(t) {
@@ -677,10 +1022,19 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       } else { roofChicken.position.y = plan.sign.h / 2 + 0.25; roofChicken.rotation.z = 0; }
       // the shopper walking up the hardware store's sidewalk toward the corner, legs scissoring with their stride
       { const walked = Math.max(0, t - SHOPPER.t0) * SHOPPER.v; shopper.position.set(shopperAt(walked), 0, SHOPPER.z); const swing = 0.5 * Math.sin(walked * 4.8); stride(shopper, swing); }
+      // Mr. Handle It winks as he's named: his lid down, his cheek up under it, his brow down a touch
+      { const k = winkAt(t - plan.wink); wink.lid.rotation.x = LID.open + k * (LID.shut - LID.open); wink.cheek.position.y = wink0.cheek + 0.04 * k; wink.brow.position.y = wink0.brow - 0.045 * k; wink.brow.rotation.z = 0.12 - 0.1 * k; }
+      // the bucket sign turns; the steam rises off the fryers' vent, drifting off left and back, swelling and thinning
+      bucketSign.rotation.y = t * 0.6;
+      steam.forEach((m, k) => {
+        const u = (((t * 0.26 + k / steam.length) % 1) + 1) % 1;
+        m.position.set(steamAt.x - 1.5 * u + 0.15 * Math.sin(t * 1.3 + k * 2.4), steamAt.y + 3.0 * u, steamAt.z - 0.7 * u);
+        m.scale.setScalar(0.7 + 2.0 * u);
+        m.material.opacity = 0.5 * Math.min(1, u * 5) * (1 - u);
+      });
       // soap bubbles drifting up from the bays
-      drifting.forEach((b, k) => {
-        if (b.userData.bucket) { (b.userData.bucket as THREE.Group).rotation.y = t * 0.6; return; } // the bucket sign turns
-        const u = (t * 0.22 + k * 0.37) % 1;
+      drifting.forEach((b, i) => {
+        const k = i + 1, u = (t * 0.22 + k * 0.37) % 1; // (k from 1: the bucket sign was the first in this list)
         b.position.y = 0.5 + u * 2.6;
         b.position.x = 5.9 + 0.4 * Math.sin(t * 0.8 + k * 2.1);
         b.scale.setScalar(1 - 0.35 * u);
