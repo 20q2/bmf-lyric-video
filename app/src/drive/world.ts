@@ -883,18 +883,43 @@ function buildStreetlights(drive: Drive): THREE.Group {
     at.push(s);
   }
   const L = STREETLIGHTS, n = at.length;
+  // (each pool draped over the road's own frame, a grid sampled along it every metre and lifted 4 cm: a flat disc in
+  // the road's plane at the lamp, over the climb's crests and bends the road and its verges rose through it in jagged
+  // teeth — the user, 2026-10-16: "jagged shadows ... it looks like a glitch". From the climb on the lamps also light
+  // the world for real, the car and the two of them too: scenes/drive.ts, their bulbs `userData.lamps`)
+  const climb = drive.stretches.find((st) => st.id === 'chorus4'), lit = climb ? motion.distanceAt(climb.start) : Infinity;
   const poles = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: WORLD.post }), n * 2);
   const bulbs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), lampMaterial('#ffcf8a'), n);
-  const pools = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 24), glowMaterial('#ffb560', GLOW.pool, true), n);
   at.forEach((s, i) => {
     poles.setMatrixAt(2 * i, boxAt(route, s, L.lateral, 0.22, L.h, 0.22));
     poles.setMatrixAt(2 * i + 1, boxAt(route, s, (L.lateral + L.reach) / 2, L.lateral - L.reach, 0.16, 0.16, L.h - 0.1));
     bulbs.setMatrixAt(i, boxAt(route, s, L.reach + 0.3, 0.9, 0.18, 0.45, L.h - 0.3));
-    const f = route.frameAt(s), m = new THREE.Matrix4().makeBasis(f.right, f.fwd, f.up).scale(new THREE.Vector3(6.5, 6.5, 1));
-    pools.setMatrixAt(i, m.setPosition(f.pos.clone().addScaledVector(f.right, L.reach - 0.5).addScaledVector(f.up, 0.04)));
   });
-  pools.frustumCulled = false;
-  g.add(poles, bulbs, pools);
+  g.add(poles, bulbs);
+  if (n) {
+    const R = 6.5, k = 13, pos: number[] = [], uv: number[] = [], idx: number[] = [];
+    for (const s of at) {
+      const o = pos.length / 3;
+      for (let j = 0; j <= k; j++) {
+        const f = route.frameAt(s + R * (2 * j / k - 1));
+        for (let i = 0; i <= k; i++) {
+          const p = f.pos.clone().addScaledVector(f.right, L.reach - 0.5 + R * (2 * i / k - 1)).addScaledVector(f.up, 0.04);
+          pos.push(p.x, p.y, p.z); uv.push(i / k, j / k);
+        }
+      }
+      for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) { const a0 = o + j * (k + 1) + i; idx.push(a0, a0 + 1, a0 + k + 1, a0 + 1, a0 + k + 2, a0 + k + 1); }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const m = glowMaterial('#ffb560', GLOW.pool, true);
+    Object.assign(m, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+    const pools = new THREE.Mesh(geo, m);
+    pools.frustumCulled = false;
+    g.add(pools);
+  }
+  // where the lit lamps' light comes from: just under each bulb
+  g.userData.lamps = at.filter((s) => s >= lit).map((s) => { const f = route.frameAt(s); return f.pos.clone().addScaledVector(f.right, L.reach + 0.3).add(new THREE.Vector3(0, L.h - 0.6, 0)); });
   return g;
 }
 

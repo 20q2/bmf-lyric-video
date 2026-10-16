@@ -52,6 +52,12 @@ const TUNNEL_LIGHT = { intensity: 30, reach: 13, lamps: 7, look: 16, search: 110
 /** In a tunnel, the car's headlights' light (candela; from this far ahead of its centre and up, m; the cone's half
  *  angle, rad, and its soft edge). */
 const HEADLIGHT = { intensity: 45, ahead: 2.8, up: 0.75, reach: 45, angle: 0.5, penumbra: 0.7 };
+/** From the climb on, by night: the street lamps light the world for real (their pools on the road and the ground
+ *  whatever its shape, and the car and the two of them as they pass under — the user, 2026-10-16: the car "entirely
+ *  unaffected by the lights"): the tunnel's lights, out of it, on the lamps (world.ts streetlights) nearest a point
+ *  `look` m along the camera's view, each fading out as it drops to the edge of the set; their colour, candela, reach
+ *  (m). And the headlights throw real light up the road ahead (candela; the drawn throw stays, world.ts). */
+const LAMP_LIGHT = { color: new THREE.Color('#ffb766'), intensity: 70, reach: 16, look: 30, gap: 18, headlight: 70 };
 const TUNNEL_DARK = new THREE.Color('#120a05');
 const _rise = new THREE.Matrix4();
 /** A banner's plane is in the sky from this long before its line is revealed until this long after the line (s). */
@@ -147,6 +153,8 @@ export default class DriveScene extends Scene {
    *  views. */
   private climb: THREE.Object3D | null = null;
   private climbFrom = Infinity;
+  /** The street lamps lit for real from the climb on (their bulbs). */
+  private lamps: THREE.Vector3[] = [];
   /** Where the moon hangs at the end (unit). */
   private endMoon = new THREE.Vector3();
   /** The world's still parts, hidden while off screen. */
@@ -163,6 +171,7 @@ export default class DriveScene extends Scene {
     this.sign = world.userData.sign;
     this.climb = world.getObjectByName('climb') ?? null;
     this.climbFrom = this.drive.stretches.find((st) => st.id === 'chorus4')?.start ?? Infinity;
+    this.lamps = (world.getObjectByName('streetlights')?.userData.lamps as THREE.Vector3[] | undefined) ?? [];
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
     this.heft = heftOf(this.drive.stretches, this.drive.reading);
     this.cast = castOf(audio, lyrics);
@@ -424,6 +433,7 @@ export default class DriveScene extends Scene {
         if (!lamp) { l.intensity = 0; return; }
         const fr = d.route.frameAt(lamp.s);
         l.position.copy(fr.pos).addScaledVector(fr.up, TUNNEL.h - 0.6);
+        l.color.set('#ffa24a'); l.distance = TUNNEL_LIGHT.reach;
         l.intensity = TUNNEL_LIGHT.intensity * inside * Math.min(1, (edge - lamp.d) / gap);
       });
       // the car's headlights throw real light down the bore: it sweeps the tiles and the paint on them as it passes
@@ -431,6 +441,24 @@ export default class DriveScene extends Scene {
       this.headlight.position.copy(cf.pos).addScaledVector(cf.fwd, HEADLIGHT.ahead).addScaledVector(cf.up, HEADLIGHT.up);
       this.headlight.target.position.copy(cf.pos).addScaledVector(cf.fwd, HEADLIGHT.ahead + 20).addScaledVector(cf.up, HEADLIGHT.up - 0.6);
       this.headlight.intensity = HEADLIGHT.intensity * inside;
+    } else if (t >= this.climbFrom && NIGHT.value > 0) {
+      // the street lamps nearest where the camera looks (as the tunnel's lamps), their light the bulbs'
+      const view = new THREE.Vector3(); this.cam.getWorldDirection(view);
+      const focus = this.cam.position.clone().addScaledVector(view, LAMP_LIGHT.look);
+      const byNear = this.lamps.map((p) => ({ p, d: p.distanceTo(focus) })).sort((a, b) => a.d - b.d);
+      const edge = byNear[this.sodium.length]?.d ?? Infinity;
+      this.sodium.forEach((l, k) => {
+        const lamp = byNear[k];
+        if (!lamp) { l.intensity = 0; return; }
+        l.position.copy(lamp.p);
+        l.color.copy(LAMP_LIGHT.color);
+        l.distance = LAMP_LIGHT.reach;
+        l.intensity = LAMP_LIGHT.intensity * NIGHT.value * Math.min(1, (edge - lamp.d) / LAMP_LIGHT.gap);
+      });
+      // the headlights up the road ahead, with the speed (parked at the overlook they'd searchlight the wall)
+      this.headlight.position.copy(cf.pos).addScaledVector(cf.fwd, HEADLIGHT.ahead).addScaledVector(cf.up, HEADLIGHT.up);
+      this.headlight.target.position.copy(cf.pos).addScaledVector(cf.fwd, HEADLIGHT.ahead + 20).addScaledVector(cf.up, HEADLIGHT.up - 1.2);
+      this.headlight.intensity = LAMP_LIGHT.headlight * NIGHT.value * Math.min(1, d.motion.speedAt(t) / 4);
     } else { this.sodium.forEach((l) => (l.intensity = 0)); this.headlight.intensity = 0; }
     this.sun.intensity *= 1 - inside;
     // the printed shadows (look/toon.ts): the sun's, then fainter, the moon's

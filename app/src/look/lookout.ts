@@ -296,7 +296,7 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
       put(new THREE.BoxGeometry(0.75, 0.16, 0.34), pole, P(x + toward * arm, h - 0.08, z)); // the head
       put(new THREE.BoxGeometry(0.6, 0.04, 0.26), head, P(x + toward * arm, h - 0.17, z)); // its lens
       pool(x + toward * arm, z, 6.5);
-      light(x + toward * arm, h - 0.6, z, 26, 18);
+      light(x + toward * arm, h - 0.6, z, 26, 28); // (reaching the parked car: a warm side on it from the lamp beside it)
     }
     for (const [x, z] of [[-15.5, -5], [-20.5, 2.5]] as const) {
       put(new THREE.CylinderGeometry(0.05, 0.08, 3.1, 8), pole, P(x, 1.55, z));
@@ -364,9 +364,12 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
  *  rolling, grown over with chaparral and its bushes — narrowed to a shoulder, the climb's verges would otherwise show
  *  the road standing on a bank over the coast's sea (and 40 m wide, they read as a band floating in the fog). Each 2 m
  *  of road holds up the ground square off it (fanning out a little round bends), none past the road's end: the canyon
- *  ahead of the overlook stays the lookout's own. Never over a road: within its width it stays under it. (The scene
- *  shows it from the climb's first cut: from the coast it would stand in other sections' views.) */
-export const CLIMB = { shoulder: 7.5, slope: 0.6, cell: 4, margin: 110, roll: 2.2, fan: 0.12 };
+ *  ahead of the overlook stays the lookout's own. Never over a road or its verges: under them it stays below (`under` m
+ *  under a verge, held a little under the road itself). On the plain it lies at `floor`, under the world's ground
+ *  (world.ts base, at -0.4: lying at its level, the two fought across the plain round the climb's foot — the flicker by
+ *  the taco shop behind chorus 4's board, the user, 2026-10-16), rising out of it where the hills begin. (The scene
+ *  shows it from the climb's first cut: from the coast it would stand in other sections' views.) */ 
+export const CLIMB = { shoulder: 7.5, slope: 0.6, cell: 4, margin: 110, roll: 2.2, fan: 0.12, under: 2.5, floor: -0.55 };
 export function buildClimbHills(frameAt: (s: number) => { pos: THREE.Vector3; fwd: THREE.Vector3 }, s0: number, s1: number, verge: (s: number) => number): THREE.Group {
   const C = CLIMB, pts: THREE.Vector3[] = [], fwds: THREE.Vector3[] = [], reach: number[] = [];
   for (let s = s0; s <= s1; s += 2) { const f = frameAt(s); pts.push(f.pos.clone()); fwds.push(V(f.fwd.x, 0, f.fwd.z).normalize()); reach.push(Math.max(C.shoulder, verge(s))); }
@@ -374,10 +377,18 @@ export function buildClimbHills(frameAt: (s: number) => { pos: THREE.Vector3; fw
   const nx = Math.ceil((hi.x - lo.x) / C.cell), nz = Math.ceil((hi.z - lo.z) / C.cell);
   /** The ground at (x, z), and how far it is from the edge of the nearest verge (m). */
   const ground = (x: number, z: number) => {
-    let h = -0.4, cap = Infinity, edge = Infinity;
+    let h = C.floor, cap = Infinity, edge = Infinity;
     pts.forEach((p, k) => {
       const dx = x - p.x, dz = z - p.z, f = fwds[k]!, along = dx * f.x + dz * f.z, across = Math.abs(dx * f.z - dz * f.x);
       if (Math.hypot(dx, dz) < C.shoulder) cap = Math.min(cap, p.y - 0.15);
+      // (and well under its verges, all of their width, coming back up over a cell past their edge: capped only within
+      // the shoulder, another leg's slope rose through the hairpin's 40 m verge, its coarse facets and their scrub
+      // standing out of it in jagged dark shapes — the user, 2026-10-16: "it looks like a glitch"; held just under the
+      // verge, the grid's 4 m facets still broke through it. Off the road, from the verge's edge down the skirt hides it)
+      if (Math.abs(along) <= 1.05 + C.fan * across + C.cell && across < reach[k]! + C.cell) {
+        const under = Math.min(1, Math.max(0, (reach[k]! + C.cell - across) / C.cell)) * Math.min(1, Math.max(0, (across - ROAD_HALF - 1) / 2));
+        cap = Math.min(cap, p.y - 0.15 - C.under * under);
+      }
       if (Math.abs(along) > 1.05 + C.fan * across || (k === pts.length - 1 && along > 0) || (k === 0 && along < 0)) return;
       edge = Math.min(edge, across - reach[k]!);
       h = Math.max(h, p.y - 0.15 - Math.max(0, across - reach[k]!) * C.slope);
@@ -385,7 +396,7 @@ export function buildClimbHills(frameAt: (s: number) => { pos: THREE.Vector3; fw
     // (rolling, away from the road and up off the plain)
     const roll = C.roll * (Math.sin(x * 0.045 + z * 0.02) * Math.sin(z * 0.05 - x * 0.013) + 0.5 * Math.sin(x * 0.11 + 2.0) * Math.sin(z * 0.09 + 1.0));
     const k = Math.min(1, Math.max(0, edge / 20)) * Math.min(1, Math.max(0, (h + 0.4) / 6));
-    return { y: Math.min(cap, Math.max(-0.4, h + roll * k)), edge };
+    return { y: Math.min(cap, Math.max(C.floor, h + roll * k)), edge };
   };
   const geo = new THREE.PlaneGeometry(1, 1, nx, nz).rotateX(-Math.PI / 2), p = geo.attributes.position!;
   for (let i = 0; i < p.count; i++) {
