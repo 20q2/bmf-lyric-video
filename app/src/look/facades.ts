@@ -15,7 +15,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash } from '../engine/util';
 import { WORLD, toon } from './toon';
 import { F, font } from '../engine/type';
-import { nightGlass } from './night';
+import { BEHIND, nightGlass } from './night';
 import type { Block } from '../drive/blocks';
 
 /** How deep the front's detail is (m: the body stands this far behind the box's front); the storefront (its glass's
@@ -45,12 +45,14 @@ class Parts {
     const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z);
     this[to].push(this.coloured(g, to === 'walls' ? this.wall : this.trimC));
   }
-  /** A pane facing +x (out of the front) or along ±z (an end), lit at night if `lit`. */
-  pane(w: number, h: number, x: number, y: number, z: number, facing: 'x' | 'z+' | 'z-', lit: boolean) {
+  /** A pane facing +x (out of the front) or along ±z (an end), lit at night if `lit`; behind it (look/night.ts
+   *  nightGlass) a shop, a room upstairs, or the dark (a carport's mouth). */
+  pane(w: number, h: number, x: number, y: number, z: number, facing: 'x' | 'z+' | 'z-', lit: boolean, behind: keyof typeof BEHIND = 'shop') {
     const g = new THREE.PlaneGeometry(w, h);
     if (facing === 'x') g.rotateY(Math.PI / 2); else if (facing === 'z-') g.rotateY(Math.PI);
     g.translate(x, y, z);
     g.setAttribute('lit', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(lit ? 1 : 0), 1));
+    g.setAttribute('behind', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(BEHIND[behind]), 1));
     this.glass.push(g);
   }
   /** A shop's sign on its band, facing +x (or along ±z: a corner's end), its texture the atlas's cell `k` (turned back
@@ -124,7 +126,7 @@ export function facadeOf(b: Block): FacadeGeometry {
       P.sign(Math.min((x1 - x0) * 0.62, 9), (b1 - b0) * 0.78, (x0 + x1) / 2, g0 + (b0 + b1) / 2, ze + c * 0.165, Math.floor(r(5) * SHOPS.length), facing);
     }
   } else {
-    P.pane(Math.min(W * 0.5, 7), 2.4, xf + 0.02, g0 + 1.2, (r(6) - 0.5) * W * 0.3, 'x', false); // the carport's dark mouth
+    P.pane(Math.min(W * 0.5, 7), 2.4, xf + 0.02, g0 + 1.2, (r(6) - 0.5) * W * 0.3, 'x', false, 'dark'); // the carport's dark mouth
   }
   // the floors above: framed windows with sills, on its front and its two ends
   const y0 = g0 + (apartments ? 3.3 : 4.3), top = H - A.cornice - 0.4;
@@ -135,7 +137,7 @@ export function facadeOf(b: Block): FacadeGeometry {
     const m = across(W), pitch = A.win.w + A.win.gap;
     for (let i = 0; i < m; i++) {
       const z = (i - (m - 1) / 2) * pitch, lit = r(100 + k * 37 + i) > 0.5;
-      P.pane(A.win.w, A.win.h, xf + 0.01, y, z, 'x', lit);
+      P.pane(A.win.w, A.win.h, xf + 0.01, y, z, 'x', lit, 'room');
       P.box('trim', 0.08, 0.08, A.win.w + 0.16, xf + 0.04, y + A.win.h / 2 + 0.04, z);
       P.box('trim', 0.08, A.win.h, 0.08, xf + 0.04, y, z - A.win.w / 2 - 0.04);
       P.box('trim', 0.08, A.win.h, 0.08, xf + 0.04, y, z + A.win.w / 2 + 0.04);
@@ -148,7 +150,7 @@ export function facadeOf(b: Block): FacadeGeometry {
       const x = body - 0.8 - A.win.w / 2 - i * pitch;
       if (x - A.win.w / 2 < -D / 2 + 0.4) break;
       for (const sz2 of [1, -1] as const) {
-        P.pane(A.win.w, A.win.h, x, y, sz2 * (ez + 0.005), sz2 > 0 ? 'z+' : 'z-', r(300 + k * 41 + i + (sz2 > 0 ? 0 : 7)) > 0.55);
+        P.pane(A.win.w, A.win.h, x, y, sz2 * (ez + 0.005), sz2 > 0 ? 'z+' : 'z-', r(300 + k * 41 + i + (sz2 > 0 ? 0 : 7)) > 0.55, 'room');
         P.box('trim', A.win.w + 0.16, 0.08, 0.08, x, y + A.win.h / 2 + 0.04, sz2 * (ez + 0.04));
         for (const j of [-1, 1]) P.box('trim', 0.08, A.win.h, 0.08, x + j * (A.win.w / 2 + 0.04), y, sz2 * (ez + 0.04));
         P.box('trim', A.win.w + 0.3, 0.1, 0.16, x, y - A.win.h / 2 - 0.05, sz2 * (ez + 0.08)); // its sill

@@ -100,32 +100,70 @@ void main() {
   });
 }
 
-/** Window glass on the street fronts (look/facades.ts): an interior seen through it — a back wall, shelves with wares
- *  on them (the user, 2026-10-13: "all the windows are blacked out ... little things going on inside") — dim by day
- *  under the glass's tint; by night lit where its `lit` attribute is 1, warm. */
+/** What a pane's `behind` attribute says is behind it (nightGlass). */
+export const BEHIND = { shop: 0, room: 1, dark: 2 } as const;
+
+/** Window glass on the street fronts (look/facades.ts): an interior seen through it (the user, 2026-10-13: "all the
+ *  windows are blacked out ... little things going on inside") — by its `behind` attribute (BEHIND), a shop's back wall
+ *  and shelves of stock in muted colours (bright reds, yellows and blues read as "library books": the user,
+ *  2026-10-15), or upstairs a room: blinds, curtains or a net, a lamp, a picture on the wall — dim by day under the
+ *  glass's tint; by night lit where its `lit` attribute is 1, warm. */
 export function nightGlass(): THREE.MeshToonMaterial {
   const m = toon({ color: '#28323c' });
   m.onBeforeCompile = (sh) => {
     printShadows(sh);
     sh.uniforms.night = NIGHT;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-attribute float lit; varying float vLit; varying vec2 vGlassUv; varying vec3 vGlassPos;`).replace('#include <begin_vertex>', `#include <begin_vertex>
-vLit = lit; vGlassUv = uv; vGlassPos = position;`);
+attribute float lit; attribute float behind; varying float vLit; varying float vBehind; varying vec2 vGlassUv; varying vec3 vGlassPos;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+vLit = lit; vBehind = behind; vGlassUv = uv; vGlassPos = position;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform float night; varying float vLit; varying vec2 vGlassUv; varying vec3 vGlassPos;
+uniform float night; varying float vLit; varying float vBehind; varying vec2 vGlassUv; varying vec3 vGlassPos;
 float glassHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-  // the interior: a warm back wall, three shelves across the pane with wares standing on them (a pane's own seed)
-  vec2 q = vGlassUv; float seed = floor(vGlassPos.x * 0.7 + vGlassPos.z * 1.3);
-  vec3 wall = mix(vec3(0.62, 0.48, 0.36), vec3(0.42, 0.52, 0.55), step(0.5, glassHash(vec2(seed, 3.0))));
-  float shelfY = fract(q.y * 3.0 + 0.15), shelf = step(0.9, shelfY);
-  float slot = floor(q.x * 9.0 + seed), item = step(0.35, glassHash(vec2(slot, floor(q.y * 3.0) + seed)));
-  float itemH = 0.35 + 0.45 * glassHash(vec2(slot, 7.0 + seed)), onShelf = step(shelfY, itemH) * step(0.15, fract(q.x * 9.0)) * step(fract(q.x * 9.0), 0.85) * item;
-  vec3 ware = mix(vec3(0.9, 0.25, 0.3), mix(vec3(0.95, 0.85, 0.4), vec3(0.3, 0.6, 0.9), step(0.5, glassHash(vec2(slot, 11.0)))), step(0.66, glassHash(vec2(slot, 5.0 + seed))));
-  vec3 interior = mix(mix(wall, vec3(0.85, 0.78, 0.68), shelf), ware, onShelf);
+  vec2 q = vGlassUv; float seed = floor(vGlassPos.x * 0.7 + vGlassPos.y * 0.37 + vGlassPos.z * 1.3);
+  vec3 interior; float cover = 0.0; // (how much of it hangs right behind the glass, catching the day)
+  if (vBehind < 0.5) {
+    // a shop: a warm back wall, three shelves across the pane, stock standing on them with gaps between, in putty,
+    // sage, muted brick, now and then a slate (a pane's own seed)
+    vec3 wall = mix(vec3(0.58, 0.48, 0.38), vec3(0.46, 0.50, 0.50), step(0.5, glassHash(vec2(seed, 3.0))));
+    float shelfY = fract(q.y * 3.0 + 0.15), shelf = step(0.9, shelfY);
+    float slot = floor(q.x * 9.0 + seed), item = step(0.5, glassHash(vec2(slot, floor(q.y * 3.0) + seed)));
+    float itemH = 0.35 + 0.4 * glassHash(vec2(slot, 7.0 + seed)), onShelf = step(shelfY, itemH) * step(0.15, fract(q.x * 9.0)) * step(fract(q.x * 9.0), 0.85) * item;
+    float pick = glassHash(vec2(slot, 5.0 + seed));
+    vec3 ware = mix(mix(vec3(0.74, 0.68, 0.57), vec3(0.56, 0.60, 0.51), step(0.4, pick)), vec3(0.63, 0.46, 0.40), step(0.75, pick));
+    ware = mix(ware, vec3(0.46, 0.52, 0.58), step(0.88, glassHash(vec2(slot, 11.0 + seed))));
+    interior = mix(mix(wall, vec3(0.80, 0.74, 0.65), shelf), ware, onShelf);
+  } else if (vBehind < 1.5) {
+    // a room upstairs: its back wall, shaded toward the ceiling and the floor; a picture on it, a lamp's shade; and
+    // across the glass blinds let down part way, curtains drawn to the sides, or a net
+    float c = glassHash(vec2(seed, 21.0)), h2 = glassHash(vec2(seed, 22.0));
+    vec3 wall = mix(vec3(0.52, 0.45, 0.38), vec3(0.42, 0.45, 0.47), step(0.5, glassHash(vec2(seed, 23.0))));
+    vec3 room = wall * mix(0.6, 1.0, smoothstep(0.98, 0.45, q.y)) * mix(0.7, 1.0, smoothstep(0.0, 0.3, q.y));
+    float px = 0.3 + 0.4 * glassHash(vec2(seed, 24.0));
+    float pic = step(abs(q.x - px), 0.13) * step(abs(q.y - 0.6), 0.1) * step(0.45, glassHash(vec2(seed, 25.0)));
+    float picIn = step(abs(q.x - px), 0.1) * step(abs(q.y - 0.6), 0.075);
+    room = mix(room, mix(vec3(0.25, 0.2, 0.17), mix(vec3(0.55, 0.58, 0.5), vec3(0.62, 0.5, 0.42), h2), picIn), pic);
+    float lx = mix(0.18, 0.82, glassHash(vec2(seed, 26.0)));
+    float lamp = step(abs(q.x - lx), 0.1 - (q.y - 0.24) * 0.3) * step(0.24, q.y) * step(q.y, 0.38) * step(0.55, glassHash(vec2(seed, 27.0)));
+    room = mix(room, vec3(0.9, 0.82, 0.62), lamp);
+    vec3 cloth = mix(mix(vec3(0.70, 0.52, 0.48), vec3(0.72, 0.64, 0.42), step(0.33, h2)), mix(vec3(0.52, 0.58, 0.50), vec3(0.82, 0.78, 0.68), step(0.5, glassHash(vec2(seed, 28.0)))), step(0.66, h2));
+    if (c < 0.4) {
+      float drop = 0.3 + 0.55 * glassHash(vec2(seed, 29.0)), blind = step(1.0 - drop, q.y);
+      vec3 slats = mix(vec3(0.86, 0.82, 0.72), vec3(0.66, 0.62, 0.55), step(0.82, fract(q.y * 16.0)));
+      interior = mix(room, slats, blind); cover = blind;
+    } else if (c < 0.8) {
+      float w = 0.18 + 0.2 * glassHash(vec2(seed, 30.0)), panel = step(q.x, w) + step(1.0 - w, q.x);
+      vec3 folds = cloth * (0.82 + 0.18 * sin(q.x * 44.0));
+      interior = mix(room, folds, min(panel, 1.0)); cover = min(panel, 1.0);
+    } else {
+      interior = mix(room, vec3(0.86, 0.84, 0.8), 0.62); cover = 0.6;
+    }
+  } else {
+    interior = vec3(0.12, 0.11, 0.12); // the dark
+  }
   // (dim by day under the glass's tint, bright and warm by night where lit; unlit at night, the dark shop)
   float litNow = vLit * night;
-  vec3 dayLook = mix(diffuseColor.rgb, interior * 0.55, 0.75);
+  vec3 dayLook = mix(diffuseColor.rgb, interior * mix(0.55, 0.8, cover), 0.75 + 0.1 * cover);
   diffuseColor.rgb = mix(dayLook, interior * 0.9, litNow) * (1.0 - 0.5 * night * (1.0 - vLit));`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += interior * vec3(1.0, 0.8, 0.55) * litNow * ${(GLOW.window * 0.7).toFixed(2)};`);
