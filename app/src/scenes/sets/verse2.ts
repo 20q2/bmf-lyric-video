@@ -281,7 +281,7 @@ function fryWindow(c: CanvasRenderingContext2D, W: number, H: number, side: numb
       c.fillStyle = '#f4ead2'; c.beginPath(); c.ellipse(px + pw * 0.77, my + mh * 0.62, pw * 0.15, mh * 0.13, 0, 0, Math.PI * 2); c.fill();
       for (let j = 0; j < 3; j++) { c.fillStyle = j % 2 ? '#c8742a' : '#e09a3a'; c.beginPath(); c.ellipse(px + pw * (0.71 + j * 0.06), my + mh * (0.56 - (j % 2) * 0.05), pw * 0.05, mh * 0.08, 0.6, 0, Math.PI * 2); c.fill(); }
       c.font = font(F.sign(600), mh * 0.1);
-      items[k]!.forEach((it, j) => { const yy = my + mh * (0.42 + j * 0.14); c.fillStyle = '#fff6e0'; c.fillText(it, px + 20, yy, pw * 0.36); c.fillStyle = '#ffcf4a'; c.fillText(`${(2.99 + k * 4 + j * 1.5).toFixed(2)}`, px + pw * 0.43, yy); });
+      items[k]!.forEach((it, j) => { const yy = my + mh * (0.42 + j * 0.14); c.fillStyle = '#fff6e0'; c.fillText(it, px + 20, yy, pw * 0.36); c.fillStyle = '#ffcf4a'; c.fillText(k === 1 && j === 0 ? '9.99' : `${(2.99 + k * 4 + j * 1.5).toFixed(2)}`, px + pw * 0.43, yy); }); // (the 8 PC the card's $9.99)
     });
     // the staff behind the counter: red shirts, caps
     person(c, W * 0.3, H * 0.46, s, { body: '#c8202e', skin: '#8f5e40', hair: '#141012', cap: '#c8202e', face: 1, arm: 1 });
@@ -317,7 +317,8 @@ function fryWindow(c: CanvasRenderingContext2D, W: number, H: number, side: numb
     }
     // a card taped in the glass
     c.fillStyle = '#fff6e0'; c.fillRect(W * 0.8, H * 0.76, W * 0.17, H * 0.18); c.fillStyle = '#c8202e'; c.textAlign = 'center'; c.font = font(F.sign(700), H * 0.05);
-    c.fillText('2 PC + BISCUIT', W * 0.885, H * 0.82, W * 0.16); c.font = font(F.sign(700), H * 0.08); c.fillText('$2.99', W * 0.885, H * 0.9);
+    // (its price the I Like Ur Look cover's, an Easter egg: the user, 2026-10-16)
+    c.fillText('8 PC BUCKET', W * 0.885, H * 0.82, W * 0.16); c.font = font(F.sign(700), H * 0.08); c.fillText('$9.99', W * 0.885, H * 0.9);
   }
   // the awning's shade at its head; the glass's sheen (the shop glass's streaks of sky)
   const sh = c.createLinearGradient(0, 0, 0, H * 0.25); sh.addColorStop(0, 'rgba(60,24,12,0.45)'); sh.addColorStop(1, 'rgba(60,24,12,0)'); c.fillStyle = sh; c.fillRect(0, 0, W, H * 0.25);

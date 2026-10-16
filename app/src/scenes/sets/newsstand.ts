@@ -61,7 +61,8 @@ function drawCell(c: CanvasRenderingContext2D, i: number) {
     // cover lines and the price
     c.font = font(F.archivo(75, 700), 17);
     for (let k = 0; k < 3; k++) c.fillText(['THE SUMMER ISSUE', '50 BEST TACOS', 'HOW TO DRIVE IT', 'ROAD TRIP!', 'NEW MUSIC', 'SECRETS OF L.A.', 'FALL LOOKS', 'BIG INTERVIEW'][Math.floor(H(3 + k) * 8)]!, w * 0.06, h * (0.42 + k * 0.08));
-    c.font = font(F.mono(600), 13); c.fillText('$5.99', w * 0.06, h * 0.95);
+    // (the cover price the user's I Like Ur Look cover carries, look/effortless.ts: an Easter egg, the user, 2026-10-16)
+    c.font = font(F.mono(600), 13); c.fillText('$9.99 US · $12.99 CAN', w * 0.06, h * 0.95, w * 0.6);
     c.fillStyle = '#f8f8f4'; c.fillRect(w * 0.68, h * 0.86, w * 0.26, h * 0.1);
     c.fillStyle = '#141414'; for (let x = 0; x < w * 0.22; x += 3) if (hash(i, x) > 0.4) c.fillRect(w * 0.7 + x, h * 0.875, 2, h * 0.07);
     return;

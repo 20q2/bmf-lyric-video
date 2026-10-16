@@ -202,7 +202,7 @@ const STRIP: Record<string, StripTrade> = {
   diner: { name: 'DINER', sign: 'box', bg: '#2a4a52', ink: '#e0d0a8', sub: 'BREAKFAST ALL NIGHT', rooms: [4], window: ['OPEN', C.red], blade: ['EAT', C.red], awning: ['#5a2a30', '#a89878'] },
   records: { name: 'RECORDS', sign: 'neon', bg: '', ink: C.blue, icon: 'record', rooms: [8], window: ['OPEN', C.red], blade: ['RECORDS', C.amber] },
   tattoo: { name: 'TATTOO', sign: 'neon', bg: '', ink: C.green, icon: 'star', rooms: [26], window: ['WALK-INS', C.amber], blade: ['TATTOO', C.green] },
-  motel: { name: 'MOTEL', sign: 'box', bg: '#3a2a44', ink: '#d8c8a8', sub: 'AIR CONDITIONED · POOL', rooms: [28], window: ['VACANCY', C.red], blade: ['MOTEL', C.rose], tall: true },
+  motel: { name: 'MOTEL', sign: 'box', bg: '#3a2a44', ink: '#d8c8a8', sub: 'ROOMS $9.99 · POOL · A/C', rooms: [28], window: ['VACANCY', C.red], blade: ['MOTEL', C.rose], tall: true },
   laundry: { name: 'COIN LAUNDRY', sign: 'box', bg: '#34587a', ink: '#e0dccc', sub: 'OPEN 24 HOURS', rooms: [2, 31], window: ['24 HRS', C.blue] },
   lounge: { name: 'COCKTAILS', sign: 'neon', bg: '', ink: C.teal, icon: 'martini', rooms: [3], window: ['COLD BEER', C.amber], blade: ['LOUNGE', C.teal], awning: ['#2a3048'] },
   psychic: { name: 'PSYCHIC', sign: 'neon', bg: '', ink: C.violet, icon: 'eye', rooms: [27], window: ['READINGS', C.violet] },
