@@ -12,6 +12,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALM, palmVariant } from '../look/palms';
 import { IMPALA, impalaHull, wireWheel } from '../look/impala';
 import { printedGround } from '../look/ground';
+import { SURF, seaSwash, seaWater } from '../look/sea';
 import type { Drive } from './drive';
 import { ROAD_HALF, ROAD_START, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
@@ -71,6 +72,26 @@ function ribbon(route: Route, s0: number, s1: number, a: number | ((s: number) =
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** The sea's water from `d0` to `d1` m out from the waterline (negative: up the sand), at heights `y0`, `y1` off the
+ *  road's: its uv (s along the road, d out from the waterline) and `seaOff` (the way out to sea) as look/sea.ts reads
+ *  them. */
+function seaRibbon(route: Route, s0: number, s1: number, d0: number, d1: number, y0: number, y1: number): THREE.BufferGeometry {
+  const n = Math.max(2, Math.ceil((s1 - s0) / STEP) + 1), pos: number[] = [], uv: number[] = [], off: number[] = [], idx: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const s = s0 + ((s1 - s0) * i) / (n - 1), f = route.frameAt(s), out = new THREE.Vector2(-f.right.x, -f.right.z).normalize();
+    for (const [d, y] of [[d0, y0], [d1, y1]] as const) {
+      const p = f.pos.clone().addScaledVector(f.right, -(BEACH + d));
+      pos.push(p.x, p.y + y, p.z); uv.push(s, d); off.push(out.x, out.y);
+    }
+    if (i) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('seaOff', new THREE.Float32BufferAttribute(off, 2)); g.setIndex(idx);
   g.computeVertexNormals();
   return g;
 }
@@ -213,22 +234,13 @@ export function buildWorld(drive: Drive): THREE.Group {
   const verge = vergesOf(drive, end);
   g.add(named(new THREE.Mesh(strip(route, (s) => (seaLeft(s) ? -BEACH : -verge(-1, s)), -ROAD_HALF, -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
   g.add(named(new THREE.Mesh(strip(route, ROAD_HALF, (s) => verge(1, s), -0.05, (s) => (seaLeft(s) ? sand : groundOf(s)), end), printedGround(lambert())), 'verges'));
-  // the sea beyond the beach, and the surf's foam along the shore: broken white lines, a second set further out
-  {
-    const water = toon({ color: WORLD.sea, side: THREE.DoubleSide }), foam: THREE.Matrix4[] = [];
-    for (const st of drive.stretches) {
-      if (!BLOCKS[st.id]!.seaLeft) continue;
-      const a = Math.max(ROAD_START, motion.distanceAt(st.start) - 60), b = Math.min(end, motion.distanceAt(st.end) + 60);
-      g.add(named(new THREE.Mesh(ribbon(route, a, b, -SEA, -0.12, -BEACH, -0.12), water), 'sea'));
-      for (let s = a; s < b; s += 7) {
-        if (hash(s, 71) < 0.3) continue;
-        foam.push(boxAt(route, s + 3 * hash(s, 72), -BEACH - 0.6 - 1.5 * hash(s, 73), 0.5 + 0.8 * hash(s, 74), 0.03, 3 + 3 * hash(s, 75), -0.1));
-        if (hash(s, 76) < 0.5) foam.push(boxAt(route, s + 2 + 3 * hash(s, 77), -BEACH - 6 - 3 * hash(s, 78), 0.4, 0.03, 2 + 3 * hash(s, 79), -0.1));
-      }
-    }
-    const fm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#f4f0e6' }), foam.length);
-    foam.forEach((m, i) => fm.setMatrixAt(i, m));
-    g.add(named(fm, 'sea'));
+  // the sea beyond the beach, its swell, surf and foam drawn by its shader (look/sea.ts: the static white slabs that
+  // stood for the foam are gone), and the wash up the sand
+  for (const st of drive.stretches) {
+    if (!BLOCKS[st.id]!.seaLeft) continue;
+    const a = Math.max(ROAD_START, motion.distanceAt(st.start) - 60), b = Math.min(end, motion.distanceAt(st.end) + 60);
+    g.add(named(new THREE.Mesh(seaRibbon(route, a, b, SEA - BEACH, 0, -0.12, -0.12), seaWater()), 'sea'));
+    g.add(named(new THREE.Mesh(seaRibbon(route, a, b, 0, -SURF.runup - 0.6, -0.045, -0.045), seaSwash()), 'sea'));
   }
   // the overlook (the user, 2026-10-13: they sat "at the top of a box"): the road ends in a lot at the lip, a stone
   // wall along it, the city below (look/lookout.ts)
@@ -727,7 +739,9 @@ function placeSigns(drive: Drive): THREE.Group {
     const coast = !!BLOCKS[drive.stretchAt(drive.stretches.find((x) => s < motion.distanceAt(x.end))?.start ?? 0).id]!.seaLeft, side = coast ? -1 : 1;
     const f = route.frameAt(s), face = f.fwd.clone().negate().addScaledVector(f.right, -0.5 * side).setY(0).normalize(); // toward the oncoming car and the road
     const sign = new THREE.Group();
-    sign.add(new THREE.Mesh(new THREE.PlaneGeometry(P.w, P.h), new THREE.MeshBasicMaterial({ map: tex })));
+    // (on the coast its paint is lit like the beach round it: unlit, its greens and whites glowed off the dusk sand —
+    // the user, 2026-10-16)
+    sign.add(new THREE.Mesh(new THREE.PlaneGeometry(P.w, P.h), coast ? toon({ map: tex }) : new THREE.MeshBasicMaterial({ map: tex })));
     for (const px of [-P.w / 2 + 0.6, P.w / 2 - 0.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, P.y + P.h / 2, 0.2), toon({ color: WORLD.post })); leg.position.set(px, (P.h / 2 - P.y) / 2, -0.12); sign.add(leg); } // (legs: the ground to the board's top)
     sign.matrixAutoUpdate = false;
     sign.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(face).normalize(), new THREE.Vector3(0, 1, 0), face).setPosition(f.pos.clone().addScaledVector(f.right, side * (coast ? P.lateral - 3 : P.lateral)).add(new THREE.Vector3(0, P.y, 0)));

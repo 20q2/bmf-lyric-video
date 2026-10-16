@@ -15,11 +15,12 @@ import { BLOCKS } from '../../drive/blocks';
 import { printedGround } from '../../look/ground';
 import { SUN_AZ_DEG, COAST_T, type SkyState, skyStateAt } from '../../drive/sky';
 import { WORLD, toon } from '../../look/toon';
+import { SEA_TIME, seaWater } from '../../look/sea';
 import { GLOW, lampMaterial } from '../../look/night';
 import { PALM, palmVariant } from '../../look/palms';
 import { F } from '../../engine/type';
 import { hash } from '../../engine/util';
-import { box, canvasTex, cyl, onPanel, pic, plane, roadFrame, sedan, signFace, stride, walker } from './kit';
+import { box, canvasTex, cyl, fuse, onPanel, paint, part, plane, tball, tbox, tcyl, roadFrame, sedan, signFace, stride, walker } from './kit';
 
 /** The coast's furniture: the boardwalk's inner and outer edges (m off the road's centre, left negative), the stalls'
  *  fronts along its sea side, the umbrellas' band of sand, the lifeguard towers' line by the water, and how many of
@@ -81,7 +82,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     box(g, 2 * plan.pylons + A.pylon.w + 0.3, 0.45, 0.8, 0, -B.h / 2 - 0.35, -0.3, blue); // its sill
     // WELCOME TO, the arch's own words, over the band
     box(g, 9.5, 1.15, 0.55, 0, B.h / 2 + 0.85, -0.32, blue);
-    plane(g, 9, 0.95, 0, B.h / 2 + 0.85, -0.03, pic(signFace('WELCOME TO', 1024, 108, '#f6edd6', null, F.sign(600), 0.62, 0.24)));
+    plane(g, 9, 0.95, 0, B.h / 2 + 0.85, -0.03, paint(signFace('WELCOME TO', 1024, 108, '#f6edd6', null, F.sign(600), 0.62, 0.24), { transparent: true }));
     // the arc: stepped blocks rising to a keystone
     for (const [dx, dy, w] of [[-9, 1.9, 4], [9, 1.9, 4], [-5.4, 2.6, 4], [5.4, 2.6, 4], [-1.8, 3.1, 4.2], [1.8, 3.1, 4.2]] as const) {
       box(g, w, 0.7, 0.6, dx, B.h / 2 + dy, -0.35, cream);
@@ -192,7 +193,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       const run = 4.5, rl = Math.hypot(run, floor), ramp = box(g, rl, 0.08, 1.1, T.w / 2 + run / 2, floor / 2, 0, wood); ramp.rotation.z = -Math.atan2(floor, run);
       box(g, 0.06, 2.2, 0.06, -T.w / 2 + 0.4, T.top + 1.3, -T.d / 2 + 0.4, wood);
       box(g, 0.9, 0.5, 0.02, -T.w / 2 + 0.85, T.top + 2.1, -T.d / 2 + 0.4, toon({ color: '#c8102e' }));
-      const num = pic(signFace(String(14 + k), 128, 128, '#2b4a66', '#f6edd6', F.sign(700), 0.7, 0));
+      const num = paint(signFace(String(14 + k), 128, 128, '#2b4a66', '#f6edd6', F.sign(700), 0.7, 0));
       for (const sx of [-1, 1]) { const p = plane(g, 0.9, 0.9, sx * (T.w / 2 + 0.01), (floor + T.top) / 2, 0, num); p.rotation.y = (sx * Math.PI) / 2; }
       plane(g, 0.9, 0.9, 0, (floor + T.top) / 2, -T.d / 2 - 0.01, num).rotation.y = Math.PI;
     }
@@ -207,7 +208,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       for (let y = 0; y <= 64; y += 8) { c.beginPath(); c.moveTo(0, y); c.lineTo(256, y); c.stroke(); }
       c.fillStyle = '#f4f0e6'; c.fillRect(0, 0, 256, 9);
     });
-    const net = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, alphaTest: 0.3, side: THREE.DoubleSide }), post = toon({ color: '#e8e2d4' }), ballM = toon({ color: '#f6e27a' });
+    const net = toon({ map: netTex, alphaTest: 0.3, side: THREE.DoubleSide }), post = toon({ color: '#e8e2d4' }), ballM = toon({ color: '#f6e27a' });
     const courts = boards.length ? [boards[0]![0] + 22, (boards[0]![0] + boards[boards.length - 1]![1]) / 2 + 6] : [];
     courts.forEach((s, k) => {
       const g = onRoad(s, -27); // (the net across the beach, the court's halves either side along it)
@@ -238,15 +239,14 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       const g = onRoad(s, COAST.stalls);
       // (its counter faces the boardwalk: the road. In this frame x is out to sea: the box stands behind x = 0)
       g.matrix.multiply(new THREE.Matrix4().makeRotationY(-Math.PI / 2)); // x along the road, z toward the road
-      const paint = toon({ color: wall });
-      box(g, W, Hh, D, 0, Hh / 2, -D / 2, paint);
+      box(g, W, Hh, D, 0, Hh / 2, -D / 2, toon({ color: wall }));
       box(g, W + 0.3, 0.18, D + 0.3, 0, Hh + 0.09, -D / 2, toon({ color: '#f4efe4' })); // its roof's lip
       box(g, W - 0.8, 1.0, 0.05, 0, 1.6, 0.01, toon({ color: '#2c2630' })); // its serving window
       box(g, W - 0.6, 0.08, 0.5, 0, 1.08, 0.25, toon({ color: '#f4efe4' })); // the counter
       const aw = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.4, 1.2), toon({ map: awn(stripe, '#ffffff'), side: THREE.DoubleSide }));
       aw.position.set(0, Hh - 0.2, 0.5); aw.rotation.x = -1.0; g.add(aw);
       box(g, W * 0.92, 0.7, 0.12, 0, Hh + 0.55, 0.0, toon({ color: stripe })); // its sign board
-      plane(g, W * 0.86, 0.6, 0, Hh + 0.55, 0.07, pic(signFace(name, 512, 72, ink, null, F.sign(700), 0.7, 0.12)));
+      plane(g, W * 0.86, 0.6, 0, Hh + 0.55, 0.07, paint(signFace(name, 512, 72, ink, null, F.sign(700), 0.7, 0.12), { transparent: true }));
       if (name === 'BEACH SHOP') for (let j = 0; j < 4; j++) { // flag towels hung out on a rail beside it
         box(g, 0.05, 2.6, 0.05, W / 2 + 0.3 + j * 1.25, 1.3, 0.3, wood);
         const tw = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.7), toon({ color: ['#e23d5a', '#2fa3c4', '#f2b134', '#7a5bd6'][j]!, side: THREE.DoubleSide }));
@@ -301,7 +301,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       const booth = onRoad(a + 4, 9.5);
       box(booth, 2, 2.4, 2, 0, 1.2, 0, cream); box(booth, 2.4, 0.15, 2.4, 0, 2.47, 0, blue);
       box(booth, 0.06, 4.6, 0.06, 0, 2.3, -2.2, toon({ color: WORLD.post }));
-      const ps = plane(booth, 2.6, 0.9, 0, 4.3, -2.26, pic(signFace('BEACH PARKING', 512, 176, '#ffffff', '#1e6fd9', F.sign(700), 0.38, 0.06), { side: THREE.DoubleSide }));
+      const ps = plane(booth, 2.6, 0.9, 0, 4.3, -2.26, paint(signFace('BEACH PARKING', 512, 176, '#ffffff', '#1e6fd9', F.sign(700), 0.38, 0.06), { side: THREE.DoubleSide }));
       ps.rotation.y = Math.PI; // (to the traffic coming along the road)
     }
     for (let k = 0, s = plan.from + 66; s < end; k++, s += 6.4 + 3 * hash(k, 61)) {
@@ -375,7 +375,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     box(pg, SH.w + 0.6, 0.22, SH.d + 0.6, 0, roofY + 0.1, -SH.back - SH.d / 2, toon({ color: '#f4efe4' }));
     box(pg, 3.6, 1.2, 0.05, -1.2, base + 1.7, -SH.back + 0.01, toon({ color: '#2c2630' })); // its window
     box(pg, 3.8, 0.1, 0.55, -1.2, base + 1.05, -SH.back + 0.27, toon({ color: '#f4efe4' }));
-    plane(pg, 2.4, 0.5, 2.2, base + 2.4, -SH.back + 0.02, pic(signFace('RENTALS', 512, 104, '#fbf1d8', '#d81e2c', F.sign(700), 0.62, 0.14)));
+    plane(pg, 2.4, 0.5, 2.2, base + 2.4, -SH.back + 0.02, paint(signFace('RENTALS', 512, 104, '#fbf1d8', '#d81e2c', F.sign(700), 0.62, 0.14)));
     // the rack of boards beside it: upright, nose up, each its own colours
     const BC = ['#f2b134', '#e23d5a', '#ffffff', '#2fa3c4', '#3cb27a', '#f47a2a', '#ff6fa8'];
     for (let j = 0; j < 7; j++) {
@@ -386,7 +386,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     for (const x of [P.w / 2 + 0.5, P.w / 2 + 5.0]) box(pg, 0.1, 1.4, 0.1, x, base + 0.7, -0.6, toon({ color: '#3a2a24' }));
     // its feather flag
     box(pg, 0.05, 3.6, 0.05, -P.w / 2 - 0.8, base + 1.8, 0.4, toon({ color: '#3a2a24' }));
-    const flag = plane(pg, 0.7, 2.6, -P.w / 2 - 0.45, base + 2.2, 0.4, pic(canvasTex(64, 256, (c) => { c.fillStyle = '#d81e2c'; c.fillRect(0, 0, 64, 256); c.fillStyle = '#fbf1d8'; c.font = `bold 44px "${F.sign(700)}"`; c.textAlign = 'center'; for (const [i, ch] of [...'SURF'].entries()) c.fillText(ch, 32, 56 + i * 52); }), { side: THREE.DoubleSide }));
+    const flag = plane(pg, 0.7, 2.6, -P.w / 2 - 0.45, base + 2.2, 0.4, paint(canvasTex(64, 256, (c) => { c.fillStyle = '#d81e2c'; c.fillRect(0, 0, 64, 256); c.fillStyle = '#fbf1d8'; c.font = `bold 44px "${F.sign(700)}"`; c.textAlign = 'center'; for (const [i, ch] of [...'SURF'].entries()) c.fillText(ch, 32, 56 + i * 52); }), { side: THREE.DoubleSide }));
     flag.rotation.y = 0.3;
     root.add(pg);
   }
@@ -396,27 +396,72 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
   const fishers: THREE.Group[] = [];
   {
     const g = onRoad(plan.pierS, 0), deckM = toon({ map: canvasTex(64, 256, (c) => { c.fillStyle = '#7a6452'; c.fillRect(0, 0, 64, 256); c.fillStyle = 'rgba(40, 26, 20, 0.6)'; for (let y = 0; y < 256; y += 8) c.fillRect(0, y, 64, 1.5); }) });
-    const pile = toon({ color: '#3a2a24' }), rail = toon({ color: '#ece6da' });
     const x0 = -COAST.walk[1] + 5, x1 = SEA * 0.62, y = 2.6, W = 7; // (from just past the boardwalk)
-    const deck = box(g, x1 - x0, 0.3, W, (x0 + x1) / 2, y, 0, deckM);
+    // the pavilion's platform at its end: a square deck wider than the pier, the pavilion on it with a walk round it
+    // (the pavilion stood on the pier's own 7 m deck, 9 m wide, its piles out of sight under the middle: the user,
+    // 2026-10-16, "the house is floating… nothing underneath it that looks like it's supporting it")
+    const PX = x1 - 4, PH = 6.5;
+    const deck = box(g, PX - PH - x0 + 0.5, 0.3, W, (x0 + PX - PH + 0.5) / 2, y, 0, deckM);
     ((deck.material as THREE.MeshToonMaterial).map!).wrapT = THREE.RepeatWrapping;
+    box(g, 2 * PH, 0.3, 2 * PH, PX, y, 0, deckM);
     // the ramp up from the boardwalk
     const rl = Math.hypot(5, y), ramp = box(g, rl, 0.25, W - 1, x0 - 2.5, y / 2, 0, deckM); ramp.rotation.z = Math.atan2(y, 5);
-    for (let x = x0 + 2; x < x1; x += 6) for (const dz of [-W / 2 + 0.4, 0, W / 2 - 0.4]) cyl(g, 0.22, y + 1.2, x, y / 2 - 0.6, dz, pile, 8);
-    for (let x = x0 + 2; x < x1; x += 12) { const b = box(g, 0.12, 0.12, W - 0.6, x, y - 1.0, 0, pile); b.rotation.x = 0.35; } // cross bracing
-    for (const dz of [-W / 2 + 0.05, W / 2 - 0.05]) {
-      box(g, x1 - x0, 0.08, 0.08, (x0 + x1) / 2, y + 1.15, dz, rail);
-      box(g, x1 - x0, 0.05, 0.05, (x0 + x1) / 2, y + 0.65, dz, rail);
-      for (let x = x0 + 1; x < x1; x += 2.5) box(g, 0.08, 1.1, 0.08, x, y + 0.7, dz, rail);
+    // what holds it up, and its rails and lamp posts: tinted parts fused into one mesh (they were ~200 draws a pass)
+    const under = new THREE.Group(); g.add(under);
+    const PILE = '#3a2a24', BRACE = '#4b3a30', RAIL = '#ece6da', foot = -1.6, cap = y - 0.32;
+    const pileAt = (x: number, z: number) => tcyl(under, 0.22, cap - foot, x, (cap + foot) / 2, z, PILE, 8);
+    /** A brace from (ax, ay, az) to (bx, by, bz). */
+    const brace = (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => {
+      const d = new THREE.Vector3(bx - ax, by - ay, bz - az), b = tbox(under, 0.14, 0.14, d.length(), (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, BRACE);
+      b.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d.normalize());
+    };
+    const lo = 0.25, hi = y - 0.55; // (the bracing from just over the water up under the caps)
+    // the pier's bents every 6 m: three piles, a cap beam across under the deck, an X of braces between the outer piles;
+    // down its length a stringer under each edge, and a wale along its outer piles low over the water
+    const zs = [-W / 2 + 0.4, 0, W / 2 - 0.4] as const;
+    for (let x = x0 + 2; x < PX - PH; x += 6) {
+      for (const z of zs) pileAt(x, z);
+      tbox(under, 0.4, 0.32, W, x, cap, 0, BRACE);
+      brace(x, lo, zs[0], x, hi, zs[2]); brace(x, lo, zs[2], x, hi, zs[0]);
     }
+    for (const z of [zs[0], zs[2]]) {
+      tbox(under, PX - PH - x0, 0.36, 0.26, (x0 + PX - PH) / 2, cap - 0.1, z, BRACE);
+      tbox(under, PX - PH - x0, 0.16, 0.16, (x0 + PX - PH) / 2, lo + 0.25, z, BRACE);
+    }
+    // the platform: a grid of piles 3 m apart, caps across, X-braced round all four sides
+    const grid = [-6, -3, 0, 3, 6];
+    for (const gx of grid) for (const gz of grid) pileAt(PX + gx, gz);
+    for (const gx of grid) tbox(under, 0.4, 0.32, 2 * PH - 0.6, PX + gx, cap, 0, BRACE);
+    for (const gz of [-6, 6]) tbox(under, 2 * PH - 0.6, 0.36, 0.3, PX, cap - 0.1, gz, BRACE);
+    for (let k = 0; k < 4; k++) {
+      const a = grid[k]!, b = grid[k + 1]!;
+      for (const side of [-6, 6]) {
+        brace(PX + a, lo, side, PX + b, hi, side); brace(PX + b, lo, side, PX + a, hi, side); // (its sides along the pier)
+        brace(PX + side, lo, a, PX + side, hi, b); brace(PX + side, lo, b, PX + side, hi, a); // (its ends)
+      }
+    }
+    // the rails: along the pier, and round the platform (open where the pier comes on)
+    const rails = (ax: number, az: number, bx: number, bz: number) => {
+      const len = Math.hypot(bx - ax, bz - az), alongX = Math.abs(bx - ax) > Math.abs(bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2;
+      tbox(under, alongX ? len : 0.08, 0.08, alongX ? 0.08 : len, cx, y + 1.15, cz, RAIL);
+      tbox(under, alongX ? len : 0.05, 0.05, alongX ? 0.05 : len, cx, y + 0.65, cz, RAIL);
+      const n = Math.max(1, Math.round(len / 2.5));
+      for (let i = 0; i <= n; i++) tbox(under, 0.08, 1.1, 0.08, ax + ((bx - ax) * i) / n, y + 0.7, az + ((bz - az) * i) / n, RAIL);
+    };
+    for (const dz of [-W / 2 + 0.05, W / 2 - 0.05]) rails(x0, dz, PX - PH, dz);
+    const e = PH - 0.05;
+    rails(PX - e, -e, PX + e, -e); rails(PX - e, e, PX + e, e); rails(PX + e, -e, PX + e, e);
+    rails(PX - e, -e, PX - e, -W / 2); rails(PX - e, W / 2, PX - e, e);
+    // the platform's fascia: a painted board round its deck's edge
+    for (const sd of [-1, 1]) { tbox(under, 2 * PH + 0.1, 0.36, 0.06, PX, y - 0.05, sd * (PH + 0.03), RAIL); tbox(under, 0.06, 0.36, 2 * PH + 0.1, PX + sd * (PH + 0.03), y - 0.05, 0, RAIL); }
     // its entrance: a gateway over the ramp's foot with the pier's name
     for (const dz of [-W / 2 + 0.2, W / 2 - 0.2]) box(g, 0.5, 5, 0.5, x0 - 4.6, 2.5, dz, cream);
     box(g, 0.6, 1.2, W + 0.4, x0 - 4.6, 5.4, 0, blue);
-    const nameP = plane(g, W, 0.9, x0 - 4.95, 5.4, 0, pic(signFace('PACIFIC PIER', 768, 110, '#f6edd6', null, F.sign(700), 0.62, 0.2)));
+    const nameP = plane(g, W, 0.9, x0 - 4.95, 5.4, 0, paint(signFace('PACIFIC PIER', 768, 110, '#f6edd6', null, F.sign(700), 0.62, 0.2), { transparent: true }));
     nameP.rotation.y = -Math.PI / 2;
     // lamps along it
-    for (let x = x0 + 6; x < x1 - 6; x += 12) for (const dz of [-W / 2 + 0.2, W / 2 - 0.2]) {
-      box(g, 0.12, 3.6, 0.12, x, y + 1.95, dz, toon({ color: '#2b4a66' }));
+    for (let x = x0 + 6; x < PX - PH - 2; x += 12) for (const dz of [-W / 2 + 0.2, W / 2 - 0.2]) {
+      tbox(under, 0.12, 3.6, 0.12, x, y + 1.95, dz, '#2b4a66');
       const b = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), bulb); b.position.set(x, y + 3.9, dz); g.add(b);
     }
     // benches down its middle
@@ -425,7 +470,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     const bx = x0 + 34;
     box(g, 6, 3, 4, bx, y + 1.65, -W / 2 + 2.3, toon({ color: '#c94f3a' }));
     box(g, 6.6, 0.2, 4.6, bx, y + 3.25, -W / 2 + 2.3, toon({ color: '#f4efe4' }));
-    const bait = plane(g, 3.6, 0.8, bx - 3.02, y + 2.4, -W / 2 + 2.3, pic(signFace('BAIT & TACKLE', 640, 140, '#fff4d6', '#2b4a66', F.sign(700), 0.56, 0.08)));
+    const bait = plane(g, 3.6, 0.8, bx - 3.02, y + 2.4, -W / 2 + 2.3, paint(signFace('BAIT & TACKLE', 640, 140, '#fff4d6', '#2b4a66', F.sign(700), 0.56, 0.08)));
     bait.rotation.y = -Math.PI / 2; // (on its end toward the shore)
     // people fishing along its rails: standing at the rail, rods out over the water, lines down
     const rod = toon({ color: '#1a1620' });
@@ -436,26 +481,32 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       cyl(g, 0.006, y + 2.9, x, (y + 2.9) / 2, z + side * 2.65, rod, 3);
       if (k % 3 === 0) box(g, 0.45, 0.35, 0.3, x + 0.6, y + 0.33, z - side * 0.3, toon({ color: '#e8e2d4' })); // a bucket
     }
-    // the pavilion at its end
-    box(g, 9, 3, 9, x1 - 4, y + 1.65, 0, cream);
-    box(g, 10, 0.35, 10, x1 - 4, y + 3.3, 0, blue);
-    const pt = new THREE.Mesh(new THREE.ConeGeometry(6.6, 2.8, 4), blue); pt.position.set(x1 - 4, y + 4.8, 0); pt.rotation.y = Math.PI / 4; g.add(pt);
-    for (const dz of [-2.5, 2.5]) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), bulb); b.position.set(x1 - 8.6, y + 2.4, dz * 1.45); g.add(b); }
+    // the pavilion at its end, on its platform: a cream house under a blue hipped roof, windows round it, its door to
+    // the pier; lamps at the platform's corners
+    box(g, 9, 3, 9, PX, y + 1.65, 0, cream);
+    box(g, 10, 0.35, 10, PX, y + 3.3, 0, blue);
+    const pt = new THREE.Mesh(new THREE.ConeGeometry(6.6, 2.8, 4), blue); pt.position.set(PX, y + 4.8, 0); pt.rotation.y = Math.PI / 4; g.add(pt);
+    for (const z of [-3, -1, 1, 3]) for (const sx of [-1, 1]) tbox(under, 0.08, 1.1, 1.2, PX + sx * 4.52, y + 1.95, z, '#2c3440'); // its windows
+    for (const x of [-3, -1, 1, 3]) for (const sz of [-1, 1]) tbox(under, 1.2, 1.1, 0.08, PX + x, y + 1.95, sz * 4.52, '#2c3440');
+    tbox(under, 0.1, 2.2, 1.4, PX - 4.53, y + 1.25, 0, '#6a4a3a'); // its door
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      tbox(under, 0.12, 3.6, 0.12, PX + sx * (PH - 0.3), y + 1.95, sz * (PH - 0.3), '#2b4a66');
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), bulb); b.position.set(PX + sx * (PH - 0.3), y + 3.9, sz * (PH - 0.3)); g.add(b);
+    }
+    fuse(under);
   }
 
   // ---- boats offshore: sailboats (a hull, a mast, a white sail) and a fishing boat, rocking on the swell ----
   const boats: { g: THREE.Group; k: number; s: number; lat: number }[] = [];
   {
-    const hullW = toon({ color: '#f4f0e6' }), sail = toon({ color: '#fbf7ee', side: THREE.DoubleSide }), red = toon({ color: '#c8102e' });
+    const hullW = toon({ color: '#f4f0e6' }), sail = toon({ color: '#fbf7ee', side: THREE.DoubleSide }), red = toon({ color: '#c8102e' }); // (the sailboats')
     const sailGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.6, 0.2), new THREE.Vector3(0, 7.6, 0.2), new THREE.Vector3(0, 0.6, -3.2)]);
     sailGeo.computeVertexNormals();
     for (let k = 0; k < 6; k++) {
       const s = plan.from + 90 + k * ((end - plan.from - 60) / 6) + 15 * hash(k, 81), lat = -70 - 70 * hash(k, 82);
       const g = new THREE.Group(); g.matrixAutoUpdate = false; root.add(g);
-      if (k === 3) { // the fishing boat: a red hull, a white wheelhouse, its outriggers
-        box(g, 2.6, 1.0, 8, 0, 0.4, 0, red); box(g, 2.2, 1.6, 2.4, 0, 1.7, 1.2, hullW); box(g, 0.08, 4, 0.08, 0, 2.8, -1.5, toon({ color: '#2c2630' }));
-        for (const sx of [-1, 1]) { const o = box(g, 0.06, 0.06, 5, sx * 2.2, 3.4, -1.5, toon({ color: '#2c2630' })); o.rotation.z = sx * 0.6; }
-      } else {
+      if (k === 3) g.add(fishingBoat()); // the fishing boat (its waterline at the group's foot: see update)
+      else {
         box(g, 1.6, 0.7, 5.4, 0, 0.3, 0, hullW); box(g, 1.62, 0.12, 5.42, 0, 0.6, 0, k % 2 ? red : blue);
         box(g, 0.08, 7.4, 0.08, 0, 3.9, 0.2, toon({ color: '#d8d2c8' }));
         g.add(new THREE.Mesh(sailGeo, sail));
@@ -464,13 +515,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     }
   }
 
-  // ---- waves: lines of foam rolling in to the shore, set after set, thinning out as they run up the sand ----
-  const WAVE = { sets: 3, period: 5.4, from: -BEACH - 26, to: -BEACH + 1.5, seg: 6 };
-  const waveSegs: { s: number; len: number; k: number }[] = [];
-  for (let k = 0; k < WAVE.sets; k++) for (let s = plan.from - 40; s < plan.to + 10; s += WAVE.seg) if (hash(k, s, 91) > 0.18) waveSegs.push({ s: s + 1.5 * hash(k, s, 92), len: WAVE.seg * (0.55 + 0.4 * hash(k, s, 93)), k });
-  const waves = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#f4f0e6' }), waveSegs.length);
-  waves.frustumCulled = false; root.add(waves);
-  const segM = new THREE.Matrix4(), segScale = new THREE.Vector3();
+  // (the waves are the sea's own: its shader, look/sea.ts, on the clock set below)
 
   // ---- people strolling the boardwalk, both ways, at a walking pace ----
   const strollers = Array.from({ length: 16 }, (_, k) => {
@@ -513,6 +558,12 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
   // ---- the sun's glitter path on the water: a streak of broken highlights lying along the sun's bearing — the one
   // prop that makes the sea read as sea while the sun goes down into it ----
   let glitter!: THREE.Mesh;
+  /** The arch wide's eye (drive/sets/chorus3.ts): the glitter is shown only while the lens is there. */
+  const wideEye = (() => { const f = route.frameAt(plan.archS - ARCH.eye.back); return f.pos.clone().addScaledVector(f.right, ARCH.eye.lateral).addScaledVector(UP, ARCH.eye.y); })();
+  const inWide = (t: number) => {
+    const p = drive.camera(t), c = Math.cos(p.pitch) * p.dist;
+    return wideEye.distanceTo(new THREE.Vector3(p.tx + Math.sin(p.yaw) * c, p.ty + Math.sin(p.pitch) * p.dist, p.tz + Math.cos(p.yaw) * c)) < 4;
+  };
   {
     const tex = canvasTex(256, 1024, (c) => {
       for (let k = 0; k < 150; k++) {
@@ -523,14 +574,17 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       }
     });
     const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, color: new THREE.Color(2.2, 2.2, 2.2) });
-    glitter = new THREE.Mesh(new THREE.PlaneGeometry(26, 190), m);
+    glitter = new THREE.Mesh(undefined, m);
     // lying on the water along the sun's bearing FROM the arch wide's eye (a glitter path runs viewer-to-sun: it is
     // tuned for the one shot that holds the sea)
     const cf = route.frameAt(drive.motion.distanceAt(COAST_T)), fwd = new THREE.Vector3(cf.fwd.x, 0, cf.fwd.z).normalize(), right = new THREE.Vector3(cf.right.x, 0, cf.right.z).normalize();
     const az = (SUN_AZ_DEG * Math.PI) / 180;
     const dir = fwd.clone().multiplyScalar(Math.cos(az)).addScaledVector(right, -Math.sin(az)).normalize();
     const start = route.frameAt(plan.archS - 40).pos.clone().addScaledVector(right, -11);
-    const mid = start.clone().addScaledVector(dir, 95);
+    // (from where its near corner reaches the water: from lateral -11 it lay across the beach, white bars on the sand)
+    const out = -dir.dot(right), wet = out > 0.05 ? Math.min(150, (BEACH + 2 - 11 + 13 * Math.abs(dir.dot(fwd))) / out) : 0;
+    glitter.geometry = new THREE.PlaneGeometry(26, 190 - wet);
+    const mid = start.clone().addScaledVector(dir, wet + (190 - wet) / 2);
     // (flat on the water, its long axis along the bearing: x across, y out along dir, z up)
     glitter.matrixAutoUpdate = false;
     glitter.matrix.makeBasis(new THREE.Vector3(0, 1, 0).clone().cross(dir).normalize(), dir, new THREE.Vector3(0, 1, 0)).setPosition(mid.x, 0.03, mid.z); // (a hair over the sea strip, or it drowns)
@@ -551,12 +605,24 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
     for (let s = a; s <= b; s += 10) { const f = route.frameAt(s); T.add(new THREE.Vector3(f.fwd.x, 0, f.fwd.z)); D.add(new THREE.Vector3(-f.right.x, 0, -f.right.z)); }
     T.normalize(); D.normalize();
     // the sea: from inside the sea strip's outer edge (under it) out past the haze, flaring away at either end
-    const edge: THREE.Vector2[] = [];
-    for (let s = a; s <= b + 1e-6; s += 4) { const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, -(SEA - 12)); edge.push(new THREE.Vector2(p.x, p.z)); }
+    const edge: THREE.Vector2[] = [], edgeS: number[] = [];
+    for (let s = a; s <= b + 1e-6; s += 4) { const f = route.frameAt(s), p = f.pos.clone().addScaledVector(f.right, -(SEA - 12)); edge.push(new THREE.Vector2(p.x, p.z)); edgeS.push(s); }
     const FAR = 5000, e0 = edge[0]!, e1 = edge[edge.length - 1]!;
     const corner = (e: THREE.Vector2, k: number) => new THREE.Vector2(e.x + D.x * FAR + T.x * FAR * k, e.y + D.z * FAR + T.z * FAR * k);
     const shape = new THREE.Shape([...edge, corner(e1, 0.6), corner(e0, -0.6)]);
-    const sea = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2).translate(0, route.frameAt(a).pos.y - 0.16, 0), toon({ color: WORLD.sea, side: THREE.DoubleSide }));
+    const seaGeo = new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2).translate(0, route.frameAt(a).pos.y - 0.16, 0);
+    // (the sea's shader reads where it is from its uv — along the shore, out from the waterline — and the way out:
+    // its inner edge sits where the beach's strip of sea has the same, so the swell runs on across the seam)
+    const dIn = SEA - 12 - BEACH, known = [...edge.map((e, i) => [e, edgeS[i]!, dIn] as const), [corner(e1, 0.6), edgeS[edgeS.length - 1]! + 0.6 * FAR, dIn + FAR] as const, [corner(e0, -0.6), a - 0.6 * FAR, dIn + FAR] as const];
+    const sp = seaGeo.attributes.position!, uv = new Float32Array(sp.count * 2), off = new Float32Array(sp.count * 2);
+    for (let i = 0; i < sp.count; i++) {
+      const x = sp.getX(i), z = sp.getZ(i);
+      let best = known[0]!, bd = Infinity;
+      for (const k of known) { const dd = (k[0].x - x) ** 2 + (k[0].y - z) ** 2; if (dd < bd) { bd = dd; best = k; } }
+      uv[i * 2] = best[1]; uv[i * 2 + 1] = best[2]; off[i * 2] = D.x; off[i * 2 + 1] = D.z;
+    }
+    seaGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); seaGeo.setAttribute('seaOff', new THREE.BufferAttribute(off, 2));
+    const sea = new THREE.Mesh(seaGeo, seaWater());
     sea.name = 'sea'; far.add(sea);
     // the hills: land under the climb to the overlook, falling from its verges' edges (SHOULDER out) to the plain
     const climb: THREE.Vector3[] = [];
@@ -603,6 +669,7 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
   return {
     group: root,
     update(t) {
+      SEA_TIME.value = t; // (the sea's swell and surf: its shader's clock)
       // (unseen, the props hold their pose at the nearest edge of ON: never posed, the waves, boats, gulls and strollers
       // all stood at the world's origin, in the intro's street, until the coast had been played once)
       if (on(t)) held = NaN;
@@ -610,19 +677,18 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       far.visible = t < farUntil;
       // the glitter burns while the sun is low on the water, and goes with it (drive/sky.ts: it sets after the chorus)
       const gm = glitter.material as THREE.MeshBasicMaterial, e = (skyStateAt(t, sky).sunElev * 180) / Math.PI;
+      // (and only in the arch wide it's tuned for: from the beach take's lens, lower and nearer, its streaks read as a
+      // ladder of white bars across the surf — the sea's own glints, look/sea.ts, catch the light there)
       gm.opacity = smooth(99, 104, t) * smooth(-0.5, 1, e);
-      glitter.visible = gm.opacity > 0.01;
+      glitter.visible = gm.opacity > 0.01 && inWide(t);
       if (!on(t)) return;
-      // the waves: each set rolls in from out past the break to the sand over a period, thinning as it runs up
-      waveSegs.forEach(({ s, len, k }, i) => {
-        const u = ((t / WAVE.period + k / WAVE.sets) % 1 + 1) % 1, lat = WAVE.from + (WAVE.to - WAVE.from) * u * u * (3 - 2 * u) - 2 * Math.sin(s * 0.05 + k);
-        segScale.set(0.4 + 1.6 * Math.sin(Math.PI * Math.min(1, u * 1.2)), 0.06, len);
-        segM.copy(frameM(s, lat, -0.05, 0, segScale)); // (a hair over the sea strip)
-        waves.setMatrixAt(i, segM);
-      });
-      waves.instanceMatrix.needsUpdate = true;
       // the boats rock and drift
       for (const { g, k, s, lat } of boats) {
+        if (k === 3) { // (the fishing boat sits in the water, its waterline on the sea's: it bobs, rolls and pitches gently)
+          g.matrix.copy(frameM(s + 0.4 * t, lat, -0.07 + 0.06 * Math.sin(t * 1.3 + k), 0.6 * k));
+          g.matrix.multiply(new THREE.Matrix4().makeRotationZ(0.04 * Math.sin(t * 1.1 + k * 2))).multiply(new THREE.Matrix4().makeRotationX(0.025 * Math.sin(t * 0.85 + 1)));
+          continue;
+        }
         g.matrix.copy(frameM(s + 0.4 * t, lat, -0.05 + 0.15 * Math.sin(t * 1.3 + k), 0.6 * k));
         g.matrix.multiply(new THREE.Matrix4().makeRotationZ(0.05 * Math.sin(t * 1.1 + k * 2)));
       }
@@ -659,4 +725,129 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
       }
     },
   };
+}
+
+/** The fishing boat off the beach (the user, 2026-10-16: "a smaller like shanty on the water… just looks like some
+ *  rectangles"): a small working boat, nose +z, its waterline at y 0. A lofted hull, its sheer rising to a raked,
+ *  flared bow and the forefoot cut up under it, a flat transom; white topsides with a teal band under a dark rubbing
+ *  strake, a black boot stripe at the waterline, red bottom paint, the paint worn unevenly and rust run down from the
+ *  scuppers; a worn plank deck. The wheelhouse forward, windows all round under an overhanging roof; a mast with its
+ *  crosstree, masthead light and radar; outrigger poles; rails on stanchions round the foredeck and aft; tyres hung as
+ *  fenders; buoys, a crate, a fish box and a coil of line on the after deck. Its parts tinted and fused: one mesh. */
+function fishingBoat(): THREE.Group {
+  const g = new THREE.Group(), L = 8.6, hl = L / 2, B = 2.9, K = 10, N = 34;
+  const u = (z: number) => (z + hl) / L; // (0 at the transom, 1 at the stem)
+  const half = (z: number) => { const t = u(z); return (B / 2) * (t < 0.55 ? 0.84 + 0.16 * Math.sin(((t / 0.55) * Math.PI) / 2) : Math.max(0.015, Math.cos((((t - 0.55) / 0.45) * Math.PI) / 2) ** 0.7)); };
+  const sheer = (z: number) => 1.05 + 0.62 * u(z) ** 2.4;
+  const keel = (z: number) => { const t = u(z); return -0.5 + 0.14 * Math.max(0, 1 - t / 0.12) + 0.95 * Math.max(0, (t - 0.7) / 0.3) ** 1.5; };
+  // a section's point down its side: a from the sheer (0) to the keel (1); the side falls near plumb with a little
+  // flare, then turns at the bilge to the keel
+  const at = (z: number, a: number, side: number): [number, number, number] => {
+    const top = sheer(z), bot = keel(z), w = half(z) * (1 + 0.1 * u(z) ** 2); // (the bow flares out)
+    const x = a < 0.55 ? 1 - 0.06 * (a / 0.55) : 0.94 * Math.cos((((a - 0.55) / 0.45) * Math.PI) / 2) ** 0.6;
+    const y = a < 0.55 ? (a / 0.55) * 0.55 : 0.55 + 0.45 * Math.sin((((a - 0.55) / 0.45) * Math.PI) / 2);
+    return [side * w * x, top - (top - bot) * y, z];
+  };
+  const R = 2 * K + 1, ringA = (j: number) => (j <= K ? j / K : (2 * K - j) / K), ringSide = (j: number) => (j < K ? -1 : 1);
+  const pos: number[] = [], aOf: number[] = [], idx: number[] = [];
+  for (let i = 0; i <= N; i++) {
+    const z = -hl + (L * i) / N;
+    for (let j = 0; j < R; j++) { pos.push(...at(z, ringA(j), ringSide(j))); aOf.push(ringA(j)); }
+    if (i) for (let j = 0; j < R - 1; j++) { const p0 = (i - 1) * R + j, p1 = i * R + j; idx.push(p0, p0 + 1, p1, p0 + 1, p1 + 1, p1); }
+  }
+  const hullGeo = new THREE.BufferGeometry();
+  hullGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); hullGeo.setIndex(idx); hullGeo.computeVertexNormals();
+  const hull = part(g, hullGeo, '#ece4d0');
+  // (its paint per triangle: by where it sits on the side, worn a little unevenly)
+  const tri = (m: THREE.Mesh, colourAt: (y: number, a: number, k: number) => string) => {
+    const p = m.geometry.attributes.position!, c = m.geometry.attributes.color!, col = new THREE.Color();
+    for (let k = 0; k < p.count; k += 3) {
+      const y = (p.getY(k) + p.getY(k + 1) + p.getY(k + 2)) / 3, a = m === hull ? (aOfTri[k / 3] ?? 0) : 0;
+      col.set(colourAt(y, a, k / 3)).multiplyScalar(0.9 + 0.1 * hash(k, 301));
+      for (let v = 0; v < 3; v++) c.setXYZ(k + v, col.r, col.g, col.b);
+    }
+    c.needsUpdate = true;
+  };
+  const aOfTri: number[] = [];
+  for (let k = 0; k < idx.length; k += 3) aOfTri.push((aOf[idx[k]!]! + aOf[idx[k + 1]!]! + aOf[idx[k + 2]!]!) / 3);
+  const paintBy = (y: number, a: number) => (y < 0.04 ? '#8a2e26' : y < 0.15 ? '#1d2026' : a < 0.045 ? '#4a3428' : a < 0.2 ? '#2a6f74' : y < 0.4 ? '#d8cfba' : '#ece4d0');
+  tri(hull, paintBy);
+  // the transom: the stern section closed flat
+  {
+    const z = -hl, ring = Array.from({ length: R }, (_, j) => at(z, ringA(j), ringSide(j))), c = [0, (sheer(z) + keel(z)) / 2, z];
+    const tp: number[] = [];
+    for (let j = 0; j < R - 1; j++) tp.push(...c, ...ring[j + 1]!, ...ring[j]!);
+    tp.push(...c, ...ring[0]!, ...ring[R - 1]!);
+    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3)); tg.computeVertexNormals();
+    tri(part(g, tg, '#ece4d0'), (y) => paintBy(y, y > sheer(z) - 0.06 ? 0.02 : y > sheer(z) - 0.3 ? 0.1 : 0.5));
+  }
+  // the deck: worn planks across the sheer
+  {
+    const dp: number[] = [], di: number[] = [];
+    for (let i = 0; i <= N; i++) {
+      const z = -hl + (L * i) / N, l = at(z, 0, -1), r = at(z, 0, 1);
+      dp.push(l[0], l[1] - 0.02, z, r[0], r[1] - 0.02, z);
+      if (i) { const o = (i - 1) * 2; di.push(o, o + 2, o + 1, o + 1, o + 2, o + 3); }
+    }
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(dp, 3)); dg.setIndex(di); dg.computeVertexNormals();
+    tri(part(g, dg, '#8f7a5e'), (_y, _a, k) => (hash(Math.floor(k / 4), 302) < 0.3 ? '#7d6a52' : '#957f62'));
+  }
+  // a rod from one point to another (rails, stays, outriggers)
+  const rod = (a: THREE.Vector3, b: THREE.Vector3, r: number, color: string) => {
+    const d = b.clone().sub(a), m = tcyl(g, r, d.length(), (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, color, 6);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+  };
+  const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  // the wheelhouse, forward of amidships: walls, windows round it, a door aft, its roof with a teal edge and a visor
+  const WH = { z: 1.35, w: 2.0, d: 2.3, h: 1.75 }, base = sheer(WH.z) - 0.1, roof = base + WH.h;
+  tbox(g, WH.w, WH.h, WH.d, 0, base + WH.h / 2, WH.z, '#e6dfcb');
+  for (const x of [-0.62, 0, 0.62]) tbox(g, 0.52, 0.62, 0.04, x, roof - 0.55, WH.z + WH.d / 2 + 0.01, '#26303c');
+  for (const sx of [-1, 1]) for (const dz of [-0.5, 0.45]) tbox(g, 0.04, 0.55, 0.72, sx * (WH.w / 2 + 0.01), roof - 0.55, WH.z + dz, '#26303c');
+  tbox(g, 0.72, 1.35, 0.04, 0.3, base + 0.72, WH.z - WH.d / 2 - 0.01, '#4c5c62'); // its door
+  tbox(g, WH.w + 0.4, 0.12, WH.d + 0.5, 0, roof + 0.06, WH.z + 0.1, '#d6d0c2');
+  tbox(g, WH.w + 0.42, 0.07, WH.d + 0.52, 0, roof - 0.01, WH.z + 0.1, '#2a6f74');
+  const visor = tbox(g, WH.w + 0.3, 0.06, 0.45, 0, roof - 0.02, WH.z + WH.d / 2 + 0.38, '#d6d0c2'); visor.rotation.x = 0.35;
+  // the mast on the roof's after edge: crosstree, masthead light, the radar on its post, a horn; stays to bow and stern
+  const mz = WH.z - 0.7, top = roof + 3.0;
+  tcyl(g, 0.065, 3.0, 0, roof + 1.5, mz, '#d8d2c8', 8);
+  tbox(g, 1.5, 0.07, 0.07, 0, roof + 2.1, mz, '#d8d2c8');
+  tball(g, 0.09, 0, top + 0.05, mz, '#f4efd8');
+  tcyl(g, 0.04, 0.35, 0, roof + 0.3, WH.z + 0.4, '#3a3a40', 6); tbox(g, 1.0, 0.08, 0.2, 0, roof + 0.5, WH.z + 0.4, '#3a3a40');
+  rod(V(0, top - 0.1, mz), V(0, sheer(hl - 0.2) + 0.1, hl - 0.25), 0.012, '#2c2630');
+  rod(V(0, top - 0.1, mz), V(0, sheer(-hl) + 0.1, -hl + 0.3), 0.012, '#2c2630');
+  // the outriggers: poles from the mast's foot, raised and out each side, stayed from the masthead
+  for (const sx of [-1, 1]) {
+    const foot = V(sx * 0.15, roof + 0.25, mz), tip = V(sx * 3.4, roof + 2.9, mz - 1.2);
+    rod(foot, tip, 0.045, '#5a4a3e');
+    rod(V(0, top - 0.2, mz), tip, 0.01, '#2c2630');
+  }
+  // rails on stanchions round the foredeck to the bow, and along the after deck
+  for (const sx of [-1, 1]) {
+    const run = (z0: number, z1: number, n: number) => {
+      let prev: THREE.Vector3 | null = null;
+      for (let i = 0; i <= n; i++) {
+        const z = z0 + ((z1 - z0) * i) / n, p = at(z, 0, sx), foot = V(p[0] * 0.94, p[1], z), head = V(p[0] * 0.94, p[1] + 0.6, z);
+        rod(foot, head, 0.022, '#c8c4bc');
+        if (prev) rod(prev, head, 0.026, '#c8c4bc');
+        prev = head;
+      }
+    };
+    run(WH.z + WH.d / 2 + 0.2, hl - 0.15, 4);
+    run(-hl + 0.15, WH.z - WH.d / 2 - 0.3, 4);
+  }
+  // tyres hung over the side as fenders, rust run down from the scuppers
+  for (const sx of [-1, 1]) {
+    for (const z of [-1.8, 0.4, 2.2]) {
+      const p = at(z, 0.12, sx), tyre = part(g, new THREE.TorusGeometry(0.2, 0.08, 6, 12), '#1a1618', p[0] + sx * 0.1, p[1] - 0.25, z); tyre.rotation.y = Math.PI / 2;
+    }
+    for (const z of [-3.2, -1.1, 1.0, 2.9]) { const p = at(z, 0.25, sx); tbox(g, 0.02, 0.38 + 0.2 * hash(z, sx, 303), 0.07, p[0] + sx * 0.012, p[1] - 0.12, z, '#7a4a30'); }
+  }
+  // the after deck's gear: buoys, a crate, a fish box, a coil of line
+  const deckAt = (z: number) => sheer(z) - 0.02;
+  for (const [x, z] of [[-0.8, -3.4], [-0.45, -3.6], [0.7, -2.9]] as const) tball(g, 0.2, x, deckAt(z) + 0.2, z, '#f47a2a');
+  tbox(g, 0.8, 0.5, 0.6, 0.6, deckAt(-1.6) + 0.25, -1.6, '#8a6a46');
+  tbox(g, 0.9, 0.35, 0.6, -0.55, deckAt(-1.2) + 0.18, -1.2, '#2f7ad6');
+  const coil = part(g, new THREE.TorusGeometry(0.28, 0.07, 6, 14), '#cdbf9a', -0.2, deckAt(-2.6) + 0.07, -2.6); coil.rotation.x = Math.PI / 2;
+  fuse(g);
+  return g;
 }

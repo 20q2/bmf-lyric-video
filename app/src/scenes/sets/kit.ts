@@ -29,6 +29,10 @@ export const plane = (g: THREE.Object3D, w: number, h: number, x: number, y: num
 };
 /** A flat picture (unlit), its texture's colours as drawn. */
 export const pic = (map: THREE.Texture, opts: THREE.MeshBasicMaterialParameters = {}) => new THREE.MeshBasicMaterial({ map, ...opts });
+/** A painted picture (a shop's sign, a tower's number): lit and shaded like the wall it's on (toon), so it takes the
+ *  low sun's warmth and the shade as its neighbours do — a pic() keeps its colours as drawn whatever the light, and at
+ *  dusk its whites and reds glowed off the dimming beach (the user, 2026-10-16). */
+export const paint = (map: THREE.Texture, opts: THREE.MeshToonMaterialParameters = {}) => toon({ map, ...opts });
 
 /** A group in the road's frame at s, like the car's (x to the road's left, y up, z forward), `lateral` right of its
  *  centre, on its surface; added to `root`. */
@@ -74,7 +78,7 @@ export function onPanel(p: { center: THREE.Vector3; normal: THREE.Vector3; up: T
 let TINTED: THREE.Material | null = null;
 const tintedMat = () => (TINTED ??= toon({ vertexColors: true }));
 /** A part's geometry coloured `color` (sRGB) in its vertices; unindexed, no uvs (every part alike, so they merge). */
-function tinted(geo: THREE.BufferGeometry, color: string): THREE.BufferGeometry {
+export function tinted(geo: THREE.BufferGeometry, color: string): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo;
   g.deleteAttribute('uv');
   const c = new THREE.Color(color), n = g.attributes.position!.count, a = new Float32Array(n * 3);
@@ -83,14 +87,14 @@ function tinted(geo: THREE.BufferGeometry, color: string): THREE.BufferGeometry 
   return g;
 }
 /** A tinted part in `to` at (x, y, z). */
-function part(to: THREE.Object3D, geo: THREE.BufferGeometry, color: string, x = 0, y = 0, z = 0): THREE.Mesh {
+export function part(to: THREE.Object3D, geo: THREE.BufferGeometry, color: string, x = 0, y = 0, z = 0): THREE.Mesh {
   const m = new THREE.Mesh(tinted(geo, color), tintedMat()); m.position.set(x, y, z); to.add(m); return m;
 }
-const tbox = (to: THREE.Object3D, w: number, h: number, d: number, x: number, y: number, z: number, color: string) => part(to, new THREE.BoxGeometry(w, h, d), color, x, y, z);
-const tcyl = (to: THREE.Object3D, r: number, h: number, x: number, y: number, z: number, color: string, seg = 12) => part(to, new THREE.CylinderGeometry(r, r, h, seg), color, x, y, z);
-const tball = (to: THREE.Object3D, r: number, x: number, y: number, z: number, color: string) => part(to, new THREE.SphereGeometry(r, 12, 9), color, x, y, z);
+export const tbox = (to: THREE.Object3D, w: number, h: number, d: number, x: number, y: number, z: number, color: string) => part(to, new THREE.BoxGeometry(w, h, d), color, x, y, z);
+export const tcyl = (to: THREE.Object3D, r: number, h: number, x: number, y: number, z: number, color: string, seg = 12) => part(to, new THREE.CylinderGeometry(r, r, h, seg), color, x, y, z);
+export const tball = (to: THREE.Object3D, r: number, x: number, y: number, z: number, color: string) => part(to, new THREE.SphereGeometry(r, 12, 9), color, x, y, z);
 /** The tinted parts directly in `parent` fused into one mesh (in its frame; its groups, and theirs, left alone). */
-function fuse(parent: THREE.Object3D) {
+export function fuse(parent: THREE.Object3D) {
   const parts = parent.children.filter((o): o is THREE.Mesh => (o as THREE.Mesh).isMesh && (o as THREE.Mesh).material === TINTED);
   if (parts.length < 2) return;
   const geos = parts.map((m) => { m.updateMatrix(); return m.geometry.clone().applyMatrix4(m.matrix); });
