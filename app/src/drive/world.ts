@@ -17,7 +17,7 @@ import { ROAD_HALF, ROAD_START, type Route } from './route';
 import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } from './carriers';
 import { HEADLAND, HEADWALL, TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, drawTiles, headlandAt, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
-import { BLOCKS, boxAt } from './blocks';
+import { BACK, BLOCKS, boxAt } from './blocks';
 import { sedan } from '../scenes/sets/kit';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
@@ -50,6 +50,12 @@ const PALMS = new Set(['intro', 'chorus1', 'chorus3']); // (none in verse 2: its
 /** Kerbs and sidewalks along the town's streets (not the freeway, the coast, the tunnel or the hills): the kerb's
  *  height, the sidewalk's width (m) and its concrete; broken where a cross street opens (the set-pieces' openings). */
 const SIDEWALKS = { stretches: new Set(['intro', 'chorus1', 'verse1', 'verse2', 'verse3']), kerb: 0.15, width: 3, colour: '#cbbba7' };
+/** The town's back streets: the rows of buildings behind the street (blocks.ts BACK) front one of their own, and the
+ *  ground between is parking (the user, 2026-10-15: past a board, "shops but no road or sidewalks just a flat orange
+ *  plane"). Off the road's centre (m): the lots from the sidewalk's back to `lot`, a sidewalk to `road`, the back street
+ *  to `walk`, its far sidewalk to the back row's fronts (BACK.from); the lots' bays every `bay` m, `bayLen` deep; none
+ *  where the road turns tighter than `tight` m toward that side (the strips would fold). */
+const BACK_STREET = { lot: BACK.from - 12, road: BACK.from - 9.5, walk: BACK.from - 2.5, bay: 2.8, bayLen: 5, tight: 60, lotColour: '#6b5b66' };
 
 /** A ribbon along the road from s0 to s1: at each sample, from (lateral a, height ya) to (lateral b, height yb) over the
  *  road's level; uv in metres (along, across). */
@@ -312,6 +318,52 @@ export function buildWorld(drive: Drive): THREE.Group {
         }
       }
     }
+    // the back streets and the lots (BACK_STREET), where the rows behind stand: each side's runs broken at a turn too
+    // tight for them, a tunnel, the sea; a cross street's asphalt carried through to the back street
+    const B = BACK_STREET, lotM = toon({ color: B.lotColour, side: THREE.DoubleSide }), street = toon({ color: WORLD.asphalt, side: THREE.DoubleSide });
+    const paintM = toon({ color: WORLD.dash, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+    const marks: THREE.BufferGeometry[] = [];
+    const tight = (s: number, side: number) => {
+      const f0 = route.frameAt(s - 3), f1 = route.frameAt(s + 3);
+      return f1.fwd.clone().sub(f0.fwd).dot(f0.right) * side > 0 && f0.fwd.angleTo(f1.fwd) > 6 / B.tight;
+    };
+    for (const st of drive.stretches) {
+      const bk = BLOCKS[st.id]!;
+      if (!K.stretches.has(st.id) || !bk.back) continue;
+      const a0 = st.k === 0 ? ROAD_START : motion.distanceAt(st.start), b0 = motion.distanceAt(st.end);
+      for (const side of [-1, 1]) {
+        if (side === -1 && bk.seaLeft) continue;
+        // (the runs: the stretch less its tight turns and tunnels, sampled every 2 m)
+        const runs: [number, number][] = [];
+        let from: number | null = null;
+        for (let s = a0; s <= b0; s += 2) {
+          const ok = s > 3 && !tight(s, side) && !nearTunnel(drive.tunnels, s, TUNNEL_CLEAR);
+          if (ok && from === null) from = s;
+          if ((!ok || s + 2 > b0) && from !== null) { if (s - from > 8) runs.push([from, s]); from = null; }
+        }
+        const cuts = drive.openings.filter((o) => o.side === side);
+        for (const [ra, rb] of runs) {
+          // (the back street and its far sidewalk run unbroken; the lots and the near sidewalk stop at a cross street)
+          g.add(named(new THREE.Mesh(ribbon(route, ra, rb, side * B.road, 0.012, side * B.walk, 0.012), street), 'backstreets'));
+          g.add(named(new THREE.Mesh(ribbon(route, ra, rb, side * B.walk, K.kerb, side * BACK.from, K.kerb), walk), 'backstreets'));
+          g.add(named(new THREE.Mesh(ribbon(route, ra, rb, side * B.walk, 0, side * B.walk, K.kerb), kerb), 'backstreets'));
+          for (let s = ra + 2; s + 3 < rb; s += 8) marks.push(ribbon(route, s, s + 3, side * ((B.road + B.walk) / 2 - 0.07), 0.016, side * ((B.road + B.walk) / 2 + 0.07), 0.016));
+          let a = ra;
+          for (const o of [...cuts.filter((o) => o.b > ra && o.a < rb).sort((x, y) => x.a - y.a), { a: rb, b: rb }]) {
+            if (o.a - a > 1) {
+              g.add(named(new THREE.Mesh(ribbon(route, a, o.a, side * (ROAD_HALF + K.width), 0.006, side * B.lot, 0.006), lotM), 'backstreets'));
+              g.add(named(new THREE.Mesh(ribbon(route, a, o.a, side * B.lot, K.kerb, side * B.road, K.kerb), walk), 'backstreets'));
+              g.add(named(new THREE.Mesh(ribbon(route, a, o.a, side * B.road, 0, side * B.road, K.kerb), kerb), 'backstreets'));
+              // (the bays: a row off the street's sidewalk and a row off the back street's)
+              for (let s = a + 1; s + 0.2 < o.a; s += B.bay) for (const [x0, x1] of [[ROAD_HALF + K.width + 0.6, ROAD_HALF + K.width + 0.6 + B.bayLen], [B.lot - 0.6 - B.bayLen, B.lot - 0.6]] as const) marks.push(ribbon(route, s, s + 0.12, side * x0, 0.01, side * x1, 0.01));
+            }
+            if (o.b > o.a && o.a < rb) g.add(named(new THREE.Mesh(ribbon(route, Math.max(o.a, ra), Math.min(o.b, rb), side * ROAD_HALF, 0.01, side * B.walk, 0.01), street), 'backstreets'));
+            a = Math.max(a, o.b);
+          }
+        }
+      }
+    }
+    if (marks.length) g.add(named(new THREE.Mesh(mergeGeometries(marks), paintM), 'backstreets'));
   }
 
   // the town's buildings (blocks.ts: the guard checks them too)
