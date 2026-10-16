@@ -1897,25 +1897,25 @@
       "i": 31,
       "text": "Blowin' money fast, we might crash",
       "section": "bridge1",
-      "start": 127.14,
+      "start": 128.17,
       "end": 131.76,
       "words": [
         {
           "w": "Blowin'",
-          "start": 127.14,
-          "end": 128.15,
+          "start": 128.17,
+          "end": 129.05,
           "conf": 0.7
         },
         {
           "w": "money",
-          "start": 128.15,
-          "end": 129.5,
+          "start": 129.09,
+          "end": 129.85,
           "conf": 0.7
         },
         {
           "w": "fast,",
-          "start": 129.5,
-          "end": 129.88,
+          "start": 129.99,
+          "end": 130.38,
           "conf": 0.7
         },
         {
@@ -2707,19 +2707,19 @@
         {
           "w": "Blowin'",
           "start": 173.05,
-          "end": 173.66,
+          "end": 174.1,
           "conf": 0.7
         },
         {
           "w": "money",
-          "start": 173.66,
-          "end": 174.4,
-          "conf": 0.61
+          "start": 174.1,
+          "end": 174.85,
+          "conf": 0.6
         },
         {
           "w": "fast,",
-          "start": 174.4,
-          "end": 174.85,
+          "start": 175.0,
+          "end": 175.38,
           "conf": 0.6
         },
         {
@@ -2833,7 +2833,12 @@
       "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
     },
     {
-      "start": 129.98,
+      "start": 127.14,
+      "end": 128.07,
+      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
+    },
+    {
+      "start": 130.5,
       "end": 131.17,
       "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
     },

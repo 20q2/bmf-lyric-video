@@ -79,6 +79,11 @@ FIX = {
     # L47 outro "Blowin'": 172.15-173.00 is the falling "oh" ad-lib (312 -> 207 Hz); "Blowin'" enters at 173.05 on
     # the 277 Hz note L45 starts on (165.69). Whisper: "Girl" (= Blowin') 173.06.
     (47, 0): dict(start=173.05, conf=0.7),
+    # L47 outro: the bridge's melody (see L31) — "Blowin'" 277 -> 311 Hz, "money" from the step up to 351 Hz at
+    # 174.10, through its 139 Hz tail to 174.85; "fast" the 209-230 Hz note 175.00-175.38 (the user, 2026-10-16, of
+    # L31's: the highlight a full second early).
+    (47, 1): dict(start=174.10, end=174.85, conf=0.6),
+    (47, 2): dict(start=175.00, end=175.38, conf=0.6),
     # L47 outro "...we might crash" (the user confirmed the words), faint: after the high "mmm" (420 Hz, 175.45-176.20)
     # the lead's short phrase 176.30-176.62 (-50 dB, 174 -> 156 Hz, the bridge's "crash" contour), spaced as L31's.
     (47, 3): dict(start=176.30, end=176.40, conf=0.4),
@@ -93,17 +98,19 @@ FIX = {
     (30, 0): dict(start=125.29, conf=0.75),
     # L31 bridge "...fast, (mmm) we might crash": same shape; "we might crash" 131.27-131.76 (233-261 Hz), then the
     # "oh" ad-lib (415 Hz) 131.80-132.25; L32 "Tryna" re-enters at 132.34 (onset 1.1, 272 Hz).
-    # Its first half: "Blowin'" 127.17 (onset 5.3, 314 -> 207 Hz) to the dip at 128.10, "money" from 128.15 (onset 1.4,
-    # 277 Hz; CTC: 129.04), "fast" from the unvoiced /f/ at 129.50 to 129.88; the 210 Hz hum 130.0-130.4 is the "mmm".
-    (31, 1): dict(start=128.15, conf=0.7),
-    (31, 2): dict(start=129.50, end=129.88, conf=0.7),
+    # Its first half sings L29's melody — "Blow" 277 Hz, "in'" 311, "mon" 351, "ey" low, "fast" 209 — after a falling
+    # "oh" ad-lib 127.15-128.05 (314 -> 207 Hz, as before L47's "Blowin'"). So "Blowin'" from 128.17 (277 Hz), "money"
+    # from the step up to 351 Hz at 129.09 (CTC: 129.04) through its 138 Hz tail to 129.85, "fast" 129.99-130.38 (210
+    # -> 230 Hz); the 415-470 Hz note 130.49-131.21 is the "mmm". (These were one note early, the ad-lib taken for
+    # "Blowin'": the user, 2026-10-16, "money doesn't start till around 129".)
+    (31, 0): dict(start=128.17, end=129.05, conf=0.7),
+    (31, 1): dict(start=129.09, end=129.85, conf=0.7),
+    (31, 2): dict(start=129.99, end=130.38, conf=0.7),
     # "we" 131.27-131.39 (261 Hz), "might" from the onset at 131.40 (233 Hz), "crash" from 131.55 (rising to 261 Hz).
     (31, 3): dict(start=131.27, end=131.39, conf=0.65),
     (31, 4): dict(start=131.40, end=131.54, conf=0.6),
     (31, 5): dict(start=131.55, end=131.76, conf=0.65),
     (32, 0): dict(start=132.34, conf=0.7),
-    # L47 outro "fast" (CTC: from 174.81): 174.40-174.85 (351 Hz -> 139 Hz, gone by 174.90); the 213-230 Hz note from 175.00 is the "oh".
-    (47, 2): dict(start=174.40, end=174.85, conf=0.6),
     # L48, the song's last phrase, fades out at -51..-56 dB: two notes, 177.35-177.85 (310 Hz) and 178.05-178.55
     # (280-309 Hz), the stem at its floor from 178.60. Whisper: Tryna 177.10, make 177.56, it 177.86, last 178.10.
     (48, 0): dict(start=177.35, end=177.55, conf=0.5),
