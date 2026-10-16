@@ -51,6 +51,9 @@ export interface Placed {
   plan: unknown;
   /** Shots of its own that aren't any phrase's (the intro's, before the first word). */
   shots?: Shot[];
+  /** Its own take for a line of its stretch the drive places (a run of one line's carriers, of one kind), in place of
+   *  the drive's (drive.ts: lineTake, roadTake, glideTake); undefined leaves it to the drive. */
+  take?: (run: readonly Carrier[]) => Target | undefined;
   /** The next stretch's faces on the left stand at least this far along the road (their centres, m); by default past
    *  its own blocks. */
   floor?: number;

@@ -4,7 +4,7 @@
 // only (canvas).
 import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
-import { type Chorus2Plan, GANTRY, MEDIAN, TRAIN, FREEWAY_EDGE, LANES } from '../../drive/sets/chorus2';
+import { type Chorus2Plan, GANTRY, MEDIAN, TRAIN, FREEWAY_EDGE, LANES, trafficS } from '../../drive/sets/chorus2';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -97,7 +97,8 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
     }
   }
 
-  // slower traffic in the outside lane, overtaken (the cheapest speed there is)
+  // slower traffic in the outside lane, overtaken (the cheapest speed there is); the two beside him through the
+  // dropping line surging away (drive/sets/chorus2.ts SURGE)
   const traffic = plan.traffic.map((T, i) => {
     const g = new THREE.Group(); g.matrixAutoUpdate = false;
     g.add(sedan({ color: ['#e8e2d2', '#5a6a7d', '#b0532e'][i % 3]! }));
@@ -132,7 +133,7 @@ export function buildChorus2(drive: Drive): { group: THREE.Group; update(t: numb
         if (there) frameAt(T.tailS + TRAIN.v * (t - T.at) + (k + 0.5) * TRAIN.car + k * TRAIN.gap, MEDIAN.tracks, c.matrix);
       }
       for (const { T: tr, g } of traffic) {
-        const s = tr.s0 + tr.v * (t - tr.t0);
+        const s = trafficS(tr, t);
         g.visible = s > plan.s0 + 10 && s < plan.s1 - 5;
         if (g.visible) frameAt(s, tr.lat, g.matrix);
       }

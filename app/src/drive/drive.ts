@@ -121,7 +121,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const solo = emphasisOf(lyrics.lines), nextStart = (i: number) => lyrics.lines[i + 1]?.words[0]?.start ?? Infinity;
   const setFrames = new Map<string, SetFrame>(), clears: Placed['clear'] = [], setBlocks: Block[] = [], plans: Record<string, unknown> = {}, ofSets: Carrier[] = [], openings: { side: number; a: number; b: number }[] = [];
   // (the faces on the left after a set-piece stand past its ground: its own blocks' far end, and their clear zone)
-  const floor: Record<string, number> = {}, setShots: Shot[] = [];
+  const floor: Record<string, number> = {}, setShots: Shot[] = [], setTakes: Record<string, NonNullable<Placed['take']>> = {};
   for (const st of stretches) {
     const next = stretches[st.k + 1], p = SETS[st.id]?.place({ st, audio, route, motion, carFrame, solo, nextStart, next, floor: floor[st.id] });
     if (!p) continue;
@@ -131,6 +131,7 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     clears.push(...p.clear); setBlocks.push(...p.blocks);
     if (p.openings) openings.push(...p.openings);
     if (p.shots) setShots.push(...p.shots);
+    if (p.take) setTakes[st.id] = p.take;
     if (next && p.floor !== undefined) floor[next.id] = p.floor;
     plans[st.id] = p.plan;
   }
@@ -166,12 +167,13 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
     // (elsewhere, a line on one kind of sign: from its framing to the next's)
     if (j === i + 1 && GLIDES.has(carriers[i]!.kind)) while (j < carriers.length && !own_(j) && carriers[j]!.phrase.line === carriers[i]!.phrase.line && carriers[j]!.kind === carriers[i]!.kind) j++;
     const run = carriers.slice(i, j);
-    const take = run.length < 2 ? undefined : PAIRABLE.has(run[0]!.kind) ? lineTake(run, run.map((_, k) => fastAt(i + k)))
+    // (a set-piece may take a line of its stretch it lets the drive place: chorus 2's road paint)
+    const take = run.length < 2 ? undefined : setTakes[run[0]!.stretch]?.(run) ?? (PAIRABLE.has(run[0]!.kind) ? lineTake(run, run.map((_, k) => fastAt(i + k)))
       : run[0]!.kind === 'road' ? roadTake(run, route)
       // (a line's towed banners share one aim, the formation's top: the line rides on its first's framing — gliding
       // to the next's only swapped the eye's seeded offset, a whip mid-line at "fly, fly" — the user, 2026-10-14)
       : run[0]!.kind === 'banner' ? framing(run[0]!, carFrame, (t) => motion.distanceAt(t))
-      : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t))));
+      : glideTake(run, run.map((c) => framing(c, carFrame, (t) => motion.distanceAt(t)))));
     for (let k = i; k < j; k++) takes[k] = take;
     i = j;
   }

@@ -7,7 +7,8 @@
 //   "The boy West side of Compton came…"     one big freeway sign, three panels across the lanes, the car rushing under
 // And the SLAUSON exit sign at the end, where the car comes off into the neighbourhood (verse 2). Pure.
 import * as THREE from 'three';
-import { type Carrier, type Kind, layout, lineTake, lookFrom } from '../carriers';
+import { type Carrier, type Kind, ROAD_TAKE, layout, lineTake, lookFrom } from '../carriers';
+import type { Target } from '../shots';
 import { TEXT_SHARE } from '../ads';
 import { type Phrase, phraseOf, phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
@@ -51,13 +52,43 @@ export interface Chorus2Plan {
    *  road's own ribbon: a strip beside it shaded differently from the road). */
   lanes: { a: number; b: number; edge: number; merge: number };
   /** Slower cars in the outside lane, overtaken through the chorus (the cheapest speed there is: relative motion):
-   *  each where it is when they pass it (m along the road, s), its own speed (m/s) and its lane (m off the centre). */
-  traffic: { s0: number; t0: number; v: number; lat: number }[];
+   *  each where it is when they pass it (m along the road, s), its own speed (m/s) and its lane (m off the centre); and
+   *  its surge, if it has one (SURGE): from `at` (s) it speeds up by `dv` (m/s) over `over` (s), and keeps that pace. */
+  traffic: { s0: number; t0: number; v: number; lat: number; surge?: { at: number; dv: number; over: number } }[];
+}
+/** Where a car of the traffic is along the road at t (m): at its own pace through where they pass it, plus whatever its
+ *  surge has put on since it began (its speed eased up, smoothstep, so it never jerks). */
+export function trafficS(T: Chorus2Plan['traffic'][number], t: number): number {
+  let s = T.s0 + T.v * (t - T.t0);
+  if (T.surge && t > T.surge.at) {
+    const { at, dv, over } = T.surge, u = Math.min(1, (t - at) / over);
+    s += dv * (over * (u * u * u - (u * u * u * u) / 2) + Math.max(0, t - at - over)); // (∫ dv·(3u² − 2u³) dt)
+  }
+  return s;
 }
 
 /** The pace (m/s): the freeway's; easing off for "…panties from dropping" (its road paint, read in one take high ahead
  *  of the car: at freeway speed its phrases lie too far apart to hold), from this long before it, back up after it. */
 export const PACE = { freeway: 26, easy: 15, off: 0.9, offRamp: 0.7, on: 0.1, onRamp: 1.2 };
+/** "…panties from dropping" on the road paint in one steady move, in place of the drive's road take (carriers.ts
+ *  roadTake: its aim eased through each phrase and caught up between, nearly still, then racing, then still again —
+ *  the user, 2026-10-15: "a kind of staggered camera panning … just kept it smooth. Keep the camera moving down along
+ *  the highway at a little bit of a slower rate than our car is, so our car slowly comes into view"). High ahead of
+ *  the car looking back down the road, as the drive's is, but travelling on at one constant pace, `pace` of the car's
+ *  over the line, through the phrases' middles (fit to them at ROAD_TAKE.at of each); the car gains on it the whole
+ *  line, coming down out of the frame's top toward the lens. From `dist` m (further back than the drive's: the frame
+ *  holds the road from the car to the phrase ahead), this steeply (radians: nearly overhead, steeper than the drive's,
+ *  so the phrase up toward the frame's top, further off, still reads big enough), aimed `toward` m back toward the car.
+ *  (Tight: the guard's frame margin and type size leave the car coming in from the top only about a third of the way
+ *  down by the line's end — the paint lies just ahead of where the car is as each phrase ends.) */
+export const DROP_TAKE = { pace: 0.7, dist: 39, pitch: 1.4, toward: -2 };
+/** The two cars beside his as the dropping line is sung (the second and third of the traffic: the first is behind,
+ *  out of the take), speeding up through it, each its own way, so they pull away from him and on down the frame apart
+ *  (the user, 2026-10-15: "accelerated the cars to the left of our car, within the camera's view … so they're not
+ *  making, like, a weird line in the highway, it'll look more organic that way" — at their own steady paces they and
+ *  he crept down the road abreast, a row across the lanes): which car, when its surge starts (s after the line
+ *  starts), by how much (m/s), over how long (s). */
+export const SURGE = [{ car: 1, at: 0.1, dv: 10, over: 1.8 }, { car: 2, at: 1.1, dv: 13, over: 1.3 }];
 
 export const CHORUS2: SetPiece = {
   owns: (line) => CAMPAIGN.test(line.text) || PLACE.test(line.text),
@@ -142,16 +173,29 @@ export const CHORUS2: SetPiece = {
       blocks.push({ s: m, lateral: WALL.face - WALL.d / 2, w: WALL.seg, h: WALL.h, d: WALL.d, color: 0, concrete: true, matrix: alongRoad(m, WALL.face - WALL.d / 2, WALL.d, WALL.h, WALL.seg + 0.05) });
     }
     const until = at + (s1 - tailS) / TRAIN.v;
-    // slower traffic in the outside lane, one overtaken in each third of the chorus
-    const traffic = ([[0.23, 18, 0], [0.55, 17, 1], [0.84, 20, 0]] as const).map(([u, v, lane]) => {
-      const t0 = st.start + (st.end - st.start) * u;
-      return { s0: carS(t0), t0, v, lat: ROAD_HALF + LANES.w * (lane + 0.5) };
+    // slower traffic in the outside lanes, overtaken through the chorus; the two beside him as he eases off for the
+    // dropping line surge on past him instead, apart (SURGE)
+    const drop = st.lines.find((l) => /dropping/i.test(l.text));
+    const traffic: Chorus2Plan['traffic'] = ([[0.23, 18, 0], [0.55, 17, 1], [0.84, 20, 0]] as const).map(([u, v, lane], i) => {
+      const t0 = st.start + (st.end - st.start) * u, S = drop && SURGE.find((x) => x.car === i);
+      return { s0: carS(t0), t0, v, lat: ROAD_HALF + LANES.w * (lane + 0.5), ...(S ? { surge: { at: drop.start + S.at, dv: S.dv, over: S.over } } : {}) };
     });
     const plan: Chorus2Plan = {
       s0, s1, train: { tailS, at, from: Math.max(st.start - 1, at - 4), until }, posters: posters.map((c) => c.s),
       gantryS, panels, exitS: carS(st.end - EXIT.before) + 40, traffic,
       lanes: { a: s0, b: s1, edge: FREEWAY_EDGE, merge: 45 },
     };
-    return { carriers, frames, clear: [{ side: -1, a: s0, b: s1 }], blocks, plan };
+    // the dropping line's road paint (the drive places it): one steady move down the road, slower than the car
+    const dropTake = (run: readonly Carrier[]): Target | undefined => {
+      if (run[0]!.kind !== 'road') return undefined;
+      const T0 = run[0]!.phrase.start, T1 = run[run.length - 1]!.phrase.end, v = DROP_TAKE.pace * (carS(T1) - carS(T0)) / (T1 - T0);
+      const keys = run.map((c) => [c.phrase.start + (c.phrase.end - c.phrase.start) * ROAD_TAKE.at, c.s] as const);
+      const tm = keys.reduce((a, [t]) => a + t, 0) / keys.length, sm = keys.reduce((a, [t, s]) => a + s - v * (t - tm), 0) / keys.length;
+      return (t) => {
+        const f = route.frameAt(sm + v * (t - tm) + DROP_TAKE.toward), grade = Math.asin(Math.max(-1, Math.min(1, f.fwd.y)));
+        return { tx: f.pos.x, ty: f.pos.y + 0.03, tz: f.pos.z, dist: DROP_TAKE.dist, yaw: Math.atan2(f.fwd.x, f.fwd.z), pitch: DROP_TAKE.pitch - grade, roll: 0 };
+      };
+    };
+    return { carriers, frames, clear: [{ side: -1, a: s0, b: s1 }], blocks, plan, take: dropTake };
   },
 };
