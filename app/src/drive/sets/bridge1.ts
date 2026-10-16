@@ -167,8 +167,11 @@ export const BRIDGE1: SetPiece = {
       // (the move on to the next piece starts on C's last word and lands just before D is sung, at about the car's
       // pace: it was crammed into the breath between them, a dash that arrived after "we": the user, 2026-10-16, "feels
       // a little bit late and like it could be a little bit smoother")
-      const sC = paint(C, 0, sS + 11), sD = paint(D, 1, sC + 26), go = Math.max(C.start + 0.8, C.end - 0.45);
-      const hi = { x: -2.8, y: 5.1 }, lo = { x: 3.5, y: 1.1 }, mid = { x: 3, y: 2.6 };
+      // (the two pieces one mural just past the sign, read in one steady pan as the eye drifts on low behind them: it
+      // held on the first while it was sung, then dashed 26 m on to the second — the user, 2026-10-16, "I'd like for
+      // that to be one smooth continuous shot instead of being split between the two sets of lyrics")
+      const sC = paint(C, 0, sS + 15), sD = paint(D, 1, sC + 12);
+      const hi = { x: -2.8, y: 5.1 }, lo = { x: 3.5, y: 1.4 };
       // (the sign held, creeping on, until "Blowin'" comes again; then a cut to the piece, low behind them — it panned
       // down to it: the user, 2026-10-16, "instead of panning down, we should just cut ... I like that it kind of
       // lingers")
@@ -179,12 +182,9 @@ export const BRIDGE1: SetPiece = {
         { t: C.start, eye: [sS - 12.5 + creep * (C.start - S.line.end), hi.x, hi.y], at: [sS, 0, 3] },
       ], true);
       take([C, D], [
-        { t: C.start - 0.3, eye: [sC - 10.5, lo.x, lo.y], at: [sC, W0, 3.3] }, // (just past the sign: it's behind the lens)
-        { t: go, eye: [sC - 8, lo.x, lo.y + 0.3], at: [sC, W0, 3.3] },
-        { t: C.end, eye: [sC - 5.5, lo.x - 0.2, lo.y + 0.6], at: [sC + 1, W0, 3.3] },
-        { t: D.start - 0.15, eye: [sD - 14, mid.x, mid.y], at: [sD + 5, W0 + 2, 3] },
-        { t: D.end + 0.6, eye: [sD - 12.5, mid.x, mid.y], at: [sD + 5, W0 + 2, 3] },
-      ]);
+        { t: C.start - 0.3, eye: [sS + 0.5, lo.x, lo.y], at: [sC - 4, W0, 3.3] }, // (just past the sign: it's behind the lens)
+        { t: D.end + 0.6, eye: [sC - 6, lo.x, lo.y + 0.5], at: [sD - 0.5, W0 + 0.5, 3.1] },
+      ], true);
     }
 
     // ---- take 3, the second sign: low on the right walkway short of it, the car passing the lens on its left and
