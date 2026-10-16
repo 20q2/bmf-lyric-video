@@ -261,6 +261,48 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
     }
   }
 
+  // ---- the writer's own piece: 20Q2 (the user's handle, 2026-10-16: "really cute if there was some 20Q2 graffiti in
+  // the tunnel"), a burner on the left wall a few metres past the last lyric piece, where the camera rests on "we might
+  // crash" — a sprayed cloud, the letters stepped and tilted with a 3D block, a crown over them, drips; its name tagged
+  // again here and there among the tags below ----
+  {
+    const last = paintAt.reduce((m, p) => (p.b > m.b ? p : m), paintAt[0]!), w = 4.6, h = 2.3, sp = last.b + 2.2 + w / 2, y = WALK.h + 1.95;
+    const tex = canvasTex(1024, 512, (c) => {
+      // the cloud sprayed behind: soft overlapping blobs, a pale violet, its edge fuzzed
+      for (let k = 0; k < 26; k++) {
+        const x = 250 + 524 * hash(k, 91), yy = 256 + (hash(k, 92) - 0.5) * 150, r = 70 + 50 * hash(k, 93), g = c.createRadialGradient(x, yy, 0, x, yy, r);
+        g.addColorStop(0, 'rgba(176,150,214,0.9)'); g.addColorStop(0.7, 'rgba(176,150,214,0.75)'); g.addColorStop(1, 'rgba(176,150,214,0)');
+        c.fillStyle = g; c.beginPath(); c.arc(x, yy, r, 0, Math.PI * 2); c.fill();
+      }
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+      const chars = ['2', '0', 'Q', '2'], x0 = 230, step = 190;
+      const at = (k: number) => ({ x: x0 + k * step + (hash(k, 94) - 0.5) * 20, y: 270 + (k % 2 ? -18 : 14), r: (hash(k, 95) - 0.5) * 0.32, size: 250 + 40 * hash(k, 96) });
+      const each = (draw: (ch: string, k: number) => void) => chars.forEach((ch, k) => { const a = at(k); c.save(); c.translate(a.x, a.y); c.rotate(a.r); c.font = font(F.graffiti(), a.size); draw(ch, k); c.restore(); });
+      // (a letter filled or stroked at an offset; the zero a fat oval ring of its own: the handstyle's reads as a D)
+      const ring = (dx: number, dy: number) => { c.beginPath(); c.ellipse(dx, dy, 66, 98, 0, 0, Math.PI * 2); c.ellipse(dx, dy, 22, 50, 0, Math.PI * 2, 0, true); };
+      const fill = (ch: string, dx = 0, dy = 0) => { if (ch === '0') { ring(dx, dy); c.fill(); } else c.fillText(ch, dx, dy); };
+      const stroke = (ch: string) => { if (ch === '0') { ring(0, 0); c.stroke(); } else c.strokeText(ch, 0, 0); };
+      // its 3D block, stepped down and right, then the outline, then the fill fading yellow to orange to hot pink
+      each((ch) => { c.fillStyle = '#3a1c4e'; for (let d = 1; d <= 16; d += 1.5) fill(ch, d, d); });
+      each((ch) => { c.lineWidth = 26; c.strokeStyle = '#141218'; stroke(ch); });
+      each((ch) => { const g = c.createLinearGradient(0, -110, 0, 110); g.addColorStop(0, '#ffe14a'); g.addColorStop(0.55, '#ff8a1e'); g.addColorStop(1, '#ff3f8e'); c.fillStyle = g; fill(ch); });
+      // the shine: white flecks on each letter's upper left, a star or two
+      each((ch, k) => { c.fillStyle = '#ffffff'; c.fillRect(-60 + 20 * hash(k, 97), -78, 34, 9); c.fillRect(-64 + 20 * hash(k, 97), -60, 12, 9); });
+      const star = (x: number, yy: number, r: number) => { c.fillStyle = '#ffffff'; c.beginPath(); for (let k = 0; k < 8; k++) { const a = (Math.PI / 4) * k, q = k % 2 ? r * 0.25 : r; c.lineTo(x + q * Math.cos(a), yy + q * Math.sin(a)); } c.fill(); };
+      star(860, 120, 26); star(150, 400, 18);
+      // drips off the letters' feet
+      c.fillStyle = '#ff3f8e';
+      for (let k = 0; k < 7; k++) { const x = 200 + 600 * hash(k, 98), len = 30 + 70 * hash(k, 99); c.fillRect(x, 360, 7, len); c.beginPath(); c.arc(x + 3.5, 360 + len, 6, 0, Math.PI * 2); c.fill(); }
+      // a crown over the Q, outlined
+      c.save(); c.translate(x0 + 2 * step, 92); c.rotate(-0.12);
+      c.beginPath(); c.moveTo(-60, 30); c.lineTo(-66, -26); c.lineTo(-30, 4); c.lineTo(0, -38); c.lineTo(30, 4); c.lineTo(66, -26); c.lineTo(60, 30); c.closePath();
+      c.lineWidth = 12; c.strokeStyle = '#141218'; c.stroke(); c.fillStyle = '#ffe14a'; c.fill(); c.restore();
+    });
+    const g = onWall(sp, -1);
+    plane(g, w, h, 0, y, 0.025, toon({ map: tex, transparent: true, alphaTest: 0.02, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -3 }));
+    taken.push({ side: -1, a: sp - w / 2 - 0.3, b: sp + w / 2 + 0.3, lo: y - h / 2 - 0.3, hi: y + h / 2 + 0.3 });
+  }
+
   // ---- tags: small, unreadable handstyles, throw-ups, stickers and water stains, layered round the pieces (never over
   // one), thickest near them, so the lyric wall reads as a tagged wall in a used tunnel ----
   {
@@ -273,13 +315,14 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
         c.save(); c.beginPath(); c.rect(x0, y0, CELL, CELL); c.clip(); c.translate(x0 + CELL / 2, y0 + CELL / 2);
         const kind = i < 4 ? 'stain' : i < 8 ? 'throw' : i < 10 ? 'sticker' : 'tag';
         kinds.push(kind);
-        const word = Array.from({ length: 3 + Math.floor(r(1) * 3) }, (_, k) => letters[Math.floor(hash(i, k, 62) * letters.length)]).join('');
+        const own = i === 5 || i === 13 || i === 22 || i === 29; // (20Q2's tags among the others: the piece above)
+        const word = own ? '20Q2' : Array.from({ length: 3 + Math.floor(r(1) * 3) }, (_, k) => letters[Math.floor(hash(i, k, 62) * letters.length)]).join('');
         const ink = inks[Math.floor(r(2) * inks.length)]!;
         if (kind === 'stain') { // water and rust run down from the haunch
           for (let k = 0; k < 5; k++) { const w = 10 + 30 * hash(i, k, 63), gx = (hash(i, k, 64) - 0.5) * 120, g = c.createLinearGradient(0, -CELL / 2, 0, CELL / 2); g.addColorStop(0, `rgba(${k % 2 ? '90,50,24' : '40,30,28'},0.8)`); g.addColorStop(1, 'rgba(60,40,30,0)'); c.fillStyle = g; c.fillRect(gx - w / 2, -CELL / 2, w, CELL * (0.5 + 0.5 * hash(i, k, 65))); }
         } else if (kind === 'throw') { // bubble letters: a fill, a fat outline
           c.rotate((r(3) - 0.5) * 0.3); c.font = font(F.graffiti(), 96); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
-          const t2 = word.slice(0, 3); c.lineWidth = 22; c.strokeStyle = ink === '#e9e6ea' ? '#141218' : ink; c.strokeText(t2, 0, 0, CELL * 0.9);
+          const t2 = own ? word : word.slice(0, 3); c.lineWidth = 22; c.strokeStyle = ink === '#e9e6ea' ? '#141218' : ink; c.strokeText(t2, 0, 0, CELL * 0.9);
           c.fillStyle = r(4) < 0.5 ? '#e9e6ea' : '#b8b8c4'; c.fillText(t2, 0, 0, CELL * 0.9);
         } else if (kind === 'sticker') { // a slap: HELLO my name is, scrawled over
           c.rotate((r(3) - 0.5) * 0.4); c.fillStyle = r(4) < 0.5 ? '#d8262e' : '#2b6fd6'; c.fillRect(-70, -48, 140, 96); c.fillStyle = '#f6f2ea'; c.fillRect(-62, -12, 124, 52);
@@ -291,7 +334,7 @@ export function buildBridge1(drive: Drive): { group: THREE.Group; update(t: numb
           c.lineWidth = 3; c.strokeText(word, 0, 0, CELL * 0.7); c.fillText(word, 0, 0, CELL * 0.7);
           c.lineWidth = 6; c.lineCap = 'round'; c.beginPath(); c.moveTo(-80, 34); c.quadraticCurveTo(0, 60 + 20 * r(6), 90, 22); c.stroke();
           for (let k = 0; k < 2; k++) if (hash(i, k, 67) < 0.6) c.fillRect(-60 + 120 * hash(i, k, 68), 10, 3, 20 + 40 * hash(i, k, 69));
-          if (r(7) < 0.25) { c.strokeStyle = '#141218'; c.lineWidth = 7; c.beginPath(); c.moveTo(-90, -30); c.lineTo(90, 30); c.stroke(); } // crossed out
+          if (r(7) < 0.25 && !own) { c.strokeStyle = '#141218'; c.lineWidth = 7; c.beginPath(); c.moveTo(-90, -30); c.lineTo(90, 30); c.stroke(); } // crossed out
         }
         c.restore();
       }
