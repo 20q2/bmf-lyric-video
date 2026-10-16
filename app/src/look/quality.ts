@@ -3,7 +3,8 @@
 // of a frame changes. Browser and bun (no location under bun: final).
 const params = typeof location === 'undefined' ? null : new URLSearchParams(location.search);
 
-/** Rendering at full quality (the export, and under bun). */
-export const FINAL = !params || params.has('export');
+/** Rendering at full quality (the export, and under bun; ?quality=preview drives the export at the player's, to time
+ *  what the player costs: scripts/render.ts --preview). */
+export const FINAL = !params || (params.has('export') && params.get('quality') !== 'preview');
 /** Each shadow cascade's map (px: look/shadows.ts), and how often the hero's sky reflection is remade (s of song time). */
 export const QUALITY = { shadowMap: FINAL ? 2048 : 1536, envStep: FINAL ? 0.25 : 1 } as const;

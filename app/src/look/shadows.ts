@@ -73,8 +73,10 @@ uniform vec3 shadeDir;
 const vec2 SHADE_SEARCH[ 6 ] = vec2[ 6 ]( ${disc(6, 0.5)} );
 const vec2 SHADE_PCF[ 16 ] = vec2[ 16 ]( ${disc(16)} );
 // one tap, o (uv) off c, its depth following the receiver's own plane (g: depth per uv: a surface the light grazes
-// doesn't shadow itself across a wide kernel), dz (depth units) nearer the light
-float shadeTap( sampler2DShadow m, vec3 c, vec2 g, vec2 o, float dz ) { return texture( m, vec3( c.xy + o, c.z + dot( g, o ) - dz ) ); }
+// doesn't shadow itself across a wide kernel), dz (depth units) nearer the light. (With no gradients: the maps have no
+// mips, and a plain texture() in these loops needs the screen's derivatives, so Direct3D's compiler unrolled every one
+// of them — each material took ~0.4 s to compile, and playback froze while it did, 13 s at the first cut)
+float shadeTap( sampler2DShadow m, vec3 c, vec2 g, vec2 o, float dz ) { return textureGrad( m, vec3( c.xy + o, c.z + dot( g, o ) - dz ), vec2( 0.0 ), vec2( 0.0 ) ); }
 // the share of taps round c (radius r, uv) with something at least dz above them toward the light
 float shadeOver( sampler2DShadow m, vec3 c, vec2 g, float r, float dz ) {
   float o = 1.0 - shadeTap( m, c, g, vec2( 0.0 ), dz );
@@ -185,12 +187,16 @@ export class Cascades {
   private view = new THREE.Frustum();
   private toLight = new THREE.Vector3(0, 1, 0);
   private far = new THREE.Vector3();
+  /** Every caster drawn into every map, uncull'd (the load's warm-up: each kind of caster's depth shader compiled then,
+   *  not on first sight). */
+  everything = false;
   constructor(private size: number) {
     const sphere = new THREE.Sphere();
     this.lights.forEach((l, i) => {
       // (three asks each map's box which casters to draw: only those big enough for it whose shadow can be seen)
       const box = l.shadow.getFrustum(), least = CASCADES[i]!.least;
       box.intersectsObject = (o: THREE.Object3D) => {
+        if (this.everything) return true;
         const inst = o as THREE.InstancedMesh;
         if (inst.isInstancedMesh) { if (!inst.boundingSphere) inst.computeBoundingSphere(); sphere.copy(inst.boundingSphere!); }
         else { const g = (o as THREE.Mesh).geometry; if (!g.boundingSphere) g.computeBoundingSphere(); sphere.copy(g.boundingSphere!); }

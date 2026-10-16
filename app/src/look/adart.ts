@@ -85,6 +85,8 @@ function keep(poly: Corner[], f: (l: number) => number): Corner[] {
   return out;
 }
 let portraitCache: { paths: { path: Path2D; color: string }[]; glints: [number, number][] } | null = null;
+/** His portrait's paths, built now (~0.5 s, once: the scene's load, not the first board that shows him). */
+export const warmPortrait = () => void portrait();
 function portrait() {
   if (portraitCache) return portraitCache;
   const { pos, nrm, tone, part } = bustTriangles(), P = POSE, cy = Math.cos(P.turn), sy = Math.sin(P.turn), cp = Math.cos(-P.below), sp = Math.sin(-P.below);

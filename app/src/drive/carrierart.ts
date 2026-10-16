@@ -178,6 +178,18 @@ export class CarrierArt {
   private c: CanvasRenderingContext2D;
   private key = '';
   private style: Style;
+  /** The board's ad art (its product, his portrait: the same at every draw), painted once and laid in after: repainted
+   *  at each step of a lyric's reveal, his portrait's thousands of triangles cost ~350 ms of the GPU a frame — through
+   *  every board's flip, on screen or not (the user, 2026-10-15: "it just freezes in those parts"). */
+  private adArt: HTMLCanvasElement | null = null;
+  /** Its own copy before the lyric (the flip's first face), likewise painted once. */
+  private copyDone = false;
+  /** What the graffiti piece on the 'paint' layer was painted for (the word lit, the punch): it's laid on again, at
+   *  each step of its reveal, fade and dimming, without being painted again (~190 ms a paint, every frame of its
+   *  reveal in the tunnel). */
+  private pieceKey = '';
+  /** What the piece's base (its cloud, block, outlines and drips: all but its letters' faces) was painted for. */
+  private baseKey = '';
 
   constructor(private carrier: Carrier) {
     this.canvas.width = carrier.kind === 'hill' ? HILL_CANVAS_W : CANVAS_W;
@@ -188,6 +200,14 @@ export class CarrierArt {
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.anisotropy = 16;
     this.update(-Infinity); // blank until its reveal
+  }
+
+  /** Paints its heaviest art now (the scene's load), so its first frames on screen only lay it on: a graffiti piece's
+   *  base (~200–450 ms, at each piece's first sight in the tunnel). */
+  warm() {
+    if (!this.style.graffiti) return;
+    this.draw(this.carrier.phrase.start + 1e-3);
+    this.key = ''; // (drawn for real at its first update)
   }
 
   update(t: number) {
@@ -208,7 +228,13 @@ export class CarrierArt {
     // the board's art, built round its lyric (never fading for it): an ad's product, or a route sign's shield and arrow
     const share = TEXT_SHARE[carrier.kind] ?? 1;
     // (a bus's ad is the bus's: its rows are the headline over it)
-    if (carrier.ad && carrier.kind !== 'bus' && carrier.kind !== 'giant') drawAd(c, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1], Number(carrier.id.split('.')[1] ?? 0) + carrier.phrase.line);
+    if (carrier.ad && carrier.kind !== 'bus' && carrier.kind !== 'giant') {
+      if (!this.adArt) {
+        const a = (this.adArt = document.createElement('canvas')); a.width = W; a.height = H;
+        drawAd(a.getContext('2d')!, carrier.ad, W, H, share, carrier.kind === 'billboard' || carrier.kind === 'poster' ? undefined : style.colors[1], Number(carrier.id.split('.')[1] ?? 0) + carrier.phrase.line);
+      }
+      c.drawImage(this.adArt, 0, 0);
+    }
     // (a shop's poster, taped up in its window: tape across its corners)
     if (carrier.kind === 'window' && carrier.ad) for (const [x, y, a] of [[0, 0, -0.785], [W, 0, 0.785], [0, H, 0.785], [W, H, -0.785]] as const) { c.save(); c.translate(x, y); c.rotate(a); c.fillStyle = 'rgba(205,205,195,0.8)'; c.fillRect(-W * 0.045, -H * 0.05, W * 0.09, H * 0.1); c.restore(); }
     else if (carrier.kind === 'street' || carrier.kind === 'gantry') drawRoute(c, W, H, share);
@@ -222,7 +248,7 @@ export class CarrierArt {
     // board, slat by slat, from the copy to the words
     if (shown >= 1) { this.drawWords(c, t, TW, 1); return; }
     const before = this.layer('before'), after = this.layer('after');
-    this.drawCopy(before.getContext('2d')!, TW);
+    if (!this.copyDone) { this.drawCopy(before.getContext('2d')!, TW); this.copyDone = true; }
     const ac = after.getContext('2d')!;
     ac.clearRect(0, 0, W, H);
     if (shown > 0) this.drawWords(ac, t, TW, 1);
@@ -399,6 +425,13 @@ export class CarrierArt {
   private drawGraffiti(c: CanvasRenderingContext2D, t: number, TW: number, alpha: number) {
     if (alpha <= 0) return;
     const { canvas, carrier, style } = this, W = canvas.width, H = canvas.height, G = style.graffiti!, seed = carrier.phrase.start;
+    const baseKey = `${Math.round(punchAt(carrier, t) * 10)}:${W}x${H}:${TW}`, pieceKey = `${carrier.phrase.words.findIndex((w) => t >= w.start && t < w.end)}:${baseKey}`;
+    if (pieceKey === this.pieceKey) { c.globalAlpha = alpha; c.drawImage(this.layer('paint'), 0, 0); c.globalAlpha = 1; return; }
+    this.pieceKey = pieceKey;
+    // (a word lit as it's sung recolours only the letters' faces: the base under them is painted again only when the
+    // punch moves the letters)
+    const fresh = baseKey !== this.baseKey;
+    this.baseKey = baseKey;
     const words = carrier.phrase.words, P = GRAFFITI;
     const soloRow = carrier.phrase.solo === 'first' ? 0 : carrier.phrase.solo === 'last' ? carrier.rows.length - 1 : -1;
     const weights = carrier.rows.map((_, r) => (r === soloRow ? SOLO_ROW : 1)), sum = weights.reduce((a, b) => a + b, 0);
@@ -452,7 +485,9 @@ export class CarrierArt {
       at(k, g, dx, dy, (k, lw) => { k.fillStyle = color; k.strokeStyle = color; k.lineWidth = lw(width); k.strokeText(g.ch, 0, 0); k.fillText(g.ch, 0, 0); });
     const block = (g: Glyph, k: number) => [g.em * P.depth * 0.55 * k, g.em * P.depth * k] as const;
 
-    const paint = this.layer('paint'), p = paint.getContext('2d')!;
+    const paint = this.layer('paint'), base = this.layer('graffitiBase');
+    let p = base.getContext('2d')!;
+    if (fresh) {
     p.clearRect(0, 0, W, H);
     // the cloud: a coat of the second colour round the letters and their block, a bubble behind each letter, overspray
     // past its edge (hard-edged: a soft halo read as neon, not paint)
@@ -483,6 +518,10 @@ export class CarrierArt {
         p.beginPath(); p.arc(x, y1, rad * g.em, 0, Math.PI * 2); p.fill();
       }
     }
+    }
+    p = paint.getContext('2d')!;
+    p.clearRect(0, 0, W, H);
+    p.drawImage(base, 0, 0);
     // the letters' faces: white, then their fade laid over it nudged down and right (a shine left on their upper
     // edges), the word being sung in its own; the paint's grain pricked through to the tiles
     const face = this.layer('face'), f = face.getContext('2d')!;

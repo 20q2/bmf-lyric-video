@@ -3,6 +3,10 @@
 //   stills:  bun scripts/render.ts stills --t 1.5,23,40.2 [--only id1,id2] [--out dir]
 //   sheet:   bun scripts/render.ts sheet --from 20 --to 35 [--n 12] [--cols 4] [--only ids] [--out file.png]   (or --times a,b,c)
 //   perf:    bun scripts/render.ts perf --from 20 --to 25 [--only ids] [--samples 1] [--shutter 0.5]   (avg ms per frame incl. GPU sync and the export's pixel readback)
+//   play:    bun scripts/render.ts play [--from 0] [--to <duration>] [--fps 30] [--over 150]   (plays it through as the player does, from a
+//            fresh load: every frame slower than --over ms, with the shader programs compiled in it, and each 10 s's median)
+//            --prof: a CPU profile of the run (the heaviest functions by their own time)
+//   --preview (all modes): the player's quality (look/quality.ts), not the export's
 //   video:   bun scripts/render.ts video [--from 0] [--to <duration>] [--fps 60] [--crf 16] [--x264 aq-mode=3] [--samples 1] [--shutter 0.5] [--out ../out/lyricvideo.mp4] [--noaudio]
 //            --samples N averages N sub-frames per frame over shutter×(1/fps): motion blur + temporal AA;
 //            --samples auto picks the count per frame (4, 12, 36, 108 or 324, see Engine.render)
@@ -16,7 +20,7 @@ import path from 'node:path';
 
 const argv = process.argv.slice(2);
 const mode = argv[0] ?? 'stills';
-const MODES = ['stills', 'sheet', 'perf', 'video', 'gpu'];
+const MODES = ['stills', 'sheet', 'perf', 'play', 'video', 'gpu'];
 if (!MODES.includes(mode)) {
   console.error(`unknown mode: ${mode}
 
@@ -24,6 +28,7 @@ usage: bun scripts/render.ts <mode> [options]   (options: see the comment at the
   stills --t 1.5,23,40.2 [--only ids] [--out dir]
   sheet  --from 20 --to 35 [--n 12] [--cols 4] [--only ids] [--out file.png]   (or --times a,b,c)
   perf   --from 20 --to 25 [--only ids] [--samples 1] [--shutter 0.5]
+  play   [--from 0] [--to <duration>] [--fps 30] [--over 150]
   video  [--from 0] [--to <duration>] [--fps 60] [--samples N|auto] [--shutter 0.5] [--preset slow] [--out ../out/lyricvideo.mp4] [--noaudio]
   gpu    (print the WebGL renderer string)
   all modes: [--scale N] [--url URL] [--hide name,name (the drive's named world parts)]`);
@@ -126,7 +131,7 @@ async function bootApp(browser: Browser, url: string) {
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   const only = opt('only');
   const hide = opt('hide'); // (debugging: hide the world's named parts, e.g. --hide blocks,palms)
-  await page.goto(`${url}/?export=1${only ? `&only=${only}` : ''}${SCALE !== 1 ? `&scale=${SCALE}` : ''}${CARD ? `&card=${encodeURIComponent(CARD)}` : ''}${hide ? `&hide=${encodeURIComponent(hide)}` : ''}`);
+  await page.goto(`${url}/?export=1${only ? `&only=${only}` : ''}${SCALE !== 1 ? `&scale=${SCALE}` : ''}${CARD ? `&card=${encodeURIComponent(CARD)}` : ''}${hide ? `&hide=${encodeURIComponent(hide)}` : ''}${flag('preview') ? '&quality=preview' : ''}`);
   // (a module that throws while it loads leaves no __lv at all: say what the page said, not just that it timed out)
   try { await page.waitForFunction(() => (window as any).__lv?.ready || (window as any).__lv?.error, null, { timeout: 120000 }); }
   catch (e) { throw new Error(`the app didn't boot within 120 s; ${logs.length ? `the page logged:\n${logs.join('\n')}` : 'the page logged no errors'}`, { cause: e }); }
@@ -258,6 +263,44 @@ try {
       const out = opt('out', path.join(ROOT, `out/sheets/sheet_${from}-${to}.png`))!;
       await sheet(page, times, +opt('cols', '4')!, out);
       console.log(out);
+    } else if (mode === 'play') {
+      const dur: number = await page.evaluate(() => (window as any).__lv.duration);
+      const from = +opt('from', '0')!, to = +opt('to', String(dur))!, fps = +opt('fps', '30')!, over = +opt('over', '150')!;
+      // (frame by frame from a fresh load, each synced (a pixel read back), as the player meets them: what a viewer sees
+      // freeze is a frame far over its time, usually shaders compiling the first time something is drawn)
+      // (--prof: a CPU profile of the run, its heaviest functions by their own time)
+      const cdp = flag('prof') ? await page.context().newCDPSession(page) : null;
+      if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
+      const r = await page.evaluate(async ({ from, to, fps, over }) => {
+        const P = (window as any).__lv, gl = P.engine.renderer.getContext() as WebGL2RenderingContext, px = new Uint8Array(4), info = P.engine.renderer.info;
+        const slow: [number, number, number][] = [], ms: number[] = [], names: string[] = [];
+        for (let n = Math.round(from * fps); n < Math.round(to * fps); n++) {
+          const t = n / fps, progs = info.programs?.length ?? 0, a = performance.now();
+          P.engine.render(t, 1 / fps, true, 1, 0.5);
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          const dt = performance.now() - a;
+          ms.push(dt);
+          if (dt > over) slow.push([t, dt, (info.programs?.length ?? 0) - progs]);
+          if ((info.programs?.length ?? 0) > progs) names.push(`${t.toFixed(2)}: ${(info.programs as { name: string; cacheKey: string }[]).slice(progs).map((p) => (p.name || (p as unknown as { cacheKey: string }).cacheKey.replace(/\s+/g, ' ').slice(0, 60))).join(' | ')}`);
+          if (n % 30 === 0) await new Promise((res) => setTimeout(res, 0));
+        }
+        return { slow, ms, names };
+      }, { from, to, fps, over });
+      if (cdp) {
+        const { profile } = await cdp.send('Profiler.stop') as { profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }[]; samples: number[]; timeDeltas: number[] } };
+        const self: Record<string, number> = {}, byId = new Map(profile.nodes.map((n) => [n.id, n]));
+        profile.samples.forEach((id, k) => { const f = byId.get(id)!.callFrame, key = `${f.functionName || '(anon)'} ${f.url.split('/').pop()?.split('?')[0]}:${f.lineNumber}`; self[key] = (self[key] ?? 0) + (profile.timeDeltas[k] ?? 0); });
+        console.log('CPU profile, own time (ms):');
+        for (const [k, v] of Object.entries(self).sort((a, b) => b[1] - a[1]).slice(0, 25)) console.log(`  ${(v / 1000).toFixed(0).padStart(7)}  ${k}`);
+      }
+      if (r.names.length) console.log(['programs compiled while playing:', ...r.names.map((n) => '  ' + n)].join('\n'));
+      for (const [t, dt, k] of r.slow) console.log(`  ${t.toFixed(2).padStart(7)} s  ${dt.toFixed(0).padStart(5)} ms${k ? `  (${k} program${k > 1 ? 's' : ''} compiled)` : ''}`);
+      const total = r.slow.reduce((a, [, dt]) => a + dt, 0);
+      console.log(`${r.slow.length} frames over ${over} ms (${(total / 1000).toFixed(1)} s in all)`);
+      for (let s = Math.floor(from / 10) * 10; s < to; s += 10) {
+        const w = r.ms.slice(Math.max(0, Math.round((s - from) * fps)), Math.max(0, Math.round((s + 10 - from) * fps))).sort((a, b) => a - b);
+        if (w.length) console.log(`  ${String(s).padStart(4)}-${s + 10} s  median ${w[w.length >> 1]!.toFixed(0)} ms  p95 ${w[Math.floor(w.length * 0.95)]!.toFixed(0)} ms`);
+      }
     } else if (mode === 'perf') {
       const from = +opt('from', '0')!, to = +opt('to', '5')!;
       const r = await page.evaluate(async ({ from, to, samples, shutter }) => {

@@ -21,6 +21,7 @@ import { PrintPass } from '../look/print';
 import { QUALITY } from '../look/quality';
 import { Cascades } from '../look/shadows';
 import { Zones } from './zones';
+import { warmPortrait } from '../look/adart';
 import { SkyEnv } from '../look/envsky';
 import { GLOW, NIGHT, PULSE } from '../look/night';
 import { buildCity } from '../look/city';
@@ -150,7 +151,7 @@ export default class DriveScene extends Scene {
   /** The world's still parts, hidden while off screen. */
   private zones!: Zones;
 
-  override init() {
+  override async init() {
     const { audio, lyrics, renderer } = this.ctx;
     this.drive = makeDrive(audio, lyrics);
     this.rt.depthTexture = new THREE.DepthTexture(this.rt.width, this.rt.height, THREE.FloatType);
@@ -223,6 +224,38 @@ export default class DriveScene extends Scene {
     { const f = new THREE.Vector3(end.fwd.x, 0, end.fwd.z).normalize(), r = new THREE.Vector3(end.right.x, 0, end.right.z).normalize();
       this.endMoon.copy(f).multiplyScalar(Math.cos(END_MOON.bearing)).addScaledVector(r, Math.sin(END_MOON.bearing)).multiplyScalar(Math.cos(END_MOON.elev)).setY(Math.sin(END_MOON.elev)).normalize(); }
     this.world.add(this.city.group);
+    // every shader compiled now, while it loads, not on first sight: each one compiled mid-play froze the frame (the
+    // user, 2026-10-15: "it just freezes in those parts" — 32 at once at the first cut). Everything shown for it (a
+    // hidden prop's material is still a shader to come), the sky's reflection in place (the hero's paint compiles
+    // with it); compileAsync lets the driver compile them in parallel
+    this.world.environment = this.env.update(0, (tau) => this.skyAt(tau));
+    const shown: THREE.Object3D[] = [];
+    this.world.traverse((o) => { if (!o.visible) { o.visible = true; shown.push(o); } });
+    this.world.updateMatrixWorld(true);
+    // (into the scene's own target, as it renders: a shader is built for its target — its tone mapping, its colour
+    // space — and compiled for the screen, every one was compiled again at the first frame)
+    const was = renderer.getRenderTarget();
+    renderer.setRenderTarget(this.rt);
+    await renderer.compileAsync(this.world, this.cam);
+    // (and one render, every caster in every shadow map: the maps' depth shaders are made as things are first drawn
+    // into them, ~0.5 s each, three at the first cut)
+    this.shade.everything = true;
+    renderer.clear(true, true, true);
+    renderer.render(this.world, this.cam);
+    this.shade.everything = false;
+    renderer.setRenderTarget(was);
+    for (const o of shown) o.visible = false;
+    // (every texture sent to the GPU now, its mips made — first drawn, a cut to a street of signs and fronts sent them
+    // all at once: 1.4 s; and his portrait's paths built, ~0.5 s, before the first board that shows him)
+    const sent = new Set<THREE.Texture>();
+    this.world.traverse((o) => {
+      const ms = (o as THREE.Mesh).material; if (!ms) return;
+      for (const m of Array.isArray(ms) ? ms : [ms]) for (const v of Object.values(m)) if ((v as THREE.Texture)?.isTexture && !sent.has(v as THREE.Texture)) { sent.add(v as THREE.Texture); renderer.initTexture(v as THREE.Texture); }
+    });
+    warmPortrait();
+    for (const a of this.arts) a.warm();
+    // (and waited for: the GPU's done with it all before the first frame is asked for)
+    { const gl = renderer.getContext(); renderer.setRenderTarget(null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4)); renderer.setRenderTarget(was); }
   }
 
   override render(f: Frame, out: THREE.WebGLRenderTarget): PostOverrides {
