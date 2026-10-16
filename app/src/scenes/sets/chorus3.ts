@@ -75,30 +75,50 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
   const take: [number, number] = [plan.towel.s - 14, plan.shop.s + 9];
   const sOf = (k: number, n: number) => plan.from + 64 + ((end - plan.from - 64) * (k + hash(k, n, 3) * 0.8)) / n;
 
-  // ---- the arch: pylons, the band's box, WELCOME TO over it, a stepped arc on top, bulbs along the band's foot ----
+  // ---- the arch: one built thing, every part standing on the one under it (the user, 2026-10-16: "the archway is
+  // floating in the air at the top" — the stepped blocks hung 1.25 m over the band with sky between, the keystone
+  // over them, WELCOME TO on its own box, and the pylons stopped short of all of it). The band's box spans the pylons
+  // and runs into them; a lintel beam across the pylons' full width caps it; on the lintel the stepped parapet, each
+  // step on the one below and the first between the pylons, a blue coping along each; WELCOME TO a panel set into the
+  // parapet's face; the keystone on the top step; the pylons rise past the first step to their caps. Bulbs along the
+  // band's foot. ----
   {
-    const B = plan.band, A = ARCH, g = onPanel(B);
-    box(g, 2 * plan.pylons + A.pylon.w, B.h + 0.6, 0.6, 0, 0, -0.35, cream); // the band's box (the carriers face it)
-    box(g, 2 * plan.pylons + A.pylon.w + 0.3, 0.45, 0.8, 0, -B.h / 2 - 0.35, -0.3, blue); // its sill
-    // WELCOME TO, the arch's own words, over the band
-    box(g, 9.5, 1.15, 0.55, 0, B.h / 2 + 0.85, -0.32, blue);
-    plane(g, 9, 0.95, 0, B.h / 2 + 0.85, -0.03, paint(signFace('WELCOME TO', 1024, 108, '#f6edd6', null, F.sign(600), 0.62, 0.24), { transparent: true }));
-    // the arc: stepped blocks rising to a keystone
-    for (const [dx, dy, w] of [[-9, 1.9, 4], [9, 1.9, 4], [-5.4, 2.6, 4], [5.4, 2.6, 4], [-1.8, 3.1, 4.2], [1.8, 3.1, 4.2]] as const) {
-      box(g, w, 0.7, 0.6, dx, B.h / 2 + dy, -0.35, cream);
-    }
-    box(g, 1.6, 1.1, 0.7, 0, B.h / 2 + 3.5, -0.35, blue); // the keystone
-    // bulbs along the band's foot (dusk: they're already on)
-    for (let i = 0; i <= 26; i++) {
-      const s = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bulb);
-      s.position.set(-plan.pylons + (2 * plan.pylons * i) / 26, -B.h / 2 - 0.08, 0.05); g.add(s);
-    }
+    const B = plan.band, A = ARCH, g = onPanel(B), hh = B.h / 2, W = 2 * plan.pylons + A.pylon.w, CREAM = '#f6edd6', BLUE = '#2b4a66';
+    tbox(g, W, B.h + 0.6, 0.6, 0, 0, -0.35, CREAM); // the band's box (the carriers face it), into the pylons
+    tbox(g, W - 0.1, 0.45, 0.8, 0, -hh - 0.35, -0.3, BLUE); // its sill (its ends inside the pylons, as the lintel's)
+    // the lintel over it, into the pylons (not out through their outer faces) and deeper than the band (z -1.1 to 0.4),
+    // a blue cornice along its top
+    const L0 = hh + 0.3, L1 = L0 + 0.75;
+    tbox(g, W - 0.1, L1 - L0, 1.5, 0, (L0 + L1) / 2, -0.35, CREAM);
+    tbox(g, W - 0.1, 0.16, 1.7, 0, L1 - 0.02, -0.35, BLUE);
+    // the parapet: three steps on the lintel, the first running into the pylons; a coping on each step's top
+    const STEP = 0.8, steps = [plan.pylons - 0.4, 7.6, 4.2];
+    steps.forEach((half, k) => {
+      const y0 = L1 + k * STEP;
+      tbox(g, 2 * half, STEP, 1.0, 0, y0 + STEP / 2, -0.45, CREAM);
+      tbox(g, 2 * half + 0.2, 0.12, 1.2, 0, y0 + STEP, -0.45, BLUE);
+    });
+    const top = L1 + steps.length * STEP;
+    tbox(g, 1.8, 0.9, 1.2, 0, top + 0.45, -0.45, BLUE); // the keystone, on the top step
+    // WELCOME TO, the arch's own words: a panel set into the parapet's face across its first two steps
+    const wy = L1 + STEP;
+    tbox(g, 9.6, 1.3, 0.3, 0, wy, 0.05, BLUE);
+    plane(g, 9, 1.0, 0, wy, 0.215, paint(signFace('WELCOME TO', 1024, 114, '#f6edd6', null, F.sign(600), 0.62, 0.24), { transparent: true }));
+    fuse(g);
+    // bulbs along the band's foot (dusk: they're already on): one draw
+    const bulbs: THREE.Matrix4[] = [];
+    for (let i = 0; i <= 26; i++) bulbs.push(new THREE.Matrix4().makeTranslation(-plan.pylons + (2 * plan.pylons * i) / 26, -hh - 0.08, 0.05));
+    const bl = new THREE.InstancedMesh(new THREE.SphereGeometry(0.09, 8, 6), bulb, bulbs.length);
+    bulbs.forEach((m, i) => bl.setMatrixAt(i, m)); g.add(bl);
     root.add(g);
-    // the pylons, down to the ground (their blocks are the drive's: here the stone)
+    // the pylons, down to the ground, up past the parapet's first step to their caps (their blocks are the drive's:
+    // here the stone)
     for (const side of [-1, 1]) {
-      const p = onRoad(plan.archS, side * plan.pylons), h = B.bottom + B.h + 1;
-      box(p, A.pylon.w, h, A.pylon.w, 0, h / 2, 0, cream);
-      box(p, A.pylon.w + 0.4, 0.5, A.pylon.w + 0.4, 0, 1.1, 0, blue); // its base course
+      const p = onRoad(plan.archS, side * plan.pylons), h = B.bottom + B.h + A.pylon.over;
+      tbox(p, A.pylon.w, h, A.pylon.w, 0, h / 2, 0, CREAM);
+      tbox(p, A.pylon.w + 0.4, 0.5, A.pylon.w + 0.4, 0, 1.1, 0, BLUE); // its base course
+      tbox(p, A.pylon.w + 0.4, 0.35, A.pylon.w + 0.4, 0, h + 0.175, 0, BLUE); // its cap
+      fuse(p);
     }
   }
 
@@ -298,11 +318,64 @@ export function buildChorus3(drive: Drive): { group: THREE.Group; update(t: numb
         if (hash(s, row, 65) < 0.72) { const g = onRoad(s + 1.4, row); g.matrix.multiply(new THREE.Matrix4().makeRotationY(row < 20 ? Math.PI / 2 : -Math.PI / 2)); g.add(sedan({ color: COLORS[Math.floor(hash(s, row, 66) * COLORS.length)]!, length: 4.3 + 0.5 * hash(s, row, 67) })); }
       }
       instanced(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#f4f0e6' }), stripes);
+      // its edge, so it stops reading as a dark stain on the sand (the user, 2026-10-16: "a bit of a trim around it…
+      // it seems to kind of just blend into the sand"): a raised concrete kerb round it, open at its mouth by the
+      // booth; a concrete wheel stop at the head of each bay; a low block wall with a coping along its far, sand side;
+      // and sand blown up over the kerb in low drifts
+      const MOUTH = [a + 5.5, a + 12] as const, KERB = '#e8e1d4', kerb: THREE.Matrix4[] = [], wall: THREE.Matrix4[] = [], coping: THREE.Matrix4[] = [];
+      for (let s = a; s < b; s += 2) {
+        const len = Math.min(2, b - s), mid = s + len / 2;
+        if (mid < MOUTH[0] || mid > MOUTH[1]) kerb.push(frameM(mid, L[0], 0.1, 0, new THREE.Vector3(0.9, 0.3, len + 0.04)));
+        wall.push(frameM(mid, L[1] + 0.2, 0.42, 0, new THREE.Vector3(0.4, 0.94, len + 0.02)));
+        coping.push(frameM(mid, L[1] + 0.2, 0.93, 0, new THREE.Vector3(0.56, 0.1, len + 0.03)));
+      }
+      // (the ends, across the lot from the road's kerb to the wall)
+      for (const s of [a, b]) for (let lat = L[0]; lat < L[1]; lat += 2) {
+        const len = Math.min(2, L[1] - lat);
+        kerb.push(frameM(s, lat + len / 2, 0.1, Math.PI / 2, new THREE.Vector3(0.9, 0.3, len + 0.04)));
+      }
+      instanced(new THREE.BoxGeometry(1, 1, 1), toon({ color: KERB }), kerb);
+      instanced(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#e9dcc0' }), wall);
+      instanced(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#c9bba3' }), coping);
+      // the wheel stops: each bay's centre, under the parked car's nose (the near row's noses toward the road, the far
+      // row's toward the wall)
+      const stops: THREE.Matrix4[] = [];
+      for (const [row, head] of [[12.5, 10.45], [25.5, 27.55]] as const) for (let s = a + 3; s < b - 3 - 2.8; s += 2.8) stops.push(frameM(s + 1.4, head, 0.07, 0, new THREE.Vector3(0.22, 0.14, 1.75)));
+      instanced(new THREE.BoxGeometry(1, 1, 1), toon({ color: KERB }), stops);
+      // sand drifted over the kerb on the road side and the ends: low flattened mounds astride it, spilling a little
+      // onto the asphalt
+      const drift: THREE.Matrix4[] = [];
+      for (let k = 0; k < Math.floor((b - a) / 5); k++) {
+        const s = a + 2 + (k + hash(k, 68)) * 5;
+        if (s > MOUTH[0] - 1 && s < MOUTH[1] + 1) continue;
+        if (hash(k, 69) < 0.65) drift.push(frameM(s, L[0] + 0.05 + 0.25 * hash(k, 70), 0.0, 0.3 * (hash(k, 71) - 0.5), new THREE.Vector3(0.8 + 0.5 * hash(k, 72), 0.22 + 0.1 * hash(k, 73), 1.8 + 2.4 * hash(k, 74))));
+      }
+      for (const s of [a, b]) for (let k = 0; k < 5; k++) drift.push(frameM(s + (s === a ? 0.2 : -0.2), L[0] + 2 + k * 4.3 + 1.5 * hash(s, k, 75), 0.0, Math.PI / 2, new THREE.Vector3(0.8, 0.24, 1.4 + 1.6 * hash(s, k, 76))));
+      instanced(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), toon({ color: '#ecc995' }), drift);
       const booth = onRoad(a + 4, 9.5);
       box(booth, 2, 2.4, 2, 0, 1.2, 0, cream); box(booth, 2.4, 0.15, 2.4, 0, 2.47, 0, blue);
-      box(booth, 0.06, 4.6, 0.06, 0, 2.3, -2.2, toon({ color: WORLD.post }));
-      const ps = plane(booth, 2.6, 0.9, 0, 4.3, -2.26, paint(signFace('BEACH PARKING', 512, 176, '#ffffff', '#1e6fd9', F.sign(700), 0.38, 0.06), { side: THREE.DoubleSide }));
-      ps.rotation.y = Math.PI; // (to the traffic coming along the road)
+      // its sign on a pole by the booth, to the traffic coming along the road: the standard parking sign — a white P
+      // on a blue square in a white border — over a plate with BEACH PARKING (painted: it takes the light like the
+      // booth); a grey sheet-metal back
+      const SIGN = { w: 2.0, sq: 2.0, plate: 0.8, top: 5.7 }, postH = SIGN.top + 0.05, sy = SIGN.top - SIGN.sq / 2, py = SIGN.top - SIGN.sq - 0.05 - SIGN.plate / 2;
+      box(booth, 0.1, postH, 0.1, 0, postH / 2, -2.2, toon({ color: WORLD.post }));
+      box(booth, SIGN.w + 0.06, SIGN.sq + SIGN.plate + 0.11, 0.04, 0, (SIGN.top + py - SIGN.plate / 2) / 2, -2.27, toon({ color: '#8e949a' }));
+      const pTex = canvasTex(512, 512, (c) => {
+        c.fillStyle = '#ffffff'; c.beginPath(); c.roundRect(0, 0, 512, 512, 40); c.fill();
+        c.fillStyle = '#1d5bb8'; c.beginPath(); c.roundRect(20, 20, 472, 472, 28); c.fill();
+        c.strokeStyle = '#ffffff'; c.lineWidth = 10; c.beginPath(); c.roundRect(44, 44, 424, 424, 18); c.stroke();
+        c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `bold 400px "${F.sign(700)}"`; c.fillText('P', 256, 276);
+      });
+      const plateTex = canvasTex(512, 204, (c) => {
+        c.fillStyle = '#ffffff'; c.beginPath(); c.roundRect(0, 0, 512, 204, 24); c.fill();
+        c.strokeStyle = '#1d5bb8'; c.lineWidth = 10; c.beginPath(); c.roundRect(14, 14, 484, 176, 14); c.stroke();
+        c.fillStyle = '#1d5bb8'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `bold 74px "${F.sign(700)}"`;
+        (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '6px';
+        c.fillText('BEACH', 256, 66); c.fillText('PARKING', 256, 146, 450);
+      });
+      // (faces toward -z: the traffic coming along the road; 1.5 cm proud of the back)
+      plane(booth, SIGN.w, SIGN.sq, 0, sy, -2.305, paint(pTex, { transparent: true })).rotation.y = Math.PI;
+      plane(booth, SIGN.w, SIGN.plate, 0, py, -2.305, paint(plateTex, { transparent: true })).rotation.y = Math.PI;
     }
     for (let k = 0, s = plan.from + 66; s < end; k++, s += 6.4 + 3 * hash(k, 61)) {
       if (hash(k, 62) < 0.25 || boards.some(([a, b]) => s > a - 30 && s < b + 10) || Math.abs(s - plan.archS) < 14) continue;

@@ -26,9 +26,10 @@ const flat = (v: THREE.Vector3) => new THREE.Vector3(v.x, 0, v.z).normalize();
 const PLACE = /south of somewhere/i, DROP = /panties from dropping/i;
 
 /** The arch: this far before his first campaign board (m: clear of its take's rays); its band's underside over the
- *  road, its pylons (off the road's centre, their plan size), and the wide's eye (m back from the arch, off the road's
- *  centre, up). */
-export const ARCH = { before: 15, bottom: 6.2, pylon: { lateral: 12, w: 2.4 }, eye: { back: 50, lateral: 1, y: 4.2 } };
+ *  road, its pylons (off the road's centre, their plan size, how far they rise over the band's lettering — past the
+ *  lintel and the parapet's first step, to their caps: scenes/sets/chorus3.ts), and the wide's eye (m back from the
+ *  arch, off the road's centre, up). */
+export const ARCH = { before: 15, bottom: 6.2, pylon: { lateral: 12, w: 2.4, over: 2.4 }, eye: { back: 50, lateral: 1, y: 4.2 } };
 /** The beach's three surfaces for the dropping line, from `ahead` m past where the car is as the line starts (clear of
  *  his last board on the sand): the towel (m along from there, off the road's centre: left negative), the raked words
  *  (the same), and the surf shack's roof sign (the same, its face's centre over the sand, its toe back toward the
@@ -158,7 +159,7 @@ export const CHORUS3: SetPiece = {
     };
     const blocks: Block[] = [
       { s: archS, lateral: 0, w: 0.6, h: H + 0.6, d: 2 * A.pylon.lateral + A.pylon.w, color: 0.8, bare: true, prop: true, matrix: boxAt(route, archS, 0, 2 * A.pylon.lateral + A.pylon.w, H + 0.6, 0.6, A.bottom - 0.3) },
-      ...[-1, 1].map((side): Block => ({ s: archS, lateral: side * A.pylon.lateral, w: A.pylon.w, h: A.bottom + H + 1, d: A.pylon.w, color: 0.8, bare: true, prop: true, matrix: boxAt(route, archS, side * A.pylon.lateral, A.pylon.w, A.bottom + H + 1, A.pylon.w) })),
+      ...[-1, 1].map((side): Block => ({ s: archS, lateral: side * A.pylon.lateral, w: A.pylon.w, h: A.bottom + H + A.pylon.over, d: A.pylon.w, color: 0.8, bare: true, prop: true, matrix: boxAt(route, archS, side * A.pylon.lateral, A.pylon.w, A.bottom + H + A.pylon.over, A.pylon.w) })),
       { s: sP, lateral: S.shop.lateral - S.shack.d / 2, w: S.shack.d, h: S.shack.h, d: S.shack.w, color: 0.7, bare: true, prop: true, matrix: shackAt() },
     ];
     const clear = [

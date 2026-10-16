@@ -589,7 +589,10 @@ export function lineTake(cs: readonly Carrier[], previews: readonly boolean[]): 
   keys.push([keys[keys.length - 1]![0] + PAIR.slide, cs.length - 1]);
   for (let k = 1; k < keys.length; k++) keys[k]![1] = Math.max(keys[k]![1], keys[k - 1]![1]);
   const along = (t: number) => { // where along the faces the take is at t (0: the first; i + 0.5: between i and i + 1)
-    if (t <= keys[0]![0]) return 0;
+    // (before its first key, where that key holds: a take cut to early — a line found up to PREROLL ahead — whose first
+    // face previews the next starts at PAIR.toNext, not 0; 0 here jumped the camera 15 m as the first word landed,
+    // chorus 3's opening: the user, 2026-10-16, "starts in one place and then it snaps into focus")
+    if (t <= keys[0]![0]) return keys[0]![1];
     for (let k = 1; k < keys.length; k++) if (t < keys[k]![0]) { const [t0, p0] = keys[k - 1]!, [t1, p1] = keys[k]!; const u = (t - t0) / Math.max(1e-3, t1 - t0); return p0 + (p1 - p0) * (u * u * (3 - 2 * u)); }
     return cs.length - 1;
   };
