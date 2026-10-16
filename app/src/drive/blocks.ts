@@ -13,9 +13,9 @@ import { TUNNEL_CLEAR, type Tunnel, nearTunnel } from './tunnel';
 /** Per stretch: building heights (m, min–max), how many plots stay empty, which side is the sea, how far back (m) the
  *  near row starts, the rows behind it (how many, their heights), and how many of the left kerb's parking spots are
  *  taken (none: no parking). */
-export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number; back?: [number, number, number]; parked?: number }> = {
+export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLeft?: boolean; far?: number; back?: [number, number, number]; parked?: number; /** Built as a commercial strip (STRIP). */ strip?: boolean }> = {
   intro: { h: [6, 10], empty: 0.5, back: [2, 8, 16], parked: 0.55 },
-  chorus1: { h: [8, 22], empty: 0.3, back: [2, 10, 26], parked: 0.6 },
+  chorus1: { h: [6, 16], empty: 0.06, back: [2, 10, 26], parked: 0.6, strip: true },
   verse1: { h: [14, 40], empty: 0.1, back: [3, 18, 50], parked: 0.6 },
   chorus2: { h: [6, 14], empty: 0.6, far: 40, back: [1, 8, 18] },
   verse2: { h: [4, 8], empty: 0.3, back: [1, 6, 10] }, // (its set parks its own lowriders)
@@ -34,6 +34,18 @@ const NEAR_UNDER_SKY = 8;
 /** The rows behind the street: the first this far off the road's centre (m), each next one this much further; none
  *  within this far of the road (wherever it bends back past them); a quarter of their plots empty (lots, parking). */
 export const BACK = { from: 44, step: 26, road: 8, empty: 0.25 };
+/** A stretch built as an LA commercial strip (the user, 2026-10-16: "it looks like all of these buildings are on parking
+ *  lots ... it's like everything is a parking lot here"): its street's shops wall to wall, fronting the back of the
+ *  sidewalk (`walk` m off the road's centre: world.ts SIDEWALKS; up to `front` m behind it, where the sidewalk's carried
+ *  back to them), a plot each less a party wall's gap, an alley between some (`alleys` of them, this wide), deep enough
+ *  to close off the lots behind them up to the back street's sidewalk (`back` m off the road's centre: world.ts
+ *  BACK_STREET.lot); their plots cut short where a face, a set's own building or a cross street needs the ground (the
+ *  shops run on up to it), and only `least` m of a plot left is still built. A face's clearances are what its shot
+ *  needs: on its own side the ground round it (`own` m either side: a billboard stands in its lot), across the road,
+ *  where its camera stands, the shops stand back behind the lens, their fronts `behind` m off the road's centre (the
+ *  whole stretch from 58 m to 165 m stood empty for chorus 1's two boards). The rows behind keep fewer lots
+ *  (`backEmpty`). */
+export const STRIP = { walk: ROAD_HALF + 3, front: 1.2, party: 0.3, alleys: 0.3, alley: [2.5, 4] as [number, number], back: BACK.from - 12.5, least: 8, own: 6, behind: 11, backEmpty: 0.1 };
 /** A footprint's sample points (the unit box's base). */
 const FOOTPRINT = [-0.5, -0.25, 0, 0.25, 0.5].flatMap((x) => [-0.5, -0.25, 0, 0.25, 0.5].map((z) => [x, z] as const));
 
@@ -79,9 +91,44 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
   const skyRoad = carriers.filter((c) => c.kind === 'sky').map((c) => [motion.distanceAt(c.phrase.start) - 20, motion.distanceAt(c.phrase.end + 1.5) + 60] as const);
   const out: Block[] = own.filter((b) => !faces.some((t) => t.side === Math.sign(b.lateral) && b.s + b.w / 2 > t.a && b.s - b.w / 2 < t.b));
   const owned = own.map((b) => ({ side: Math.sign(b.lateral), a: b.s - b.w / 2 - 4, b: b.s + b.w / 2 + 4 }));
+  // (a strip's: what its plots give way to, per side, and the ground across from a face on the left, where the shops
+  // stand back behind its camera)
+  const stripCarriers = carriers.filter((c) => c.solid && BLOCKS[c.stretch]?.strip);
+  const stripFaces = stripCarriers.flatMap((c) => {
+    const side = Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) || 1;
+    return [{ side, a: c.s - c.w / 2 - STRIP.own, b: c.s + c.w / 2 + STRIP.own }];
+  });
+  const behindLens = stripCarriers.flatMap((c) => {
+    const side = Math.sign(c.center.clone().sub(route.frameAt(c.s).pos).dot(route.frameAt(c.s).right)) || 1;
+    return side < 0 ? [{ side: 1, a: c.s - c.w - 24, b: c.s + c.w + 24 }] : [];
+  });
+  const stripTaken = [...stripFaces, ...hills, ...keepClear, ...owned, ...openings.map((o) => ({ side: o.side, a: o.a - 1, b: o.b + 1 }))];
+  /** A strip's shop on plot k: the plot less its gap, cut back to its longest free piece; or none. */
+  const stripPlot = (k: number, side: number, s: number, b: (typeof BLOCKS)[string]): Block | null => {
+    if (hash(k, side, 1) < b.empty || nearTunnel(tunnels, s, TUNNEL_CLEAR)) return null;
+    const gap = hash(k, side, 7) < STRIP.alleys ? STRIP.alley[0] + (STRIP.alley[1] - STRIP.alley[0]) * hash(k, side, 8) : STRIP.party;
+    let pieces: [number, number][] = [[s - (PLOT - gap) / 2, s + (PLOT - gap) / 2]];
+    for (const t of stripTaken) if (t.side === side) pieces = pieces.flatMap(([x, y]): [number, number][] => [[x, Math.min(y, t.a)], [Math.max(x, t.b), y]]).filter(([x, y]) => y - x >= STRIP.least);
+    if (!pieces.length) return null;
+    const [x0, x1] = pieces.reduce((m, p) => (p[1] - p[0] > m[1] - m[0] ? p : m));
+    const at = (x0 + x1) / 2, w = x1 - x0;
+    // (across from a face on the left: behind the lens)
+    const front = Math.max(STRIP.walk + STRIP.front * hash(k, side, 5), ...behindLens.filter((t) => t.side === side && x1 > t.a && x0 < t.b).map(() => STRIP.behind));
+    const d = STRIP.back - front - 2 * hash(k, side, 3), tall = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
+    const h = skyRoad.some(([a, z]) => at > a && at < z) ? Math.min(tall, NEAR_UNDER_SKY) : tall;
+    const lateral = side * (front + d / 2), lift = route.frameAt(at).pos.y + 0.4;
+    // (by a cross street its storefront turns the corner: look/facades.ts)
+    const corner = openings.find((o) => o.side === side && Math.abs(o.a - x1) < 3) ? 1 : openings.find((o) => o.side === side && Math.abs(x0 - o.b) < 3) ? -1 : undefined;
+    return { s: at, lateral, w, h, d, color: hash(k, side, 6), matrix: boxAt(route, at, lateral, d, h + lift, w, -lift), ...(corner ? { corner } : {}) } as Block;
+  };
   for (let k = 0; k * PLOT < route.length; k++) {
     for (const side of [1, -1]) {
       const s = k * PLOT + PLOT / 2, b = BLOCKS[stretchAtS(s).id]!;
+      if (b.strip) {
+        const blk = stripPlot(k, side, s, b);
+        if (blk) out.push(blk);
+        continue;
+      }
       if ((side === -1 && b.seaLeft) || hash(k, side, 1) < b.empty) continue;
       if (nearTunnel(tunnels, s, TUNNEL_CLEAR) || [...taken, ...owned].some((t) => t.side === side && s > t.a && s < t.b)) continue;
       const w = 10 + 10 * hash(k, side, 2), d = 10 + 10 * hash(k, side, 3), tall = b.h[0] + (b.h[1] - b.h[0]) * hash(k, side, 4);
@@ -121,7 +168,7 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
       if (!b.back || (side === -1 && b.seaLeft) || nearTunnel(tunnels, s, TUNNEL_CLEAR) || hills.some((t) => t.side === side && s > t.a && s < t.b)) continue;
       const [rows, h0, h1] = b.back;
       for (let r = 0; r < rows; r++) {
-        if (hash(k, side, 20 + r) < BACK.empty) continue;
+        if (hash(k, side, 20 + r) < (b.strip ? STRIP.backEmpty : BACK.empty)) continue;
         const w = 14 + 10 * hash(k, side, 30 + r), d = 14 + 8 * hash(k, side, 40 + r), h = h0 + (h1 - h0) * hash(k, side, 50 + r);
         const at = s + (hash(k, side, 70 + r) - 0.5) * 6, lateral = side * (BACK.from + r * BACK.step + d / 2 + 6 * hash(k, side, 60 + r));
         // (nor across a cross street: the road to Slauson ran into storefronts)

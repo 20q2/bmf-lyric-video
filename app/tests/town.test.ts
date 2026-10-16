@@ -36,8 +36,9 @@ test('every facade stays inside its block: the box the guard checks', () => {
   const out: string[] = [];
   drive.blocks.forEach((b, i) => {
     if (b.concrete || b.prop) return;
-    const inv = b.matrix.clone().invert(), f = facadeOf(b);
-    for (const [name, g] of Object.entries(f)) {
+    const inv = b.matrix.clone().invert();
+    // (each front as the town builds it, its own treatment, and plain, as a set's own fronts are)
+    for (const [name, g] of [...Object.entries(facadeOf(b)), ...Object.entries(facadeOf(b, { vary: true })).map(([k, g]) => [`${k} (varied)`, g] as const)]) {
       const p = g.getAttribute('position'), v = new THREE.Vector3();
       for (let k = 0; k < p.count; k++) {
         v.fromBufferAttribute(p, k).applyMatrix4(inv);

@@ -17,12 +17,14 @@ const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math
 
 /** The barbershop on the far left corner (m along the road from where the car waited: where it starts; its front off
  *  the road's centre, its depth and height); a window a phrase (width, height, their middles' height, the wall either
- *  end), a door between each. */
-export const BARBER = { s0: 17, face: -(ROAD_HALF + 3), d: 11, h: 6.2, window: { w: 5.8, h: 2.5, y: 2.45, inset: 0.5 }, door: 1.3 };
+ *  end), a door between each in a bay of its own `door` m wide (the user, 2026-10-16: the door "seems a bit short and
+ *  is also hidden behind the windows ... you could fix that by making the barbershop a little bit longer": its bay was
+ *  1.3 m, the windows' frames and awnings eating into it from both sides). */
+export const BARBER = { s0: 17, face: -(ROAD_HALF + 3), d: 11, h: 6.2, window: { w: 5.8, h: 2.5, y: 2.45, inset: 0.5 }, door: 2.4 };
 /** The take: the eye at the mouth of the cross street on the right, drifting along (m along the road, from and to:
  *  short of the signal's mast, which would stand in the frame), off the road's centre, up (over the two of them as the car passes between: they never hide the windows); the aim swings from the
  *  first window to the second this long either side of the second phrase's first word (s). */
-export const TAKE = { s: [9, 12.6] as [number, number], lateral: ROAD_HALF + 2, y: 2.6, swing: [0.4, 0.15] as [number, number] };
+export const TAKE = { s: [9.8, 13.1] as [number, number], lateral: ROAD_HALF + 2, y: 2.6, swing: [0.4, 0.15] as [number, number] };
 
 export interface Chorus1Plan {
   /** The barbershop's block, its windows' centres (m along the road) and its doors'. */

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LANE } from '../../drive/drive';
 import { carMatrix, riseAt } from '../../drive/carriers';
-import { AT, BUS, PACE, SIDE, VAN, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
+import { AT, BUS, PACE, SIDE, VAN, busAlong, type Verse1Plan, vanAheadAt, vanThere } from '../../drive/sets/verse1';
 import { ROAD_HALF } from '../../drive/route';
 import { WORLD, toon } from '../../look/toon';
 import { GLOW, lampMaterial } from '../../look/night';
@@ -391,18 +391,13 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
    *  turns, then on and round the corner into the cross street. */
   const busMatrix = (t: number): THREE.Matrix4 => {
     if (t < plan.joinAt) {
-      // down the side street to its line, waiting there, then out: on along its turn into their lane, coming up to
-      // their speed (drive/sets/verse1.ts busRamp), eased onto its place a tailgate's length ahead of them as it joins
+      // down the side street, rolling over its line without stopping (drive/sets/verse1.ts busAlong), on along its turn
+      // into their lane, coming up to their speed, eased onto its place a tailgate's length ahead of them as it joins
       const f0 = route.frameAt(plan.sideS), fwd = new THREE.Vector3(f0.fwd.x, 0, f0.fwd.z).normalize(), right = new THREE.Vector3(f0.right.x, 0, f0.right.z).normalize();
       const at = (along: number, lateral: number) => f0.pos.clone().addScaledVector(fwd, along).addScaledVector(right, lateral);
       const pose = (p: THREE.Vector3, head: THREE.Vector3) => new THREE.Matrix4().makeBasis(UP.clone().cross(head).normalize(), UP, head).setPosition(p);
-      if (t < plan.busPull) {
-        const u = Math.min(1, Math.max(0, (plan.busArrive - t) / SIDE.approach));
-        return pose(at(SIDE.lane, SIDE.wait + (SIDE.from - SIDE.wait) * u * u), right.clone().negate());
-      }
       const R = SIDE.R, straight = SIDE.wait - LANE - R, arc = (Math.PI / 2) * R, lane0 = plan.sideS + SIDE.lane + R;
-      const tau = t - plan.busPull, rb = plan.busRamp, v = plan.joinV, S = (x: number) => x * x * x - (x * x * x * x) / 2;
-      const own = tau < rb ? v * rb * S(tau / rb) : (v * rb) / 2 + v * (tau - rb);
+      const own = busAlong(plan, t);
       const ride = straight + arc + drive.motion.distanceAt(t) + plan.busAhead - lane0;
       const w = Math.min(1, Math.max(0, (t - (plan.joinAt - 1.5)) / 1.5)), d = own + (ride - own) * w * w * (3 - 2 * w);
       if (d < straight) return pose(at(SIDE.lane, SIDE.wait - d), right.clone().negate());
@@ -429,7 +424,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     group: root,
     update(t, car) {
       // (they're only there for the verse: the bus from its stop, the van once the bus is out of its way)
-      bus.visible = t >= plan.busArrive - SIDE.approach && t < plan.turnAt + BUS.gone;
+      bus.visible = t >= plan.busFrom && t < plan.turnAt + BUS.gone;
       if (bus.visible) bus.matrix.copy(busMatrix(t));
       van.visible = vanThere(plan, t);
       if (van.visible) van.matrix.copy(carMatrix(drive.carFrame(t, vanAheadAt(plan, t))));

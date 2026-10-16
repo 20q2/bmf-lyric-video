@@ -463,7 +463,7 @@ export function buildWorld(drive: Drive): THREE.Group {
   // the town's buildings (blocks.ts: the guard checks them too)
   const towns = drive.blocks.filter((b) => !b.concrete && !b.prop), concrete = drive.blocks.filter((b) => b.concrete && !b.prop);
   // (each a street front: look/facades.ts — its body, storefront, windows, sign and cornice, inside its box)
-  g.add(named(facadeMeshes(facades(towns)), 'blocks'));
+  g.add(named(facadeMeshes(facades(towns, { vary: true })), 'blocks'));
   // (a set-piece's concrete: a viaduct's deck and piers)
   const crete = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: '#b9ada0' }), Math.max(1, concrete.length));
   concrete.forEach((b, i) => crete.setMatrixAt(i, b.matrix));
@@ -476,6 +476,9 @@ export function buildWorld(drive: Drive): THREE.Group {
   // and turn
   const VARIANTS = 4, placed: THREE.Matrix4[][] = Array.from({ length: VARIANTS }, () => []);
   const skyRoad = drive.carriers.filter((c) => c.kind === 'sky').map((c) => [motion.distanceAt(c.phrase.start) - 20, motion.distanceAt(c.phrase.end + 1.5) + 40] as const);
+  // (the buildings' footprints grown by a crown's reach, as inverse matrices into their unit boxes)
+  const REACH = 3;
+  const stands = drive.blocks.filter((b) => !b.car && !b.concrete).map((b) => boxAt(route, b.s, b.lateral, b.d + 2 * REACH, 1, b.w + 2 * REACH).invert());
   for (let k = 0; k * 30 < route.length; k++) {
     const s = k * 30 + 5;
     if (!PALMS.has(stretchAtS(s).id) || s < CORNER.cross[1] + 15) continue; // (none on the intro's corner: the signs stand against the sky)
@@ -492,6 +495,9 @@ export function buildWorld(drive: Drive): THREE.Group {
       // nor by a set-piece's sign: its own designed shots stand close to it (a palm by the lens at the chapel)
       if (drive.carriers.some((c) => SET_KINDS.has(c.kind) && !c.ride && Math.abs(c.s - s) < c.w / 2 + 20)) continue;
       const h = 10 + 6 * hash(k, side, 8), f = route.frameAt(s), at = f.pos.clone().addScaledVector(f.right, side * (beach ? BEACH - 7 - 4 * hash(k, 15) : 11.5));
+      // nor in a building, or with its crown through one (a strip's shops stand at the back of the sidewalk: blocks.ts
+      // STRIP; its palms stand in its lots and alleys)
+      if (stands.some((m) => { const p = at.clone().applyMatrix4(m); return Math.abs(p.x) < 0.5 && Math.abs(p.z) < 0.5; })) continue;
       const m = new THREE.Matrix4().compose(at, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash(k, side, 9) * Math.PI * 2), new THREE.Vector3().setScalar(h / PALM.h));
       placed[Math.floor(hash(k, side, 7) * VARIANTS)]!.push(m);
     }
@@ -696,14 +702,27 @@ function furniture(drive: Drive): THREE.InstancedMesh {
 const POWER = { stretches: new Set(['chorus3']), lateral: 13, every: 34, h: 9 };
 function dressing(drive: Drive): THREE.Group {
   const g = new THREE.Group(), { route } = drive, awn: THREE.Matrix4[] = [], awnCol: THREE.Color[] = [], roof: THREE.Matrix4[] = [];
-  const palette = ['#ff5a36', '#2b78a6', '#1f6b44', '#f6dd8f', '#c8102e', '#ffffff'];
+  // (muted, the fronts' own: canvas in faded brick, slate, sage, tan, plum, cream, umber; canopies in painted metal —
+  // they were saturated orange, blue, red and yellow slabs, every one the same, under the shops' own signs)
+  const canvas = ['#9c4a3a', '#3f5f6e', '#4f6b4a', '#b89f72', '#6e5466', '#d9d0bc', '#7a6a58'], metal = ['#3a3c40', '#6b6e70', '#c9c2b2'];
+  /** A box `across` x `h` x `along` at s, its centre `y` over the road, turned `tilt` about the road's direction. */
+  const tilted = (s: number, lateral: number, across: number, h: number, along: number, y: number, tilt: number) =>
+    boxAt(route, s, lateral, 1, 1, 1, y - 0.5).multiply(new THREE.Matrix4().makeRotationZ(tilt)).multiply(new THREE.Matrix4().makeScale(across, h, along));
   drive.blocks.forEach((b, i) => {
     if (b.concrete || b.prop) return;
     const side = Math.sign(b.lateral), front = Math.abs(b.lateral) - b.d / 2;
     if (b.h > 4 && !b.bare && hash(i, 41) < 0.6) {
-      // an awning, 1.6 m out from the face toward the road, over the shop's glass and under its sign (look/facades.ts)
-      awn.push(boxAt(route, b.s, side * (front - 0.8), 1.6, 0.15, b.w * 0.7, 3.0));
-      awnCol.push(new THREE.Color(palette[Math.floor(hash(i, 42) * palette.length)]!));
+      // an awning over the shop's glass and under its sign (look/facades.ts), out from the face toward the road, each
+      // shop its own: a canvas shed sloping down to a valance, or a flat metal canopy; its width its own
+      const w = b.w * (0.5 + 0.35 * hash(i, 45)), at = b.s + (hash(i, 46) - 0.5) * (b.w - w) * 0.6;
+      if (hash(i, 47) < 0.6) {
+        const out = 1.5, slope = 0.38, c = new THREE.Color(canvas[Math.floor(hash(i, 42) * canvas.length)]!);
+        awn.push(tilted(at, side * (front - out / 2), out / Math.cos(slope), 0.06, w, 3.1 - (out / 2) * Math.tan(slope), -side * slope)); awnCol.push(c);
+        awn.push(boxAt(route, at, side * (front - out - 0.02), 0.04, 0.28, w, 3.1 - out * Math.tan(slope) - 0.24)); awnCol.push(c.clone().multiplyScalar(0.85)); // its valance
+      } else {
+        awn.push(boxAt(route, at, side * (front - 0.6), 1.2, 0.1, w, 2.95));
+        awnCol.push(new THREE.Color(metal[Math.floor(hash(i, 42) * metal.length)]!));
+      }
     }
     for (let k = 0; k < 1 + Math.floor(hash(i, 43) * 3); k++) {
       const u = hash(i, 44 + k) - 0.5, v = hash(i, 50 + k) - 0.5, tank = hash(i, 56 + k) < 0.25;

@@ -100,6 +100,10 @@ function sideWall(g: THREE.Group, w: number) {
   plane(side, 3.6, 1.35, x(1.95), 1.6, 0.025, paint(bills, { transparent: true, alphaTest: 0.5 }));
 }
 
+/** A door in its bay (m): its leaf's width and height (a shop door's 2.1 m), the rail over it, the transom light over
+ *  that, the frame's jambs, the step up to it off the walk. */
+const DOOR = { w: 1.0, h: 2.13, rail: 0.08, transom: 0.5, jamb: 0.09, step: 0.12 };
+
 export function buildChorus1(drive: Drive): { group: THREE.Group; update(t: number): void } | null {
   const plan = drive.plans.chorus1 as Chorus1Plan | undefined;
   if (!plan) return null;
@@ -120,10 +124,28 @@ export function buildChorus1(drive: Drive): { group: THREE.Group; update(t: numb
     const awning = plane(g, Wn.w + 0.4, 1.1, x(s), Wn.y + Wn.h / 2 + 0.6, 0.5, toon({ map: stripes, side: THREE.DoubleSide }));
     awning.rotation.x = -1.05; // (sloping down and out over the sidewalk)
   }
-  // the doors between; the barber pole at the shop's near end (out from the front: anywhere else it'd stand over a window)
-  for (const s of plan.doors) {
-    box(g, B.door - 0.1, 2.4, 0.06, x(s), 1.2, 0.03, dark);
-    plane(g, B.door - 0.5, 1.2, x(s), 1.55, 0.065, glass);
+  // the doors between, each in its own bay (clear of the windows' frames and awnings): a shop door's 2.1 m, a glazed
+  // leaf in a dark aluminium frame with a push bar and a kick plate, a transom light over it, the frame's head level
+  // with the windows' tops' trim below the awnings; OPEN on its glass, the hours under; a step up off the walk. The barber
+  // pole at the shop's near end (out from the front: anywhere else it'd stand over a window)
+  {
+    const D = DOOR, y0 = SIDEWALKS.kerb + D.step, open = paint(canvasTex(256, 192, (c) => {
+      c.fillStyle = '#c8202e'; c.beginPath(); c.roundRect(28, 10, 200, 70, 12); c.fill();
+      c.fillStyle = '#f8f4ea'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), 52); c.fillText('OPEN', 128, 48);
+      c.font = font(F.sign(600), 22); c.fillText('TUE – SAT', 128, 118); c.fillText('9 – 6', 128, 150);
+    }), { transparent: true, alphaTest: 0.5 });
+    for (const s of plan.doors) {
+      const fx = x(s), head = y0 + D.h + D.rail + D.transom;
+      tbox(g, D.w + 2 * D.jamb, head + D.jamb, 0.07, fx, (head + D.jamb) / 2, 0.035, '#2a2c31'); // the frame, from the base course up
+      plane(g, D.w - 0.16, D.h - 0.42, fx, y0 + 0.3 + (D.h - 0.42) / 2, 0.075, glass); // the leaf's glass, its stiles and rails the frame's
+      plane(g, D.w, D.transom, fx, y0 + D.h + D.rail + D.transom / 2, 0.075, glass); // the transom light over it
+      tbox(g, D.w - 0.08, 0.24, 0.03, fx, y0 + 0.14, 0.085, '#b8b2a4'); // the kick plate
+      tbox(g, D.w - 0.24, 0.05, 0.06, fx, y0 + 1.0, 0.11, '#c9c4b8'); // the push bar
+      plane(g, 0.5, 0.375, fx, y0 + 1.5, 0.08, open);
+      tbox(g, D.w + 2 * D.jamb + 0.4, D.step + 0.05, 0.45, fx, y0 - (D.step + 0.05) / 2, 0.225, '#b8ab98'); // the step up off the walk
+      tbox(g, D.w + 2 * D.jamb + 0.3, 0.12, 0.12, fx, head + D.jamb + 0.06, 0.06, '#f8f4ea'); // its head's trim
+    }
+    fuse(g);
   }
   const poles: THREE.Texture[] = [];
   {

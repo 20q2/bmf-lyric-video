@@ -102,6 +102,10 @@ void main() {
 
 /** What a pane's `behind` attribute says is behind it (nightGlass). */
 export const BEHIND = { shop: 0, room: 1, dark: 2 } as const;
+// (A shop pane's `trade` attribute (look/facades.ts TRADE_OF) picks what's behind it: 0 shelves of stock, 1 clothes on
+// a rail, 2 a lunch counter under its menu board, 3 bills taped up inside the glass, 4 an office's vertical blinds.
+// Every shop window in town showed the same three shelves of stock: the user, 2026-10-16, "every front of the store
+// has the same texture on the front of it".)
 
 /** Window glass on the street fronts (look/facades.ts): an interior seen through it (the user, 2026-10-13: "all the
  *  windows are blacked out ... little things going on inside") — by its `behind` attribute (BEHIND), a shop's back wall
@@ -114,15 +118,48 @@ export function nightGlass(): THREE.MeshToonMaterial {
     printShadows(sh);
     sh.uniforms.night = NIGHT;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-attribute float lit; attribute float behind; varying float vLit; varying float vBehind; varying vec2 vGlassUv; varying vec3 vGlassPos;`).replace('#include <begin_vertex>', `#include <begin_vertex>
-vLit = lit; vBehind = behind; vGlassUv = uv; vGlassPos = position;`);
+attribute float lit; attribute float behind; attribute float trade; varying float vLit; varying float vBehind; varying float vTrade; varying vec2 vGlassUv; varying vec3 vGlassPos;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+vLit = lit; vBehind = behind; vTrade = trade; vGlassUv = uv; vGlassPos = position;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform float night; varying float vLit; varying float vBehind; varying vec2 vGlassUv; varying vec3 vGlassPos;
+uniform float night; varying float vLit; varying float vBehind; varying float vTrade; varying vec2 vGlassUv; varying vec3 vGlassPos;
 float glassHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   vec2 q = vGlassUv; float seed = floor(vGlassPos.x * 0.7 + vGlassPos.y * 0.37 + vGlassPos.z * 1.3);
   vec3 interior; float cover = 0.0; // (how much of it hangs right behind the glass, catching the day)
-  if (vBehind < 0.5) {
+  if (vBehind < 0.5 && vTrade > 0.5) {
+    // a shop of another kind (its trade), all in the same muted colours
+    if (vTrade < 1.5) {
+      // clothes: a rail across the top, garments hanging off it at their own lengths, a pale back wall
+      vec3 wall = mix(vec3(0.62, 0.56, 0.50), vec3(0.50, 0.48, 0.52), step(0.5, glassHash(vec2(seed, 41.0))));
+      float rail = step(abs(q.y - 0.84), 0.014), slot = floor(q.x * 13.0 + seed), fx = fract(q.x * 13.0);
+      float len = 0.32 + 0.32 * glassHash(vec2(slot, 42.0)), pk = glassHash(vec2(slot, 44.0));
+      float hang = step(q.y, 0.83) * step(0.83 - len, q.y) * step(0.07, fx) * step(fx, 0.93) * step(0.2, glassHash(vec2(slot, 43.0)));
+      vec3 cloth = mix(mix(vec3(0.70, 0.60, 0.52), vec3(0.42, 0.46, 0.52), step(0.35, pk)), mix(vec3(0.58, 0.42, 0.40), vec3(0.80, 0.76, 0.68), step(0.5, glassHash(vec2(slot, 45.0)))), step(0.65, pk));
+      interior = mix(mix(wall, vec3(0.32, 0.30, 0.29), rail), cloth * (0.9 + 0.1 * sin(fx * 18.0)), hang);
+    } else if (vTrade < 2.5) {
+      // a lunch counter: its front and top across the pane's foot, a menu board up the back wall, its rows of items
+      vec3 wall = vec3(0.40, 0.33, 0.29);
+      float menu = step(0.66, q.y) * step(q.y, 0.92) * step(0.1, q.x) * step(q.x, 0.9);
+      float rows = step(0.55, fract(q.y * 16.0)) * step(0.12, fract(q.x * 3.0)) * step(fract(q.x * 3.0), 0.8);
+      vec3 board = mix(vec3(0.84, 0.79, 0.66), vec3(0.34, 0.29, 0.27), rows * 0.65);
+      vec3 front = mix(vec3(0.55, 0.43, 0.35), vec3(0.58, 0.36, 0.33), step(0.5, glassHash(vec2(seed, 51.0))));
+      interior = mix(mix(wall, board, menu), front * (0.9 + 0.1 * step(0.5, fract(q.x * 12.0))), step(q.y, 0.32));
+      interior = mix(interior, vec3(0.80, 0.78, 0.72), step(abs(q.y - 0.33), 0.02));
+    } else if (vTrade < 3.5) {
+      // bills taped up inside the glass over a dim shop: notices, a menu, a sale, their lines of type
+      vec2 f = fract(vec2(q.x * 3.0, q.y * 2.0));
+      float cell = floor(q.x * 3.0) + 3.0 * floor(q.y * 2.0) + seed, pk = glassHash(vec2(cell, 62.0));
+      float paper = step(0.4, glassHash(vec2(cell, 61.0))) * step(0.12, f.x) * step(f.x, 0.88) * step(0.1, f.y) * step(f.y, 0.86);
+      vec3 pc = mix(mix(vec3(0.88, 0.84, 0.74), vec3(0.80, 0.68, 0.50), step(0.45, pk)), vec3(0.62, 0.70, 0.72), step(0.8, pk));
+      float lines = step(0.6, fract(f.y * 7.0)) * step(0.24, f.x) * step(f.x, 0.76) * step(0.2, f.y) * step(f.y, 0.62);
+      interior = mix(vec3(0.30, 0.28, 0.29), mix(pc, vec3(0.32, 0.27, 0.27), lines * 0.7), paper); cover = paper;
+    } else {
+      // an office: vertical blinds drawn part way across, a dim room past them
+      float drawn = step(q.x, 0.35 + 0.65 * glassHash(vec2(seed, 72.0)));
+      vec3 blinds = mix(vec3(0.84, 0.82, 0.76), vec3(0.68, 0.66, 0.61), step(0.84, fract(q.x * 18.0)));
+      interior = mix(vec3(0.40, 0.38, 0.36), blinds, drawn); cover = drawn;
+    }
+  } else if (vBehind < 0.5) {
     // a shop: a warm back wall, three shelves across the pane, stock standing on them with gaps between, in putty,
     // sage, muted brick, now and then a slate (a pane's own seed)
     vec3 wall = mix(vec3(0.58, 0.48, 0.38), vec3(0.46, 0.50, 0.50), step(0.5, glassHash(vec2(seed, 3.0))));
