@@ -1128,8 +1128,8 @@ export function buildCar(): THREE.Group {
     x.fillStyle = '#f2f1ea'; x.fillRect(0, 0, 256, 128); x.strokeStyle = '#1b2a6b'; x.lineWidth = 8; x.strokeRect(4, 4, 248, 120);
     x.fillStyle = '#d81e2c'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `italic 600 30px "${F.bodoni(700, { italic: true })}"`; x.fillText('California', 128, 30);
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-    const plate = add(new THREE.PlaneGeometry(0.46, 0.23), new THREE.MeshBasicMaterial({ map: tex }), 0, 0.7, -hl - 0.075); plate.rotation.y = Math.PI; plate.name = 'plate';
-    box(0.5, 0.27, 0.03, 0, 0.7, -hl - 0.06, dark);
+    const plate = add(new THREE.PlaneGeometry(0.46, 0.23), new THREE.MeshBasicMaterial({ map: tex }), 0, 0.7, -hl - 0.085); plate.rotation.y = Math.PI; plate.name = 'plate';
+    box(0.5, 0.27, 0.03, 0, 0.7, -hl - 0.06, dark); // (its holder: its face at -hl - 0.075, the plate 1 cm proud of it — flush, they fought)
   }
   for (let k = 0; k < 4; k++) box(Wd - 0.52, 0.018, 0.03, 0, 0.55 + k * 0.06, hl + 0.025, chrome).name = 'grille';
   for (const x of [0.72, 0.45, -0.45, -0.72]) add(new THREE.TorusGeometry(0.1, 0.014, 6, 18), chrome, x, 0.68, hl + 0.03).name = 'headBezel';
