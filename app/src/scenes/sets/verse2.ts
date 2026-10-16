@@ -81,7 +81,9 @@ function lay(o: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, face: THR
  *  bald, a gold earring, a wink, a tight white tee over a barrel chest, navy work pants, a tool belt with a hammer in
  *  its loop; one fist on his hip, a giant wrench over his other shoulder. (He was a flat painting on the wall that read
  *  as a bowling pin: "not passing the mark", the user, 2026-10-14.) Feet on the plinth's top, facing +z. */
-function mrHandleIt(g: THREE.Object3D) {
+function mrHandleIt(man: THREE.Object3D) {
+  // (his still parts in a group of their own, batched into a few meshes: his wink's movers beside it, not in it)
+  const g = new THREE.Group(); man.add(g);
   const skin = toon({ color: '#9a5b3a' }), tee = toon({ color: '#f7f4ec' }), pants = toon({ color: '#283a63' }), boot = toon({ color: '#3f2a20' });
   const leather = toon({ color: '#8a5a32' }), gold = toon({ color: '#f6c445' }), ink = toon({ color: HW.ink }), steel = toon({ color: HW.steel });
   // the plinth, his name across its front
@@ -111,16 +113,17 @@ function mrHandleIt(g: THREE.Object3D) {
   // then it should give us a wink"). (He was painted mid-wink, an eye a dash.)
   const white = toon({ color: '#f7f4ec' }), eyes: { lid: THREE.Mesh; brow: THREE.Mesh; cheek: THREE.Mesh }[] = [];
   for (const s of [-1, 1]) {
-    const ex = s * 0.17, ey = y0 + 4.93, eye = new THREE.Group(); eye.position.set(ex, ey, 0.4); eye.rotation.y = s * 0.32; eye.scale.set(1, 1.25, 0.6); g.add(eye);
+    const ex = s * 0.17, ey = y0 + 4.93, eye = new THREE.Group(); eye.position.set(ex, ey, 0.4); eye.rotation.y = s * 0.32; eye.scale.set(1, 1.25, 0.6); (s < 0 ? man : g).add(eye);
     ball(eye, 0.11, 0, 0, 0, white);
     ball(eye, 0.05, -0.025, -0.02, 0.095, ink).scale.z = 0.35; // (the pupil, a disc on the white: toward the street below, inside the shut lid)
     // the lids: skin domes over its top and its foot, the upper's rim lined dark; the upper turns down to meet the lower
     // (rotation.x: open LID.open, shut LID.shut), its line then a curve across the shut eye
-    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.125, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), skin); lid.name = 'lid'; lid.rotation.x = LID.open; eye.add(lid);
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.125, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), skin); lid.rotation.x = LID.open; eye.add(lid);
     const under = new THREE.Mesh(new THREE.SphereGeometry(0.124, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), skin); under.rotation.x = 0.59; eye.add(under);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(0.125, 0.012, 6, 24), ink); rim.rotation.x = Math.PI / 2; lid.add(rim);
-    const brow = box(g, 0.22, 0.05, 0.08, ex, ey + 0.2, 0.36, ink); brow.rotation.z = -s * 0.12; brow.name = 'brow';
-    const cheek = ball(g, 0.1, ex - s * 0.02, ey - 0.17, 0.4, skin); cheek.scale.set(1.3, 0.8, 0.7); cheek.name = 'cheek';
+    const brow = box(s < 0 ? man : g, 0.22, 0.05, 0.08, ex, ey + 0.2, 0.36, ink); brow.rotation.z = -s * 0.12;
+    const cheek = ball(s < 0 ? man : g, 0.1, ex - s * 0.02, ey - 0.17, 0.4, skin); cheek.scale.set(1.3, 0.8, 0.7);
+    if (s < 0) { lid.name = 'lid'; brow.name = 'brow'; cheek.name = 'cheek'; } // (named, the batching leaves them be)
     eyes.push({ lid, brow, cheek });
   }
   ball(g, 0.08, 0, y0 + 4.8, 0.47, skin);
@@ -763,9 +766,10 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
   let bucketSign!: THREE.Group;
   const steam: THREE.Sprite[] = [], steamAt = new THREE.Vector3();
   {
-    const B = plan.chicken, Ck = SHACK.chicken, Sh = SHACK.shop, g = front(B.s, Sh.face), w = B.w, h = Ck.h;
-    g.matrix.elements[13] = plan.chickenFloor;
-    const inv = g.matrix.clone().invert();
+    // (its still parts in a group of their own, batched into a few meshes; the bucket sign and the steam beside it)
+    const B = plan.chicken, Ck = SHACK.chicken, Sh = SHACK.shop, at = front(B.s, Sh.face), g = new THREE.Group(), w = B.w, h = Ck.h;
+    at.matrix.elements[13] = plan.chickenFloor; at.add(g);
+    const inv = at.matrix.clone().invert();
     const cream = toon({ color: '#fff6e0' }), redM = toon({ color: red }), white = toon({ color: '#ffffff' }), ink = toon({ color: '#1d2026' });
     box(g, w, h, Ck.d, 0, h / 2, -Ck.d / 2, wallMaterial('#fff6e0', new THREE.Vector3(w, h, Ck.d), 0, false));
     // its apron: from its front to the sidewalk's back, flush with it, sampled along the road round its bend (in its
@@ -872,7 +876,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
       steamAt.set(vx, h + 2.1, vz);
       // (its puffs soft, pale against the sky, the sun through them: shaded as solid balls they read as smoke, then beads)
       const puff = canvasTex(128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, 'rgba(255,248,240,1)'); gr.addColorStop(0.55, 'rgba(255,246,236,0.6)'); gr.addColorStop(1, 'rgba(255,244,232,0)'); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
-      for (let k = 0; k < 12; k++) { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, transparent: true, depthWrite: false })); m.name = 'steam'; g.add(m); steam.push(m); }
+      for (let k = 0; k < 12; k++) { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, transparent: true, depthWrite: false })); m.name = 'steam'; at.add(m); steam.push(m); }
     }
     // out front: the picnic table before the first window, two eating at it (a bucket, cups, the napkins between them)
     {
@@ -912,11 +916,10 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     }
     // the bucket sign on a pole by the road end, turning slowly (its pole down to the apron)
     const px = w / 2 - 1.2, py = apronY(px);
-    bucketSign = new THREE.Group(); bucketSign.position.set(px, h + 2.6, 0.4); g.add(bucketSign);
+    bucketSign = new THREE.Group(); bucketSign.position.set(px, h + 2.6, 0.4); at.add(bucketSign);
     cyl(g, 0.12, h + 2.0 - py, px, (h + 2.0 + py) / 2, 0.4, dark);
     { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.8, 1.6, 16), redM); bucketSign.add(b); for (let k = 0; k < 8; k++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.62, 0.05), white); const a = (k / 8) * Math.PI * 2; st.position.set(Math.sin(a) * 0.9, 0, Math.cos(a) * 0.9); st.rotation.y = a; bucketSign.add(st); } const lid = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.12, 16), white); lid.position.y = 0.85; bucketSign.add(lid); }
     fuse(g);
-    root.add(g);
   }
   {
     const Ck = SHACK.chicken;
