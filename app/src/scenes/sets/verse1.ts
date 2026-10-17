@@ -337,6 +337,11 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     tcyl(van, 0.016, 0.02, -0.09, 0.87, zB - 0.01, CHROME, 8).rotation.x = Math.PI / 2;
     // the plate's holder (its face 3.5 cm behind the plate: they z-fought once), the lamp's chrome hood over it
     tbox(van, 0.7, 0.36, 0.02, 0, VAN.plateY, zB - 0.015, INK);
+    // and its own plate in it, 2 cm behind the carrier's and a little smaller (the carrier's gone once it pulls away: it
+    // drove off up the street with an empty black hole for a plate): cream, a red band, its number in navy blocks
+    tbox(van, 0.6, 0.29, 0.006, 0, VAN.plateY, zB - 0.032, '#f2f1ea');
+    tbox(van, 0.3, 0.03, 0.004, 0, VAN.plateY + 0.1, zB - 0.036, '#c8102e');
+    for (let k = 0; k < 7; k++) if (k !== 3) tbox(van, 0.05, 0.11, 0.004, -0.21 + k * 0.07, VAN.plateY - 0.02, zB - 0.036, '#1b2a6b');
     tbox(van, 0.16, 0.035, 0.08, 0, VAN.plateY + 0.175, zB - 0.04, CHROME);
     // the tail lamps' chrome housings on the corner posts (their lenses below), reversing lamps under them
     for (const sx of [1, -1]) { tbox(van, 0.14, 0.62, 0.04, sx * 0.945, 0.86, zB - 0.012, CHROME); tbox(van, 0.1, 0.12, 0.012, sx * 0.945, 0.66, zB - 0.035, '#ece8da'); }
