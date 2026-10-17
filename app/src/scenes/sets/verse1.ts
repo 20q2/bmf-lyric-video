@@ -14,7 +14,8 @@ import { GLOW, lampMaterial } from '../../look/night';
 import { drawAd } from '../../look/adart';
 import { F, font } from '../../engine/type';
 import { TEXT_SHARE } from '../../drive/ads';
-import { fuse, paint, sedan, tbox, tcyl } from './kit';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { fuse, paint, part, sedan, tball, tbox, tcyl } from './kit';
 import { buildNewsstand } from './newsstand';
 import { holdPhone, lapGrip } from '../../look/cast3d';
 import { LEAD } from '../../drive/shots';
@@ -38,7 +39,6 @@ const cyl = (g: THREE.Object3D, r: number, h: number, x: number, y: number, z: n
 const plane = (g: THREE.Object3D, w: number, h: number, x: number, y: number, z: number, m: THREE.Material) => {
   const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); p.position.set(x, y, z); g.add(p); return p;
 };
-const wheel = (g: THREE.Object3D, r: number, x: number, z: number, m: THREE.Material) => { const w = cyl(g, r, 0.28, x, r, z, m); w.rotation.z = Math.PI / 2; };
 /** A group in a panel's own frame (x along its text, y its up, z out of its face), origin at its centre. */
 function onPanel(p: Panel): THREE.Group {
   const g = new THREE.Group(), along = p.up.clone().cross(p.normal).normalize();
@@ -278,17 +278,149 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
   // ---- the van ahead of the bus: its back doors carry the stickers, its bumper the plate (the carriers) ----
   const van = moving();
   {
-    const paint = toon({ color: '#d9d4c7' }), chrome = toon({ color: WORLD.chrome }), H = VAN.half;
-    box(van, 2.0, 2.0, 2 * H, 0, 0.35 + 1.0, 0, paint);
-    box(van, 2.06, 0.16, 0.14, 0, 0.36, -H - 0.04, chrome);
-    for (const x of [-0.9, 0.9]) plane(van, 0.14, 0.3, x, 1.0, -H - 0.01, tail).rotation.y = Math.PI;
-    for (const z of [-H + 0.8, H - 0.9]) for (const x of [-0.9, 0.9]) wheel(van, 0.36, x, z, black);
-    // its rear windows over the stickers, its roof's cap, the cab's side windows, its mirrors
-    const glassM = toon({ color: '#28323c' });
-    for (const x of [-0.47, 0.47]) plane(van, 0.82, 0.3, x, 2.13, -H - 0.012, glassM).rotation.y = Math.PI;
-    box(van, 2.0, 0.08, 2 * H, 0, 2.39, 0, toon({ color: '#ece8de' }));
-    box(van, 2.02, 0.5, 1.5, 0, 1.92, H - 0.95, glassM);
-    for (const x of [-1.08, 1.08]) box(van, 0.08, 0.22, 0.12, x, 1.75, H - 0.45, black);
+    // (the user, 2026-10-17: "a quick model fidelity improvement for ... the truck we're behind" — it was a box with two
+    // red planes and four drums) a '70s delivery van, a step van's tall box: its shell one section lofted down its
+    // length (tucked under at the sill, upright to the belt, leaning in to rounded roof shoulders, a white roof), a brown
+    // stripe round it, road grime up its flanks; its back doors two leaves (shut lines, the seam, hinges, a handle,
+    // small windows high up over the stickers), tail lamps in chrome housings on its corner posts, three ID lamps over
+    // the doors, a plate lamp, a chrome step bumper, mud flaps; arches with tyres, steel wheels and dog-dish hubcaps;
+    // West Coast mirrors out on arms (they show either side of its back); a cab door and window each side, the sliding
+    // door on its curb side, a ladder on a roof rack. Tinted and fused (it moves: the batcher can't merge it), the lamps'
+    // lenses one mesh in their glow. What carries the lyric stays put: the stickers (VAN.stickersY, 2 cm off the doors —
+    // nothing within their rectangle stands out further than 1 cm) and the plate (VAN.plateY, 6 cm off the back, its
+    // holder 3.5 cm behind it).
+    const H = VAN.half, [D0, D1] = VAN.doors;
+    const PAINT = '#d9d4c7', ROOF = '#efece4', STRIPE = '#7a4a2a', DIRT = '#7d705c', RUST = '#8a4a26', CHROME = '#c9c6bd', INK = '#1b1820';
+    const SHUT = '#5a554c', RUBBER = '#2b2a30', GLASS = '#2a3440', TYRE = '#1d1b20', STEEL = '#d8d4c6', ALU = '#b9b5ab';
+    // its section (x its left, y up): Y0 its sill, W0 its half-width to the belt, W1 at its shoulders, their radius R
+    const Y0 = 0.4, BELT = 1.3, TOP = 2.52, R = 0.22, W0 = 1.02, W1 = 0.97;
+    const lean = Math.atan2(W0 - W1, TOP - R - BELT), hw = (y: number) => (y <= BELT ? W0 : W0 - (W0 - W1) * Math.min(1, (y - BELT) / (TOP - R - BELT)));
+    const half: [number, number][] = [[0, Y0], [W0 - 0.06, Y0], [W0 - 0.015, Y0 + 0.015], [W0, Y0 + 0.06], [W0, 0.75], [W0, BELT], [W1, TOP - R]];
+    for (let k = 1; k <= 6; k++) { const a = (k / 6) * (Math.PI / 2); half.push([W1 - R + R * Math.cos(a), TOP - R + R * Math.sin(a)]); }
+    const outline = [...half, [0, TOP + 0.015] as [number, number], ...half.slice(1).reverse().map(([x, y]) => [-x, y] as [number, number])];
+    const shell = part(van, new THREE.ExtrudeGeometry(new THREE.Shape(outline.map(([x, y]) => new THREE.Vector2(x, y))), { depth: 2 * H, bevelEnabled: false }).translate(0, 0, -H), PAINT);
+    { // (the roof white, its belly dark, grime up its flanks from the sill to the belt; its ends left clean)
+      const g = shell.geometry, p = g.attributes.position!, n = g.attributes.normal!, c = g.attributes.color!, k = new THREE.Color(), dirt = new THREE.Color(DIRT), roof = new THREE.Color(ROOF), belly = new THREE.Color('#2a2622');
+      for (let i = 0; i < p.count; i++) {
+        if (Math.abs(n.getZ(i)) > 0.5) continue;
+        k.setRGB(c.getX(i), c.getY(i), c.getZ(i));
+        if (n.getY(i) > 0.9) k.copy(roof); else if (n.getY(i) < -0.9) k.copy(belly); else k.lerp(dirt, 0.8 * Math.min(1, Math.max(0, (1.1 - p.getY(i)) / 0.7)));
+        c.setXYZ(i, k.r, k.g, k.b);
+      }
+    }
+    /** A tinted box on a flank (side `sx`: 1 its left) at height y, standing `out` m proud of it, leaning with it. */
+    const onSide = (sx: number, w: number, h: number, l: number, y: number, z: number, out: number, color: string) => {
+      const b = tbox(van, w, h, l, sx * (hw(y) + out), y, z, color); b.rotation.z = sx * lean; return b;
+    };
+    /** A door's upright shut line on a flank from y0 to y1: upright under the belt, leaning with it above. */
+    const shutLine = (sx: number, z: number, y0: number, y1: number) => {
+      tbox(van, 0.012, BELT - y0, 0.014, sx * (W0 + 0.004), (y0 + BELT) / 2, z, SHUT);
+      onSide(sx, 0.012, y1 - BELT, 0.014, (BELT + y1) / 2, z, 0.004, SHUT);
+    };
+    // the stripe, round it under the belt (behind the stickers, across the back)
+    for (const sx of [1, -1]) tbox(van, 0.008, 0.12, 2 * H - 0.02, sx * (W0 + 0.002), 1.22, 0, STRIPE);
+    tbox(van, 2 * W0 - 0.02, 0.12, 0.008, 0, 1.22, -H - 0.003, STRIPE);
+    tbox(van, 2 * W0 - 0.02, 0.12, 0.008, 0, 1.22, H + 0.003, STRIPE);
+
+    // ---- its back ----
+    const zB = -H, dm = (D0 + D1) / 2, dh = D1 - D0, LEAF = 0.86;
+    // the doors' shut lines and seam (1.2 cm proud: under the stickers' 2), the sill under them grimy
+    for (const x of [-LEAF, 0, LEAF]) tbox(van, 0.014, dh, 0.02, x, dm, zB - 0.002, SHUT);
+    for (const y of [D0, D1]) tbox(van, 2 * LEAF, 0.014, 0.02, 0, y, zB - 0.002, SHUT);
+    tbox(van, 2 * W0 - 0.04, D0 - Y0 - 0.03, 0.008, 0, (D0 + Y0) / 2 + 0.005, zB - 0.002, '#b3a993');
+    // their windows, high up, in rubber (their foot behind the top sticker)
+    for (const sx of [1, -1]) { tbox(van, 0.68, 0.32, 0.016, sx * 0.42, 2.23, zB - 0.002, RUBBER); tbox(van, 0.62, 0.26, 0.016, sx * 0.42, 2.23, zB - 0.006, GLASS); }
+    // hinges on the leaves' outer edges, a chrome handle and lock on the curb-side leaf under the stickers
+    for (const sx of [1, -1]) for (const y of [1.35, 1.85, 2.3]) { tbox(van, 0.07, 0.13, 0.035, sx * 0.875, y, zB - 0.017, '#6f6b63'); tcyl(van, 0.014, 0.15, sx * 0.905, y, zB - 0.03, CHROME, 6); }
+    tbox(van, 0.2, 0.028, 0.02, -0.25, 0.87, zB - 0.035, CHROME);
+    for (const x of [-0.34, -0.16]) tbox(van, 0.025, 0.028, 0.035, x, 0.87, zB - 0.018, CHROME);
+    tcyl(van, 0.016, 0.02, -0.09, 0.87, zB - 0.01, CHROME, 8).rotation.x = Math.PI / 2;
+    // the plate's holder (its face 3.5 cm behind the plate: they z-fought once), the lamp's chrome hood over it
+    tbox(van, 0.7, 0.36, 0.02, 0, VAN.plateY, zB - 0.015, INK);
+    tbox(van, 0.16, 0.035, 0.08, 0, VAN.plateY + 0.175, zB - 0.04, CHROME);
+    // the tail lamps' chrome housings on the corner posts (their lenses below), reversing lamps under them
+    for (const sx of [1, -1]) { tbox(van, 0.14, 0.62, 0.04, sx * 0.945, 0.86, zB - 0.012, CHROME); tbox(van, 0.1, 0.12, 0.012, sx * 0.945, 0.66, zB - 0.035, '#ece8da'); }
+    // the ID lamps' bases over the doors, the corner clearance lamps'
+    for (const x of [-0.2, 0, 0.2]) tbox(van, 0.11, 0.06, 0.012, x, 2.468, zB - 0.006, CHROME);
+    for (const sx of [1, -1]) tbox(van, 0.09, 0.07, 0.012, sx * 0.93, 2.36, zB - 0.006, CHROME);
+    // the step bumper: chrome, a rubber tread on top, black brackets under; its ends wrapping round
+    tbox(van, 2.12, 0.12, 0.1, 0, 0.38, zB - 0.07, '#e2e0da');
+    tbox(van, 2.13, 0.022, 0.104, 0, 0.405, zB - 0.07, '#f7f6f1');
+    tbox(van, 2.08, 0.03, 0.08, 0, 0.307, zB - 0.065, INK);
+    tbox(van, 0.7, 0.012, 0.08, 0, 0.446, zB - 0.07, RUBBER);
+    for (const sx of [1, -1]) { tbox(van, 0.06, 0.15, 0.16, sx * 1.03, 0.37, zB + 0.02, CHROME); tbox(van, 0.08, 0.1, 0.12, sx * 0.55, 0.26, zB - 0.04, INK); }
+    // grime and rust: streaks down the corner posts, rust at the doors' feet and the sill's corners
+    for (const sx of [1, -1]) for (const [x, y, h] of [[0.93, 1.75, 0.5], [0.97, 1.6, 0.35]] as const) tbox(van, 0.018, h, 0.006, sx * x, y, zB - 0.003, '#a99d86');
+    for (const [x, y, w, h] of [[0.7, D0 + 0.02, 0.1, 0.035], [-0.62, D0 + 0.015, 0.06, 0.025], [0.96, 0.47, 0.07, 0.06], [-0.95, 0.5, 0.05, 0.08]] as const) tbox(van, w, h, 0.016, x, y, zB - 0.004, RUST);
+    // under it: the mud flaps behind the rear wheels, the axle and its pumpkin, the tailpipe out on the curb side
+    const zR = -H + 1.0, zF = H - 0.95;
+    for (const sx of [1, -1]) tbox(van, 0.24, 0.36, 0.012, sx * 0.9, 0.25, zR - 0.55, INK);
+    tcyl(van, 0.05, 1.7, 0, 0.38, zR, '#2a2622', 8).rotation.z = Math.PI / 2;
+    tball(van, 0.13, 0.1, 0.37, zR, '#2a2622');
+    tcyl(van, 0.032, 0.5, -0.72, 0.23, zB + 0.15, '#57524a', 8).rotation.x = Math.PI / 2;
+
+    // ---- its wheels: in their arches (dark half-discs, a lip round each, rust on the rear ones' lips), tyres a
+    // centimetre proud, steel wheels in its body colour, chrome dog-dish caps ----
+    for (const z of [zR, zF]) for (const sx of [1, -1]) {
+      const arch = part(van, new THREE.CylinderGeometry(0.47, 0.47, 0.012, 14, 1, false, 0, Math.PI), '#16141a', sx * W0, 0.38, z); arch.rotation.z = Math.PI / 2;
+      const lip = part(van, new THREE.TorusGeometry(0.47, 0.022, 5, 14, Math.PI), PAINT, sx * (W0 + 0.004), 0.38, z); lip.rotation.y = Math.PI / 2;
+      tcyl(van, 0.38, 0.22, sx * 0.92, 0.38, z, TYRE, 18).rotation.z = Math.PI / 2;
+      tcyl(van, 0.25, 0.012, sx * 1.034, 0.38, z, STEEL, 16).rotation.z = Math.PI / 2;
+      tcyl(van, 0.18, 0.02, sx * 1.044, 0.38, z, CHROME, 16).rotation.z = Math.PI / 2;
+      tcyl(van, 0.055, 0.02, sx * 1.058, 0.38, z, '#8a8780', 10).rotation.z = Math.PI / 2;
+      if (z === zR) for (const a of [0.5, 2.5]) tbox(van, 0.012, 0.035, 0.07, sx * (W0 + 0.012), 0.38 + 0.48 * Math.sin(a), z + 0.48 * Math.cos(a), RUST).rotation.x = Math.PI / 2 - a;
+    }
+
+    // ---- its flanks: a cab door each side, its window and vent wing, a handle; a cargo window on its left; the
+    // sliding door on its curb side (right), its window, handle and track; marker lamps fore and aft; the mirrors ----
+    const cab0 = 0.2, cab1 = 1.12;
+    for (const sx of [1, -1]) {
+      for (const z of [cab0, cab1]) shutLine(sx, z, 0.5, 2.2);
+      onSide(sx, 0.012, 0.6, 0.98, 1.85, (cab0 + cab1) / 2, 0.003, RUBBER);
+      onSide(sx, 0.016, 0.54, 0.92, 1.85, (cab0 + cab1) / 2, 0.006, GLASS);
+      onSide(sx, 0.02, 0.54, 0.02, 1.85, cab1 - 0.26, 0.012, RUBBER); // (the vent wing's divider)
+      tbox(van, 0.04, 0.03, 0.14, sx * (W0 + 0.01), 1.36, cab0 + 0.14, CHROME);
+      tbox(van, 0.012, 0.07, 0.04, sx * (W0 + 0.004), 0.95, -H + 0.12, PAINT); // (the rear marker's base: its lens below)
+      onSide(sx, 0.012, 0.06, 0.05, 2.2, H - 0.12, 0.004, '#ffb000');
+      // the West Coast mirror: a tall head out on two arms
+      for (const y of [1.62, 1.92]) tcyl(van, 0.012, 0.28, sx * (W0 + 0.1), y, cab1 + 0.08, CHROME, 6).rotation.z = Math.PI / 2;
+      tbox(van, 0.04, 0.4, 0.17, sx * (W0 + 0.24), 1.77, cab1 + 0.08, INK);
+      tbox(van, 0.01, 0.36, 0.14, sx * (W0 + 0.262), 1.77, cab1 + 0.08, '#8fa0ad');
+    }
+    onSide(1, 0.012, 0.62, 1.1, 1.85, -0.9, 0.003, RUBBER); onSide(1, 0.016, 0.56, 1.04, 1.85, -0.9, 0.006, GLASS);
+    { const s0 = -1.05, s1 = 0.12, sx = -1;
+      for (const z of [s0, s1]) shutLine(sx, z, 0.46, 2.2);
+      tbox(van, 0.012, 0.014, s1 - s0, sx * (W0 + 0.004), 0.47, (s0 + s1) / 2, SHUT);
+      onSide(sx, 0.012, 0.6, 0.98, 1.85, (s0 + s1) / 2, 0.003, RUBBER); onSide(sx, 0.016, 0.54, 0.92, 1.85, (s0 + s1) / 2, 0.006, GLASS);
+      tbox(van, 0.04, 0.03, 0.16, sx * (W0 + 0.01), 1.28, s1 - 0.12, CHROME);
+      tbox(van, 0.014, 0.025, H + s0 - 0.2, sx * (hw(1.4) + 0.006), 1.4, (-H + 0.2 + s0) / 2, '#4a463f'); // (its track, aft)
+      tbox(van, 0.012, 0.09, 0.22, sx * (W0 + 0.004), 0.6, s0 + 0.2, RUST); }
+
+    // ---- its front (seen least): the windshield in two panes, a grille between round headlamps, a chrome bumper ----
+    tbox(van, 1.84, 0.7, 0.012, 0, 1.86, H + 0.003, RUBBER);
+    tbox(van, 1.78, 0.64, 0.016, 0, 1.86, H + 0.006, GLASS);
+    tbox(van, 0.04, 0.66, 0.02, 0, 1.86, H + 0.01, RUBBER);
+    tbox(van, 1.1, 0.32, 0.016, 0, 0.92, H + 0.006, INK);
+    for (const x of [-0.75, 0.75]) { tcyl(van, 0.1, 0.02, x, 0.92, H + 0.01, CHROME, 14).rotation.x = Math.PI / 2; tcyl(van, 0.08, 0.02, x, 0.92, H + 0.02, '#f4efd8', 14).rotation.x = Math.PI / 2; }
+    tbox(van, 2.1, 0.14, 0.1, 0, 0.42, H + 0.05, CHROME);
+
+    // ---- on its roof: a vent, the rack (rails on posts, cross bars), an aluminium ladder lashed to it ----
+    tbox(van, 0.5, 0.08, 0.5, -0.3, TOP + 0.04, 0.8, '#d7d3ca');
+    for (const sx of [1, -1]) {
+      for (const z of [-1.9, -0.6, 0.7, 1.9]) tbox(van, 0.03, 0.14, 0.03, sx * 0.8, TOP + 0.06, z, INK);
+      tcyl(van, 0.02, 3.86, sx * 0.8, TOP + 0.13, 0, INK, 6).rotation.x = Math.PI / 2;
+    }
+    for (const z of [-1.9, -0.6, 0.7, 1.9]) tcyl(van, 0.018, 1.62, 0, TOP + 0.13, z, INK, 6).rotation.z = Math.PI / 2;
+    for (const x of [0.12, 0.54]) tbox(van, 0.04, 0.05, 3.7, x, TOP + 0.175, 0.05, ALU);
+    for (let z = -1.7; z <= 1.8; z += 0.3) tbox(van, 0.42, 0.025, 0.03, 0.33, TOP + 0.175, z, ALU);
+    fuse(van);
+
+    // the lamps' lenses, lit as the bus's are: the tail lamps, the ID and clearance lamps, the rear markers; the plate's
+    const red: THREE.BufferGeometry[] = [], lens = (w: number, h: number, d: number, x: number, y: number, z: number) => red.push(new THREE.BoxGeometry(w, h, d).translate(x, y, z));
+    for (const sx of [1, -1]) { lens(0.1, 0.4, 0.012, sx * 0.945, 0.96, zB - 0.037); lens(0.07, 0.04, 0.02, sx * 0.93, 2.36, zB - 0.018); lens(0.02, 0.05, 0.09, sx * (W0 + 0.01), 0.95, -H + 0.12); }
+    for (const x of [-0.2, 0, 0.2]) lens(0.08, 0.04, 0.03, x, 2.468, zB - 0.017);
+    van.add(new THREE.Mesh(mergeGeometries(red, false)!, tail));
+    van.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.006, 0.05).translate(0, VAN.plateY + 0.157, zB - 0.045), lampMaterial('#fff2d8', GLOW.tail, 1.0)));
     root.add(van);
   }
 

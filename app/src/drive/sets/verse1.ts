@@ -69,7 +69,7 @@ export const BUS = { curb: ROAD_HALF - 1.15, accel: 4, join: 0.5, gap: 2, half: 
  *  left, still in the menu board's shot (the user, 2026-10-15: "just kind of disappears ... if it wants to pull ahead
  *  ... so it's out of frame later, that's fine"); its half-length; its back doors (bottom, top) and its stickers'
  *  middle; its plate's centre. */
-export const VAN = { appear: 1.2, gap: 3, close: 3, by: 0.7, leave: 0.3, accel: 3, top: 9, half: 2.6, doors: [0.55, 2.35] as [number, number], stickersY: 1.55, plateY: 0.66 };
+export const VAN = { appear: 1.2, gap: 3, close: 3, by: 0.7, leave: 0.3, accel: 3, top: 9, half: 2.6, doors: [0.84, 2.42] as [number, number], stickersY: 1.55, plateY: 0.66 };
 /** Where things stand: the speed trailer (where the car passes it, off the road, its display's height); the burger
  *  stand's menu board (passed as its line is sung, how far through) and its marquee (on along the road from the board,
  *  off the road, its centre's height). In the car (x its left, y up, z forward): her phone, the radio in the dash. */
