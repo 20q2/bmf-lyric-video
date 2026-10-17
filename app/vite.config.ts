@@ -13,6 +13,13 @@ function repoAssets(): Plugin {
   return {
     name: 'repo-assets',
     configureServer(server) {
+      // (data/ is fetched once at load, outside the module graph: a timing fix there never reached an open preview —
+      // the user, 2026-10-17, "I'm not seeing any change". So a change to it reloads the page, unless HMR is off.)
+      if (!process.env.LV_NO_HMR) {
+        const dataDir = normalizePath(path.join(repoRoot, 'data'));
+        server.watcher.add(dataDir);
+        server.watcher.on('change', (file) => { if (normalizePath(file).startsWith(dataDir + '/')) server.ws.send({ type: 'full-reload' }); });
+      }
       server.middlewares.use((req, _res, next) => {
         if (assetDirs.some((dir) => req.url?.startsWith(`/${dir}/`))) {
           req.url = `/@fs/${encodeURI(normalizePath(repoRoot))}${req.url}`;
