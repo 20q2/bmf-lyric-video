@@ -78,14 +78,14 @@ function patch(route: Route, verts: readonly (readonly [number, number, number])
 
 /** A ribbon along the road from s0 to s1: at each sample, from (lateral a, height ya) to (lateral b, height yb) over the
  *  road's level; uv in metres (along, across). */
-function ribbon(route: Route, s0: number, s1: number, a: number | ((s: number) => number), ya: number, b: number | ((s: number) => number), yb: number): THREE.BufferGeometry {
+function ribbon(route: Route, s0: number, s1: number, a: number | ((s: number) => number), ya: number | ((s: number) => number), b: number | ((s: number) => number), yb: number | ((s: number) => number)): THREE.BufferGeometry {
   const n = Math.max(2, Math.ceil((s1 - s0) / STEP) + 1), pos: number[] = [], uv: number[] = [], idx: number[] = [];
   const at = (x: number | ((s: number) => number), s: number) => (typeof x === 'number' ? x : x(s));
   for (let i = 0; i < n; i++) {
-    const s = s0 + ((s1 - s0) * i) / (n - 1), f = route.frameAt(s), as = at(a, s), bs = at(b, s);
+    const s = s0 + ((s1 - s0) * i) / (n - 1), f = route.frameAt(s), as = at(a, s), bs = at(b, s), yas = at(ya, s), ybs = at(yb, s);
     const p = f.pos.clone().addScaledVector(f.right, as), q = f.pos.clone().addScaledVector(f.right, bs);
-    pos.push(p.x, p.y + ya, p.z, q.x, q.y + yb, q.z);
-    uv.push(s, 0, s, Math.hypot(bs - as, yb - ya));
+    pos.push(p.x, p.y + yas, p.z, q.x, q.y + ybs, q.z);
+    uv.push(s, 0, s, Math.hypot(bs - as, ybs - yas));
     if (i) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
   }
   const g = new THREE.BufferGeometry();
@@ -176,8 +176,9 @@ function roadPaint(route: Route, end: number, left: number, right: (s: number) =
 
 /** An embankment along one side of the road (side: -1 left, +1 right): from the verge's edge (`edge` m out) down to
  *  the plain at SLOPE, wherever the road stands above it; steeper on a bend's inside, where it may reach no further
- *  out than the bend's radius (past it, the hairpin up into the hills folded it into tall sheets across the sky). */
-function skirt(route: Route, side: number, edge: (s: number) => number, end = route.length): THREE.BufferGeometry {
+ *  out than the bend's radius (past it, the hairpin up into the hills folded it into tall sheets across the sky). Its
+ *  top `top(s)` m under the road's level (under the verge; on the climb, the retaining wall's foot: CLIMB_WALL). */
+function skirt(route: Route, side: number, edge: (s: number) => number, end = route.length, top: (s: number) => number = () => 0.05): THREE.BufferGeometry {
   const n = Math.ceil((end - ROAD_START) / STEP) + 1, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx: number[] = [];
   const c = new THREE.Color(WORLD.ground).multiplyScalar(0.8);
   // each sample's bend radius on this side (Infinity where the road runs straight or bends the other way)
@@ -191,11 +192,13 @@ function skirt(route: Route, side: number, edge: (s: number) => number, end = ro
     let run = e + SLOPE * h;
     for (let j = Math.max(0, i - Math.ceil(run / STEP)); j < Math.min(n, i + Math.ceil(run / STEP) + 1); j++) run = Math.min(run, 0.85 * inside[j]!);
     run = Math.max(e, run);
-    const p = f.pos.clone().addScaledVector(f.right, side * e).addScaledVector(f.up, -0.05);
+    const p = f.pos.clone().addScaledVector(f.right, side * e); p.y -= top(s); // (straight down: as the wall's face, world.ts climbWalls)
     const q = f.pos.clone().addScaledVector(f.right, side * run); q.y = -0.4;
     pos.set([p.x, p.y, p.z, q.x, q.y, q.z], i * 6);
     col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
-    if (i > 0) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+    // (wound to face out and up on either side: the left's, wound as the right's, faced in under the road and was
+    // culled from outside — on the climb's left, past the bend, you looked under the verge into its far side's inside)
+    if (i > 0) { const o = (i - 1) * 2; if (side > 0) idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); else idx.push(o, o + 2, o + 1, o + 1, o + 2, o + 3); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -233,6 +236,74 @@ function vergesOf(drive: Drive, end: number): (side: number, s: number) => numbe
   };
 }
 
+/** The climb's retaining walls (the user, 2026-10-17: driving up to the vista "I can see through the mesh of the like
+ *  concrete of the road"): along both verges' edges from where the road stands `from` m over the plain to its end, a
+ *  board-formed concrete wall holding the verge up, `depth` m from its parapet's foot down to its own (eased in over
+ *  `ramp` m; never under the plain), the hills meeting its face (look/lookout.ts CLIMB.under holds them that far under
+ *  the verge), the embankment carried on from its foot; its parapet `h` m over the verge, `t` m either side of the
+ *  edge, under a cap `cap.w` m either side and `cap.h` thick. */
+const CLIMB_WALL = { from: 6, ramp: 14, depth: 3.2, h: 0.55, t: 0.15, cap: { w: 0.22, h: 0.1 }, tile: { along: 6, down: 4 }, colour: '#b3a99b', capColour: '#cbc0ae' };
+
+/** The concrete's face: panels between expansion joints, the formwork's boards, the pour's mottle, grime run down from
+ *  the cap, a row of weep holes. One tile (`tile` m), its top row the wall's top. */
+function wallTexture(): THREE.CanvasTexture {
+  const W = CLIMB_WALL, w = 512, h = Math.round((512 * W.tile.down) / W.tile.along), px = w / W.tile.along, cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const c = cv.getContext('2d')!;
+  let k = 0; const r = () => hash(++k, 5.3);
+  c.fillStyle = W.colour; c.fillRect(0, 0, w, h);
+  for (let i = 0; i < 260; i++) { c.fillStyle = r() < 0.5 ? 'rgba(70,58,66,0.07)' : 'rgba(255,248,236,0.07)'; c.fillRect(r() * w, r() * h, (0.3 + r()) * px, (0.15 + 0.4 * r()) * px); }
+  // the boards: a faint line every 0.3 m, a stronger one at each lift (1.2 m)
+  for (let y = 0.3; y < W.tile.down; y += 0.3) { const lift = Math.abs(y / 1.2 - Math.round(y / 1.2)) < 0.01; c.fillStyle = lift ? 'rgba(50,40,50,0.28)' : 'rgba(50,40,50,0.09)'; c.fillRect(0, y * px, w, lift ? 2 : 1); }
+  // grime run down from the cap, longest under the joints
+  for (let i = 0; i < 14; i++) {
+    const x = r() * w, len = (0.4 + 2.6 * r() ** 2) * px, g = c.createLinearGradient(0, 0, 0, len);
+    g.addColorStop(0, 'rgba(44,34,44,0.26)'); g.addColorStop(1, 'rgba(44,34,44,0)'); c.fillStyle = g; c.fillRect(x, 0, (0.08 + 0.3 * r()) * px, len);
+  }
+  for (const x of [0, w - 1]) { const g = c.createLinearGradient(0, 0, 0, 2.4 * px); g.addColorStop(0, 'rgba(44,34,44,0.3)'); g.addColorStop(1, 'rgba(44,34,44,0)'); c.fillStyle = g; c.fillRect(x - 0.15 * px, 0, 0.3 * px, 2.4 * px); }
+  // the expansion joint at the panel's ends (the tile's edges), its sealant dark
+  c.fillStyle = 'rgba(30,22,30,0.75)'; c.fillRect(0, 0, 3, h); c.fillRect(w - 3, 0, 3, h);
+  // the weep holes, a stain under each
+  for (const x of [1.5, 4.5]) {
+    const y = 2.3 * px, s = 0.1 * px, g = c.createLinearGradient(0, y, 0, y + 0.8 * px);
+    g.addColorStop(0, 'rgba(40,30,38,0.35)'); g.addColorStop(1, 'rgba(40,30,38,0)'); c.fillStyle = g; c.fillRect(x * px - s * 0.7, y, s * 1.4, 0.8 * px);
+    c.fillStyle = '#231a22'; c.beginPath(); c.arc(x * px, y, s / 2, 0, Math.PI * 2); c.fill();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.flipY = false; t.repeat.set(1 / W.tile.along, 1 / W.tile.down); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+/** The climb's retaining walls (CLIMB_WALL) along both verges (`verge(side, s)` m out) from `s0` to the road's end
+ *  `end`: the walls and their caps (two meshes), and how far under the road's level each wall's foot lies at s (the
+ *  embankment's top: `skirt`). */
+function climbWalls(route: Route, verge: (side: number, s: number) => number, s0: number, end: number): { group: THREE.Group; foot: (s: number) => number } {
+  const W = CLIMB_WALL, g = new THREE.Group();
+  let from = Infinity;
+  for (let s = ROAD_START + Math.ceil((s0 - ROAD_START) / STEP) * STEP; s < end; s += STEP) if (route.frameAt(s).pos.y + 0.4 >= W.from) { from = s; break; }
+  const sm = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
+  // (the wall's foot: eased in from the verge's own level, never below the plain at -0.4)
+  const foot = (s: number) => (s < from ? 0.05 : Math.min(route.frameAt(s).pos.y + 0.4, 0.05 + (W.depth - 0.05) * sm((s - from) / W.ramp)));
+  if (!(from < end)) return { group: g, foot };
+  const walls: THREE.BufferGeometry[] = [], caps: THREE.BufferGeometry[] = [], top = W.h + W.cap.h;
+  for (const side of [-1, 1]) {
+    const at = (d: number) => (s: number) => side * (verge(side, s) + d);
+    // the face down to the foot (a little under it, into the embankment), the road side, the cap and its edges
+    walls.push(ribbon(route, from, end, at(W.t), W.h, at(W.t), (s) => -foot(s) - 0.3), ribbon(route, from, end, at(-W.t), W.h, at(-W.t), -0.05));
+    caps.push(ribbon(route, from, end, at(-W.cap.w), top, at(W.cap.w), top));
+    for (const d of [-W.cap.w, W.cap.w]) caps.push(ribbon(route, from, end, at(d), W.h, at(d), top));
+    caps.push(ribbon(route, from, end, at(W.t), W.h, at(W.cap.w), W.h), ribbon(route, from, end, at(-W.cap.w), W.h, at(-W.t), W.h));
+    // its ends, closed
+    for (const s of [from, end]) {
+      const e = verge(side, s), l = (d: number) => side * (e + d);
+      walls.push(patch(route, [[s, l(-W.t), -0.05], [s, l(W.t), -foot(s) - 0.3], [s, l(-W.t), W.h], [s, l(W.t), W.h]], [0, 1, 2, 1, 3, 2]));
+      caps.push(patch(route, [[s, l(-W.cap.w), W.h], [s, l(W.cap.w), W.h], [s, l(-W.cap.w), top], [s, l(W.cap.w), top]], [0, 1, 2, 1, 3, 2]));
+    }
+  }
+  g.add(new THREE.Mesh(mergeGeometries(walls)!, toon({ map: wallTexture(), side: THREE.DoubleSide })), new THREE.Mesh(mergeGeometries(caps)!, toon({ color: W.capColour, side: THREE.DoubleSide })));
+  return { group: g, foot };
+}
+
 export function buildWorld(drive: Drive): THREE.Group {
   const { route, motion } = drive, g = new THREE.Group();
   const stretchAtS = (s: number): Stretch => {
@@ -266,7 +337,10 @@ export function buildWorld(drive: Drive): THREE.Group {
   // the hills the climb runs up to it (shown from the climb on: the scene)
   { const climb = drive.stretches.find((st) => st.id === 'chorus4'); if (climb) g.add(named(buildClimbHills((s) => route.frameAt(s), motion.distanceAt(climb.start), end, (s) => Math.max(verge(-1, s), verge(1, s))), 'climb')); }
   // embankments where the road has climbed: from each verge's edge down to the plain
-  for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? BEACH : verge(side, s)), end), lambert()), 'skirts'));
+  // (on the climb, from the foot of its retaining walls)
+  const climbAt = drive.stretches.find((st) => st.id === 'chorus4'), walls = climbWalls(route, verge, climbAt ? motion.distanceAt(climbAt.start) : Infinity, end);
+  g.add(named(walls.group, 'climbwalls'));
+  for (const side of [-1, 1]) g.add(named(new THREE.Mesh(skirt(route, side, (s) => (side < 0 && seaLeft(s) ? BEACH : verge(side, s)), end, walls.foot), lambert()), 'skirts'));
   const box3 = new THREE.Box3();
   for (let s = 0; s < route.length; s += 50) box3.expandByPoint(route.frameAt(s).pos);
   const base = new THREE.Mesh(new THREE.PlaneGeometry(BASE, BASE), printedGround(toon({ color: grass.clone().multiplyScalar(0.85) })));
