@@ -46,7 +46,7 @@ export const STOP = { brake: 3, hold: 0.6, go: 3, goV: 13 };
  *  side"): it comes down the street from `from` m off the road at `cruise` m/s, slows over the last `slow` m to `roll`
  *  m/s and rolls over its line `cross` s after the car has stopped at theirs — out of the plane shot's frame until a
  *  moment before — then on round into their lane, coming up to their speed. */
-export const SIDE = { line: 0.3, half: 4.25, lane: 2, wait: 12.1, from: 70, cruise: 7, slow: 8, roll: 4, cross: 0.05, R: 7, sign: 0.6, signH: 2.2 };
+export const SIDE = { line: 0.3, half: 4.25, lane: 2, wait: 11.2, from: 70, cruise: 7, slow: 8, roll: 4, cross: 0.05, R: 7, sign: 0.6, signH: 2.2 };
 /** How far the bus is past its line in the side street at t (m: negative coming down it; then on along its turn into
  *  their lane and up it), before it's eased onto its place ahead of them (scenes/sets/verse1.ts). Pure. */
 export function busAlong(plan: Pick<Verse1Plan, 'busLine' | 'busRamp' | 'joinV'>, t: number): number {
@@ -57,11 +57,12 @@ export function busAlong(plan: Pick<Verse1Plan, 'busLine' | 'busRamp' | 'joinV'>
   return vL * tau + (tau < rb ? dv * rb * sm(tau / rb) : dv * (rb / 2 + tau - rb));
 }
 /** The bus they tailgate: it pulls out from its stop at the curb (`curb` m off the road's centre, accelerating at
- *  `accel`) into their lane `join` s before its line, `gap` m off their nose; its half-length (a 30 ft city bus: at
- *  36 ft it was "very large" pulling out across the lens — the user, 2026-10-16; SIDE.wait keeps its nose at its line); its tail ad's centre's
+ *  `accel`) into their lane `join` s before its line, `gap` m off their nose; its half-length (a short 24 ft city bus: at
+ *  36 ft it was "very large" pulling out across the lens, at 30 ft it still "takes up too much attention" — the user,
+ *  2026-10-16; SIDE.wait keeps its nose at its line); its tail ad's centre's
  *  height; it turns off right `turnAfter` s after its line, `lead` m on and round a corner of radius R, gone `gone` s
  *  later. It's only there for the verse: at its stop from `early` s before the verse. */
-export const BUS = { curb: ROAD_HALF - 1.15, accel: 4, join: 0.5, gap: 2, half: 4.6, adY: 1.85, turnAfter: 0.35, lead: 2, R: 10, gone: 3, early: 3 };
+export const BUS = { curb: ROAD_HALF - 1.15, accel: 4, join: 0.5, gap: 2, half: 3.7, adY: 1.85, turnAfter: 0.35, lead: 2, R: 10, gone: 3, early: 3 };
 /** The van that was ahead of the bus: there once the bus has turned off (`appear` s after), `gap` m off their nose once
  *  it's closed in (at `close` m/s, by `by` s before its line); away `leave` s after its line, pulling ahead (accelerating
  *  at `accel` to `top` m/s quicker than them) on up the street for the rest of the verse — it vanished 4 s after it

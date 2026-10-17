@@ -60,7 +60,7 @@ const HOLD = { inset: 0.045, lift: 0.85, small: 0.55 };
 const P_GAP = 0.006;
 /** The ad on the bus's street side (m, its frame: x its left, z forward): its size, its centre's height and how far
  *  forward of the middle (between the wheel arches, under the windows). */
-const SIDE_AD = { w: 4.1, h: 0.8, y: 1.5, z: 0.05 };
+const SIDE_AD = { w: 3.0, h: 0.68, y: 1.5, z: 0.05 };
 /** The channel's ad (the user's Easter egg, 2026-10-16: "Lyrics by Desaign ... the spelling is intentional"): its
  *  logo, the neon play button the user sent (an outlined triangle glowing red at its foot, violet up its back, blue
  *  to cyan at its tip, on black), drawn here at the panel's size; the wordmark; the channel's handle under it ("the
