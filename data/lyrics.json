@@ -1920,19 +1920,19 @@
         },
         {
           "w": "we",
-          "start": 131.27,
-          "end": 131.39,
-          "conf": 0.65
+          "start": 130.5,
+          "end": 130.94,
+          "conf": 0.6
         },
         {
           "w": "might",
-          "start": 131.4,
-          "end": 131.54,
+          "start": 130.95,
+          "end": 131.24,
           "conf": 0.6
         },
         {
           "w": "crash",
-          "start": 131.55,
+          "start": 131.27,
           "end": 131.76,
           "conf": 0.65
         }
@@ -2835,11 +2835,6 @@
     {
       "start": 127.14,
       "end": 128.07,
-      "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
-    },
-    {
-      "start": 130.5,
-      "end": 131.17,
       "desc": "unlisted vocal (backing vocal / ad-lib / breath)"
     },
     {

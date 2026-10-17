@@ -96,20 +96,23 @@ FIX = {
     # L30 bridge "Tryna": after the "oh" ad-lib (420 Hz, 124.22-124.84) and a silence, the lead re-enters at 125.29
     # (onset 2.5, 282 Hz). Whisper: "make" 125.62.
     (30, 0): dict(start=125.29, conf=0.75),
-    # L31 bridge "...fast, (mmm) we might crash": same shape; "we might crash" 131.27-131.76 (233-261 Hz), then the
-    # "oh" ad-lib (415 Hz) 131.80-132.25; L32 "Tryna" re-enters at 132.34 (onset 1.1, 272 Hz).
+    # L31 bridge "...fast, we might crash": "we might crash" 130.50-131.76 (below), then the "oh" ad-lib (415 Hz)
+    # 131.80-132.25; L32 "Tryna" re-enters at 132.34 (onset 1.1, 272 Hz).
     # Its first half sings L29's melody — "Blow" 277 Hz, "in'" 311, "mon" 351, "ey" low, "fast" 209 — after a falling
     # "oh" ad-lib 127.15-128.05 (314 -> 207 Hz, as before L47's "Blowin'"). So "Blowin'" from 128.17 (277 Hz), "money"
     # from the step up to 351 Hz at 129.09 (CTC: 129.04) through its 138 Hz tail to 129.85, "fast" 129.99-130.38 (210
-    # -> 230 Hz); the 415-470 Hz note 130.49-131.21 is the "mmm". (These were one note early, the ad-lib taken for
+    # -> 230 Hz); the 415-470 Hz note after it is "we might" (below). (These were one note early, the ad-lib taken for
     # "Blowin'": the user, 2026-10-16, "money doesn't start till around 129".)
     (31, 0): dict(start=128.17, end=129.05, conf=0.7),
     (31, 1): dict(start=129.09, end=129.85, conf=0.7),
     (31, 2): dict(start=129.99, end=130.38, conf=0.7),
-    # "we" 131.27-131.39 (261 Hz), "might" from the onset at 131.40 (233 Hz), "crash" from 131.55 (rising to 261 Hz).
-    (31, 3): dict(start=131.27, end=131.39, conf=0.65),
-    (31, 4): dict(start=131.40, end=131.54, conf=0.6),
-    (31, 5): dict(start=131.55, end=131.76, conf=0.65),
+    # "we might" is the high note after "fast": "we" from its entry at 130.50 (422 Hz), "might" from the fresh attack at
+    # 130.95 (onset 1.1) as it climbs to 474 Hz, to 131.21; "crash" the low phrase 131.27-131.76 (261 -> 233 -> 261 Hz).
+    # (All three had been packed into that last half second, the high note taken for an ad-lib: the user, 2026-10-16,
+    # "'we might crash' doesn't highlight on time ... too late".)
+    (31, 3): dict(start=130.50, end=130.94, conf=0.6),
+    (31, 4): dict(start=130.95, end=131.24, conf=0.6),
+    (31, 5): dict(start=131.27, end=131.76, conf=0.65),
     (32, 0): dict(start=132.34, conf=0.7),
     # L48, the song's last phrase, fades out at -51..-56 dB: two notes, 177.35-177.85 (310 Hz) and 178.05-178.55
     # (280-309 Hz), the stem at its floor from 178.60. Whisper: Tryna 177.10, make 177.56, it 177.86, last 178.10.
