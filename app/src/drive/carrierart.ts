@@ -247,7 +247,10 @@ export class CarrierArt {
     else if (carrier.kind === 'menu' && revealAt(carrier, t) > 0) this.drawPrices(c, share);
     else if (carrier.kind === 'plate') { c.fillStyle = '#c8102e'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.bodoni(700, { italic: true }), H * 0.17); c.fillText('California', W / 2, H * 0.15); c.textAlign = 'left'; }
     const TW = W * share; // the lyric's width
-    const shown = Math.round(revealAt(carrier, t) * FLIP.steps) / FLIP.steps;
+    // (a graffiti piece is paint on the wall: there whole from the first, only the word being sung lit — it faded in
+    // and dimmed back once sung: the user, 2026-10-16, "don't fade away the graffiti, just highlight the words being
+    // sung")
+    const shown = style.graffiti ? 1 : Math.round(revealAt(carrier, t) * FLIP.steps) / FLIP.steps;
     if (!COPY.has(carrier.kind)) { if (shown > 0) { this.drawWords(c, t, TW, shown); if (style.graffiti) this.onTiles(); } return; }
     // a board shows its ad's own copy (its maker, its line) until its lyric comes; then it flips like a tri-vision
     // board, slat by slat, from the copy to the words
@@ -336,7 +339,7 @@ export class CarrierArt {
     // the push on the ones before it are the carrier's, carriers.ts riseAt)
     const pop = style.bubble ? alpha : 1;
     if (style.bubble) alpha = Math.min(1, pop / BUBBLE.fade);
-    alpha *= 1 - (1 - STALE.to) * Math.round(staleAt(this.carrier, t) * 8) / 8; // (sung and read: dimmed back)
+    if (!style.graffiti) alpha *= 1 - (1 - STALE.to) * Math.round(staleAt(this.carrier, t) * 8) / 8; // (sung and read: dimmed back; paint stays)
     let em = carrier.em * pxPerM;
     c.font = font(style.family, em);
     const label = (w: Word) => (style.caps ? w.w.toUpperCase() : w.w);
