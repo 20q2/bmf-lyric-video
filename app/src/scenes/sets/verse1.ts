@@ -182,10 +182,33 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
   {
     const BODY = '#ece6d6', INK = '#1b1820', H = BUS.half;
     // (its shell tinted and fused: one mesh, not forty — it moves, so the batcher can't merge it)
-    tbox(bus, 2.5, 2.9, 2 * H, 0, 0.35 + 1.45, 0, BODY);
+    // (the user, 2026-10-16: "increase the bus fidelity" — it was a box with a black slab down each side) its body, the
+    // roof stepped in on rounded shoulders; its livery: a maroon skirt, the orange band, a rub rail, a pinstripe under
+    // the windows; the windows each framed, pillars between them in its body colour, rubber above and below; the front
+    // door on its curb side, split glass; wheel arches, chrome hubcaps; amber markers at its corners; a roof hatch
+    const GLASS = '#2a3440', RUBBER = '#33323a', CHROME = '#c9c6bd';
+    tbox(bus, 2.5, 2.6, 2 * H, 0, 0.35 + 1.3, 0, BODY);
+    tbox(bus, 2.1, 0.3, 2 * H - 0.1, 0, 3.1, 0, BODY);
+    for (const x of [-1.05, 1.05]) tcyl(bus, 0.2, 2 * H - 0.1, x, 2.95, 0, BODY, 10).rotation.x = Math.PI / 2;
+    tbox(bus, 2.52, 0.3, 2 * H + 0.02, 0, 0.5, 0, '#7a2236');
     tbox(bus, 2.52, 0.18, 2 * H + 0.02, 0, 0.9, 0, '#e0682b');
-    tbox(bus, 2.52, 0.9, 2 * H - 1.2, 0, 2.55, 0.3, INK); // the windows down its sides
-    for (const z of [-H + 1.6, H - 1.5]) for (const x of [-1.15, 1.15]) tcyl(bus, 0.5, 0.28, x, 0.5, z, INK).rotation.z = Math.PI / 2;
+    tbox(bus, 2.54, 0.05, 2 * H + 0.02, 0, 1.05, 0, CHROME);
+    tbox(bus, 2.52, 0.04, 2 * H + 0.02, 0, 2.02, 0, '#c9a24a');
+    const w0 = -H + 0.9, w1 = H - 0.3;
+    tbox(bus, 2.52, 0.9, w1 - w0, 0, 2.55, (w0 + w1) / 2, GLASS); // the windows down its sides
+    for (const y of [2.08, 3.02]) tbox(bus, 2.56, 0.05, w1 - w0, 0, y, (w0 + w1) / 2, RUBBER);
+    for (let z = w0; z <= w1 + 0.01; z += (w1 - w0) / Math.round((w1 - w0) / 1.1)) tbox(bus, 2.56, 0.9, 0.12, 0, 2.55, z, BODY);
+    { const zd = H - 0.85; // (its door, on its right: the bus's frame has x to its left)
+      tbox(bus, 0.04, 2.35, 1.0, -1.265, 1.55, zd, RUBBER);
+      for (const dz of [-0.24, 0.24]) { tbox(bus, 0.03, 1.05, 0.42, -1.29, 2.2, zd + dz, GLASS); tbox(bus, 0.03, 0.75, 0.42, -1.29, 1.05, zd + dz, GLASS); } }
+    for (const z of [-H + 1.6, H - 1.5]) for (const x of [-1.15, 1.15]) {
+      tbox(bus, 0.04, 0.78, 1.28, x * 1.093, 0.6, z, '#16141a'); // (its arch)
+      tcyl(bus, 0.5, 0.28, x, 0.5, z, INK).rotation.z = Math.PI / 2;
+      tcyl(bus, 0.24, 0.3, x * 1.02, 0.5, z, CHROME).rotation.z = Math.PI / 2;
+      tcyl(bus, 0.08, 0.32, x * 1.03, 0.5, z, '#55525a', 8).rotation.z = Math.PI / 2;
+    }
+    for (const x of [-1.265, 1.265]) for (const z of [-H + 0.15, H - 0.15]) tbox(bus, 0.03, 0.08, 0.16, x, 1.25, z, '#ffb000');
+    tbox(bus, 0.7, 0.08, 0.7, 0, 3.29, -0.6, '#d8d2c2');
     for (const x of [-1.05, 1.05]) plane(bus, 0.2, 0.3, x, 0.75, -H - 0.01, tail).rotation.y = Math.PI;
     // its back: the rear window over the ad, an amber route sign over that, the engine's louvres under it, a bumper, a
     // plate; an air-conditioning pod on the roof (QA: a bare box filling the frame for seconds)
@@ -208,6 +231,7 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
     // over it lit amber, headlamps either side of a grille, a bumper, its mirrors on stalks
     tbox(bus, 2.3, 1.45, 0.03, 0, 2.35, H + 0.005, INK);
     for (const x of [-0.56, 0.56]) plane(bus, 1.04, 1.3, x, 2.35, H + 0.025, glassM);
+    for (const x of [-0.5, 0.6]) tbox(bus, 0.72, 0.03, 0.02, x, 1.85, H + 0.04, INK).rotation.z = 0.45; // (its wipers)
     tbox(bus, 1.8, 0.24, 0.03, 0, 3.22, H + 0.005, INK);
     plane(bus, 1.7, 0.18, 0, 3.22, H + 0.025, new THREE.MeshBasicMaterial({ map: route, color: new THREE.Color(1.6, 1.6, 1.6) }));
     const lens = toon({ color: '#f4efd8' });

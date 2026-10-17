@@ -29,8 +29,9 @@ export const BLOCKS: Record<string, { h: [number, number]; empty: number; seaLef
 export const PLOT = 22;
 const NEAR = 11;
 /** The front row stands low (m) along the road where the car is while sky-writing is up (its camera looks up past
- *  it). */
-const NEAR_UNDER_SKY = 8;
+ *  it): a single storey, a shop and its sign band (at 8 m the green block by the lens still loomed over chorus 1's
+ *  plane shot — the user, 2026-10-16, "lower the height of the green building in that same frame on the left"). */
+const NEAR_UNDER_SKY = 5;
 /** The rows behind the street: the first this far off the road's centre (m), each next one this much further; none
  *  within this far of the road (wherever it bends back past them); a quarter of their plots empty (lots, parking). */
 export const BACK = { from: 44, step: 26, road: 8, empty: 0.25 };
