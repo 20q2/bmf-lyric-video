@@ -1,7 +1,8 @@
 // Verse 3's props (drive/sets/verse3.ts): the Strip as a street at night. The buildings are the set's own lots (the
 // drive's blocks, built here from the town's front geometry, look/facades.ts, in the strip's own night colours); on
-// them, each business's own signs, mounted as it would mount them — the drugstore's neon on standoffs off its upper
-// wall, DRUGS down a blade at its corner, the green cross; the liquor store's sign on a steel frame on its roof, the
+// them, each business's own signs, mounted as it would mount them — the drugstore's big two-tone capsule (the line
+// across its body, Rx and a mortar and pestle in its cap) sat on a steel shelf over its front and tied back over its
+// roof, DRUGS down a blade at its corner, the green cross; the liquor store's sign on a steel frame on its roof, the
 // champagne glass beside it; the theatre's marquee out over the sidewalk on tie rods, its bulbs chasing, NITE OWL down
 // a blade over it; the tiki bar's big roof sign on its lattice at the corner, bamboo round it, torches at the kerb; the
 // hotel's neon standing on a frame on its entrance canopy (out to the kerb on brass posts), HOTEL down its blade, the
@@ -264,6 +265,10 @@ const ROOMS = { fill: 0.72, shop: 0.7 };
 /** The chapel's sign's heart: its top over the line's middle (m), its width to its height's (x the classic curve's), how
  *  far its tip stands off the portico's roof (m). */
 const HEART = { top: 2.9, wide: 1.0, lift: 0.15 };
+/** The drugstore's capsule (m, in its face's frame): its ends this far in from its frontage's corners (clear of the
+ *  blade and the cross), its round ends' radius the rows' half height and `margin`, the seam `seam` past the widest
+ *  row's backer, its face `off` behind the line's, `depth` deep; its pink tube `tube` in from its edge. */
+const CAPSULE = { inset: 1.4, margin: 0.36, seam: 0.45, off: 0.06, depth: 0.44, tube: 0.17 };
 const CHAPEL = { gable: 3.2, portico: { w: 4.6, d: 1.6, h: 2.95 }, steeple: { side: 2.3, back: 2.2, tower: 3.6, belfry: 2.2, spire: 3.6 }, lawn: 1.3 };
 
 /** The rooms seen through the fillers' windows: an atlas of 8 x 4 cells, each a room of its own. Shops' ground-floor
@@ -679,17 +684,6 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     return out;
   };
 
-  /** A wall sign's hardware round its face (in the face's frame, the wall `back` m behind it): standoffs, the
-   *  transformer box at its foot, the conduit from it down the wall, a tube round the panel's edge in the lines' pink
-   *  (it frames them: no other colour round the words). */
-  const wallMount = (g: THREE.Object3D, W: number, H: number, start: number, back = MOUNT.wall) => {
-    for (const x of [-W / 2 + 0.4, W / 2 - 0.4]) for (const y of [-H / 2 + 0.3, H / 2 - 0.3]) box(g, 0.08, 0.08, back, x, y, -back / 2 - 0.04, steel);
-    box(g, 0.5, 0.8, 0.28, W / 2 + 0.6, -H / 2 + 0.4, -back + 0.14, toon({ color: '#3a3540' }));
-    cyl(g, 0.04, H + 0.4 - 0.8, W / 2 + 0.6, (H / 2 + 0.4 - H / 2 + 0.8) / 2, -back + 0.06, conduit);
-    const run = cyl(g, 0.035, W, 0, -H / 2 + 0.12, -back + 0.06, conduit); run.rotation.z = Math.PI / 2;
-    const fw = W + 0.6, fh = H + 0.5, px = Math.round((1024 * fh) / fw);
-    neon(g, fw, fh, 0, 0, 0.01, neonTex(1024, px, PINK, (c) => { c.strokeStyle = PINK; c.lineWidth = 7; c.beginPath(); c.roundRect(14, 14, 1024 - 28, px - 28, 22); c.stroke(); }), { start, peak: 1.2 });
-  };
   /** A blade down a building's corner, out from its wall (in the lot's frame: at x, from y0 up h, out `out` m). */
   const blade = (g: THREE.Object3D, x: number, y0: number, h: number, word: string, color: string, out = 1.25, start?: number, peak = SECONDARY) => {
     const b = new THREE.Group(); b.position.set(x, y0 + h / 2, out / 2 + 0.05); b.rotation.y = Math.PI / 2; g.add(b);
@@ -731,19 +725,23 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     reflect(sign.s, sign.side, W, theme === 'marquee' || theme === 'pawn' ? '#c8a070' : PINK, theme === 'marquee' || theme === 'pawn' ? 0.3 : 0.6);
     switch (theme) {
       case 'pill': {
+        // (the user, 2026-10-17: "you did such a good job with this" — the hotel's, the pawn shop's and the chapel's
+        // signs made their buildings' own — "go back and update the neon sign over the drugstore as well". Its line was
+        // in a pink-framed panel on its wall, a green capsule drawn beside it. Now the drugstore's sign is the capsule:
+        // a big two-tone sheet-metal cabinet, the line across its plum body, Rx and a mortar and pestle in tube on its
+        // green cap; sat on a steel shelf on knee braces over its front, tied back over its parapet to posts on its
+        // roof, the transformer on the shelf's end; its pink on its face, on the wall and on the sidewalk.)
         storefront(g, lot.w, 'pill');
-        wallMount(fg, W, H, start);
-        blade(g, -lot.w / 2 + 0.5, 3.8, 5.6, 'DRUGS', C.green, 1.3); // (down its up-street corner: seen coming)
-        // the capsule beside the words, and the cross on its bracket at the far corner
-        neon(fg, 2.0, 1.15, -W / 2 - 1.4, 0.2, -0.1, neonTex(512, 288, C.green, (c) => {
-          c.strokeStyle = C.green; c.lineWidth = 14; c.save(); c.translate(256, 144); c.rotate(-0.5);
-          c.beginPath(); c.roundRect(-150, -62, 300, 124, 62); c.stroke(); c.beginPath(); c.moveTo(0, -62); c.lineTo(0, 62); c.stroke(); c.restore();
-        }));
+        // (down its up-street corner: seen coming; its top up over the parapet, held by a mast from the roof)
+        const bladeX = -lot.w / 2 + 0.5, bladeTop = 3.9 + 4.7;
+        blade(g, bladeX, 3.9, 4.7, 'DRUGS', C.green, 1.3);
+        tbox(g, 0.12, bladeTop - lot.h + 0.2, 0.12, bladeX, (lot.h + bladeTop) / 2 - 0.1, -0.12, '#4a4450');
+        pillSign(g, fg, sign, lot, H, start);
+        // the cross on its bracket at the far corner
         const cross = new THREE.Group(); cross.position.set(lot.w / 2 - 0.6, 4.6, 0.9); cross.rotation.y = Math.PI / 2; g.add(cross);
         box(cross, 1.3, 1.3, 0.25, 0, 0, 0, dark);
         for (const sd of [1, -1]) { const p = neon(cross, 1.1, 1.1, 0, 0, sd * 0.14, canvasTex(128, 128, (c) => { c.fillStyle = C.green; c.fillRect(44, 10, 40, 108); c.fillRect(10, 44, 108, 40); }), { peak: 0.9 }); if (sd < 0) p.rotation.y = Math.PI; }
         box(g, 0.08, 0.08, 1.4, lot.w / 2 - 0.6, 5.0, 0.7, steel);
-        wash(fg, W + 6, H + 4, 0, 0, -MOUNT.wall + 0.02, PINK, 0.2);
         break;
       }
       case 'pop': {
@@ -981,6 +979,99 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         break;
       }
     }
+  }
+
+  /** The drugstore's capsule sign (see its case above): in its face's frame (`fg`: the line's middle at the origin, the
+   *  wall `out` m behind) the cabinet — its plum body round the line, the seam past the widest row, its green cap —
+   *  with a bright trim round its face, the pink tube in from its edge round the body (green round the cap), Rx and a
+   *  mortar and pestle in tube on the cap; the steel shelf it sits on, on knee braces off the wall, arms back over the
+   *  parapet to posts braced on the roof, the transformer on the shelf's end and its conduit; its light. */
+  function pillSign(g: THREE.Object3D, fg: THREE.Object3D, sign: Verse3Plan['signs'][number], lot: Lot, H: number, start: number) {
+    const sp = SHOPS.find((s) => s.theme === sign.theme)!, K = CAPSULE, out = sp.out ?? MOUNT.wall, along = sp.along ?? 0;
+    const faceY = sign.face.center.y - route.frameAt(sign.s).pos.y, roof = lot.h - faceY, ledge = 3.93 - faceY; // (the storefront's fascia's top)
+    const r = H / 2 + K.margin, xl = -lot.w / 2 + K.inset - along, xr = lot.w / 2 - K.inset - along, cl = xl + r, cr = xr - r;
+    const widest = Math.max(...faces.filter((f) => Math.abs(f.s - sign.s) < 0.01).flatMap((c) => neonPlates(c).map((p) => p.w / 2)));
+    const xs = Math.min(cr, widest + K.seam), front = -K.off, back = front - K.depth, wall = -out;
+    const steelC = '#4a4450', trimC = '#8c8698';
+    /** A capsule's outline from a to b (its straight run), round at either end or cut square (the seam). */
+    const outline = (a: number, b: number, rr: number, roundA: boolean, roundB: boolean) => {
+      const s = new THREE.Shape(); s.moveTo(a, -rr); s.lineTo(b, -rr);
+      if (roundB) s.absarc(b, 0, rr, -Math.PI / 2, Math.PI / 2, false); else s.lineTo(b, rr);
+      s.lineTo(a, rr);
+      if (roundA) s.absarc(a, 0, rr, Math.PI / 2, (3 * Math.PI) / 2, false); else s.lineTo(a, -rr);
+      return s;
+    };
+    const slab = (s: THREE.Shape, d: number) => new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 20 });
+    // the cabinet: its body and its cap, the trim round its face, the seam's band
+    part(fg, slab(outline(cl, xs, r, true, false), K.depth), '#2c1532', 0, 0, back);
+    part(fg, slab(outline(xs, cr, r, false, true), K.depth), '#1f4a44', 0, 0, back);
+    const trim = outline(cl, cr, r + 0.07, true, true); trim.holes.push(outline(cl, cr, r - 0.06, true, true));
+    part(fg, slab(trim, 0.08), trimC, 0, 0, front - 0.05);
+    tbox(fg, 0.16, 2 * r - 0.1, 0.07, xs, 0, front + 0.015, trimC);
+    // its tube in from its edge: pink round the body (it frames the line), green round the cap; flickering on with it
+    {
+      const m = 0.8, pw = xr - xl + 2 * m, ph = 2 * r + 2 * m, px = 1024 / pw, ri = r - K.tube, n = 64;
+      const loop: THREE.Vector2[] = [];
+      for (let i = 0; i <= n; i++) loop.push(new THREE.Vector2(cr - ((cr - cl) * i) / n, ri)); // (along its top, right to left)
+      for (let i = 1; i < n; i++) { const a = Math.PI / 2 + (Math.PI * i) / n; loop.push(new THREE.Vector2(cl + ri * Math.cos(a), ri * Math.sin(a))); }
+      for (let i = 0; i <= n; i++) loop.push(new THREE.Vector2(cl + ((cr - cl) * i) / n, -ri));
+      for (let i = 1; i < n; i++) { const a = -Math.PI / 2 + (Math.PI * i) / n; loop.push(new THREE.Vector2(cr + ri * Math.cos(a), ri * Math.sin(a))); }
+      const P = (v: THREE.Vector2) => [(v.x - xl + m) * px, (ph / 2 - v.y) * px] as const;
+      const tube = (col: string, keep: (x: number) => boolean) => neonTex(1024, Math.round(ph * px), col, (c) => {
+        c.strokeStyle = col; c.lineWidth = 0.075 * px; c.shadowBlur = 0.14 * px; // (a tight glow: neonTex's, a fraction of the texture's height, spread past its plane's edge as a hard-edged haze)
+        loop.forEach((v, i) => { const u = loop[(i + 1) % loop.length]!; if (!keep(v.x) || !keep(u.x)) return; c.beginPath(); c.moveTo(...P(v)); c.lineTo(...P(u)); c.stroke(); });
+      });
+      const x0 = (xl + xr) / 2;
+      neon(fg, pw, ph, x0, 0, front + 0.02, tube(PINK, (x) => x < xs - 0.16), { start, peak: 1.2 });
+      neon(fg, pw, ph, x0, 0, front + 0.021, tube(C.green, (x) => x > xs + 0.16));
+    }
+    // Rx over a mortar and pestle on the cap
+    {
+      const cx = (xs + cr + r * 0.8) / 2;
+      neon(fg, 1.5, 1.1, cx, 0.78, front + 0.025, neonTex(512, 376, C.green, (c) => {
+        c.strokeStyle = C.green; c.lineWidth = 15; c.font = font(F.sign(700), 300); c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.strokeText('Rx', 256, 200, 470);
+      }));
+      neon(fg, 1.25, 1.25, cx, -0.86, front + 0.025, neonTex(256, 256, C.green, (c) => {
+        c.strokeStyle = C.green; c.lineWidth = 10;
+        c.beginPath(); c.moveTo(150, 112); c.lineTo(214, 26); c.stroke(); // the pestle, its head in the bowl
+        c.beginPath(); c.arc(214, 26, 9, 0, Math.PI * 2); c.stroke();
+        c.beginPath(); c.moveTo(34, 112); c.lineTo(222, 112); c.stroke(); // the bowl's rim
+        c.beginPath(); c.arc(128, 112, 88, 0, Math.PI); c.stroke(); // its bowl
+        c.beginPath(); c.moveTo(102, 196); c.lineTo(88, 232); c.lineTo(168, 232); c.lineTo(154, 196); c.stroke(); // its foot
+      }));
+    }
+    // the shelf it sits on, along the wall over the fascia, on knee braces; saddles under its belly
+    const shelfY = Math.max(ledge + 0.06, -r - 0.05), sd = out - 0.04;
+    tbox(fg, cr - cl + 1.2, 0.08, sd, (cl + cr) / 2, shelfY - 0.04, wall + sd / 2, steelC);
+    tbox(fg, cr - cl + 1.2, 0.14, 0.05, (cl + cr) / 2, shelfY - 0.07, wall + sd, steelC); // (its lip)
+    for (const x of [cl, (cl + cr) / 2, cr]) {
+      const kh = 0.75, kd = sd - 0.1, knee = tbox(fg, 0.07, Math.hypot(kh, kd), 0.07, x, shelfY - 0.08 - kh / 2, wall + kd / 2, steelC);
+      knee.rotation.x = Math.atan2(kd, kh);
+      tbox(fg, 0.24, 0.3, 0.04, x, shelfY - 0.08 - kh, wall + 0.02, steelC); // (its plate on the wall)
+      tbox(fg, 0.5, Math.max(0.04, -r - shelfY + 0.02), 0.3, x, (shelfY - r) / 2, (front + back) / 2 - 0.05, steelC); // the saddle
+    }
+    // standoffs from its back to the wall, and its arms back over the parapet to posts on the roof, braced down to it
+    for (const x of [cl + 0.4, cr - 0.4]) for (const y of [-r * 0.45, r * 0.45]) tbox(fg, 0.09, 0.09, back - wall, x, y, (back + wall) / 2, steelC);
+    if (r > roof + 0.4) {
+      const postZ = wall - 0.7, armY = (r + roof) / 2 + 0.1;
+      for (const x of [cl, (cl + cr) / 2, cr]) {
+        tbox(fg, 0.12, r - 0.25 - roof, 0.12, x, (roof + r - 0.25) / 2, postZ, steelC);
+        tbox(fg, 0.1, 0.1, back - postZ, x, armY, (back + postZ) / 2, steelC);
+        const bh = (armY - roof) * 0.9, bd = 1.2, brace = tbox(fg, 0.08, Math.hypot(bh, bd), 0.08, x, roof + bh / 2, postZ - bd / 2, steelC);
+        brace.rotation.x = Math.atan2(bd, bh);
+      }
+    }
+    // the transformer on the shelf's up-street end, out from under the capsule's round end; its conduit up the wall
+    tbox(fg, 0.5, 0.42, 0.3, xl + 0.45, shelfY + 0.21, wall + 0.2, '#3a3540');
+    tcyl(fg, 0.03, -r * 0.3 - shelfY - 0.42, xl + 0.6, (shelfY + 0.42 - r * 0.3) / 2, wall + 0.06, '#5b5660', 8);
+    // its light: the tubes' pink across its body and green on its cap, on the wall round it, on the shelf and the
+    // sidewalk under it
+    wash(fg, xs - xl + 1, 2 * r + 1, (xl + xs) / 2, 0, front + 0.012, PINK, 0.45);
+    wash(fg, xr - xs + 0.6, 2 * r, (xs + xr) / 2, 0, front + 0.013, C.green, 0.3);
+    { const y0 = -r - 2, y1 = Math.min(r + 2, roof); wash(fg, xr - xl + 6, y1 - y0, (xl + xr) / 2, (y0 + y1) / 2, wall + 0.02, PINK, 0.3); } // (up to its roof: over it was sky)
+    wash(fg, xr - xl + 1, sd + 0.4, (xl + xr) / 2, shelfY + 0.012, wall + sd / 2, PINK, 0.3, true);
+    wash(g, xr - xl + 2, 3.2, along, 0.19, 1.6, PINK, 0.16, true);
   }
 
   /** The hotel's entrance canopy (in its lot's frame) and its lines' neon standing on it (see its case above). */

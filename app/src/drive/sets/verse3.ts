@@ -4,7 +4,8 @@
 // moving scene." So the strip is a street now: both kerbs built wall to wall, two to four storeys (the town's fronts,
 // blocks.ts/look/facades.ts), a cross street half way, and every line's neon is one business's own sign, mounted the way
 // that business would mount it (the props: scenes/sets/verse3.ts):
-//   "Ecstasy is just a pill away"             the drugstore's neon, bolted to its upper floor (left)
+//   "Ecstasy is just a pill away"             the drugstore's big capsule sign, sat on a steel shelf over its front and
+//                                             tied back over its roof, Rx and a mortar and pestle in its cap (left)
 //   "Pop it up or you could screw today"      the liquor store's sign up on a steel frame on its flat roof (left)
 //   "I'm just tryna hear you say my name"     the theatre's marquee, out over the sidewalk (left)
 //   "Love to play your ruler, be your Jane"   the tiki bar's big sign on its roof at the corner, turned to face the
@@ -40,9 +41,14 @@ export const STREET = { front: ROAD_HALF + 3, depth: [13, 18] as [number, number
 /** The businesses the lines are on, in the lines' order (the tiki bar's sign carries two): its side, how far past the
  *  car's place at its line's middle it stands (m: the take looks ahead to it), its frontage and height (m), how it
  *  mounts its sign, the lyric's scale (x the kind's: carriers.ts LAYOUT) and the sign's height (its centre, m; a roof
- *  sign's foot over the roof). */
-export const SHOPS: readonly { theme: Theme; kind: Kind; side: -1 | 1; ahead: number; w: number; h: number; mount: Mount; scale: number; y: number; out?: number }[] = [
-  { theme: 'pill', kind: 'neon', side: -1, ahead: 6, w: 12, h: 8.4, mount: 'wall', scale: 0.5, y: 5.7 },
+ *  sign's foot over the roof); `out`, a wall sign's face off its wall (m: MOUNT.wall if not given); `along`, its face's
+ *  middle off its frontage's middle (m, up the strip). */
+export const SHOPS: readonly { theme: Theme; kind: Kind; side: -1 | 1; ahead: number; w: number; h: number; mount: Mount; scale: number; y: number; out?: number; along?: number }[] = [
+  // (the drugstore's line on its own sign, a big two-tone capsule: in a pink-framed panel on its wall it read as stuck
+  // on, as the hotel's had — the user, 2026-10-17, "go back and update the neon sign over the drugstore as well". A
+  // storey lower, so the capsule stands up over its parapet; the line `along` down the strip of the frontage's middle,
+  // so the capsule's cap, past the words, stays clear of the green cross.)
+  { theme: 'pill', kind: 'neon', side: -1, ahead: 6, w: 12, h: 7.4, mount: 'wall', scale: 0.52, y: 6.4, out: 0.8, along: -1.1 },
   { theme: 'pop', kind: 'neon', side: -1, ahead: 6, w: 11, h: 5.0, mount: 'roof', scale: 0.6, y: 1.4 },
   { theme: 'marquee', kind: 'marquee', side: -1, ahead: 3, w: 15, h: 12.6, mount: 'marquee', scale: 1.8, y: 5.3 },
   { theme: 'tiki', kind: 'neon', side: 1, ahead: 6, w: 11, h: 4.4, mount: 'cross', scale: 0.64, y: 1.6 },
@@ -55,9 +61,9 @@ export const SHOPS: readonly { theme: Theme; kind: Kind; side: -1 | 1; ahead: nu
   // (`out`: it stands off its wall clear of the chapel's cornice, which ran across the heart at MOUNT.wall)
   { theme: 'chapel', kind: 'neon', side: -1, ahead: 5, w: 13, h: 8.2, mount: 'wall', scale: 0.55, y: 6.4, out: 0.62 },
 ];
-/** The businesses whose sets build their lines' own mounting (Carrier.mounted): the hotel's backers on their frame on
- *  its canopy, the chapel's ribbon across its heart. */
-export const OWN_MOUNT: ReadonlySet<Theme> = new Set<Theme>(['phone', 'chapel']);
+/** The businesses whose sets build their lines' own mounting (Carrier.mounted): the drugstore's capsule, the hotel's
+ *  backers on their frame on its canopy, the chapel's ribbon across its heart. */
+export const OWN_MOUNT: ReadonlySet<Theme> = new Set<Theme>(['pill', 'phone', 'chapel']);
 /** Which business each of the verse's lines is on. */
 export const LINE_SHOP = [0, 1, 2, 3, 3, 4, 5, 6];
 /** A marquee hangs this far out from its wall (m); a roof sign stands this far back from the parapet, a cross sign its
@@ -213,7 +219,7 @@ export const VERSE3: SetPiece = {
         normal = right.clone().multiplyScalar(-sp.side); // (facing the road from its side)
         // (a wall's sign and a fascia stand off its front, toward the road; a roof's frame stands back on the roof)
         const lateral = sp.mount === 'marquee' ? STREET.front - MOUNT.marquee : sp.mount === 'canopy' ? STREET.front - MOUNT.canopy : sp.mount === 'roof' ? STREET.front + MOUNT.roofBack : STREET.front - (sp.out ?? MOUNT.wall);
-        center = atRoad(s, sp.side * lateral, sp.mount === 'roof' ? L.h + sp.y + H / 2 : sp.y);
+        center = atRoad(s + (sp.along ?? 0), sp.side * lateral, sp.mount === 'roof' ? L.h + sp.y + H / 2 : sp.y);
       }
       const up = UP.clone();
       let top = H / 2;
