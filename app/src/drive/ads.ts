@@ -25,9 +25,11 @@ export const BRAND: Record<Ad, [brand: string, tagline: string]> = {
 export const AD = { minH: 4.4 };
 /** The share of each board's width its lyric takes; the rest, on the right, is its art: a product (ADVERTISED kinds)
  *  or, on route signs, a shield and an arrow. The art stays: it's built round the words, never fades for them. Faces
- *  not listed are all lyric. */
-export const TEXT_SHARE: Partial<Record<Kind, number>> = { billboard: 0.62, sign: 0.6, storefront: 0.72, street: 0.7, gantry: 0.72, bus: 0.8, menu: 0.76, poster: 0.62, window: 0.72 };
-export const ADVERTISED: ReadonlySet<Kind> = new Set<Kind>(['billboard', 'sign', 'storefront']);
+ *  not listed are all lyric. (A storefront carries no product: its one use is verse 3's pawn shop cabinet, whose
+ *  lyric left the right 28% of its face an empty slab — the user, 2026-10-17: "a lot of white space on the right side
+ *  of the pawn shop sign".) */
+export const TEXT_SHARE: Partial<Record<Kind, number>> = { billboard: 0.62, sign: 0.6, street: 0.7, gantry: 0.72, bus: 0.8, menu: 0.76, poster: 0.62, window: 0.72 };
+export const ADVERTISED: ReadonlySet<Kind> = new Set<Kind>(['billboard', 'sign']);
 
 /** Words that pick a product, checked in this order. */
 const BY_WORD: readonly [RegExp, Ad][] = [

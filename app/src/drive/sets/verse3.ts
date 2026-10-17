@@ -9,9 +9,10 @@
 //   "I'm just tryna hear you say my name"     the theatre's marquee, out over the sidewalk (left)
 //   "Love to play your ruler, be your Jane"   the tiki bar's big sign on its roof at the corner, turned to face the
 //   "You could be my Tarzan, toss me up"      traffic coming up the strip (right): the one sign, filling row by row
-//   "Other hoes is lacking, call me up"       the hotel's neon between its floors, the payphones on its wall (left)
+//   "Other hoes is lacking, call me up"       the hotel's neon standing on its entrance canopy, the payphones by it (left)
 //   "Know my baby packing, why I'm stuck"     the pawn shop's big lit cabinet, under its PAWN · LOANS · GOLD head (left)
-//   "That's why he my man"                    the wedding chapel's neon by its heart, the camera rising off it (left)
+//   "That's why he my man"                    the wedding chapel's big neon heart, a ribbon across it carrying the line,
+//                                             wedding bells lighting word by word, the camera rising off it (left)
 // Five moving takes, cut between lines (never in one): along the right sidewalk as the car slows past, low by the kerb
 // as it crosses the frame under the marquee, behind it up the street to the corner, a crane along the hotel and the
 // pawn shop, and up off the chapel. Pure.
@@ -30,8 +31,9 @@ const smooth = (a: number, b: number, x: number) => { const u = Math.min(1, Math
 
 export type Theme = 'pill' | 'pop' | 'marquee' | 'tiki' | 'phone' | 'pawn' | 'chapel';
 /** How a business mounts its sign: flat on its upper wall on standoffs, on a steel frame on its roof facing the street,
- *  on its roof turned to face the coming traffic (`cross`), on its marquee out over the sidewalk, on its fascia. */
-export type Mount = 'wall' | 'roof' | 'cross' | 'marquee' | 'fascia';
+ *  on its roof turned to face the coming traffic (`cross`), on its marquee out over the sidewalk, on its fascia, on a
+ *  frame standing on its entrance canopy out over the sidewalk (`canopy`). */
+export type Mount = 'wall' | 'roof' | 'cross' | 'marquee' | 'fascia' | 'canopy';
 
 /** The street's fronts: how far off the road's centre (m: the sidewalk's back edge), the lots' depth, a storey. */
 export const STREET = { front: ROAD_HALF + 3, depth: [13, 18] as [number, number], storey: 3.3 };
@@ -39,21 +41,29 @@ export const STREET = { front: ROAD_HALF + 3, depth: [13, 18] as [number, number
  *  car's place at its line's middle it stands (m: the take looks ahead to it), its frontage and height (m), how it
  *  mounts its sign, the lyric's scale (x the kind's: carriers.ts LAYOUT) and the sign's height (its centre, m; a roof
  *  sign's foot over the roof). */
-export const SHOPS: readonly { theme: Theme; kind: Kind; side: -1 | 1; ahead: number; w: number; h: number; mount: Mount; scale: number; y: number }[] = [
+export const SHOPS: readonly { theme: Theme; kind: Kind; side: -1 | 1; ahead: number; w: number; h: number; mount: Mount; scale: number; y: number; out?: number }[] = [
   { theme: 'pill', kind: 'neon', side: -1, ahead: 6, w: 12, h: 8.4, mount: 'wall', scale: 0.5, y: 5.7 },
   { theme: 'pop', kind: 'neon', side: -1, ahead: 6, w: 11, h: 5.0, mount: 'roof', scale: 0.6, y: 1.4 },
   { theme: 'marquee', kind: 'marquee', side: -1, ahead: 3, w: 15, h: 12.6, mount: 'marquee', scale: 1.8, y: 5.3 },
   { theme: 'tiki', kind: 'neon', side: 1, ahead: 6, w: 11, h: 4.4, mount: 'cross', scale: 0.64, y: 1.6 },
-  { theme: 'phone', kind: 'neon', side: -1, ahead: 6, w: 12, h: 11.2, mount: 'wall', scale: 0.5, y: 5.6 },
+  // (the hotel's lines on a frame on its entrance canopy: on its wall, in a pink-framed panel between its floors, they
+  // read as stuck on — the user, 2026-10-17: "placed a bit awkwardly ... better integrated within the environment")
+  { theme: 'phone', kind: 'neon', side: -1, ahead: 6, w: 12, h: 11.2, mount: 'canopy', scale: 0.5, y: 5.6 },
   // (the pawn shop a storey taller: its big PAWN box sign stands on its wall over the board, under its parapet)
   { theme: 'pawn', kind: 'storefront', side: -1, ahead: 6, w: 11, h: 9.6, mount: 'fascia', scale: 0.62, y: 4.6 },
-  { theme: 'chapel', kind: 'neon', side: -1, ahead: 5, w: 13, h: 8.2, mount: 'wall', scale: 0.55, y: 5.4 },
+  // (the chapel's line on a ribbon across a big neon heart sitting on its portico: the heart's tip clears the portico)
+  // (`out`: it stands off its wall clear of the chapel's cornice, which ran across the heart at MOUNT.wall)
+  { theme: 'chapel', kind: 'neon', side: -1, ahead: 5, w: 13, h: 8.2, mount: 'wall', scale: 0.55, y: 6.4, out: 0.62 },
 ];
+/** The businesses whose sets build their lines' own mounting (Carrier.mounted): the hotel's backers on their frame on
+ *  its canopy, the chapel's ribbon across its heart. */
+export const OWN_MOUNT: ReadonlySet<Theme> = new Set<Theme>(['phone', 'chapel']);
 /** Which business each of the verse's lines is on. */
 export const LINE_SHOP = [0, 1, 2, 3, 3, 4, 5, 6];
 /** A marquee hangs this far out from its wall (m); a roof sign stands this far back from the parapet, a cross sign its
- *  near edge this far in from the front. */
-export const MOUNT = { marquee: 2.3, roofBack: 0.8, crossIn: 0.5, wall: 0.28 };
+ *  near edge this far in from the front; a canopy's sign stands this far out from the wall on it, the canopy reaching
+ *  `canopyOut` out to just short of the kerb, its top `canopyTop` up. */
+export const MOUNT = { marquee: 2.3, roofBack: 0.8, crossIn: 0.5, wall: 0.28, canopy: 1.5, canopyOut: 2.65, canopyTop: 3.45 };
 /** The cross street: how far past the theatre's far end it opens, its width (m). */
 export const CROSS = { after: 2, w: 11 };
 /** The chapel's white stretch limo at the kerb out front (the scene builds it from the town's sedan): its length, how
@@ -81,8 +91,9 @@ export const TAKES = {
   /** A crane along the right side, behind the car, high: the hotel, then the pawn shop (aimed `lead` m up the street of
    *  it). */
   crane: { ahead: -7, lateral: ROAD_HALF + 0.6, y: 5.8, pan: [0.3, 0.25] as [number, number], lead: 1.8 },
-  /** Off the chapel: from across the street near its own level, rising and pulling back as the line is sung. */
-  rise: { back: [11, 16] as [number, number], lateral: [ROAD_HALF + 1.4, ROAD_HALF + 0.4] as [number, number], y: [2.4, 7.5] as [number, number] },
+  /** Off the chapel: from across the street near its own level, rising and pulling back as the line is sung; aimed
+   *  `down` m under the line's middle (its heart and bells stand over it, the limo at the kerb under it). */
+  rise: { back: [11, 16] as [number, number], lateral: [ROAD_HALF + 1.4, ROAD_HALF + 0.4] as [number, number], y: [2.4, 7.5] as [number, number], down: 0.8 },
 };
 
 interface Face { center: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; w: number; h: number }
@@ -201,7 +212,7 @@ export const VERSE3: SetPiece = {
       } else {
         normal = right.clone().multiplyScalar(-sp.side); // (facing the road from its side)
         // (a wall's sign and a fascia stand off its front, toward the road; a roof's frame stands back on the roof)
-        const lateral = sp.mount === 'marquee' ? STREET.front - MOUNT.marquee : sp.mount === 'roof' ? STREET.front + MOUNT.roofBack : STREET.front - MOUNT.wall;
+        const lateral = sp.mount === 'marquee' ? STREET.front - MOUNT.marquee : sp.mount === 'canopy' ? STREET.front - MOUNT.canopy : sp.mount === 'roof' ? STREET.front + MOUNT.roofBack : STREET.front - (sp.out ?? MOUNT.wall);
         center = atRoad(s, sp.side * lateral, sp.mount === 'roof' ? L.h + sp.y + H / 2 : sp.y);
       }
       const up = UP.clone();
@@ -211,7 +222,7 @@ export const VERSE3: SetPiece = {
         top -= lay.h;
         // (no solid of its own: the building is the town's block, which the guard sees; a carrier's own building would
         // stand a second box round it)
-        carriers.push({ id: `L${ph.line}.${phs[lines.findIndex((l) => l.i === ph.line)]!.indexOf(ph)}`, phrase: ph, kind: sp.kind, stretch: st.id, reveal: ph.start, s, center: c, normal: normal.clone(), up: up.clone(), ...lay, foot: c.y - f.pos.y, solid: null });
+        carriers.push({ id: `L${ph.line}.${phs[lines.findIndex((l) => l.i === ph.line)]!.indexOf(ph)}`, phrase: ph, kind: sp.kind, stretch: st.id, reveal: ph.start, s, center: c, normal: normal.clone(), up: up.clone(), ...lay, foot: c.y - f.pos.y, solid: null, ...(OWN_MOUNT.has(sp.theme) ? { mounted: true } : {}) });
       });
       signs.push({ theme: sp.theme, mount: sp.mount, lot, face: { center, normal, up, w: W, h: H }, starts: shopLines[k]!.map((l) => l.words[0]!.start), s, side: sp.side });
     });
@@ -248,7 +259,8 @@ export const VERSE3: SetPiece = {
     }
     { // up off the chapel
       const T = TAKES.rise, l = lines[7]!, t0 = lineStart(7), t1 = l.end + 0.4, g = signOf(6);
-      takes.push({ lines: [7], to: (t) => { const u = smooth(t0 - 0.2, t1, t); return lookFrom(atRoad(g.s - (T.back[0] + (T.back[1] - T.back[0]) * u), T.lateral[0] + (T.lateral[1] - T.lateral[0]) * u, T.y[0] + (T.y[1] - T.y[0]) * u), g.face.center); } });
+      const aim = g.face.center.clone().addScaledVector(UP, -T.down);
+      takes.push({ lines: [7], to: (t) => { const u = smooth(t0 - 0.2, t1, t); return lookFrom(atRoad(g.s - (T.back[0] + (T.back[1] - T.back[0]) * u), T.lateral[0] + (T.lateral[1] - T.lateral[0]) * u, T.y[0] + (T.y[1] - T.y[0]) * u), aim); } });
     }
     for (const take of takes) {
       const ids = take.lines.flatMap((li) => phs[li]!.map((_, pi) => `L${lines[li]!.i}.${pi}`));

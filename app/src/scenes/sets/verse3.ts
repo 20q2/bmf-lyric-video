@@ -4,11 +4,12 @@
 // wall, DRUGS down a blade at its corner, the green cross; the liquor store's sign on a steel frame on its roof, the
 // champagne glass beside it; the theatre's marquee out over the sidewalk on tie rods, its bulbs chasing, NITE OWL down
 // a blade over it; the tiki bar's big roof sign on its lattice at the corner, bamboo round it, torches at the kerb; the
-// hotel's neon between its floors, HOTEL down its blade, its canopy over the door, the payphones on its wall, CALL ME
-// in tube in its window by them; the pawn shop's one big lit cabinet (PAWN · LOANS · GOLD over the lines), the three
-// gold balls, its display windows (guitars, TVs, jewellery, tools, WE BUY GOLD and a guitar in neon) under grilles
-// part way down; the wedding chapel's clapboard front, gable, steeple and bell, its portico, stained glass, lawn and
-// picket fence, the white stretch limo at the kerb. Round them the strip's other businesses (STRIP: a diner, a donut
+// hotel's neon standing on a frame on its entrance canopy (out to the kerb on brass posts), HOTEL down its blade, the
+// payphones on its wall, CALL ME in tube in its window by them; the pawn shop's one big lit cabinet (PAWN · LOANS ·
+// GOLD over the lines), the three gold balls, its display windows (guitars, TVs, jewellery, tools, WE BUY GOLD and a
+// guitar in neon) under grilles part way down; the wedding chapel's clapboard front, gable, steeple and bell, its
+// portico, stained glass, lawn and picket fence, its sign a big neon heart on the portico with the line on a ribbon
+// across it, bulbs chasing round it, bells and rings lighting word by word; the white stretch limo at the kerb. Round them the strip's other businesses (STRIP: a diner, a donut
 // shop, a check casher, a tattoo parlour, a motel ...), each with its own sign, room, window neon, awning and people;
 // fire escapes, roof signs and plant above; the kerbs' furniture, the cross street and its signals, street lamps,
 // people on the sidewalks, the traffic's lights, the wet
@@ -25,6 +26,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LIMO, type Lot, MOUNT, SHOPS, STREET, type Theme, type Verse3Plan, limoS, lotBlock } from '../../drive/sets/verse3';
 import { PARKED } from '../../drive/blocks';
+import type { Carrier } from '../../drive/carriers';
 import { ROAD_HALF } from '../../drive/route';
 import { LANE } from '../../drive/drive';
 import { WORLD, toon } from '../../look/toon';
@@ -179,6 +181,24 @@ const flickAt = (t: number, start: number) => {
   return (t * 13) % 1 < 0.25 + 0.55 * u ? 1 : 0.05;
 };
 
+let measurer: CanvasRenderingContext2D | null = null;
+/** Where carrierart.ts draws a neon face's rows' backplates (m, in its face's frame: each row's middle, the plate's
+ *  width and height): Bodoni italic at its em, shrunk as the face shrinks a row too wide for it. */
+function neonPlates(c: Pick<Carrier, 'rows' | 'em' | 'w' | 'h'>) {
+  const x = (measurer ??= document.createElement('canvas').getContext('2d')!);
+  x.font = font(F.bodoni(700, { italic: true }), 100);
+  const ws = c.rows.map((r) => (x.measureText(r).width / 100) * c.em), widest = Math.max(...ws), k = widest > c.w * 0.92 ? (c.w * 0.92) / widest : 1;
+  const rh = c.h / c.rows.length;
+  return c.rows.map((_, r) => ({ y: c.h / 2 - rh * (r + 0.5), w: Math.min(c.w * 0.96, (ws[r]! + c.em * 0.8) * k), h: rh * 0.76 }));
+}
+/** A plate with rounded corners, `d` thick, centred on its middle. */
+function roundPlate(w: number, h: number, r: number, d: number): THREE.BufferGeometry {
+  const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  return new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 4 }).translate(0, 0, -d / 2);
+}
+
 /** The lines' pink (carrierart.ts's neon), for what belongs to them: their frames, their light on the wet road. */
 const PINK = '#ff4fa3';
 /** Everything else's neon: greyed, so no other colour stands up to the pink — dusty teal, amber, slate blue, brick,
@@ -187,6 +207,8 @@ const C = { teal: '#5d9a92', amber: '#c29a5c', blue: '#6c84b0', red: '#b25454', 
 /** How bright the strip's own neon shines (x its colour), against the lines' GLOW.neon (2.6): under half, so it reads
  *  as lit without blooming over them. */
 const SECONDARY = 1.05;
+/** A word's neon (the chapel's bells and rings) comes on over this long from its word's start (s): eased, not snapped. */
+const WORD_ON = 0.15;
 /** The strip's other businesses, on the lots between the lines' own: each a trade with its own front — its sign over its
  *  glass (a lit box sign on its band, or its name in tube on a raceway, a drawing beside it), its own room behind the
  *  glass (the atlas's cells), the neon it hangs in its window, a blade down its corner on a building tall enough, an
@@ -239,6 +261,9 @@ const ROOMS = { fill: 0.72, shop: 0.7 };
 /** The chapel (m, in its front's frame): its gable's rise over the wall, the portico (width, depth, height to its
  *  roof), the steeple (its tower's side, how far back on the roof, the belfry's height, the spire's), the lawn's
  *  depth to its picket fence. (Its limo at the kerb: drive/sets/verse3.ts LIMO.) */
+/** The chapel's sign's heart: its top over the line's middle (m), its width to its height's (x the classic curve's), how
+ *  far its tip stands off the portico's roof (m). */
+const HEART = { top: 2.9, wide: 1.0, lift: 0.15 };
 const CHAPEL = { gable: 3.2, portico: { w: 4.6, d: 1.6, h: 2.95 }, steeple: { side: 2.3, back: 2.2, tower: 3.6, belfry: 2.2, spire: 3.6 }, lawn: 1.3 };
 
 /** The rooms seen through the fillers' windows: an atlas of 8 x 4 cells, each a room of its own. Shops' ground-floor
@@ -412,6 +437,10 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
    *  they're told to call). */
   const marqueeBulbs: { m: THREE.ShaderMaterial; phase: number; k: number }[] = [];
   let coin: THREE.Mesh | null = null, coinStart = 0;
+  /** Neon lit by a word (the chapel's bells and rings): dark until `at`, then on (eased in over WORD_ON s: no flash). */
+  const wordLit: { m: THREE.MeshBasicMaterial; at: number; peak: number }[] = [];
+  /** Stretches of kerb kept clear of lamps and furniture (the hotel's canopy posts stand there): side, middle, half. */
+  const kerbClear: { side: number; s: number; half: number }[] = [];
   const neon = (g: THREE.Object3D, w: number, h: number, x: number, y: number, z: number, tex: THREE.Texture, opts: { start?: number; peak?: number; dance?: boolean } = {}) => {
     const peak = opts.peak ?? SECONDARY;
     const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, color: new THREE.Color().setScalar(peak), side: THREE.DoubleSide });
@@ -834,19 +863,18 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       case 'phone': {
         // (the user, 2026-10-15, at 146 s: "advertising, like, phones and color TVs and floating blue text over a sign
         // that's clipping over the front of the store, and then there's, like, randomly phones poking out of the front
-        // windows". Its words now on its fascia and its canopy, its payphones on a stretch of its own wall.)
+        // windows". Its words now on its canopy, its payphones on a stretch of its own wall.)
+        // (and 2026-10-17, at 145 s: its lines in a pink-framed panel on its wall between its floors were "placed a bit
+        // awkwardly ... better integrated within the environment". They stand on its entrance canopy now, as a hotel's
+        // name stands over its door: each row's tubes on a dark backer, the backers on a steel frame braced on the
+        // canopy's roof, the transformer at its foot; the canopy out to the kerb on brass posts, its soffit lit, a runner
+        // under it to the door; their pink on its roof, on the wall behind and on the sidewalk.)
         const phoneX = -lot.w / 2 + 1.5; // (the payphones' wall: the front's up-street end)
-        const phonePanes = storefront(g, lot.w, 'phone', 2.9, { solid: [[-lot.w / 2, -lot.w / 2 + 3.0]], wall: '#3e3a52' });
-        wallMount(fg, W, H, start);
+        const phonePanes = storefront(g, lot.w, 'phone', 2.9, { solid: [[-lot.w / 2, -lot.w / 2 + 3.0]], wall: '#3e3a52', fascia: false });
+        const navy = '#1f3450';
+        box(g, lot.w - 0.2, 0.95, 0.24, 0, 3.45, 0.12, toon({ color: navy })); // its fascia over the glass, bare (the canopy says it)
         blade(g, lot.w / 2 - 0.6, 3.9, 7.2, 'HOTEL', C.red, 1.5);
-        wash(fg, W + 6, H + 4, 0, 0, -MOUNT.wall + 0.02, PINK, 0.18);
-        // the canopy out over its door, HOTEL along its front edge, its tie rods to the wall, its soffit's light
-        const door = (() => { const Wd = lot.w - 0.6, n = Math.max(2, Math.round(Wd / 2.4)), pw = Wd / n; return -Wd / 2 + pw * (Math.floor(n / 2) + 0.5); })();
-        // (cantilevered: tie rods up to the wall crossed the words over it)
-        const cw = 3.4, cd = 1.4, cy = 3.05;
-        box(g, cw, 0.32, cd, door, cy, cd / 2, toon({ color: '#1f3450' }));
-        plane(g, cw - 0.2, 0.26, door, cy, cd + 0.005, litPic(signFace('HOTEL · LOBBY', 1024, 80, '#b8b0a0', '#1f3450', F.sign(700), 0.7, 0.2), 0.8));
-        plane(g, cw - 0.4, cd - 0.3, door, cy - 0.17, cd / 2, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.5, 0.36) })).rotation.x = Math.PI / 2;
+        hotelCanopy(g, sign, W, H);
         // the payphones on the wall: two hooded boxes mounted on it, the shared PHONE sign over them, their coin light
         const ph = new THREE.Group(); ph.position.set(phoneX, 0, 0.1); g.add(ph);
         box(ph, 2.4, 0.08, 0.6, 0, 2.55, 0.3, toon({ color: '#2a4a5e' })); // the hood
@@ -955,6 +983,143 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     }
   }
 
+  /** The hotel's entrance canopy (in its lot's frame) and its lines' neon standing on it (see its case above). */
+  function hotelCanopy(g: THREE.Object3D, sign: Verse3Plan['signs'][number], W: number, H: number) {
+    const out = MOUNT.canopyOut, top = MOUNT.canopyTop, ct = 0.42, cw = W + 1.6, fz = MOUNT.canopy, navy = '#1f3450', brass = '#8a7040', steelC = '#4a4450';
+    const roadY = route.frameAt(sign.s).pos.y, faceY = sign.face.center.y - roadY, kerb = 0.15;
+    // the canopy: its box, brass bands round its edges, its words along its front, its lit soffit, brass posts at the kerb
+    tbox(g, cw, ct, out, 0, top - ct / 2, out / 2, navy);
+    for (const y of [top - 0.03, top - ct + 0.03]) {
+      tbox(g, cw + 0.04, 0.06, 0.05, 0, y, out + 0.005, brass);
+      for (const sd of [-1, 1]) tbox(g, 0.05, 0.06, out, sd * (cw / 2 + 0.005), y, out / 2, brass);
+    }
+    plane(g, cw - 0.5, ct - 0.18, 0, top - ct / 2, out + 0.04, litPic(signFace('HOTEL · COLOR TV · WEEKLY RATES', 1024, Math.round((1024 * (ct - 0.18)) / (cw - 0.5)), '#c8b48a', navy, F.sign(700), 0.7, 0.14), 0.8));
+    plane(g, cw - 0.3, out - 0.3, 0, top - ct - 0.005, out / 2, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.52, 0.38) })).rotation.x = Math.PI / 2;
+    for (const sd of [-1, 1]) {
+      const x = sd * (cw / 2 - 0.12), z = out - 0.12;
+      tcyl(g, 0.05, top - ct - kerb, x, kerb + (top - ct - kerb) / 2, z, brass, 10);
+      tcyl(g, 0.1, 0.12, x, kerb + 0.06, z, brass, 10); // (its foot)
+    }
+    tbox(g, 1.5, 0.012, out - 0.1, 0, kerb + 0.007, out / 2 - 0.05, '#5a1e2a'); // the runner to the door
+    // the frame on its roof: posts up the backers' backs, braced back down to the roof, a rail along their feet
+    // (its end posts outside the narrower rows, standing a little over the top row with a rail across: a frame, seen)
+    const top0 = faceY + H / 2 + 0.3, posts = [-W / 2 + 0.15, 0, W / 2 - 0.15];
+    for (const x of posts) {
+      tbox(g, 0.13, top0 - top, 0.13, x, (top + top0) / 2, fz - 0.24, steelC);
+      const bh = (top0 - top) * 0.6, bd = fz - 0.24 - 0.35, brace = tbox(g, 0.08, Math.hypot(bh, bd), 0.08, x, top + bh / 2, 0.35 + bd / 2, steelC);
+      brace.rotation.x = Math.atan2(bd, bh);
+      tbox(g, 0.32, 0.05, 0.32, x, top + 0.025, fz - 0.24, steelC); // (its base plate)
+    }
+    for (const y of [top + 0.12, top0 - 0.05]) tbox(g, W - 0.15, 0.1, 0.1, 0, y, fz - 0.24, steelC);
+    // each row's tubes on its own dark backer (where carrierart.ts draws its plate), a channel behind it to the posts
+    for (const c of faces.filter((f) => Math.abs(f.s - sign.s) < 0.01)) {
+      const cy = c.center.y - roadY;
+      for (const p of neonPlates(c)) {
+        part(g, roundPlate(p.w, p.h, p.h * 0.24, 0.07), '#130b15', 0, cy + p.y, fz - 0.09);
+        tbox(g, Math.max(0.6, p.w - 0.7), 0.16, 0.1, 0, cy + p.y - p.h * 0.1, fz - 0.17, '#2a2630');
+      }
+    }
+    // the transformer at the frame's foot, its conduit up the end post
+    tbox(g, 0.55, 0.42, 0.34, W / 2 - 0.2, top + 0.21, fz - 0.7, '#3a3540');
+    tcyl(g, 0.03, faceY - H / 2 - top, W / 2 - 0.8 + 0.09, top + (faceY - H / 2 - top) / 2, fz - 0.3, '#5b5660', 8);
+    // their pink on the canopy's roof, on the wall behind, on the sidewalk under it; the soffit's warm pool
+    wash(g, cw - 0.2, out - 0.2, 0, top + 0.012, out / 2, PINK, 0.32, true);
+    wash(g, W + 7, H + 5, 0, faceY, 0.32, PINK, 0.3);
+    wash(g, cw + 1.2, out + 0.6, 0, kerb + 0.02, out / 2, '#c8a078', 0.22, true);
+    wash(g, cw + 3, out + 1.2, 0, kerb + 0.025, out / 2 + 0.3, PINK, 0.1, true);
+    kerbClear.push({ side: sign.side, s: sign.s, half: cw / 2 });
+  }
+
+  /** The chapel's sign, in its face's frame (see buildChapel): the heart (a dark sheet-metal cabinet on the wall, its tip
+   *  `foot` m under the line's middle on a shoe on the portico's roof), its pink tube round it and chasing bulbs inside
+   *  that; the ribbon across it carrying the line (a dark band edged in gold tube, its ends folded back into notched
+   *  tails); wedding bells either side lighting as "he" and "my" are sung, a pair of rings over it at "man". */
+  function chapelSign(fg: THREE.Object3D, sign: Verse3Plan['signs'][number], W: number, H: number, start: number, roof: number) {
+    const wall = -(SHOPS.find((s) => s.theme === sign.theme)!.out ?? MOUNT.wall) + 0.02, K = HEART, foot = roof + K.lift;
+    // the heart's outline (m, in the face's frame), its tip resting `foot` up
+    const ky = (K.top - foot) / (11.92 + 17), kx = ky * K.wide, cy = foot + 17 * ky;
+    const heartAt = (a: number, s = 1) => new THREE.Vector2(s * kx * 16 * Math.sin(a) ** 3, cy + s * ky * (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a)) + (1 - s) * ky * -2.5); // (inset about its middle)
+    const outline = (s = 1, n = 160) => Array.from({ length: n }, (_, i) => heartAt((i / n) * Math.PI * 2, s));
+    const cab = new THREE.ExtrudeGeometry(new THREE.Shape(outline()), { depth: 0.12, bevelEnabled: false, curveSegments: 1 });
+    part(fg, cab, '#2a1830', 0, 0, -0.27);
+    // (stood off the wall on brackets, clear of the cornice: its back's steel to the wall)
+    for (const [x, y] of [[-kx * 9, cy + ky * 6], [kx * 9, cy + ky * 6], [-kx * 6, cy - ky * 6], [kx * 6, cy - ky * 6]] as const) tbox(fg, 0.1, 0.1, -0.27 - wall, x, y, (wall - 0.27) / 2, '#4a4450');
+    tbox(fg, 0.7, foot - roof + 0.06, 0.3, 0, (roof + foot) / 2 - 0.03, -0.2, '#4a4450'); // the shoe under its tip, on the portico
+    const front = -0.13;
+    // its tube, just inside its edge
+    const hw = kx * 32 + 0.6, hh = ky * 29 + 0.6, hcy = cy + ky * (11.92 - 17) / 2, px = 1024 / hw, ph = Math.round(hh * px);
+    const toPx = (v: THREE.Vector2) => [(v.x + hw / 2) * px, (hcy + hh / 2 - v.y) * px] as const;
+    neon(fg, hw, hh, 0, hcy, front + 0.012, neonTex(1024, ph, PINK, (c) => {
+      c.strokeStyle = PINK; c.lineWidth = 0.075 * px; c.beginPath();
+      outline(0.95).forEach((v, i) => { const [x, y] = toPx(v); if (i) c.lineTo(x, y); else c.moveTo(x, y); }); c.closePath(); c.stroke();
+    }), { start, peak: 1.3 });
+    // chasing bulbs inside the tube
+    const bulb = [lampMaterial('#e8b878', 1.7, 0.5), lampMaterial('#e8b878', 1.7, 0.5)];
+    marqueeBulbs.push(...bulb.map((m, i) => ({ m, phase: i, k: 1.7 })));
+    {
+      const ring = outline(0.86, 400), len: number[] = [0];
+      for (let i = 1; i <= ring.length; i++) len.push(len[i - 1]! + ring[i % ring.length]!.distanceTo(ring[i - 1]!));
+      const total = len[ring.length]!, n = Math.round(total / 0.42);
+      for (let k = 0, j = 0; k < n; k++) {
+        const at = (k / n) * total;
+        while (len[j + 1]! < at) j++;
+        const v = ring[j]!;
+        ball(fg, 0.055, v.x, v.y, front + 0.03, bulb[k % 2]!);
+      }
+    }
+    // the ribbon: its band behind the line, its tails folded back, the gold tube round them
+    const rw = W + 0.5, rh = H + 0.24, tail = { in: 0.5, out: 1.15, notch: 0.42, top: rh / 2 - 0.55, bot: -rh / 2 - 0.42 };
+    tbox(fg, rw, rh, 0.05, 0, 0, -0.05, '#22132a');
+    const tails: THREE.Vector2[][] = [];
+    for (const sd of [-1, 1]) {
+      const x0 = sd * (rw / 2 - tail.in), x1 = sd * (rw / 2 + tail.out), mid = (tail.top + tail.bot) / 2;
+      const pts = [new THREE.Vector2(x0, tail.top), new THREE.Vector2(x1, tail.top), new THREE.Vector2(x1 - sd * tail.notch, mid), new THREE.Vector2(x1, tail.bot), new THREE.Vector2(x0, tail.bot)];
+      if (sd < 0) pts.reverse();
+      tails.push(pts);
+      part(fg, new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: 0.04, bevelEnabled: false }), '#1a0e20', 0, 0, -0.1);
+      // the fold: a darker wedge from the band's foot down to the tail's
+      part(fg, new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(sd * (rw / 2), -rh / 2), new THREE.Vector2(sd * (rw / 2), tail.bot), new THREE.Vector2(sd * (rw / 2 - tail.in * 0.9), tail.bot)].map((v, i, a) => (sd < 0 ? a[a.length - 1 - i]! : v))), { depth: 0.03, bevelEnabled: false }), '#0e0812', 0, 0, -0.065);
+    }
+    {
+      const ow = rw + 2 * tail.out + 0.4, oh = rh + 1.1, opx = 1024 / ow, oph = Math.round(oh * opx), oy = -0.2;
+      const P = (x: number, y: number) => [(x + ow / 2) * opx, (oy + oh / 2 - y) * opx] as const;
+      neon(fg, ow, oh, 0, oy, 0.008, neonTex(1024, oph, C.amber, (c) => {
+        c.strokeStyle = C.amber; c.lineWidth = 0.05 * opx; c.lineJoin = 'round';
+        const inset = 0.09, poly = (pts: (readonly [number, number])[], close = true) => { c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); if (close) c.closePath(); c.stroke(); };
+        poly([P(-rw / 2 + inset, rh / 2 - inset), P(rw / 2 - inset, rh / 2 - inset), P(rw / 2 - inset, -rh / 2 + inset), P(-rw / 2 + inset, -rh / 2 + inset)]);
+        for (const sd of [-1, 1]) { // the tails' outer edges (their inner ends are behind the band)
+          const x0 = sd * (rw / 2 + 0.02), x1 = sd * (rw / 2 + tail.out - inset), mid = (tail.top + tail.bot) / 2;
+          poly([P(x0, tail.top - inset), P(x1, tail.top - inset), P(x1 - sd * (tail.notch - inset), mid), P(x1, tail.bot + inset), P(x0, tail.bot + inset)], false);
+        }
+      }), { start, peak: SECONDARY * 1.15 });
+    }
+    // the bells either side, swung in toward it, and the rings over its cleft: each lit by its word
+    const words = faces.filter((f) => Math.abs(f.s - sign.s) < 0.01).flatMap((f) => f.phrase.words);
+    const wordAt = (name: string) => words.find((w) => w.w.toLowerCase().replace(/[^a-z]/g, '') === name)?.start ?? start;
+    const lit = (w: number, h: number, x: number, y: number, rot: number, tex: THREE.Texture, at: number) => {
+      const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, color: new THREE.Color().setScalar(0.12), side: THREE.DoubleSide });
+      wordLit.push({ m, at, peak: 1.25 });
+      const p = plane(fg, w, h, x, y, front + 0.02, m); p.rotation.z = rot; return p;
+    };
+    const bellTex = neonTex(256, 320, C.amber, (c) => {
+      c.strokeStyle = C.amber; c.lineWidth = 11;
+      c.beginPath(); c.moveTo(40, 250); c.quadraticCurveTo(70, 236, 74, 180); c.bezierCurveTo(78, 70, 178, 70, 182, 180); c.quadraticCurveTo(186, 236, 216, 250); c.closePath(); c.stroke();
+      c.beginPath(); c.arc(128, 276, 16, 0, Math.PI * 2); c.stroke(); // its clapper
+      c.beginPath(); c.arc(128, 66, 14, 0, Math.PI * 2); c.stroke(); // its loop
+      c.beginPath(); c.moveTo(92, 214); c.lineTo(164, 214); c.stroke(); // a band round it
+    });
+    const bx = kx * 16 + 0.8, by = tail.top + 0.85;
+    lit(1.2, 1.5, -bx, by, -0.28, bellTex, wordAt('he'));
+    lit(1.2, 1.5, bx, by, 0.28, bellTex, wordAt('my'));
+    lit(1.2, 0.74, 0, cy + ky * 7.8, 0, neonTex(416, 256, C.amber, (c) => {
+      c.strokeStyle = C.amber; c.lineWidth = 12;
+      for (const x of [158, 258]) { c.beginPath(); c.arc(x, 146, 74, 0, Math.PI * 2); c.stroke(); }
+      c.beginPath(); c.moveTo(258, 72); c.lineTo(242, 40); c.lineTo(258, 18); c.lineTo(274, 40); c.closePath(); c.stroke(); // its stone
+    }), wordAt('man'));
+    // its pink on the wall round it and down on the lawn
+    wash(fg, rw + 6, hh + 4, 0, hcy, wall + 0.01, PINK, 0.3);
+  }
+
   /** The wedding chapel, in its lot's frame (its front at z 0, the lyric's neon on it). */
   function buildChapel(g: THREE.Object3D, lot: Lot, sign: Verse3Plan['signs'][number], fg: THREE.Object3D, W: number, H: number, start: number) {
     const Wl = lot.w, Hl = lot.h, D = lot.d - 1, K = CHAPEL;
@@ -982,8 +1147,9 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       else { for (let k = 0; k < 12; k++) { c.fillStyle = cols[k % cols.length]!; c.beginPath(); c.moveTo(128, 128); c.arc(128, 128, 118, (k / 12) * Math.PI * 2, ((k + 1) / 12) * Math.PI * 2); c.closePath(); c.fill(); } c.strokeStyle = '#1a1420'; c.lineWidth = 7; for (let k = 0; k < 12; k++) { c.beginPath(); c.moveTo(128, 128); c.lineTo(128 + 118 * Math.cos((k / 12) * Math.PI * 2), 128 + 118 * Math.sin((k / 12) * Math.PI * 2)); c.stroke(); } c.fillStyle = '#7a5a6e'; c.beginPath(); c.arc(128, 128, 30, 0, Math.PI * 2); c.fill(); }
     });
     const stained = (arch: boolean) => pic(glassTex(arch), { color: new THREE.Color().setScalar(0.62) });
-    const rose = new THREE.Mesh(new THREE.CircleGeometry(0.85, 32), stained(false)); rose.position.set(0, Hl + K.gable * 0.42, 0.05); g.add(rose);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.92, 0.1, 8, 32), trim); ring.position.copy(rose.position); g.add(ring);
+    // (high in the gable, over the sign's heart and its rings)
+    const rose = new THREE.Mesh(new THREE.CircleGeometry(0.6, 32), stained(false)); rose.position.set(0, Hl + K.gable * 0.6, 0.05); g.add(rose);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.08, 8, 32), trim); ring.position.copy(rose.position); g.add(ring);
     /** An arched window: its glass (a rectangle under a half disc), its trim round it, its sill. */
     const archWindow = (x: number, y0: number, w: number, h: number) => {
       const sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(w / 2, h - w / 2); sh.absarc(0, h - w / 2, w / 2, 0, Math.PI, false); sh.lineTo(-w / 2, 0);
@@ -1002,8 +1168,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     box(g, P.w + 0.4, 0.36, P.d + 0.2, 0, P.h + 0.18, P.d / 2, trim); // its roof slab
     box(g, P.w + 0.2, 0.42, 0.12, 0, P.h - 0.2, P.d + 0.02, trim); // the frieze
     plane(g, P.w - 0.3, 0.3, 0, P.h - 0.2, P.d + 0.09, pic(signFace('WEDDING CHAPEL', 1024, 72, '#5a3a5e', null, F.sign(700), 0.72, 0.18), { transparent: true }));
-    const ped = new THREE.Shape([new THREE.Vector2(-P.w / 2 - 0.2, 0), new THREE.Vector2(P.w / 2 + 0.2, 0), new THREE.Vector2(0, 0.3)]);
-    const pm = new THREE.Mesh(new THREE.ExtrudeGeometry(ped, { depth: P.d + 0.2, bevelEnabled: false }), trim); pm.position.set(0, P.h + 0.36, -0.1); g.add(pm);
+    // (flat-roofed: its sign's heart sits on it — a pediment stood where the heart's tip comes down)
     for (const x of [-P.w / 2 + 0.2, P.w / 2 - 0.2]) for (const z of [P.d - 0.15, 0.3]) {
       cyl(g, 0.15, P.h - 0.5, x, (P.h - 0.5) / 2 + 0.15, z, trim, 16);
       box(g, 0.42, 0.15, 0.42, x, 0.08, z, trim); box(g, 0.4, 0.12, 0.4, x, P.h - 0.47, z, trim); // its base, its capital
@@ -1028,16 +1193,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     const spire = new THREE.Mesh(new THREE.ConeGeometry(S.side * 0.74, S.spire, 4), roofM); spire.position.set(0, base + S.tower + S.belfry + 0.11 + S.spire / 2, sz); spire.rotation.y = Math.PI / 4; g.add(spire);
     const top = base + S.tower + S.belfry + S.spire;
     box(g, 0.1, 0.9, 0.1, 0, top + 0.4, sz, gold); box(g, 0.5, 0.1, 0.1, 0, top + 0.55, sz, gold);
-    // the lyric's mounting on the wall, its heart beside it (a smaller, dimmer pink: the line's own), wedding bells
-    wallMount(fg, W, H, start);
-    neon(fg, 1.6, 1.6, W / 2 + 1.6, -0.1, -0.1, neonTex(420, 420, PINK, (c) => {
-      c.strokeStyle = PINK; c.lineWidth = 13; c.beginPath(); c.moveTo(210, 340);
-      c.bezierCurveTo(60, 230, 60, 110, 160, 92); c.bezierCurveTo(196, 86, 210, 120, 210, 140);
-      c.bezierCurveTo(210, 120, 224, 86, 260, 92); c.bezierCurveTo(360, 110, 360, 230, 210, 340); c.stroke();
-      c.strokeStyle = C.amber; c.lineWidth = 9; c.beginPath(); c.moveTo(60, 300); c.lineTo(340, 140); c.stroke();
-      c.beginPath(); c.moveTo(340, 140); c.lineTo(300, 142); c.moveTo(340, 140); c.lineTo(330, 176); c.stroke();
-    }), { peak: 1.3, start });
-    wash(fg, W + 5, H + 3, 0, 0, -MOUNT.wall + 0.02, PINK, 0.2);
+    chapelSign(fg, sign, W, H, start, P.h + 0.36 - (sign.face.center.y - route.frameAt(sign.s).pos.y));
     // the lawn and its picket fence (a gate at the path), a monument sign on it: wedding bells, its hours
     const lawnM = toon({ color: '#3e5a44' });
     for (const sd of [-1, 1]) {
@@ -1283,6 +1439,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       const lateral = side * (ROAD_HALF + LAMPS.kerb);
       // (nor by any take's lens: its pole a dark bar down the frame's edge, its head's glare beside the words)
       const pole = atRoad(s, lateral, 0), head = atRoad(s, side * (ROAD_HALF + LAMPS.kerb - LAMPS.reach), LAMPS.h - 0.2);
+      if (kerbClear.some((k) => k.side === side && Math.abs(k.s - s) < k.half + 1)) continue;
       if (inView(pole, 0.6, LAMPS.h + 0.4) || inView(head.clone().setY(head.y - 1), 1.6, 2) || lens.some((e) => Math.hypot(e.x - pole.x, e.z - pole.z) < 4.5 || e.distanceTo(head) < 6)) continue;
       const g = onRoad(s, lateral);
       lampAt.push({ s, side });
@@ -1354,6 +1511,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
         const sp = s + (r(2) - 0.5) * 2, lateral = side * (ROAD_HALF + KERB.in), p = atRoad(sp, lateral, 0.15);
         if (sp > plan.cross[0] - 3 && sp < plan.cross[1] + 3) continue;
         if (lampAt.some((l) => l.side === side && Math.abs(l.s - sp) < 1.6)) continue;
+        if (kerbClear.some((k) => k.side === side && Math.abs(k.s - sp) < k.half + 0.6)) continue;
         if (lens.some((e) => Math.hypot(e.x - p.x, e.z - p.z) < 1.8) || inView(p, 0.4, 1.4)) continue;
         const g = spot(sp, lateral, side), u = r(1);
         if (u < 0.2) hydrant(g, out); else if (u < 0.48) meter(g, r(3) < 0.4); else if (u < 0.7) bin(g, out, r(4)); else if (u < 0.93) news(g, out, 2 + Math.floor(r(5) * 2), k * 3 + side); else mailbox(g);
@@ -1424,6 +1582,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       // the marquee's and the pawn shop's bulbs chase
       const ph = Math.floor(t * 6) % 2;
       for (const b of marqueeBulbs) b.m.uniforms.strength!.value = (b.phase + ph) % 2 === 0 ? b.k : b.k * 0.3;
+      for (const w of wordLit) w.m.color.setScalar(0.12 + (w.peak - 0.12) * Math.min(1, Math.max(0, (t - w.at) / WORD_ON)));
       if (coin) (coin.material as THREE.MeshBasicMaterial).color.setRGB(...((t >= coinStart && (t * 2.2) % 1 < 0.5 ? [1.6, 0.4, 0.3] : [0.3, 0.08, 0.06]) as [number, number, number]));
       // people walking, legs scissoring
       for (const p of people) {

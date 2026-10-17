@@ -106,6 +106,9 @@ export interface Carrier {
   /** Its words stand in the world before they're sung (a street's name on its blade: it's a street sign, not a lyric
    *  revealed), so the reading-ahead guard lets it be. */
   early?: boolean;
+  /** Neon whose set builds its own mounting (each row's backer, its frame, its light on the wall: verse 3's hotel and
+   *  chapel), so world.ts stands no dark panel behind it — that panel read as a sign stuck on the wall. */
+  mounted?: boolean;
   /** A phone bubble received, not sent: grey, on the left (the second thread is his reply). */
   received?: boolean;
 }

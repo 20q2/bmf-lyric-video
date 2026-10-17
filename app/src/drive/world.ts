@@ -1121,7 +1121,7 @@ export function buildCarrier(c: Carrier, face: THREE.Texture, wall: THREE.Color,
       box(tank ? 2 : 1.5, tank ? 2.4 : 1, tank ? 2 : 1.3, at.x + (u - 0.5) * size.x * 0.7, at.y + size.y / 2 + (tank ? 1.2 : 0.5), at.z - 1 - 2 * hash(c.s, k, 63), toon({ color: '#b9ada0' })).name = 'roof';
     }
   }
-  if (building && c.kind === 'neon') {
+  if (building && c.kind === 'neon' && !c.mounted) {
     // the neon's mounting panel on the wall (dark, the tubes stand off it), and its wash of light on the wall round it
     box(c.w + 0.5, c.h, 0.06, 0, 0, -0.035, grey('#1a1420')).name = 'panel';
     const wash = new THREE.Mesh(new THREE.PlaneGeometry(c.w + 5, c.h + 4), glowMaterial('#ff4fa3', NEON_WASH, true));

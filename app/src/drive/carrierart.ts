@@ -51,6 +51,7 @@ const OWN_COPY: Partial<Record<Carrier['kind'], [string, string]>> = {
   roofsign: ['CHICKEN', 'DINNERS'],
   vinyl: ['GRAND RE-OPENING', ''],
   tunnelsign: ['THE STRIP', 'AHEAD'],
+  storefront: ['WE BUY · WE SELL · WE LOAN', 'GOLD · GUITARS · TOOLS'], // (the pawn shop's cabinet: its face was a blank slab until its line)
 };
 export const FLIP = { slats: 10, stagger: 0.6, steps: 12 };
 /** The word of emphasis's row takes this many shares of its face's height (the others one each). */
