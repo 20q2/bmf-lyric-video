@@ -106,12 +106,13 @@ FIX = {
     (31, 0): dict(start=128.17, end=129.05, conf=0.7),
     (31, 1): dict(start=129.09, end=129.85, conf=0.7),
     (31, 2): dict(start=129.99, end=130.38, conf=0.7),
-    # "we might crash" by the user's ear (2026-10-16: 130.47 We, 131.14 Might, 131.70 Crash): "we" on the high note after
-    # "fast" (entry 130.50, 422 Hz), "might" from 131.14, "crash" from 131.70 held over the 415 Hz note to its fall
+    # "we might crash" by the user's ear (2026-10-16: 130.47 We, 131.14 Might, 131.70 Crash, then "might and crash are
+    # like .25 second too late"): "we" on the high note after "fast" (entry 130.50, 422 Hz), "might" from 130.89 (the
+    # attack at 130.95), "crash" from 131.45 held over the 415 Hz note to its fall
     # before "Tryna" (132.25). (All three had been packed into 131.27-131.76, the high note taken for an ad-lib.)
-    (31, 3): dict(start=130.47, end=131.13, conf=0.8),
-    (31, 4): dict(start=131.14, end=131.69, conf=0.8),
-    (31, 5): dict(start=131.70, end=132.25, conf=0.8),
+    (31, 3): dict(start=130.47, end=130.88, conf=0.8),
+    (31, 4): dict(start=130.89, end=131.44, conf=0.8),
+    (31, 5): dict(start=131.45, end=132.25, conf=0.8),
     (32, 0): dict(start=132.34, conf=0.7),
     # L48, the song's last phrase, fades out at -51..-56 dB: two notes, 177.35-177.85 (310 Hz) and 178.05-178.55
     # (280-309 Hz), the stem at its floor from 178.60. Whisper: Tryna 177.10, make 177.56, it 177.86, last 178.10.
