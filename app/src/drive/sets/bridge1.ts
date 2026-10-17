@@ -170,7 +170,7 @@ export const BRIDGE1: SetPiece = {
       // (the two pieces one mural just past the sign, read in one steady pan as the eye drifts on low behind them: it
       // held on the first while it was sung, then dashed 26 m on to the second — the user, 2026-10-16, "I'd like for
       // that to be one smooth continuous shot instead of being split between the two sets of lyrics")
-      const sC = paint(C, 0, sS + 15), sD = paint(D, 1, sC + 12);
+      const sC = paint(C, 0, sS + 15), sD = paint(D, 1, sC + 11);
       const hi = { x: -2.8, y: 5.1 }, lo = { x: 3.5, y: 1.4 };
       // (the sign held, creeping on, until "Blowin'" comes again; then a cut to the piece, low behind them — it panned
       // down to it: the user, 2026-10-16, "instead of panning down, we should just cut ... I like that it kind of

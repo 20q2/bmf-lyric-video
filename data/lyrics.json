@@ -1898,7 +1898,7 @@
       "text": "Blowin' money fast, we might crash",
       "section": "bridge1",
       "start": 128.17,
-      "end": 131.76,
+      "end": 132.25,
       "words": [
         {
           "w": "Blowin'",
@@ -1920,21 +1920,21 @@
         },
         {
           "w": "we",
-          "start": 130.5,
-          "end": 130.94,
-          "conf": 0.6
+          "start": 130.47,
+          "end": 131.13,
+          "conf": 0.8
         },
         {
           "w": "might",
-          "start": 130.95,
-          "end": 131.24,
-          "conf": 0.6
+          "start": 131.14,
+          "end": 131.69,
+          "conf": 0.8
         },
         {
           "w": "crash",
-          "start": 131.27,
-          "end": 131.76,
-          "conf": 0.65
+          "start": 131.7,
+          "end": 132.25,
+          "conf": 0.8
         }
       ]
     },
