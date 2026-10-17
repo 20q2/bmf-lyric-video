@@ -356,7 +356,7 @@ export class CarrierArt {
     // rows share the face's height, the word of emphasis's row a bigger share
     const soloRow = carrier.phrase.solo === 'first' ? 0 : carrier.phrase.solo === 'last' ? carrier.rows.length - 1 : -1;
     const weights = carrier.rows.map((_, r) => (r === soloRow ? SOLO_ROW : 1)), sum = weights.reduce((a, b) => a + b, 0);
-    if (style.tubes) { // neon on its backplates: a dark rounded plate behind each row, its mounting
+    if (style.tubes && !carrier.mounted) { // neon on its backplates: a dark rounded plate behind each row, its mounting (a sign built round it is its own backing: the plate showed through the drugstore's capsule)
       c.save(); c.shadowBlur = 0; c.globalAlpha = 0.55 * alpha; c.fillStyle = '#120a14';
       let y0 = 0;
       carrier.rows.forEach((row, r) => {
