@@ -102,8 +102,9 @@ void main() {
 
 /** What a pane's `behind` attribute says is behind it (nightGlass). */
 export const BEHIND = { shop: 0, room: 1, dark: 2 } as const;
-// (A shop pane's `trade` attribute (look/facades.ts TRADE_OF) picks what's behind it: 0 shelves of stock, 1 clothes on
-// a rail, 2 a lunch counter under its menu board, 3 bills taped up inside the glass, 4 an office's vertical blinds.
+// (A shop pane's `trade` attribute (drive/shops.ts TRADE, its shop's) picks what's behind it: 0 shelves of stock, 1
+// clothes on a rail, 2 a lunch counter under its menu board, 3 bills taped up inside the glass, 4 an office's vertical
+// blinds, 5 a salon's chairs under its mirror, 6 a laundromat's machines.
 // Every shop window in town showed the same three shelves of stock: the user, 2026-10-16, "every front of the store
 // has the same texture on the front of it".)
 
@@ -153,11 +154,32 @@ float glassHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3
       vec3 pc = mix(mix(vec3(0.88, 0.84, 0.74), vec3(0.80, 0.68, 0.50), step(0.45, pk)), vec3(0.62, 0.70, 0.72), step(0.8, pk));
       float lines = step(0.6, fract(f.y * 7.0)) * step(0.24, f.x) * step(f.x, 0.76) * step(0.2, f.y) * step(f.y, 0.62);
       interior = mix(vec3(0.30, 0.28, 0.29), mix(pc, vec3(0.32, 0.27, 0.27), lines * 0.7), paper); cover = paper;
-    } else {
+    } else if (vTrade < 4.5) {
       // an office: vertical blinds drawn part way across, a dim room past them
       float drawn = step(q.x, 0.35 + 0.65 * glassHash(vec2(seed, 72.0)));
       vec3 blinds = mix(vec3(0.84, 0.82, 0.76), vec3(0.68, 0.66, 0.61), step(0.84, fract(q.x * 18.0)));
       interior = mix(vec3(0.40, 0.38, 0.36), blinds, drawn); cover = drawn;
+    } else if (vTrade < 5.5) {
+      // a salon, a barber's: a long mirror across the back wall over a shelf, chairs in a row before it, their backs
+      // in a muted oxblood or sage
+      vec3 wall = mix(vec3(0.60, 0.56, 0.50), vec3(0.52, 0.55, 0.53), step(0.5, glassHash(vec2(seed, 81.0))));
+      float mirror = step(0.5, q.y) * step(q.y, 0.84) * step(0.06, q.x) * step(q.x, 0.94);
+      float shelf = step(abs(q.y - 0.47), 0.025);
+      float fx = fract(q.x * 3.0), chair = step(abs(fx - 0.5), 0.17) * step(0.2, q.y) * step(q.y, 0.42);
+      float seat = step(abs(fx - 0.5), 0.22) * step(abs(q.y - 0.2), 0.035);
+      vec3 hide = mix(vec3(0.46, 0.30, 0.29), vec3(0.42, 0.47, 0.40), step(0.5, glassHash(vec2(seed, 82.0))));
+      interior = mix(mix(mix(wall, vec3(0.70, 0.74, 0.76) * (0.9 + 0.1 * q.y), mirror), vec3(0.82, 0.80, 0.74), shelf), hide, max(chair, seat));
+      interior = mix(interior, vec3(0.30, 0.29, 0.30), step(abs(fx - 0.5), 0.03) * step(q.y, 0.12)); // (the chair's stem)
+    } else {
+      // a laundromat: a row of washers along the foot, dryers stacked over them, their round doors; a pale wall
+      vec3 wall = vec3(0.66, 0.66, 0.62);
+      vec2 cell = vec2(fract(q.x * 4.0), q.y);
+      float washer = step(0.06, cell.x) * step(cell.x, 0.94) * step(0.06, q.y) * step(q.y, 0.42);
+      float dryer = step(0.06, cell.x) * step(cell.x, 0.94) * step(0.48, q.y) * step(q.y, 0.84);
+      float door = step(length((vec2(cell.x, q.y) - vec2(0.5, q.y < 0.45 ? 0.24 : 0.66)) * vec2(1.0, 3.0)), 0.3);
+      vec3 enamel = vec3(0.82, 0.81, 0.77);
+      interior = mix(wall, enamel, max(washer, dryer));
+      interior = mix(interior, vec3(0.30, 0.33, 0.36), door * max(washer, dryer));
     }
   } else if (vBehind < 0.5) {
     // a shop: a warm back wall, three shelves across the pane, stock standing on them with gaps between, in putty,

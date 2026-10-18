@@ -13,10 +13,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash } from '../engine/util';
-import { WORLD, toon } from './toon';
+import { WORLD, printShadows, toon } from './toon';
 import { F, font } from '../engine/type';
 import { BEHIND, nightGlass } from './night';
 import type { Block } from '../drive/blocks';
+import { SHOPS, type ShopName, TRADE, isApartments, planShops, shopIndex, shopOf } from '../drive/shops';
 
 /** How deep the front's detail is (m: the body stands this far behind the box's front); the storefront (its glass's
  *  top, the sign band, a bay's width); the floors above (their height, a window's width, height, the gap between);
@@ -24,10 +25,22 @@ import type { Block } from '../drive/blocks';
  *  windows' frames and sills: their panes were bare glass flush on the wall), the coping round the roof's other edges
  *  (its height, its width) (m). */
 export const FACADE = { depth: 0.3, shop: { top: 3.0, band: [3.15, 3.95] as [number, number], bay: 3.2 }, floor: 3.3, win: { w: 1.3, h: 1.7, gap: 1.3 }, cornice: 0.55, pilasters: 14, end: 0.18, coping: [0.3, 0.32] as [number, number] };
-/** The shops' names (the signs' face, F.sign: never the lyrics'), and how many the atlas holds a row. */
-export const SHOPS = ['LIQUOR', 'DONUTS', 'TACOS', 'TIRES', 'BEAUTY SUPPLY', 'CHECKS CASHED', 'LAUNDROMAT', 'PAWN', 'WIGS', 'BAIL BONDS', 'PHO', 'MARKET', 'NAILS', 'DENTIST', 'INCOME TAX', 'RECORDS'] as const;
-const ATLAS_COLS = 4;
-const SIGN_COLOURS: readonly [string, string][] = [['#f4f0e6', '#c8202e'], ['#1d2026', '#ffd65a'], ['#c8202e', '#fff6e0'], ['#2b78a6', '#ffffff'], ['#ffd65a', '#1d2026'], ['#1f6b44', '#f4f0e6']];
+/** The sign atlas: a cell a shop (drive/shops.ts SHOPS, in order), this many a row, each this many px. */
+const ATLAS = { cols: 8, cw: 384, ch: 84 };
+const ATLAS_ROWS = Math.ceil(SHOPS.length / ATLAS.cols);
+/** Where a sign's uv (0..1 over its face) falls in the atlas's cell `k` (turned back if `mirrored`). */
+export function signUv(k: number, u: number, v: number, mirrored = false): [number, number] {
+  const cx = k % ATLAS.cols, cy = Math.floor(k / ATLAS.cols);
+  return [(cx + (mirrored ? 1 - u : u)) / ATLAS.cols, 1 - (cy + 1 - v) / ATLAS_ROWS];
+}
+/** The signs' paint, field and lettering: muted, sign painters' enamels faded by the sun — cream, oxblood, charcoal,
+ *  buff, slate, bottle green, putty, umber, sage, plum. Never the lyrics' brights: the user, 2026-10-18, "There
+ *  shouldn't be anything that catches our attention and brings us away from the lyrics" (they were fire-engine red,
+ *  sign yellow and sky blue, unlit, so they glowed in the shade). */
+const SIGN_COLOURS: readonly [string, string][] = [
+  ['#e2dbcb', '#6e2f2a'], ['#2b2e33', '#cfc09a'], ['#7a3d35', '#e6dcc6'], ['#3e5866', '#e0dacd'], ['#bfab7e', '#2f2a25'], ['#354c3e', '#ddd3bc'],
+  ['#d3cdc0', '#2c3846'], ['#5a4a3c', '#ddd0b6'], ['#a5b2a8', '#28332d'], ['#ddd2bf', '#3b5847'], ['#4a3f4c', '#d8cbb2'], ['#b5a398', '#3a2c2a'],
+];
 
 export interface FacadeGeometry { walls: THREE.BufferGeometry; trim: THREE.BufferGeometry; glass: THREE.BufferGeometry; signs: THREE.BufferGeometry }
 
@@ -35,7 +48,7 @@ export interface FacadeGeometry { walls: THREE.BufferGeometry; trim: THREE.Buffe
  *  Its walls darken toward the ground by `grime` (a share: years of dust and splash, read in their vertex colours). */
 class Parts {
   walls: THREE.BufferGeometry[] = []; trim: THREE.BufferGeometry[] = []; glass: THREE.BufferGeometry[] = []; signs: THREE.BufferGeometry[] = [];
-  constructor(private wall: THREE.Color, private trimC: THREE.Color, private mirrored: boolean, private grime = 0, private H = 1, private trade = 0) {}
+  constructor(private wall: THREE.Color, private trimC: THREE.Color, private mirrored: boolean, private grime = 0, private H = 1, private trade = 0, private surface = 0) {}
   private coloured(g: THREE.BufferGeometry, c: THREE.Color, grime = 0) {
     const n = g.getAttribute('position').count, a = new Float32Array(n * 3), y = g.getAttribute('position');
     for (let i = 0; i < n; i++) { const k = 1 - grime * (1 - Math.min(1, Math.max(0, y.getY(i) / this.H))); a.set([c.r * k, c.g * k, c.b * k], i * 3); }
@@ -45,6 +58,8 @@ class Parts {
   /** A box on the walls or the trim, in their colour or its own. */
   box(to: 'walls' | 'trim', w: number, h: number, d: number, x: number, y: number, z: number, colour?: THREE.Color) {
     const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z);
+    // (the walls' own surface, its coursing drawn by facadeWalls; a shutter or the like in its own colour, plain)
+    if (to === 'walls') g.setAttribute('surface', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(colour ? 0 : this.surface), 1));
     this[to].push(this.coloured(g, colour ?? (to === 'walls' ? this.wall : this.trimC), to === 'walls' ? this.grime : 0));
   }
   /** A pane facing +x (out of the front) or along ±z (an end), lit at night if `lit`; behind it (look/night.ts
@@ -64,8 +79,8 @@ class Parts {
     const g = new THREE.PlaneGeometry(w, h);
     if (facing === 'x') g.rotateY(Math.PI / 2); else if (facing === 'z-') g.rotateY(Math.PI);
     g.translate(x, y, z);
-    const uv = g.getAttribute('uv'), rows = Math.ceil(SHOPS.length / ATLAS_COLS), cx = k % ATLAS_COLS, cy = Math.floor(k / ATLAS_COLS);
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, (cx + (this.mirrored ? 1 - uv.getX(i) : uv.getX(i))) / ATLAS_COLS, 1 - (cy + 1 - uv.getY(i)) / rows);
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, ...signUv(k, uv.getX(i), uv.getY(i), this.mirrored));
     this.signs.push(g);
   }
 }
@@ -92,10 +107,13 @@ const TILES = ['#7a3b32', '#2f4a3e', '#24272c', '#cfc2a4', '#3c5566', '#5e4b3c']
 const BRICK = ['#9a5a48', '#86503f', '#a26c56', '#7b5546'];
 const FRAMES = ['#2a2c31', '#4a3b2c', '#5d6166'];
 const SHUTTER = '#8d8b84', AC = '#bdb7aa';
-/** What each shop (SHOPS) shows through its glass (look/night.ts nightGlass: 0 shelves, 1 a rail of clothes, 2 a counter
- *  under a menu board, 3 bills taped up, 4 an office's blinds): the liquor store its shelves, the taco shop its counter,
- *  the tax office its blinds. */
-const TRADE_OF: readonly number[] = [0, 2, 2, 3, 0, 3, 3, 0, 1, 4, 2, 0, 4, 4, 4, 3];
+/** A front's wall (the user, 2026-10-18: "I'd like for the storefront textures to be different, but I don't need them
+ *  to be that crazy ... their saturation should remain low"): the stucco's own pastel, smooth or scored in bands; or
+ *  face brick; or painted block in a muted grey, putty or sage (facadeWalls draws the coursing, fading it out where
+ *  it would shimmer). */
+export const SURFACE = { stucco: 0, brick: 1, block: 2, scored: 3 } as const;
+const WALL_BRICK = ['#8f5a4a', '#7e5446', '#9a6a56', '#74574b', '#8a6656'];
+const WALL_BLOCK = ['#b4ada0', '#a3a49a', '#bcae96', '#9ba496', '#b2a69a', '#a99e92'];
 
 /** A front's treatment: its storefront's bays (width), the bulkhead under the glass (height; tiled or brick, or the
  *  trim's), its piers' width and colour (brick: broad), its shop frame's colour (the trim's, or dark metal), a transom
@@ -108,10 +126,10 @@ interface Style {
   transom: boolean; recess: boolean; shutter: boolean;
   win: { w: number; h: number; gap: number }; muntin: 0 | 1 | 2; ac: number;
   sign: 0 | 1 | 2; signW: number; grime: number; faded: boolean;
-  /** What its shop sells, seen through its glass (TRADE_OF). */
-  trade: number;
+  /** Its wall (SURFACE) and, for brick or block, the wall's colour (else the stucco's). */
+  surface: number; wallC: string | null;
 }
-const PLAIN: Style = { trade: 0, bay: FACADE.shop.bay, bulk: 0.35, bulkC: null, pier: 0.12, pierC: null, frameC: null, transom: false, recess: false, shutter: false, win: FACADE.win, muntin: 0, ac: 0, sign: 0, signW: 0.62, grime: 0, faded: false };
+const PLAIN: Style = { surface: 0, wallC: null, bay: FACADE.shop.bay, bulk: 0.35, bulkC: null, pier: 0.12, pierC: null, frameC: null, transom: false, recess: false, shutter: false, win: FACADE.win, muntin: 0, ac: 0, sign: 0, signW: 0.62, grime: 0, faded: false };
 function styleOf(r: (k: number) => number): Style {
   const kind = Math.floor(r(400) * 4), pick = <T>(xs: readonly T[], k: number) => xs[Math.floor(r(k) * xs.length)]!;
   return {
@@ -123,19 +141,28 @@ function styleOf(r: (k: number) => number): Style {
     transom: r(406) < 0.5, recess: r(407) < 0.4, shutter: r(408) < 0.25,
     win: { w: 1.0 + 0.6 * r(409), h: 1.5 + 0.4 * r(410), gap: 0.9 + 0.8 * r(411) }, muntin: Math.floor(r(412) * 3) as 0 | 1 | 2, ac: r(413) < 0.5 ? 0.12 : 0,
     sign: Math.floor(r(414) * 3) as 0 | 1 | 2, signW: 0.4 + 0.3 * r(415), grime: 0.06 + 0.12 * r(416), faded: r(417) < 0.35,
-    trade: TRADE_OF[Math.floor(r(5) * SHOPS.length)]!, // (its sign's: r(5) picks its name)
+    // (half the fronts stucco, smooth; the rest scored, brick or block — the brick's piers then its own)
+    ...((w) => (w < 0.42 ? { surface: SURFACE.stucco, wallC: null } : w < 0.56 ? { surface: SURFACE.scored, wallC: null }
+      : w < 0.78 ? { surface: SURFACE.brick, wallC: pick(WALL_BRICK, 419) } : { surface: SURFACE.block, wallC: pick(WALL_BLOCK, 419) }))(r(418)),
   };
 }
 
-export interface FacadeOptions { /** Each front its own treatment (styleOf), not the town's one. */ vary?: boolean }
+export interface FacadeOptions {
+  /** Each front its own treatment (styleOf), not the town's one. */ vary?: boolean;
+  /** Who's who (drive/shops.ts planShops: the town's, Drive.shops); a block not in it, a name of its own by its hash.
+   *  facades plans its blocks' if not given. */
+  shops?: ReadonlyMap<Block, ShopName>;
+  /** facades, planning its blocks' shops: names and lines of business to deal none of (shopsNear). */
+  avoid?: readonly string[];
+}
 
 /** What a block's front is, as facadeOf builds it: low apartments over a carport (no shop) or a shop (its name: SHOPS),
  *  and whether it has floors over its storefront (windows up its front and its ends) — what a set dressing a block's
  *  blank end needs to know of it (scenes/sets/verse2.ts, the tire shop's). */
-export function facadeTraits(b: Block, opts: FacadeOptions = {}): { apartments: boolean; shop: (typeof SHOPS)[number]; upper: boolean } {
+export function facadeTraits(b: Block, opts: FacadeOptions = {}): { apartments: boolean; shop: ShopName; upper: boolean } {
   const r = (k: number) => hash(b.s, b.lateral, k), V = opts.vary ? styleOf(r) : PLAIN;
-  const apartments = b.h <= 9 && r(2) > 0.72 && !b.corner;
-  return { apartments, shop: SHOPS[Math.floor(r(5) * SHOPS.length)]!, upper: (apartments ? 3.3 : 4.3) + V.win.h <= b.h - FACADE.cornice - 0.4 };
+  const apartments = isApartments(b);
+  return { apartments, shop: opts.shops?.get(b) ?? SHOPS[Math.floor(r(5) * SHOPS.length)]!.name, upper: (apartments ? 3.3 : 4.3) + V.win.h <= b.h - FACADE.cornice - 0.4 };
 }
 
 /** One block's street front, in world space. */
@@ -146,16 +173,17 @@ export function facadeOf(b: Block, opts: FacadeOptions = {}): FacadeGeometry {
   const side = Math.sign(b.lateral) || 1;
   const local = b.matrix.clone().multiply(new THREE.Matrix4().makeScale(side / sx, 1 / sy, 1 / sz)).multiply(new THREE.Matrix4().makeTranslation(0, -sy / 2, 0));
   const D = sx, H = sy, W = sz, A = FACADE, front = D / 2, body = front - A.depth;
-  const stucco = new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!);
   const r = (k: number) => hash(b.s, b.lateral, k), V = opts.vary ? styleOf(r) : PLAIN;
-  let trimC = r(1) < 0.5 ? stucco.clone().lerp(new THREE.Color('#ffffff'), 0.55) : stucco.clone().multiplyScalar(0.62);
+  const stucco = new THREE.Color(V.wallC ?? WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!);
+  // (the front's trim: the wall's, lightened or deepened; brick's and block's in a pale stone, as their sills and copings are)
+  let trimC = V.surface === SURFACE.brick ? new THREE.Color('#cdc3b0').multiplyScalar(0.9 + 0.1 * r(1)) : r(1) < 0.5 ? stucco.clone().lerp(new THREE.Color('#ffffff'), 0.55) : stucco.clone().multiplyScalar(0.62);
   if (V.faded) trimC = trimC.lerp(stucco, 0.5); // (sun-faded toward the wall)
-  const P = new Parts(stucco, trimC, side < 0, V.grime, H, V.trade);
+  const T = facadeTraits(b, opts), apartments = T.apartments, xf = body;
+  const P = new Parts(stucco, trimC, side < 0, V.grime, H, TRADE[shopOf(T.shop).trade], V.surface);
   const col = (c: string | null) => (c ? new THREE.Color(c) : undefined);
   // (the ground: the road's level is its box's bottom plus its lift; the facade starts at the road)
   const g0 = H - b.h;
   // the ground floor: a storefront (bays of glass, a door, a base course, the sign band), or a carport on low apartments
-  const T = facadeTraits(b, opts), apartments = T.apartments, xf = body;
   const n = Math.max(1, Math.floor((W - 1) / V.bay)), bw = (W - 1) / n, door = Math.floor(r(3) * n);
   const zOf = (i: number) => -W / 2 + 0.5 + bw * (i + 0.5);
   // the body, behind the front's depth, its ends a little in from the box's; its roof a little under the coping's top
@@ -201,7 +229,7 @@ export function facadeOf(b: Block, opts: FacadeOptions = {}): FacadeGeometry {
     const [b0, b1] = A.shop.band;
     // the sign: on the band; painted on the wall (no band); or a cabinet standing on the band
     if (V.sign !== 1) P.box('trim', 0.16, b1 - b0, W - 0.4, xf + 0.08, g0 + (b0 + b1) / 2, 0);
-    const sw = Math.min(W * V.signW, 9), shop = SHOPS.indexOf(T.shop), sz2 = (r(4) - 0.5) * W * 0.2;
+    const sw = Math.min(W * V.signW, 9), shop = shopIndex(T.shop), sz2 = (r(4) - 0.5) * W * 0.2;
     if (V.sign === 0) P.sign(sw, (b1 - b0) * 0.78, xf + 0.165, g0 + (b0 + b1) / 2, sz2, shop);
     else if (V.sign === 1) P.sign(sw, (b1 - b0) * 0.9, xf + 0.02, g0 + (b0 + b1) / 2 + 0.05, sz2, shop);
     else {
@@ -282,13 +310,15 @@ export function facadeOf(b: Block, opts: FacadeOptions = {}): FacadeGeometry {
 
 /** The whole town's street fronts, merged per material. */
 export function facades(blocks: readonly Block[], opts: FacadeOptions = {}): FacadeGeometry {
-  const all = blocks.map((b) => facadeOf(b, opts));
+  const o = { ...opts, shops: opts.shops ?? planShops(blocks, { avoid: opts.avoid }) };
+  const all = blocks.map((b) => facadeOf(b, o));
   return { walls: merged(all.map((f) => f.walls)), trim: merged(all.map((f) => f.trim)), glass: merged(all.map((f) => f.glass)), signs: merged(all.map((f) => f.signs)) };
 }
 
 /** The street fronts' materials, made once and shared (the town's, and a set's own fronts: scenes/sets/verse2.ts) —
- *  one vertex-coloured toon for the walls and the trim, the glass, the signs (browser only: the atlas). */
-let shared: { body: THREE.Material; glass: THREE.Material; signs: THREE.Material } | undefined;
+ *  the walls (vertex-coloured toon, their coursing drawn: facadeWalls), the trim (vertex-coloured toon), the glass, the
+ *  signs (browser only: the atlas). */
+let shared: { walls: THREE.Material; trim: THREE.Material; glass: THREE.Material; signs: THREE.Material } | undefined;
 /** A facade's meshes in a group, on the shared materials (browser only). */
 export function facadeMeshes(f: FacadeGeometry): THREE.Group {
   // (the panes stand a centimetre off their walls, the signs half that off their bands: past ~100 m that's under the
@@ -296,28 +326,96 @@ export function facadeMeshes(f: FacadeGeometry): THREE.Group {
   // user, 2026-10-16, the pastel green ones down the road at the start. A polygon offset pulls them forward by a few
   // of the buffer's own steps, so it grows with the distance as the step does, and is nothing up close.)
   const forward = { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 };
-  shared ??= { body: toon({ vertexColors: true }), glass: Object.assign(nightGlass(), forward), signs: new THREE.MeshBasicMaterial({ map: signAtlas(), ...forward }) };
+  // (the signs painted, lit and shaded as the wall they're on: unlit, they kept their colours whatever the light and
+  // glowed out of the shade — scenes/sets/kit.ts paint)
+  shared ??= { walls: facadeWalls(), trim: toon({ vertexColors: true }), glass: Object.assign(nightGlass(), forward), signs: toon({ map: signAtlas(), ...forward }) };
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(f.walls, shared.body), new THREE.Mesh(f.trim, shared.body), new THREE.Mesh(f.glass, shared.glass), new THREE.Mesh(f.signs, shared.signs));
+  g.add(new THREE.Mesh(f.walls, shared.walls), new THREE.Mesh(f.trim, shared.trim), new THREE.Mesh(f.glass, shared.glass), new THREE.Mesh(f.signs, shared.signs));
   return g;
 }
 
+/** The walls' toon, its `surface` attribute (SURFACE) drawn on it in world space along each wall: brick's running
+ *  bond (its mortar paler, a brick now and then a shade off), painted block's courses (their joints in shadow),
+ *  scored stucco's bands; plain stucco as it was. Each fades to its own average where its courses get finer than a few
+ *  pixels (fwidth), so far off a wall is a flat colour, never a shimmer. */
+export function facadeWalls(): THREE.MeshToonMaterial {
+  const m = toon({ vertexColors: true });
+  m.onBeforeCompile = (sh) => {
+    printShadows(sh);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+attribute float surface; varying float vSurf; varying vec3 vSurfPos; varying vec3 vSurfN;`)
+      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+  vSurf = surface; vSurfPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vSurfN = normalize(mat3(modelMatrix) * objectNormal);`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying float vSurf; varying vec3 vSurfPos; varying vec3 vSurfN;
+float surfHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+// (a joint along a cell's edge, antialiased: 1 on it, 0 off; half its width a share of the cell)
+float surfJoint(float f, float w, float hw) { float d = min(f, 1.0 - f); return 1.0 - smoothstep(hw, hw + max(w, 1e-4) * 1.2, d); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  if (vSurf > 0.5 && abs(vSurfN.y) < 0.5) {
+    vec3 tng = normalize(vec3(-vSurfN.z, 0.0, vSurfN.x));
+    vec2 p = vec2(dot(vSurfPos, tng), vSurfPos.y);
+    vec3 base = diffuseColor.rgb;
+    if (vSurf < 1.5) {
+      // brick: 0.09 m courses of 0.25 m bricks, running bond; the mortar paler, greyed
+      vec2 g = vec2(p.x / 0.25 + 0.5 * mod(floor(p.y / 0.09), 2.0), p.y / 0.09), w = fwidth(g), f = fract(g);
+      float j = max(surfJoint(f.y, w.y, 0.07), surfJoint(f.x, w.x, 0.025));
+      float tone = 0.93 + 0.1 * surfHash(floor(g));
+      vec3 mortar = mix(base, vec3(0.74, 0.71, 0.66) * (0.6 + 0.4 * dot(base, vec3(0.6))), 0.55);
+      vec3 near = mix(base * tone, mortar, j), far = mix(base * 0.98, mortar, 0.16);
+      diffuseColor.rgb = mix(near, far, smoothstep(0.18, 0.45, max(w.x, w.y)));
+    } else if (vSurf < 2.5) {
+      // painted block: 0.2 m courses of 0.4 m blocks, running bond; the joints struck in, in shadow
+      vec2 g = vec2(p.x / 0.4 + 0.5 * mod(floor(p.y / 0.2), 2.0), p.y / 0.2), w = fwidth(g), f = fract(g);
+      float j = max(surfJoint(f.y, w.y, 0.03), surfJoint(f.x, w.x, 0.015));
+      diffuseColor.rgb = mix(base * (1.0 - 0.16 * j), base * 0.975, smoothstep(0.15, 0.4, max(w.x, w.y)));
+    } else {
+      // scored stucco: a reveal every 0.6 m up the wall
+      float g = p.y / 0.6, w = fwidth(g);
+      diffuseColor.rgb = mix(base * (1.0 - 0.14 * surfJoint(fract(g), w, 0.012)), base * 0.99, smoothstep(0.1, 0.3, w));
+    }
+  }`);
+  };
+  m.customProgramCacheKey = () => 'facadeWalls';
+  return m;
+}
+
 /** The shops' signs, a cell each, drawn once (browser only: a canvas). (The town drew it twice: once for the fronts,
- *  once for the rooftop signs.) */
+ *  once for the rooftop signs.) Each its own paint (SIGN_COLOURS) and its own sign painter's border — a keyline, a
+ *  double keyline, or rules over and under its words; a name too long for one line on two. */
 let atlas: THREE.CanvasTexture | undefined;
 export function signAtlas(): THREE.CanvasTexture {
   return (atlas ??= drawSignAtlas());
 }
 function drawSignAtlas(): THREE.CanvasTexture {
-  const cw = 512, ch = 112, rows = Math.ceil(SHOPS.length / ATLAS_COLS), cv = document.createElement('canvas');
-  cv.width = cw * ATLAS_COLS; cv.height = ch * rows;
+  const { cw, ch } = ATLAS, cv = document.createElement('canvas');
+  cv.width = cw * ATLAS.cols; cv.height = ch * ATLAS_ROWS;
   const c = cv.getContext('2d')!;
-  SHOPS.forEach((name, k) => {
-    const x = (k % ATLAS_COLS) * cw, y = Math.floor(k / ATLAS_COLS) * ch, [bg, ink] = SIGN_COLOURS[k % SIGN_COLOURS.length]!;
+  SHOPS.forEach(({ name }, k) => {
+    const x = (k % ATLAS.cols) * cw, y = Math.floor(k / ATLAS.cols) * ch, [bg, ink] = SIGN_COLOURS[(k * 5) % SIGN_COLOURS.length]!, border = (k * 7) % 3;
     c.fillStyle = bg; c.fillRect(x, y, cw, ch);
-    c.strokeStyle = ink; c.lineWidth = 4; c.strokeRect(x + 6, y + 6, cw - 12, ch - 12);
-    c.fillStyle = ink; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(F.sign(700), ch * 0.5);
-    c.fillText(name, x + cw / 2, y + ch * 0.54, cw * 0.88);
+    c.strokeStyle = ink; c.fillStyle = ink;
+    if (border === 0) { c.lineWidth = 3; c.strokeRect(x + 5, y + 5, cw - 10, ch - 10); }
+    else if (border === 1) { c.lineWidth = 2; c.strokeRect(x + 4, y + 4, cw - 8, ch - 8); c.strokeRect(x + 9, y + 9, cw - 18, ch - 18); }
+    else { c.fillRect(x + 14, y + 8, cw - 28, 3); c.fillRect(x + 14, y + ch - 11, cw - 28, 3); }
+    // its words: one line, as big as fits; or, too long for that, two (split where the lines come out most even)
+    const maxW = cw * 0.86, width = (lines: string[], px: number) => { c.font = font(F.sign(700), px); return Math.max(...lines.map((l) => c.measureText(l).width)); };
+    let lines = [name], px = ch * 0.5;
+    const words = name.split(' ');
+    if (width(lines, px) > maxW && name.includes(' · ')) { lines = name.split(' · ').slice(0, 2); px = ch * 0.34; } // (two trades, a line each)
+    else if (width(lines, px) > maxW && words.length > 1) {
+      let best: string[] = [];
+      for (let i = 1; i < words.length; i++) {
+        const two = [words.slice(0, i).join(' '), words.slice(i).join(' ')], longest = (ls: string[]) => Math.max(...ls.map((l) => l.length));
+        if (!best.length || longest(two) < longest(best)) best = two;
+      }
+      lines = best; px = ch * 0.34;
+    }
+    px *= Math.min(1, Math.max(0.72, maxW / width(lines, px)));
+    c.font = font(F.sign(700), px); c.textAlign = 'center'; c.textBaseline = 'middle';
+    lines.forEach((l, i) => c.fillText(l, x + cw / 2, y + ch * (lines.length === 1 ? 0.54 : 0.32 + 0.38 * i), maxW));
   });
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;

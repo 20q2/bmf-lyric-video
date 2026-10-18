@@ -6,6 +6,7 @@ import { makeDrive } from '../src/drive/drive';
 import { ROAD_HALF } from '../src/drive/route';
 import { ROAD_START, placeSignHits, placeSpots } from '../src/drive/world';
 import { facadeOf } from '../src/look/facades';
+import { SET_TRADES, WINDOW, shopOf } from '../src/drive/shops';
 import { LENS, placeCamera } from '../src/drive/camera';
 import { type Verse2Plan, tireShop } from '../src/drive/sets/verse2';
 import { audio, lyrics } from './data';
@@ -64,10 +65,24 @@ test("the tire shop's blank end the set dresses stands in the car wash's shot (s
   // (the set finds it among the town's blocks, which are seeded: a reseeded town could lose it, and its dressing with it)
   const plan = drive.plans.verse2 as Verse2Plan, b = tireShop(drive.blocks, plan.wash.s);
   expect(b).toBeDefined();
+  expect(drive.shops.get(b!)).toBe('TIRES'); // (its sign over its front: the town's dealing pins it, drive/shops.ts)
   const wash = drive.carriers.filter((c) => c.kind === 'carwash'), t = (wash[0]!.phrase.start + wash[wash.length - 1]!.phrase.end) / 2;
   const cam = new THREE.PerspectiveCamera(LENS.fov, 16 / 9, LENS.near, LENS.far);
   placeCamera(cam, drive.camera(t)); cam.updateMatrixWorld();
   // (its near end's middle, half way up)
   const p = new THREE.Vector3(0, 0.5 - b!.h / 2 / new THREE.Vector3().setFromMatrixColumn(b!.matrix, 1).length(), -0.5).applyMatrix4(b!.matrix).project(cam);
   expect(Math.abs(p.x) < 1 && Math.abs(p.y) < 1 && p.z < 1).toBe(true);
+});
+
+test("no shop's name twice in view, nor a set's own trade near its set (drive/shops.ts)", () => {
+  // (the user, 2026-10-18: "tacos shows up four times and tire shows up a bunch of times")
+  const bad: string[] = [], named = [...drive.shops].sort(([a], [b]) => a.s - b.s);
+  const spans = drive.stretches.map((st) => ({ id: st.id, a: drive.motion.distanceAt(st.start), b: drive.motion.distanceAt(st.end) }));
+  named.forEach(([b, name], i) => {
+    for (const [c, other] of named.slice(i + 1)) if (other === name && c.s - b.s < WINDOW) bad.push(`${name} at s=${b.s.toFixed(0)} and s=${c.s.toFixed(0)}`);
+    const st = spans.find((x) => b.s >= x.a && b.s < x.b);
+    if (st && named.some(([c, other], j) => j !== i && other === name && c.s >= st.a && c.s < st.b)) bad.push(`${name} twice in ${st.id}`);
+    for (const x of spans) if (b.s > x.a - WINDOW && b.s < x.b + WINDOW && (SET_TRADES[x.id] ?? []).includes(shopOf(name).kind) && name !== 'TIRES') bad.push(`${name} at s=${b.s.toFixed(0)}, by ${x.id}'s own`);
+  });
+  expect([...new Set(bad)]).toEqual([]);
 });

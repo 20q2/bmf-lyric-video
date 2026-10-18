@@ -11,6 +11,7 @@ import type { Route, RouteFrame } from '../route';
 import type { Shot, ShotMove, Target } from '../shots';
 import type { Stretch } from '../stretches';
 import type { Block } from '../blocks';
+import type { ShopName } from '../shops';
 import { CHORUS1 } from './chorus1';
 import { CHORUS2 } from './chorus2';
 import { CHORUS3 } from './chorus3';
@@ -63,6 +64,8 @@ export interface SetPiece {
   /** The lines it places (default: all its stretch's); the rest are placed as usual. */
   owns?(line: Line): boolean;
   place(ctx: SetContext): Placed;
+  /** The town's blocks it needs to be a certain shop (its plan's; the town deals the rest: shops.ts planShops). */
+  shops?(plan: unknown, blocks: readonly Block[]): (readonly [Block, ShopName])[];
 }
 /** Whether a set-piece places this line of stretch st. */
 export const owned = (line: Line, st: Stretch) => { const set = SETS[st.id]; return !!set && (set.owns?.(line) ?? true); };

@@ -14,6 +14,7 @@ import { UP, box, canvasTex, cyl, onPanel, pic, plane, roadFrame, sedan, signFac
 import { PALM, palmVariant } from '../../look/palms';
 import { GLOW, glowMaterial, lampMaterial } from '../../look/night';
 import { facadeMeshes, facades } from '../../look/facades';
+import { shopsNear } from '../../drive/shops';
 import type { Block } from '../../drive/blocks';
 import { hash } from '../../engine/util';
 import { F } from '../../engine/type';
@@ -118,7 +119,7 @@ function town(drive: Drive, plan: Chorus4Plan): THREE.Group {
     a += w + 2 + 4 * r(k, 6);
   }
   front(90, T.to + 3, 32, T.lot[1] - 4, 16, 8.5, true, 1); // (closing the street's end, facing down it: its shop round the corner)
-  g.add(facadeMeshes(facades(fronts)));
+  g.add(facadeMeshes(facades(fronts, { vary: true, avoid: shopsNear(drive, 'chorus4') })));
   // the roofs' clutter on the first row: water tanks on legs, the boxes of the air conditioning
   const tank = toon({ color: '#8d7a6a' }), unit = toon({ color: '#9a9590' });
   for (const b of fronts.slice(0, 6)) {

@@ -14,6 +14,7 @@ import { type Stretch, motionFor, resolveStretches } from './stretches';
 import { type Tunnel, tunnelsOf } from './tunnel';
 import { REVEAL_S } from './dissolve';
 import { type Block, blocksOf } from './blocks';
+import { type ShopName, planShops } from './shops';
 import { motelSign } from './landmarks';
 import { type Placed, type SetFrame, SETS, owned } from './sets';
 
@@ -111,6 +112,9 @@ export interface Drive {
   shots: Shot[];
   /** Each set-piece's plan for its props (sets/; scenes/sets/ builds them), by stretch. */
   plans: Record<string, unknown>;
+  /** The town's shops: each block's that shows a name (its storefront's sign, a sign on its roof), dealt along the road
+   *  (shops.ts planShops), a set's own where it needs one (SetPiece.shops). */
+  shops: ReadonlyMap<Block, ShopName>;
 }
 
 export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
@@ -261,5 +265,9 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const camera = director(audio, kept, chaseOf(stretches[0]!));
   const blocks = blocksOf(route, motion, stretches, carriers, tunnels, clears, setBlocks, openings);
   const lastCut = t0;
-  return { stretches, motion, route, carriers, tunnels, blocks, openings, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans, reading: reading.map(([a, b], i) => ({ a, b, words: carriers[i]!.phrase.words.length })) };
+  const shops = planShops(blocks, {
+    stretches: stretches.map((st) => ({ id: st.id, a: motion.distanceAt(st.start), b: motion.distanceAt(st.end) })),
+    pins: stretches.flatMap((st) => SETS[st.id]?.shops?.(plans[st.id], blocks) ?? []),
+  });
+  return { stretches, motion, route, carriers, tunnels, blocks, openings, beats: audio.beats, carFrame, stretchAt, camera, shots: kept, lastCut, plans, shops, reading: reading.map(([a, b], i) => ({ a, b, words: carriers[i]!.phrase.words.length })) };
 }

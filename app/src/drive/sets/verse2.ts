@@ -85,15 +85,16 @@ export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 6.
 /** The tire shop across the road past the car wash: the town's block (blocks.ts) whose near end stands in the wash
  *  sign's shot, a blank stucco wall face-on to its camera (the user, 2026-10-18: "at 97.3, on the left side of the tire
  *  shop building, add some interest there, it's too blank"), which the set dresses as a tire shop's side
- *  (scenes/sets/verse2.ts). The nearest tire shop in the street's row on the road's left whose near end is
- *  `from`–`to` m past the wash's sign, with a blank end at least `minH` m tall (no floor over its storefront, no corner
- *  shop round it: room for a painted panel over a door); else none. */
+ *  (scenes/sets/verse2.ts). The nearest block in the street's row on the road's left whose near end is `from`–`to` m
+ *  past the wash's sign, with a blank end at least `minH` m tall (a shop with no floor over its storefront, no corner
+ *  shop round it: room for a painted panel over a door); else none. The town signs it TIRES (VERSE2.shops: it was found
+ *  by its name, which the town's dealing of the names, drive/shops.ts, no longer leaves where it was). */
 export const TIRE_SHOP = { from: 10, to: 70, minH: 6 };
 export function tireShop(blocks: readonly Block[], washS: number): Block | undefined {
   return blocks
     .filter((b) => b.lateral < 0 && b.lateral > -BACK.from && !b.concrete && !b.prop && !b.car && !b.corner && b.h >= TIRE_SHOP.minH && b.s - b.w / 2 > washS + TIRE_SHOP.from && b.s - b.w / 2 < washS + TIRE_SHOP.to)
     .sort((a, b) => a.s - b.s)
-    .find((b) => { const t = facadeTraits(b, { vary: true }); return t.shop === 'TIRES' && !t.apartments && !t.upper; }); // (as the town builds it: drive/world.ts)
+    .find((b) => { const t = facadeTraits(b, { vary: true }); return !t.apartments && !t.upper; }); // (as the town builds it: drive/world.ts)
 }
 /** On their car (its frame: x its left, y up, z forward): the windshield banner, the hood's lettering; their plate
  *  between the tail lights, the bumper stickers on the rear bumper either side (sized from the van's: `scale`); the
@@ -143,6 +144,7 @@ export interface Verse2Plan {
 }
 
 export const VERSE2: SetPiece = {
+  shops: (plan, blocks) => { const b = tireShop(blocks, (plan as Verse2Plan).wash.s); return b ? [[b, 'TIRES'] as const] : []; },
   speed(st, audio) {
     const bar = 240 / audio.bpm, wash = st.lines[5];
     return [

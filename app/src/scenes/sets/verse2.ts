@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { wallMaterial } from '../../look/walls';
 import { FACADE, facadeMeshes, facades } from '../../look/facades';
+import { shopsNear } from '../../drive/shops';
 import type { Block } from '../../drive/blocks';
 import type { Drive } from '../../drive/drive';
 import { GIANT, SHACK, type Verse2Plan, WASH, tireShop } from '../../drive/sets/verse2';
@@ -571,7 +572,7 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
         car.position.set(cx, 0, zs - side * 1.1); car.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; st.add(car);
       }
     }
-    st.add(facadeMeshes(facades(fronts)));
+    st.add(facadeMeshes(facades(fronts, { vary: true, avoid: shopsNear(drive, 'verse2') })));
   }
 
   // ---- the A-frames: a chalkboard each (the carriers), its wooden frame, its legs and back board to the ground ----
