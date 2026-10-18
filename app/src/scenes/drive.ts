@@ -14,7 +14,7 @@ import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, FLY, centerAt, riseAt } from '../drive/carriers';
 import { COAST_T, SUN_AZ_DEG, airAt, cloudsAt, daylight, raysAt, skyStateAt } from '../drive/sky';
-import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter } from '../drive/world';
+import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter, spinProp } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
 import { PrintPass } from '../look/print';
@@ -376,6 +376,7 @@ export default class DriveScene extends Scene {
       } else if (past > 0) at.addScaledVector(a, past * SKYWRITER.speed).addScaledVector(w.up, past * SKYWRITER.climb); // away
       up.addScaledVector(a, -up.dot(a)).normalize();
       this.writer.matrix.makeBasis(a, up, a.clone().cross(up)).scale(new THREE.Vector3(k, k, k)).setPosition(at);
+      spinProp(this.writer, t);
     }
     if (this.climb) this.climb.visible = t >= this.climbFrom;
     // the hill sign stays floodlit to the end (it's the view they parked for); the beacon on its mast blinks
