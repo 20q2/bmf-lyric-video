@@ -6,6 +6,8 @@ import { makeDrive } from '../src/drive/drive';
 import { ROAD_HALF } from '../src/drive/route';
 import { ROAD_START, placeSignHits, placeSpots } from '../src/drive/world';
 import { facadeOf } from '../src/look/facades';
+import { LENS, placeCamera } from '../src/drive/camera';
+import { type Verse2Plan, tireShop } from '../src/drive/sets/verse2';
 import { audio, lyrics } from './data';
 
 const drive = makeDrive(audio, lyrics);
@@ -56,4 +58,16 @@ test("the places' signs stand clear of the buildings, near the lines that name t
     if (p.s - p.want > 40) bad.push(`${p.name}: ${(p.s - p.want).toFixed(0)} m on from its line`);
   }
   expect(bad).toEqual([]);
+});
+
+test("the tire shop's blank end the set dresses stands in the car wash's shot (scenes/sets/verse2.ts)", () => {
+  // (the set finds it among the town's blocks, which are seeded: a reseeded town could lose it, and its dressing with it)
+  const plan = drive.plans.verse2 as Verse2Plan, b = tireShop(drive.blocks, plan.wash.s);
+  expect(b).toBeDefined();
+  const wash = drive.carriers.filter((c) => c.kind === 'carwash'), t = (wash[0]!.phrase.start + wash[wash.length - 1]!.phrase.end) / 2;
+  const cam = new THREE.PerspectiveCamera(LENS.fov, 16 / 9, LENS.near, LENS.far);
+  placeCamera(cam, drive.camera(t)); cam.updateMatrixWorld();
+  // (its near end's middle, half way up)
+  const p = new THREE.Vector3(0, 0.5 - b!.h / 2 / new THREE.Vector3().setFromMatrixColumn(b!.matrix, 1).length(), -0.5).applyMatrix4(b!.matrix).project(cam);
+  expect(Math.abs(p.x) < 1 && Math.abs(p.y) < 1 && p.z < 1).toBe(true);
 });

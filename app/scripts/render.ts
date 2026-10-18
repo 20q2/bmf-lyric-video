@@ -68,6 +68,9 @@ async function ensureServer(): Promise<{ url: string; stop: () => void }> {
   // --strictPort makes vite exit at once if the random port is taken: try a few
   for (let attempt = 0; attempt < 3; attempt++) {
     const port = 5300 + Math.floor(Math.random() * 500);
+    // (a port another worktree's render already serves this app on is skipped: polled below before our vite had
+    // failed on it, it answered as ours, and the render drew that worktree's code)
+    if (await isOurApp(`http://localhost:${port}`)) { attempt--; continue; }
     // no live reload: a file saved mid-render must not reload the page
     const proc = Bun.spawn([process.execPath, 'x', 'vite', '--port', String(port), '--strictPort'], { cwd: APP, stdout: 'ignore', stderr: 'pipe', env: { ...process.env, LV_NO_HMR: '1' } });
     const stop = stopOnSignal(() => killTree(proc));

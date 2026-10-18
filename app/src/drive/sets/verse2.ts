@@ -24,8 +24,9 @@ import { type Carrier, type Kind, LAYOUT, STREET, carMatrix, glideTake, layout, 
 import { type Phrase, phraseOf, phrasesOf } from '../phrases';
 import { ROAD_HALF } from '../route';
 import { type ShotMove, LEAD, WHIP_S } from '../shots';
-import { type Block, boxAt } from '../blocks';
+import { BACK, type Block, boxAt } from '../blocks';
 import { CAR } from '../world';
+import { facadeTraits } from '../../look/facades';
 import type { Placed, SetContext, SetFrame, SetPiece } from './index';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -81,6 +82,19 @@ export const SHOTS = {
  *  walked into it. The camera stands back far enough for the whole cabinet and its wave over the top of its stand, the
  *  type ~60 px.) */
 export const WASH = { building: { ds: 14, lateral: 17 }, lateral: ROAD_HALF + 6.35, y: 4.4, through: 0.5, board: { w: 5.8, head: 0.8, gap: 0.15, foot: 0.55, pad: 0.25 }, eye: { back: 9.0, lateral: ROAD_HALF + 2.4, y: 2.6, toRoad: 1.0, up: 0.3 } };
+/** The tire shop across the road past the car wash: the town's block (blocks.ts) whose near end stands in the wash
+ *  sign's shot, a blank stucco wall face-on to its camera (the user, 2026-10-18: "at 97.3, on the left side of the tire
+ *  shop building, add some interest there, it's too blank"), which the set dresses as a tire shop's side
+ *  (scenes/sets/verse2.ts). The nearest tire shop in the street's row on the road's left whose near end is
+ *  `from`–`to` m past the wash's sign, with a blank end at least `minH` m tall (no floor over its storefront, no corner
+ *  shop round it: room for a painted panel over a door); else none. */
+export const TIRE_SHOP = { from: 10, to: 70, minH: 6 };
+export function tireShop(blocks: readonly Block[], washS: number): Block | undefined {
+  return blocks
+    .filter((b) => b.lateral < 0 && b.lateral > -BACK.from && !b.concrete && !b.prop && !b.car && !b.corner && b.h >= TIRE_SHOP.minH && b.s - b.w / 2 > washS + TIRE_SHOP.from && b.s - b.w / 2 < washS + TIRE_SHOP.to)
+    .sort((a, b) => a.s - b.s)
+    .find((b) => { const t = facadeTraits(b, { vary: true }); return t.shop === 'TIRES' && !t.apartments && !t.upper; }); // (as the town builds it: drive/world.ts)
+}
 /** On their car (its frame: x its left, y up, z forward): the windshield banner, the hood's lettering; their plate
  *  between the tail lights, the bumper stickers on the rear bumper either side (sized from the van's: `scale`); the
  *  camera high in front, and low behind. */

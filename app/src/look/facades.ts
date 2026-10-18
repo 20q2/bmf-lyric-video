@@ -129,6 +129,15 @@ function styleOf(r: (k: number) => number): Style {
 
 export interface FacadeOptions { /** Each front its own treatment (styleOf), not the town's one. */ vary?: boolean }
 
+/** What a block's front is, as facadeOf builds it: low apartments over a carport (no shop) or a shop (its name: SHOPS),
+ *  and whether it has floors over its storefront (windows up its front and its ends) — what a set dressing a block's
+ *  blank end needs to know of it (scenes/sets/verse2.ts, the tire shop's). */
+export function facadeTraits(b: Block, opts: FacadeOptions = {}): { apartments: boolean; shop: (typeof SHOPS)[number]; upper: boolean } {
+  const r = (k: number) => hash(b.s, b.lateral, k), V = opts.vary ? styleOf(r) : PLAIN;
+  const apartments = b.h <= 9 && r(2) > 0.72 && !b.corner;
+  return { apartments, shop: SHOPS[Math.floor(r(5) * SHOPS.length)]!, upper: (apartments ? 3.3 : 4.3) + V.win.h <= b.h - FACADE.cornice - 0.4 };
+}
+
 /** One block's street front, in world space. */
 export function facadeOf(b: Block, opts: FacadeOptions = {}): FacadeGeometry {
   // (the block's box: its matrix scales a unit cube; unscaled, it's the local frame. Its x axis runs away from the
@@ -146,7 +155,7 @@ export function facadeOf(b: Block, opts: FacadeOptions = {}): FacadeGeometry {
   // (the ground: the road's level is its box's bottom plus its lift; the facade starts at the road)
   const g0 = H - b.h;
   // the ground floor: a storefront (bays of glass, a door, a base course, the sign band), or a carport on low apartments
-  const apartments = b.h <= 9 && r(2) > 0.72 && !b.corner, xf = body;
+  const T = facadeTraits(b, opts), apartments = T.apartments, xf = body;
   const n = Math.max(1, Math.floor((W - 1) / V.bay)), bw = (W - 1) / n, door = Math.floor(r(3) * n);
   const zOf = (i: number) => -W / 2 + 0.5 + bw * (i + 0.5);
   // the body, behind the front's depth, its ends a little in from the box's; its roof a little under the coping's top
@@ -192,7 +201,7 @@ export function facadeOf(b: Block, opts: FacadeOptions = {}): FacadeGeometry {
     const [b0, b1] = A.shop.band;
     // the sign: on the band; painted on the wall (no band); or a cabinet standing on the band
     if (V.sign !== 1) P.box('trim', 0.16, b1 - b0, W - 0.4, xf + 0.08, g0 + (b0 + b1) / 2, 0);
-    const sw = Math.min(W * V.signW, 9), shop = Math.floor(r(5) * SHOPS.length), sz2 = (r(4) - 0.5) * W * 0.2;
+    const sw = Math.min(W * V.signW, 9), shop = SHOPS.indexOf(T.shop), sz2 = (r(4) - 0.5) * W * 0.2;
     if (V.sign === 0) P.sign(sw, (b1 - b0) * 0.78, xf + 0.165, g0 + (b0 + b1) / 2, sz2, shop);
     else if (V.sign === 1) P.sign(sw, (b1 - b0) * 0.9, xf + 0.02, g0 + (b0 + b1) / 2 + 0.05, sz2, shop);
     else {

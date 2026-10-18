@@ -10,10 +10,10 @@
 // lamps and ladder. The lyrics are the carriers. Browser only (canvas).
 import * as THREE from 'three';
 import { wallMaterial } from '../../look/walls';
-import { facadeMeshes, facades } from '../../look/facades';
+import { FACADE, facadeMeshes, facades } from '../../look/facades';
 import type { Block } from '../../drive/blocks';
 import type { Drive } from '../../drive/drive';
-import { GIANT, SHACK, type Verse2Plan, WASH } from '../../drive/sets/verse2';
+import { GIANT, SHACK, type Verse2Plan, WASH, tireShop } from '../../drive/sets/verse2';
 import { LAYOUT } from '../../drive/carriers';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF } from '../../drive/route';
@@ -1218,6 +1218,113 @@ export function buildVerse2(drive: Drive): { group: THREE.Group; update(t: numbe
     for (let k = 0; k < 14; k++) ball(b, 0.25 + 0.35 * ((k * 0.37) % 1), 5.6 + ((k * 0.61) % 1.4), 0.3 + ((k * 0.43) % 1) * 1.8, -7 + k, suds);
     // a few soap bubbles drifting up from the bays (background of the sign's shot, never near the board)
     for (const [k, z] of [-6, -2, 3].entries()) drifting.push(ball(b, 0.14 + 0.05 * k, 5.9, 0.5, z, suds));
+  }
+
+  // ---- the tire shop across the road past the car wash (the town's block: drive/sets/verse2.ts tireShop): its near end
+  // stands face-on in the wash sign's shot, and was bare stucco (the user, 2026-10-18: "at 97.3, on the left side of the
+  // tire shop building, add some interest there, it's too blank"). Dressed as an LA tire shop's side: a sign painter's
+  // TIRES panel across its top, LLANTAS NUEVAS Y USADAS on a band under it, a whitewall rolling toward the shop's front;
+  // the trades lettered on the stucco; a roll-up service door; used tires stacked and leaning along its foot; a downpipe;
+  // tags buffed out in near-matching stucco, drips from the coping, splash along the ground. In the low sun's shade, its
+  // paint muted: the wash's sign is the shot's ----
+  {
+    const b = tireShop(drive.blocks, plan.wash.s);
+    if (b) {
+      const col = (k: number) => V3(0, 0, 0).setFromMatrixColumn(b.matrix, k), c = V3(0, 0, 0).setFromMatrixPosition(b.matrix);
+      // its frame: x along the end toward the road (the shot's right), y up from the road's level, z out of the end's face
+      // (the box's x runs away from the road's right, its z along the road: facadeOf's ends stand FACADE.end in from its)
+      const out = col(2).normalize().negate(), o = c.clone().addScaledVector(out, b.w / 2 - FACADE.end);
+      o.y = c.y + col(1).length() / 2 - b.h;
+      const g = new THREE.Group(); g.matrixAutoUpdate = false;
+      g.matrix.makeBasis(UP.clone().cross(out).normalize(), UP, out).setPosition(o); root.add(g);
+      // the wall: from its back (−x) to the front's depth (+x), up to the coping
+      const xl = -b.d / 2 + 0.06, xr = b.d / 2 - FACADE.depth - 0.06, yb = 0.02, yt = b.h - FACADE.coping[0] - 0.04;
+      const rnd = (n: number) => { const v = Math.sin(n * 12.9898 + 4.1) * 43758.5453; return v - Math.floor(v); };
+      const ink = '#2a2a2e', oxblood = '#9e2f28', cream = '#e6d9bb';
+      const door = { x0: xl + 0.7, w: 3.4, h: 3.0 }, Pn = { x0: Math.max(xl + 0.35, xr - 8.3), x1: xr - 0.35, y0: door.h + 0.75, y1: yt - 0.3 }; // (the panel toward the street: the wash's shot cuts off the end's back 2 m)
+      const stucco = new THREE.Color(WORLD.stucco[Math.floor(b.color * WORLD.stucco.length)]!); // (its wall's: look/facades.ts)
+      const Wc = 2048, k = Wc / (xr - xl), Hc = Math.round((yt - yb) * k), px = (x: number) => (x - xl) * k, py = (y: number) => (yt - y) * k;
+      const wall = canvasTex(Wc, Hc, (cx) => {
+        const text = (s: string, x: number, y: number, size: number, fill: string, maxW: number, align: CanvasTextAlign = 'left') => {
+          cx.font = font(F.sign(700), size * k); cx.textAlign = align; cx.textBaseline = 'middle'; cx.fillStyle = fill; cx.fillText(s, px(x), py(y), maxW * k);
+        };
+        // tags buffed out, rolled over in a stucco not quite the wall's
+        for (const [x0, y0, w, h, d] of [[-0.9, 0.35, 2.4, 1.5, 0.9], [2.4, 1.0, 1.7, 0.85, 1.08], [door.x0 + door.w + 0.1, 3.05, 1.3, 0.6, 0.93]] as const) {
+          cx.fillStyle = `#${stucco.clone().multiplyScalar(d).getHexString()}`; cx.fillRect(px(x0), py(y0 + h), w * k, h * k);
+        }
+        // the panel: a cream field in an oxblood border, an ink keyline in it
+        const tR = (Pn.y1 - Pn.y0) / 2 + 0.15, tX = Pn.x1 - tR + 0.12, tY = (Pn.y0 + Pn.y1) / 2;
+        cx.fillStyle = oxblood; cx.beginPath(); cx.roundRect(px(Pn.x0), py(Pn.y1), (Pn.x1 - Pn.x0) * k, (Pn.y1 - Pn.y0) * k, 0.18 * k); cx.fill();
+        cx.fillStyle = cream; cx.beginPath(); cx.roundRect(px(Pn.x0 + 0.12), py(Pn.y1 - 0.12), (Pn.x1 - Pn.x0 - 0.24) * k, (Pn.y1 - Pn.y0 - 0.24) * k, 0.1 * k); cx.fill();
+        cx.strokeStyle = ink; cx.lineWidth = 0.035 * k; cx.beginPath(); cx.roundRect(px(Pn.x0 + 0.22), py(Pn.y1 - 0.22), (Pn.x1 - Pn.x0 - 0.44) * k, (Pn.y1 - Pn.y0 - 0.44) * k, 0.06 * k); cx.stroke();
+        // TIRES, shadowed; LLANTAS NUEVAS Y USADAS on an ink band under it (the signs' face: never the lyrics')
+        const tx0 = Pn.x0 + 0.4, tw = tX - tR - 1.1 - tx0, ty = Pn.y1 - 0.25 - (Pn.y1 - Pn.y0 - 0.5) * 0.36;
+        text('TIRES', tx0 + 0.07, ty - 0.07, 1.2, ink, tw);
+        text('TIRES', tx0, ty, 1.2, oxblood, tw);
+        const bandY = Pn.y0 + 0.62;
+        cx.fillStyle = ink; cx.fillRect(px(Pn.x0 + 0.3), py(bandY + 0.28), (tX - tR - 0.2 - Pn.x0 - 0.3) * k, 0.56 * k);
+        text('LLANTAS NUEVAS Y USADAS', (Pn.x0 + 0.3 + tX - tR - 0.2) / 2, bandY, 0.3, cream, tX - tR - 0.5 - Pn.x0 - 0.3, 'center');
+        // a whitewall rolling toward the shop's front (the road's way), breaking out of the panel; speed lines behind it
+        cx.fillStyle = oxblood;
+        for (const [dy, len] of [[0.55, 0.7], [0.15, 0.95], [-0.25, 0.7]] as const) { cx.beginPath(); cx.roundRect(px(tX - tR - 0.1 - len), py(tY + dy + 0.07), len * k, 0.14 * k, 0.07 * k); cx.fill(); }
+        const X0 = px(tX), Y0 = py(tY), R = tR * k, disc = (r: number, fill: string) => { cx.fillStyle = fill; cx.beginPath(); cx.arc(X0, Y0, r * R, 0, Math.PI * 2); cx.fill(); };
+        disc(1, '#1d1d20');
+        cx.fillStyle = '#3c3c42'; // its tread's blocks round the rim
+        for (let i = 0; i < 30; i++) { const a = (i / 30) * Math.PI * 2; cx.save(); cx.translate(X0, Y0); cx.rotate(a); cx.fillRect(R * 0.9, -R * 0.045, R * 0.1, R * 0.09); cx.restore(); }
+        disc(0.74, '#efeadf'); disc(0.62, '#1d1d20'); disc(0.56, '#8f969c'); disc(0.42, '#c6c9cc');
+        cx.fillStyle = '#6b7075';
+        for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 + 0.3; cx.beginPath(); cx.arc(X0 + Math.cos(a) * R * 0.25, Y0 + Math.sin(a) * R * 0.25, R * 0.05, 0, Math.PI * 2); cx.fill(); }
+        disc(0.12, '#8f969c');
+        // the trades, lettered straight on the stucco over the stacked tires (clear of the door)
+        const lx0 = door.x0 + door.w + 0.45, lw = xr - 0.55 - lx0;
+        text('BRAKES · ALIGNMENT', lx0, 2.8, 0.42, ink, lw);
+        text('FLATS FIXED $10', lx0, 2.25, 0.42, oxblood, lw);
+        text('SE HABLA ESPAÑOL', lx0, 1.78, 0.26, ink, lw);
+        // the paint worn: flaked through to the stucco in patches and specks
+        cx.globalCompositeOperation = 'destination-out';
+        for (let i = 0; i < 320; i++) {
+          const u = rnd(i), v = rnd(i + 500), r = (0.02 + 0.2 * rnd(i + 900) ** 3) * k;
+          cx.fillStyle = `rgba(0,0,0,${0.2 + 0.45 * rnd(i + 1300)})`;
+          cx.beginPath(); cx.ellipse(px(xl + u * (xr - xl)), py(1.6 + v * (yt - 1.6)), r * 1.6, r, u * 3, 0, Math.PI * 2); cx.fill();
+        }
+        cx.globalCompositeOperation = 'source-over';
+        // drips down from the coping; splash up from the ground
+        for (let i = 0; i < 46; i++) {
+          const x = rnd(i + 2000) * Wc, len = (0.4 + 2.4 * rnd(i + 2100) ** 2) * k, w = (0.03 + 0.08 * rnd(i + 2200)) * k, gd = cx.createLinearGradient(0, 0, 0, len);
+          gd.addColorStop(0, `rgba(48,36,32,${0.12 + 0.14 * rnd(i + 2300)})`); gd.addColorStop(1, 'rgba(48,36,32,0)');
+          cx.fillStyle = gd; cx.fillRect(x, 0, w, len);
+        }
+        const sp = cx.createLinearGradient(0, py(0), 0, py(1.3));
+        sp.addColorStop(0, 'rgba(45,32,28,0.45)'); sp.addColorStop(1, 'rgba(45,32,28,0)');
+        cx.fillStyle = sp; cx.fillRect(0, py(1.3), Wc, py(0) - py(1.3));
+      });
+      // (a few cm off the stucco, and pulled forward by the depth buffer's own steps: it's seen from 40 m and more)
+      plane(g, xr - xl, yt - yb, (xl + xr) / 2, (yb + yt) / 2, 0.03, paint(wall, { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+      // the roll-up service door: its curtain's slats, bottom bar and handle, the guides either side, the coil's hood over it
+      const dcx = door.x0 + door.w / 2;
+      tbox(g, door.w, door.h, 0.06, dcx, door.h / 2, 0.03, '#8e8c86');
+      for (let i = 1; i < 12; i++) tbox(g, door.w, 0.035, 0.03, dcx, (i * door.h) / 12, 0.075, '#74726d');
+      tbox(g, door.w, 0.1, 0.1, dcx, 0.05, 0.06, '#5f5d58');
+      tbox(g, 0.32, 0.05, 0.06, dcx, 0.5, 0.1, ink);
+      for (const s of [-1, 1]) tbox(g, 0.1, door.h + 0.1, 0.14, dcx + s * (door.w / 2 + 0.05), (door.h + 0.1) / 2, 0.07, '#6a6863');
+      tbox(g, door.w + 0.4, 0.5, 0.42, dcx, door.h + 0.3, 0.21, '#7d7b75');
+      // a downpipe down the front corner from a scupper's head under the coping, its shoe at the ground
+      const pX = xr - 0.25;
+      tcyl(g, 0.065, yt - 0.4, pX, 0.15 + (yt - 0.4) / 2, 0.1, '#bdb5a6', 8);
+      tbox(g, 0.34, 0.32, 0.26, pX, yt - 0.2, 0.13, '#a9a194');
+      tbox(g, 0.14, 0.12, 0.3, pX, 0.1, 0.17, '#bdb5a6');
+      // used tires along its foot: stacked, and a row stood leaning on the wall by the corner
+      const rubber = ['#2a2a2e', '#323237', '#252528'], tire = () => new THREE.TorusGeometry(0.28, 0.105, 6, 18);
+      const sx0 = door.x0 + door.w + 0.6;
+      ([[0, 5, 0.48], [0.88, 3, 0.48], [1.76, 6, 0.48], [1.3, 2, 1.05], [2.65, 4, 0.5]] as const).forEach(([x, n, z], j) => {
+        for (let i = 0; i < n; i++) {
+          const m = part(g, tire(), rubber[(i + j) % 3]!, sx0 + x + (rnd(j * 10 + i) - 0.5) * 0.08, 0.105 + i * 0.21, z + (rnd(j * 10 + i + 50) - 0.5) * 0.08);
+          m.rotation.x = Math.PI / 2;
+        }
+      });
+      for (const [x, z, lean, turn] of [[3.4, 0.5, -0.1, -0.6], [4.15, 0.62, -0.05, -1.0]] as const) part(g, tire(), rubber[1]!, sx0 + x, 0.385, z).rotation.set(lean, turn, 0, 'YXZ');
+      fuse(g);
+    }
   }
 
   // ---- parked lowriders at the left curb (the neighbourhood's own), one laid nose-down on its suspension ----
