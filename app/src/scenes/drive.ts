@@ -225,12 +225,11 @@ export default class DriveScene extends Scene {
     this.dome.setMountains(hills);
     this.env.setMountains(hills);
     this.world.fog = new THREE.Fog(0xffffff, 140, 1100);
-    // the city below the overlook, ahead of where the car parks; its lights go out block by block on the outro's
-    // "we might crash" — sung after the song has faded out of hearing, so the beat is the scene's own
+    // the city below the overlook, ahead of where the car parks, lit to the cut to the motel (its lights went out block
+    // by block on the outro's "we might crash": the user, 2026-10-18, "let's not fade out the cityscape, just let it
+    // linger till we cut to the motel sign")
     const end = this.drive.carFrame(this.ctx.audio.duration);
-    const crashes = lyrics.lines.flatMap((l) => l.words.filter((w) => /^crash/i.test(w.w)).map((w) => w.start));
-    const lastCrash = crashes.length ? Math.max(...crashes) : undefined;
-    this.city = buildCity(end.pos, end.fwd, end.right, -0.4, lastCrash, this.drive.lastCut ?? 0);
+    this.city = buildCity(end.pos, end.fwd, end.right, -0.4, undefined, this.drive.lastCut ?? 0);
     { const f = new THREE.Vector3(end.fwd.x, 0, end.fwd.z).normalize(), r = new THREE.Vector3(end.right.x, 0, end.right.z).normalize();
       this.endMoon.copy(f).multiplyScalar(Math.cos(END_MOON.bearing)).addScaledVector(r, Math.sin(END_MOON.bearing)).multiplyScalar(Math.cos(END_MOON.elev)).setY(Math.sin(END_MOON.elev)).normalize(); }
     this.world.add(this.city.group);

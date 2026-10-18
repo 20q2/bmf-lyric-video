@@ -107,10 +107,12 @@ export function buildDash(body: THREE.Group): { update(t: number, duration: numb
   for (const [x, label] of [[0.36, 'MPH'], [0.6, 'RPM']] as const) { // (clear of the head unit's screen, x < 0.26)
     const g = faceFrame(new THREE.Vector3(x, 1.12, 0.5), HEAD_UNIT.normal); g.name = 'gauge';
     const face = new THREE.Mesh(new THREE.CircleGeometry(0.075, 32), new THREE.MeshBasicMaterial({ map: gauge(label), color: new THREE.Color(1.3, 1.3, 1.3) }));
-    g.add(face);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.008, 6, 32), chrome); g.add(ring);
-    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.082, 0.14, 20), dark); pod.rotation.x = Math.PI / 2; pod.position.z = -0.07; g.add(pod); // (its housing back into the fascia)
-    const needle = new THREE.Group(); needle.position.z = 0.003; g.add(needle);
+    // (the dial a few mm proud of the pod's end cap, the needle and bezel over it: the dial and the cap shared z = 0 and
+    // fought — the silver ring flickering against the black, the user, 2026-10-18)
+    face.position.z = 0.004; g.add(face);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.008, 6, 32), chrome); ring.position.z = 0.004; g.add(ring);
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.082, 0.14, 20), dark); pod.rotation.x = Math.PI / 2; pod.position.z = -0.071; g.add(pod); // (its housing back into the fascia)
+    const needle = new THREE.Group(); needle.position.z = 0.008; g.add(needle);
     const n = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.062), new THREE.MeshBasicMaterial({ color: '#ff3a24' })); n.position.y = 0.028; needle.add(n);
     needles.push(needle);
     body.add(g);
