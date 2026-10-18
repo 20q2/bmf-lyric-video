@@ -19,7 +19,7 @@ import { BANNER, type Carrier, LAYOUT, PAIRABLE, SET_KINDS, basisOf, solidsOf } 
 import { HEADLAND, HEADWALL, TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, drawTiles, headlandAt, nearTunnel } from './tunnel';
 import type { Stretch } from './stretches';
 import { BACK, BLOCKS, boxAt } from './blocks';
-import { sedan } from '../scenes/sets/kit';
+import { canvasTex, fuse, part, sedan, tball, tbox, tcyl } from '../scenes/sets/kit';
 import { MOTEL_SIGN, motelSign } from './landmarks';
 import { CORNER } from './sets/intro';
 import { type Chorus2Plan, laneEdge } from './sets/chorus2';
@@ -1080,28 +1080,140 @@ function buildMotelSign(route: Route): THREE.Group {
   return g;
 }
 
-/** A small high-wing plane, nose along +x from its tail at 0, `k` times life size (banners' tugs, the skywriter). */
+/** The little plane's livery and parts (m, at life size; nose along +x from its tail at 0): its cream, its red trim, its
+ *  glass, tyres and steel; the fuselage's stations (x, top, bottom, half-width) from the tail post to the cowl's lip, its
+ *  rings' faces round each section and how square they are; the side windows (x spans, and the faces round from the
+ *  side they fill), the windshield's span, the cowl from here forward; its registration; the prop (its hub's x, radius,
+ *  how fast its blades seem to turn, rev/s: the film's shutter strobes a real prop's 40 down to a slow creep). */
+export const PLANE = {
+  cream: '#e9e4da', red: '#b3122e', glass: '#2c3742', tyre: '#1b1820', steel: '#55555c', soot: '#2e2c30',
+  stations: [[0, 0.34, 0.14, 0.06], [0.6, 0.38, 0.02, 0.12], [1.4, 0.44, -0.16, 0.21], [2.3, 0.51, -0.34, 0.32], [2.8, 0.55, -0.43, 0.38],
+    [3.15, 0.57, -0.48, 0.42], [3.25, 0.58, -0.49, 0.43], [3.6, 0.59, -0.53, 0.46], [3.85, 0.59, -0.53, 0.465], [3.95, 0.59, -0.53, 0.465],
+    [4.5, 0.59, -0.53, 0.47], [4.6, 0.58, -0.53, 0.47], [4.98, 0.43, -0.5, 0.45], [5.0, 0.42, -0.5, 0.45], [5.4, 0.36, -0.44, 0.4], [5.65, 0.29, -0.36, 0.33], [5.8, 0.19, -0.27, 0.24]] as const,
+  ring: 24, square: 3,
+  windows: { spans: [[2.8, 3.15], [3.25, 3.85], [3.95, 4.5]] as const, faces: [1, 2] as const },
+  windshield: [4.6, 4.98] as const, cowl: 5.0, reg: 'N427BF',
+  prop: { x: 6.12, r: 1.1, hz: 2.4 },
+} as const;
+
+/** The fuselage lofted through PLANE's stations: its faces' triangles split by their paint (the cowl red, a cheatline
+ *  just under the windows sweeping up the tail cone as it narrows, the windows' and the windshield's glass, the rest
+ *  cream), each a geometry ready for tinting, its normals smooth across the paint's edges. */
+function planeFuselage(): Map<string, THREE.BufferGeometry> {
+  const P = PLANE, S = P.stations, R = P.ring, e = 2 / P.square, pos: number[] = [], idx: number[] = [];
+  const at = (a: number) => [Math.sign(Math.cos(a)) * Math.abs(Math.cos(a)) ** e, Math.sign(Math.sin(a)) * Math.abs(Math.sin(a)) ** e] as const;
+  for (const [x, top, bottom, hw] of S) {
+    const yc = (top + bottom) / 2, hh = (top - bottom) / 2;
+    for (let j = 0; j < R; j++) { const [c, s] = at((j / R) * Math.PI * 2); pos.push(x, yc + hh * s, hw * c); }
+  }
+  const paintOf = (i: number, j: number): string => {
+    const x = (S[i]![0] + S[i + 1]![0]) / 2, side = j < R / 4 || j >= (3 * R) / 4 ? 1 : -1, round = side > 0 ? (j + R / 4) % R - R / 4 : R / 2 - 1 - j; // (faces up from the side's middle: 0 just above it, -1 just below)
+    if (x > P.cowl) return P.red;
+    if (x > P.windshield[0] && x < P.windshield[1] && j >= R / 8 && j < (3 * R) / 8) return P.glass; // (the top's faces, from 45 to 135 degrees round)
+    if ((P.windows.faces as readonly number[]).includes(round) && P.windows.spans.some(([a, b]) => x > a && x < b)) return P.glass;
+    return round === -1 ? P.red : P.cream;
+  };
+  const paints: string[] = [];
+  for (let i = 0; i < S.length - 1; i++) for (let j = 0; j < R; j++) {
+    const a = i * R + j, b = i * R + ((j + 1) % R), c = a + R, d = b + R;
+    idx.push(a, c, b, b, c, d); paints.push(paintOf(i, j), paintOf(i, j));
+  }
+  // its ends capped: the tail post, and the firewall's face behind the spinner
+  for (const [i, flip] of [[0, true], [S.length - 1, false]] as const) {
+    const ctr = pos.length / 3; pos.push(S[i]![0], (S[i]![1] + S[i]![2]) / 2, 0);
+    for (let j = 0; j < R; j++) { const a = i * R + j, b = i * R + ((j + 1) % R); idx.push(...(flip ? [ctr, a, b] : [ctr, b, a])); paints.push(i ? P.red : P.cream); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const flat = geo.toNonIndexed(), fp = flat.attributes.position!, fn = flat.attributes.normal!, out = new Map<string, THREE.BufferGeometry>();
+  for (const paint of new Set(paints)) {
+    const p: number[] = [], n: number[] = [];
+    paints.forEach((q, f) => { if (q === paint) for (let v = f * 3; v < f * 3 + 3; v++) { p.push(fp.getX(v), fp.getY(v), fp.getZ(v)); n.push(fn.getX(v), fn.getY(v), fn.getZ(v)); } });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3));
+    out.set(paint, g);
+  }
+  return out;
+}
+
+/** The prop's blur, made once: a faint disc with two ghost blades, darker toward the tips, and the ring their yellow
+ *  tips paint as they spin. */
+let PROP_TEX: THREE.CanvasTexture | null = null;
+function propTexture(): THREE.CanvasTexture {
+  if (PROP_TEX) return PROP_TEX;
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d')!, m = N / 2;
+  const disc = x.createRadialGradient(m, m, m * 0.1, m, m, m * 0.86);
+  disc.addColorStop(0, 'rgba(42,42,48,0)'); disc.addColorStop(0.25, 'rgba(42,42,48,0.28)'); disc.addColorStop(1, 'rgba(42,42,48,0.52)');
+  x.fillStyle = disc; x.beginPath(); x.arc(m, m, m * 0.86, 0, Math.PI * 2); x.fill();
+  x.fillStyle = 'rgba(30,28,34,0.28)'; // (two ghost blades, broad at the hub and narrowing out)
+  for (const s of [1, -1]) { x.beginPath(); x.moveTo(m, m - 9); x.lineTo(m + s * m * 0.86, m - 4); x.lineTo(m + s * m * 0.86, m + 4); x.lineTo(m, m + 9); x.fill(); }
+  x.strokeStyle = 'rgba(232,196,64,0.45)'; x.lineWidth = m * 0.07; x.beginPath(); x.arc(m, m, m * 0.91, 0, Math.PI * 2); x.stroke();
+  PROP_TEX = new THREE.CanvasTexture(c); PROP_TEX.colorSpace = THREE.SRGBColorSpace;
+  return PROP_TEX;
+}
+
+/** A small high-wing plane, a Cessna's lines, nose along +x from its tail at 0, `k` times life size (banners' tugs, the
+ *  skywriter): one mesh for all of it but its registration (a decal on the fin) and its prop (named `prop`, which turns:
+ *  spinProp). */
 export function buildPlane(k = 1): THREE.Group {
-  const g = new THREE.Group(), body = toon({ color: '#e9e4da' }), trim = toon({ color: '#b3122e' });
-  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); };
-  const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * k, 0.22 * k, 6 * k, 10), body);
-  fuselage.rotation.z = -Math.PI / 2; fuselage.position.set(3 * k, 0, 0); g.add(fuselage);
-  box(1.5 * k, 0.12 * k, 10 * k, 3.9 * k, 0.6 * k, 0, body); // the wing, over the cabin
-  box(0.8 * k, 0.08 * k, 3.4 * k, 0.35 * k, 0.1 * k, 0, body); // tailplane
-  box(1 * k, 1.5 * k, 0.08 * k, 0.4 * k, 0.75 * k, 0, trim); // fin
-  // a red band round its nose, its canopy, its wheels
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * k, 0.5 * k, 0.6 * k, 10), trim); band.rotation.z = -Math.PI / 2; band.position.set(5.4 * k, 0, 0); g.add(band);
-  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.42 * k, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), toon({ color: '#28323c' })); canopy.position.set(4.2 * k, 0.35 * k, 0); canopy.scale.set(1.6, 1, 1); g.add(canopy);
-  for (const z of [-0.8, 0.8]) { const wh = new THREE.Mesh(new THREE.SphereGeometry(0.2 * k, 8, 6), toon({ color: '#1b1820' })); wh.position.set(4.3 * k, -0.85 * k, z * k); g.add(wh); }
-  const prop = new THREE.Mesh(new THREE.CircleGeometry(1.1 * k, 16), new THREE.MeshBasicMaterial({ color: '#2a2a30', transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
-  prop.rotation.y = Math.PI / 2; prop.position.set(6.05 * k, 0, 0); g.add(prop); // spinning, a blur
+  const P = PLANE, g = new THREE.Group(), q = new THREE.Quaternion(), UPV = new THREE.Vector3(0, 1, 0);
+  for (const [paint, geo] of planeFuselage()) part(g, geo, paint);
+  /** A bar of section w x d from a to b (struts, gear legs). */
+  const bar = (a: THREE.Vector3, b: THREE.Vector3, w: number, d: number, color: string) => {
+    const dir = b.clone().sub(a), m = tbox(g, w, dir.length(), d, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, color);
+    m.quaternion.copy(q.setFromUnitVectors(UPV, dir.normalize()));
+  };
+  const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  // the wing over the cabin, its leading edge rounded, its tips red; a strut each side from the fuselage's foot
+  tbox(g, 1.5, 0.12, 9.4, 3.9, 0.6, 0, P.cream);
+  tcyl(g, 0.06, 9.4, 4.65, 0.6, 0, P.cream, 10).rotation.x = Math.PI / 2;
+  for (const s of [-1, 1]) {
+    tbox(g, 1.5, 0.12, 0.3, 3.9, 0.6, s * 4.85, P.red);
+    tcyl(g, 0.06, 0.3, 4.65, 0.6, s * 4.85, P.red, 10).rotation.x = Math.PI / 2;
+    bar(V(3.75, -0.32, s * 0.4), V(3.95, 0.54, s * 2.7), 0.13, 0.045, P.cream);
+  }
+  // the spinner, and the cowl's intakes either side of it and its exhaust stub under it
+  part(g, new THREE.CylinderGeometry(0.03, 0.2, 0.4, 16).rotateZ(-Math.PI / 2), P.cream, 6.0, -0.03, 0);
+  for (const s of [-1, 1]) tbox(g, 0.04, 0.08, 0.09, 5.79, 0.08, s * 0.16, P.tyre);
+  tcyl(g, 0.04, 0.22, 5.2, -0.48, 0.18, P.soot, 8).rotation.z = Math.PI / 2;
+  // the tailplane (one piece: a hairline of sky between it and its elevator broke into a row of dots under the ink
+  // outline), the fin swept back into a fillet along the spine, red, the rudder's hinge line down it
+  tbox(g, 0.82, 0.07, 3.4, 0.4, 0.24, 0, P.cream);
+  const fin = new THREE.Shape([new THREE.Vector2(-0.14, 0.24), new THREE.Vector2(1.7, 0.24), new THREE.Vector2(1.7, 0.47), new THREE.Vector2(0.95, 0.62),
+    new THREE.Vector2(0.48, 1.55), new THREE.Vector2(-0.06, 1.55)]);
+  part(g, new THREE.ExtrudeGeometry(fin, { depth: 0.07, bevelEnabled: false }).translate(0, 0, -0.035), P.red);
+  bar(V(0.1, 0.36, 0), V(0.16, 1.54, 0), 0.025, 0.09, P.soot);
+  // the smoke nozzle under the tail, where the writing comes from, on its bracket
+  tcyl(g, 0.045, 0.5, -0.02, 0.06, 0, P.steel, 10).rotation.z = Math.PI / 2;
+  tcyl(g, 0.05, 0.06, -0.29, 0.06, 0, P.soot, 10).rotation.z = Math.PI / 2;
+  tbox(g, 0.06, 0.12, 0.03, 0.12, 0.13, 0, P.steel);
+  // tricycle gear: spring legs out to the mains, a leg down to the nose wheel; each wheel in a red pant
+  const wheel = (x: number, y: number, z: number, r: number) => {
+    tcyl(g, r, r * 0.55, x, y, z, P.tyre, 14).rotation.x = Math.PI / 2;
+    tball(g, 1, x + 0.02, y + r * 0.25, z, P.red).scale.set(r * 1.75, r * 0.9, r * 0.62);
+  };
+  for (const s of [-1, 1]) { bar(V(3.65, -0.48, s * 0.22), V(3.68, -0.86, s * 0.82), 0.09, 0.04, P.steel); wheel(3.7, -0.89, s * 0.85, 0.19); }
+  bar(V(5.3, -0.4, 0), V(5.33, -0.86, 0), 0.06, 0.06, P.steel); wheel(5.34, -0.9, 0, 0.15);
+  fuse(g);
+  // its registration on the fin, both sides, ahead of the rudder (block letters, cream on the red)
+  const regTex = canvasTex(256, 56, (x) => { x.fillStyle = '#f2ecdf'; x.font = 'bold 50px Arial, Helvetica, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(P.reg, 128, 30, 250); });
+  const regGeo = mergeGeometries([0.045, -0.045].map((z) => { const p = new THREE.PlaneGeometry(0.82, 0.18); if (z < 0) p.rotateY(Math.PI); return p.translate(0.55, 0.62, z); }))!;
+  g.add(new THREE.Mesh(regGeo, toon({ map: regTex, transparent: true, alphaTest: 0.4, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
+  // the prop: a blur, turning (spinProp), lit like the rest of it (unlit, its tips' ring glowed off a plane in silhouette)
+  const prop = new THREE.Mesh(new THREE.CircleGeometry(P.prop.r, 32).rotateY(Math.PI / 2), toon({ map: propTexture(), transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  prop.name = 'prop'; prop.position.set(P.prop.x, -0.03, 0); g.add(prop);
+  g.scale.setScalar(k);
   return g;
+}
+/** Turn the props of the planes in `o` (buildPlane) to where they are at t. */
+export function spinProp(o: THREE.Object3D, t: number) {
+  o.traverse((p) => { if (p.name === 'prop') p.rotation.x = -2 * Math.PI * PLANE.prop.hz * t; });
 }
 
 /** A towed banner ripples: a wave running back from its leading (right) edge, growing toward its trailing edge. Small
  *  enough to leave the words readable. */
 export const FLUTTER = { segments: 40, amp: 0.025, waves: 2.5, hz: 1.3 };
-/** Ripple a banner carrier's face (its object from buildCarrier) at t. */
+/** Ripple a banner carrier's face (its object from buildCarrier) at t, and turn its tug's prop. */
 export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
   const face = o.getObjectByName('face') as THREE.Mesh, p = face.geometry.attributes.position!;
   for (let i = 0; i < p.count; i++) {
@@ -1109,6 +1221,7 @@ export function flutter(o: THREE.Object3D, c: Carrier, t: number) {
     p.setZ(i, FLUTTER.amp * c.w * back * Math.sin(2 * Math.PI * (FLUTTER.waves * back - FLUTTER.hz * t)));
   }
   p.needsUpdate = true;
+  spinProp(o, t); // (and its tug's prop turns)
 }
 
 /** The hill under the hill sign (in its face's frame, m): its ridge this far behind the letters, its slope's falloff
