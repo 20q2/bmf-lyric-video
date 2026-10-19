@@ -34,10 +34,13 @@ export function buildChorus4(drive: Drive): { group: THREE.Group; update(t: numb
   {
     const g = onPanel(B);
     const art = canvasTex(2048, Math.round((2048 * B.h) / B.w), (c) => drawAd(c, 'him', c.canvas.width, c.canvas.height, BOARD.text));
+    // (its layers well apart: seen from the headland over the tunnel, ~600 m off, the paint 3 cm behind the words and
+    // 7 cm before the cabinet fought it, the face flickering yellow on the horizon — the user, 2026-10-18. The cabinet
+    // stands 0.6 m back, past what the depth buffer can't tell apart that far off)
     plane(g, B.w, B.h, 0, 0, -0.03, pic(art));
-    box(g, B.w + 0.8, B.h + 0.8, 0.5, 0, 0, -0.35, toon({ color: '#3a3043' }));
+    box(g, B.w + 0.8, B.h + 0.8, 0.5, 0, 0, -0.85, toon({ color: '#3a3043' }));
     const drop = B.center.y - drive.route.frameAt(plan.boardBlock.s).pos.y;
-    for (const x of [-B.w / 3, 0, B.w / 3]) box(g, 0.5, drop + 2, 0.5, x, -(drop + 2) / 2 + B.h / 4 - 2, -0.7, dark);
+    for (const x of [-B.w / 3, 0, B.w / 3]) box(g, 0.5, drop + 2, 0.5, x, -(drop + 2) / 2 + B.h / 4 - 2, -1.2, dark);
     box(g, B.w * 0.9, 0.18, 1.1, 0, -B.h / 2 - 0.35, 0.35, dark); // the painters' catwalk
     for (let x = -B.w * 0.45; x <= B.w * 0.45; x += 3) box(g, 0.05, 1.0, 0.05, x, -B.h / 2 + 0.15, 0.85, dark); // its rail's posts
     box(g, B.w * 0.9, 0.05, 0.05, 0, -B.h / 2 + 0.65, 0.85, dark);
@@ -53,7 +56,7 @@ export function buildChorus4(drive: Drive): { group: THREE.Group; update(t: numb
     const wash = new THREE.Mesh(new THREE.PlaneGeometry(B.w, B.h), glowMaterial('#fff0c8', 0.5));
     wash.position.z = 0.04; wash.rotation.z = Math.PI; g.add(wash); // (the glow fades along v from its top edge: the plane turned, its top at the lamps)
     // cross bracing between the posts
-    for (const x of [-B.w / 6, B.w / 6]) { const br = box(g, 0.2, Math.hypot(B.w / 3, 6), 0.2, x, -B.h / 2 - 4, -0.7, dark); br.rotation.z = Math.atan2(B.w / 3, 6); }
+    for (const x of [-B.w / 6, B.w / 6]) { const br = box(g, 0.2, Math.hypot(B.w / 3, 6), 0.2, x, -B.h / 2 - 4, -1.2, dark); br.rotation.z = Math.atan2(B.w / 3, 6); }
     root.add(g);
   }
 
