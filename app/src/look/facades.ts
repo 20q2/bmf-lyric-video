@@ -336,8 +336,17 @@ export function facadeMeshes(f: FacadeGeometry): THREE.Group {
 
 /** The walls' toon, its `surface` attribute (SURFACE) drawn on it in world space along each wall: brick's running
  *  bond (its mortar paler, a brick now and then a shade off), painted block's courses (their joints in shadow),
- *  scored stucco's bands; plain stucco as it was. Each fades to its own average where its courses get finer than a few
- *  pixels (fwidth), so far off a wall is a flat colour, never a shimmer. */
+ *  scored stucco's bands; plain stucco as it was.
+ *  Its joints are box-filtered over each pixel's footprint (surfJoint), so a joint finer than a pixel is drawn as the
+ *  share of the pixel it covers, and the wall's average holds at any distance. Their light-and-dark contrast fades out,
+ *  to that average, while a course is still more than five pixels tall (FADE). Past that, brick keeps its joints only
+ *  in hue and its bricks only as a random mottle.
+ *  Mortar lines a pixel or two wide and a few pixels apart are what crawled. Brick at 15 s and 43 s rolled with "crazy
+ *  wave patterns ... as the camera moves" (the user, 2026-10-19). The lines beat against the pixel grid, and in the
+ *  shade against the print's 5.5 px halftone screen (look/print.ts). The old fade let full-contrast pale mortar down to
+ *  about two pixels a course. Its antialiasing widened a joint with the pixel's footprint instead of averaging it, so
+ *  the wall changed its tone as it receded. And it took its derivatives inside the per-pixel branch. */
+const FADE = [1 / 14, 1 / 5.5] as const; // (cells per pixel: a course 14 px tall shows its joints' contrast in full, 5.5 px or less none)
 export function facadeWalls(): THREE.MeshToonMaterial {
   const m = toon({ vertexColors: true });
   m.onBeforeCompile = (sh) => {
@@ -351,30 +360,44 @@ attribute float surface; varying float vSurf; varying vec3 vSurfPos; varying vec
       .replace('#include <common>', `#include <common>
 varying float vSurf; varying vec3 vSurfPos; varying vec3 vSurfN;
 float surfHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-// (a joint along a cell's edge, antialiased: 1 on it, 0 off; half its width a share of the cell)
-float surfJoint(float f, float w, float hw) { float d = min(f, 1.0 - f); return 1.0 - smoothstep(hw, hw + max(w, 1e-4) * 1.2, d); }`)
+// (the joints' coverage from a cell's edge to x: they are 2*hw of each cell, shifted to start it)
+float surfJointI(float x, float jw) { return floor(x) * jw + min(fract(x), jw); }
+// (how much of a box w wide (cells), centred at f (the cell's fract), falls on its joints, which run hw either side of
+// the cell's edge: the pattern box-filtered, so as w grows it settles to 2*hw, the joints' share of the wall)
+float surfJoint(float f, float w, float hw) { float x = f + hw, h = 0.5 * max(w, 1e-4); return (surfJointI(x + h, 2.0 * hw) - surfJointI(x - h, 2.0 * hw)) / (2.0 * h); }
+// (how much of a pattern's detail is left, 1 to 0, by its cells per pixel)
+float surfDetail(float w) { return 1.0 - smoothstep(${FADE[0].toFixed(4)}, ${FADE[1].toFixed(4)}, w); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+  // the wall's plane, across along it and up; and how many metres a pixel spans on it each way, taken here outside any
+  // branch (a derivative inside a branch that some of its neighbours skip is undefined)
+  vec3 sTng = vec3(-vSurfN.z, 0.0, vSurfN.x); sTng /= max(length(sTng), 1e-4);
+  vec2 sP = vec2(dot(vSurfPos, sTng), vSurfPos.y), sDx = dFdx(sP), sDy = dFdy(sP);
+  vec2 sPx = sqrt(sDx * sDx + sDy * sDy);
   if (vSurf > 0.5 && abs(vSurfN.y) < 0.5) {
-    vec3 tng = normalize(vec3(-vSurfN.z, 0.0, vSurfN.x));
-    vec2 p = vec2(dot(vSurfPos, tng), vSurfPos.y);
     vec3 base = diffuseColor.rgb;
     if (vSurf < 1.5) {
-      // brick: 0.09 m courses of 0.25 m bricks, running bond; the mortar paler, greyed
-      vec2 g = vec2(p.x / 0.25 + 0.5 * mod(floor(p.y / 0.09), 2.0), p.y / 0.09), w = fwidth(g), f = fract(g);
-      float j = max(surfJoint(f.y, w.y, 0.07), surfJoint(f.x, w.x, 0.025));
-      float tone = 0.93 + 0.1 * surfHash(floor(g));
-      vec3 mortar = mix(base, vec3(0.74, 0.71, 0.66) * (0.6 + 0.4 * dot(base, vec3(0.6))), 0.55);
-      vec3 near = mix(base * tone, mortar, j), far = mix(base * 0.98, mortar, 0.16);
-      diffuseColor.rgb = mix(near, far, smoothstep(0.18, 0.45, max(w.x, w.y)));
+      // brick: 0.09 m courses of 0.25 m bricks, running bond; the mortar paler, greyed; a brick now and then a shade off
+      vec2 cell = vec2(0.25, 0.09), g = vec2(sP.x / cell.x + 0.5 * mod(floor(sP.y / cell.y), 2.0), sP.y / cell.y), w = sPx / cell, fr = fract(g);
+      // Down the street the joints stay while a course is 3 px or more, but there the mortar is a grey within a few
+      // percent of the brick's own luma. The print's halftone dots and violet shade go by luma (look/print.ts), so a
+      // joint that differs from its brick in hue alone moves no dot. Up close it pales, as mortar does.
+      float lines = 1.0 - smoothstep(1.0 / 6.0, 1.0 / 3.0, w.y), linesX = lines * (1.0 - smoothstep(1.0 / 6.0, 1.0 / 3.0, w.x));
+      float bed = mix(0.14, surfJoint(fr.y, 1.5 * w.y, 0.07), lines), head = mix(0.05, surfJoint(fr.x, 1.5 * w.x, 0.025), linesX);
+      vec3 grey = vec3(0.74, 0.71, 0.66) / 0.713 * dot(base, vec3(0.2126, 0.7152, 0.0722));
+      vec3 mortar = mix(mix(base, grey * 1.06, 0.85), mix(base, vec3(0.74, 0.71, 0.66) * (0.6 + 0.4 * dot(base, vec3(0.6))), 0.4), surfDetail(w.y));
+      // each brick its own shade, a mottle with no rhythm that outlasts the joints, so a brick a few pixels tall still reads
+      float tone = (1.0 - smoothstep(1.0 / 6.0, 1.0 / 2.5, max(w.y, w.x))) * (surfHash(floor(g)) - 0.5);
+      diffuseColor.rgb = mix(base * (1.0 + 0.4 * tone), mortar, 1.0 - (1.0 - bed) * (1.0 - head));
     } else if (vSurf < 2.5) {
       // painted block: 0.2 m courses of 0.4 m blocks, running bond; the joints struck in, in shadow
-      vec2 g = vec2(p.x / 0.4 + 0.5 * mod(floor(p.y / 0.2), 2.0), p.y / 0.2), w = fwidth(g), f = fract(g);
-      float j = max(surfJoint(f.y, w.y, 0.03), surfJoint(f.x, w.x, 0.015));
-      diffuseColor.rgb = mix(base * (1.0 - 0.16 * j), base * 0.975, smoothstep(0.15, 0.4, max(w.x, w.y)));
+      vec2 cell = vec2(0.4, 0.2), g = vec2(sP.x / cell.x + 0.5 * mod(floor(sP.y / cell.y), 2.0), sP.y / cell.y), w = sPx / cell, fr = fract(g);
+      float dy = surfDetail(w.y), dxy = dy * surfDetail(w.x);
+      float bed = mix(0.06, surfJoint(fr.y, 1.5 * w.y, 0.03), dy), head = mix(0.03, surfJoint(fr.x, 1.5 * w.x, 0.015), dxy);
+      diffuseColor.rgb = base * (1.0 - 0.16 * (1.0 - (1.0 - bed) * (1.0 - head)));
     } else {
       // scored stucco: a reveal every 0.6 m up the wall
-      float g = p.y / 0.6, w = fwidth(g);
-      diffuseColor.rgb = mix(base * (1.0 - 0.14 * surfJoint(fract(g), w, 0.012)), base * 0.99, smoothstep(0.1, 0.3, w));
+      float w = sPx.y / 0.6;
+      diffuseColor.rgb = base * (1.0 - 0.14 * mix(0.024, surfJoint(fract(sP.y / 0.6), 1.5 * w, 0.012), surfDetail(w)));
     }
   }`);
   };
