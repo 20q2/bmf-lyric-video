@@ -22,6 +22,7 @@ import type { Stretch } from './stretches';
 import { BACK, BLOCKS, boxAt } from './blocks';
 import { canvasTex, fuse, part, sedan, tball, tbox, tcyl } from '../scenes/sets/kit';
 import { buildMotel, buildMotelSign } from '../look/motel';
+import { buildBackdrop } from '../look/backdrop';
 import { CORNER } from './sets/intro';
 import { type Chorus2Plan, laneEdge } from './sets/chorus2';
 import { buildDash } from '../look/dash';
@@ -599,6 +600,8 @@ export function buildWorld(drive: Drive): THREE.Group {
   const sign = buildMotelSign(route);
   g.add(motel, sign);
   g.userData.sign = sign.userData;
+  // the city on past the town behind the corner, into the haze (shown through the early city: scenes/drive.ts)
+  g.add(named(buildBackdrop(drive), 'backdrop'));
   return g;
 }
 

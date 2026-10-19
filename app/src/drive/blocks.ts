@@ -55,8 +55,10 @@ const FOOTPRINT = [-0.5, -0.25, 0, 0.25, 0.5].flatMap((x) => [-0.5, -0.25, 0, 0.
 export interface Block { s: number; lateral: number; w: number; h: number; d: number; color: number; matrix: THREE.Matrix4; concrete?: boolean; /** No awnings: its front carries murals. */ bare?: boolean; /** Built by its set-piece's props, or as a parked car (world.ts leaves it out of the town: the guard still sees it). */ prop?: boolean; /** A car parked at the kerb (world.ts builds it as a sedan; 'set': its set-piece builds it, the verse 3 chapel's limo; it stands on the road by design). */ car?: boolean | 'set'; /** A corner's: its end at this side of its box's z (−1, +1) faces a cross street, its storefront round it (look/facades.ts). */ corner?: -1 | 1 }
 
 /** Parking at the left kerb (the far lane's: the right lane is the car's own, and the road is a lane each way): a spot
- *  every `every` m, none within `clear` m of a lyric's carrier or a set-piece's opening (a cross street, a driveway). */
-export const PARKED = { every: 7.5, clear: 7, lateral: ROAD_HALF - 1.05 };
+ *  every `every` m, none within `clear` m of a lyric's carrier or a set-piece's opening (a cross street, a driveway);
+ *  from `from` m along the road (behind the light: further back down the street they'd be a few pixels each, and every
+ *  one a car's worth of meshes). */
+export const PARKED = { every: 7.5, clear: 7, lateral: ROAD_HALF - 1.05, from: -420 };
 
 /** A box `across` x `h` x `along` the road, standing `lateral` off it at s (its foot on the road's level, or `y0` over it). */
 export function boxAt(route: Route, s: number, lateral: number, across: number, h: number, along: number, y0 = 0): THREE.Matrix4 {
@@ -146,7 +148,7 @@ export function blocksOf(route: Route, motion: Motion, stretches: readonly Stret
   // stands under the words, and the guard checks it.)
   // (a set-piece's block that reaches the kerb on the left, a cross street's corner or a lot: no parking along it)
   const atKerb = own.filter((b) => b.lateral < 0 && -b.lateral - b.d / 2 < ROAD_HALF + 1).map((b) => ({ a: b.s - b.w / 2 - 3, b: b.s + b.w / 2 + 3 }));
-  for (let k = Math.ceil(ROAD_START / PARKED.every); k * PARKED.every < route.length; k++) {
+  for (let k = Math.ceil(Math.max(ROAD_START, PARKED.from) / PARKED.every); k * PARKED.every < route.length; k++) {
     const s = k * PARKED.every + PARKED.every / 2, b = BLOCKS[stretchAtS(s).id]!, side = -1;
     if (!b.parked || hash(k, 90) > b.parked) continue;
     if (nearTunnel(tunnels, s, TUNNEL_CLEAR) || atKerb.some((t) => s > t.a && s < t.b)) continue;

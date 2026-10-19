@@ -6,8 +6,10 @@ import * as THREE from 'three';
 /** A stretch of road: from s0 to s1 (m), turning by `turn` (radians, + to the left) and climbing by `rise` (m). */
 /** The road's half-width (m): a lane each way. */
 export const ROAD_HALF = 4;
-/** The road (its verges, its dashes, its parking) starts this far behind where the car waits at the light (m). */
-export const ROAD_START = -160;
+/** The road (its verges, its dashes, its sidewalks) starts this far behind where the car waits at the light (m): the
+ *  street behind the corner runs on into the haze, the city on either side of it (look/backdrop.ts; it ended 160 m
+ *  back, and the wide shot at 12 s looked down it to the edge of the world). */
+export const ROAD_START = -1000;
 export interface Segment { s0: number; s1: number; turn: number; rise: number }
 export interface RouteFrame {
   pos: THREE.Vector3;

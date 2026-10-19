@@ -154,6 +154,10 @@ export default class DriveScene extends Scene {
    *  views. */
   private climb: THREE.Object3D | null = null;
   private climbFrom = Infinity;
+  /** The city on past the town behind the corner (look/backdrop.ts), shown through the early city: from the freeway on
+   *  the shots looking back see it from a kilometre off, past where their own views were designed to end. */
+  private backdrop: THREE.Object3D | null = null;
+  private backdropTo = Infinity;
   /** The street lamps lit for real from the climb on (their bulbs). */
   private lamps: THREE.Vector3[] = [];
   /** Where the moon hangs at the end (unit). */
@@ -172,6 +176,8 @@ export default class DriveScene extends Scene {
     this.sign = world.userData.sign;
     this.climb = world.getObjectByName('climb') ?? null;
     this.climbFrom = this.drive.stretches.find((st) => st.id === 'chorus4')?.start ?? Infinity;
+    this.backdrop = world.getObjectByName('backdrop') ?? null;
+    this.backdropTo = this.drive.stretches.find((st) => st.id === 'chorus2')?.start ?? Infinity;
     this.lamps = (world.getObjectByName('streetlights')?.userData.lamps as THREE.Vector3[] | undefined) ?? [];
     this.stance = hydraulics(audio, lyrics, this.drive.stretches);
     this.heft = heftOf(this.drive.stretches, this.drive.reading);
@@ -381,6 +387,7 @@ export default class DriveScene extends Scene {
       spinProp(this.writer, t);
     }
     if (this.climb) this.climb.visible = t >= this.climbFrom;
+    if (this.backdrop) this.backdrop.visible = t < this.backdropTo;
     // the hill sign stays floodlit to the end (it's the view they parked for); the beacon on its mast blinks
     for (const m of this.beacons) m.visible = (t % BEACON.every) < BEACON.on;
     // the lyric faces near now
