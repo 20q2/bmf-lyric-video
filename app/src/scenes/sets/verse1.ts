@@ -513,8 +513,10 @@ export function buildVerse1(drive: Drive): { group: THREE.Group; update(t: numbe
       c.fillStyle = '#5a2a1a'; c.beginPath(); c.roundRect(bx - 108, by - 18, 216, 34, 14); c.fill(); // the patty
       c.fillStyle = '#e8a04a'; c.beginPath(); c.roundRect(bx - 112, by + 14, 224, 38, 16); c.fill(); // the bottom bun
     });
-    plane(bldg, 7, 1.75, 2.2, 4.6, 0, new THREE.MeshBasicMaterial({ map: sign })).rotation.y = Math.PI / 2;
-    box(bldg, 0.12, 1.2, 0.12, 2.06, 3.6, -2.8, dark); box(bldg, 0.12, 1.2, 0.12, 2.06, 3.6, 2.8, dark); // (its posts behind it)
+    // (its roof sign on the half of the roof toward the menu board, short of the marquee's pole 7 m on: 7 m long and
+    // centred, the marquee's board stood through it — the user, 2026-10-18)
+    plane(bldg, 5.6, 1.4, 2.2, 4.45, -1.6, new THREE.MeshBasicMaterial({ map: sign })).rotation.y = Math.PI / 2;
+    box(bldg, 0.12, 1.1, 0.12, 2.06, 3.55, -3.7, dark); box(bldg, 0.12, 1.1, 0.12, 2.06, 3.55, 0.5, dark); // (its posts behind it)
     root.add(bldg);
     // the menu board: dark, framed, on two posts, MENU over it
     const m = onPanel(P.menu), { w, h } = P.menu, drop = P.menu.center.y - P.menu.ground;
