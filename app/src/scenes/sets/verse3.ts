@@ -27,6 +27,7 @@ import * as THREE from 'three';
 import type { Drive } from '../../drive/drive';
 import { LIMO, type Lot, MOUNT, SHOPS, STREET, type Theme, type Verse3Plan, limoS, lotBlock } from '../../drive/sets/verse3';
 import { PARKED } from '../../drive/blocks';
+import { SIDEWALKS } from '../../drive/world';
 import type { Carrier } from '../../drive/carriers';
 import { ROAD_HALF } from '../../drive/route';
 import { LANE } from '../../drive/drive';
@@ -174,13 +175,20 @@ function stretchLimo(): THREE.Group {
   return car;
 }
 
-/** The flicker on: dark before, stuttering on over the last 1.1 s before `start`, lit from it. */
-const flickAt = (t: number, start: number) => {
-  if (t >= start) return 1;
-  const u = 1 - (start - t) / 1.1;
-  if (u < 0) return 0.04;
-  return (t * 13) % 1 < 0.25 + 0.55 * u ? 1 : 0.05;
+/** How long a line's neon takes to warm up, ending at its line's start (s). */
+const WARM = 0.9;
+/** A line's neon coming on (0..1): dark before, easing up over the WARM s before `start` with two shallow dips as
+ *  the gas strikes, lit from it. (It strobed on: 13 Hz between full and dark over the last 1.1 s — the user,
+ *  2026-10-19, at the chapel: "it's flickering too intensely. Maybe have it load up softly.") */
+const warmAt = (t: number, start: number) => {
+  const u = (t - start + WARM) / WARM;
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  const dip = (c: number, w: number) => Math.exp(-(((u - c) / w) ** 2));
+  return u * u * (3 - 2 * u) * (1 - 0.3 * dip(0.32, 0.07) - 0.18 * dip(0.6, 0.06));
 };
+/** A word's neon (the chapel's bells and rings) coming on from its word's start (0..1): eased over WORD_ON s. */
+const wordOn = (t: number, at: number) => { const u = Math.min(1, Math.max(0, (t - at) / WORD_ON)); return u * u * (3 - 2 * u); };
 
 let measurer: CanvasRenderingContext2D | null = null;
 /** Where carrierart.ts draws a neon face's rows' backplates (m, in its face's frame: each row's middle, the plate's
@@ -208,8 +216,9 @@ const C = { teal: '#5d9a92', amber: '#c29a5c', blue: '#6c84b0', red: '#b25454', 
 /** How bright the strip's own neon shines (x its colour), against the lines' GLOW.neon (2.6): under half, so it reads
  *  as lit without blooming over them. */
 const SECONDARY = 1.05;
-/** A word's neon (the chapel's bells and rings) comes on over this long from its word's start (s): eased, not snapped. */
-const WORD_ON = 0.15;
+/** A word's neon (the chapel's bells and rings) comes on over this long from its word's start (s): eased, not snapped
+ *  (at 0.15 s, linear, it popped on). */
+const WORD_ON = 0.35;
 /** The strip's other businesses, on the lots between the lines' own: each a trade with its own front — its sign over its
  *  glass (a lit box sign on its band, or its name in tube on a raceway, a drawing beside it), its own room behind the
  *  glass (the atlas's cells), the neon it hangs in its window, a blade down its corner on a building tall enough, an
@@ -259,9 +268,6 @@ const TRAFFIC = {
 const LAMPS = { every: 26, h: 7.4, reach: 2.4, kerb: 0.5, glow: 1.4 };
 /** How bright the windows' rooms are lit (x their drawn colours): low, so the glass reads as rooms, not lightboxes. */
 const ROOMS = { fill: 0.72, shop: 0.7 };
-/** The chapel (m, in its front's frame): its gable's rise over the wall, the portico (width, depth, height to its
- *  roof), the steeple (its tower's side, how far back on the roof, the belfry's height, the spire's), the lawn's
- *  depth to its picket fence. (Its limo at the kerb: drive/sets/verse3.ts LIMO.) */
 /** The chapel's sign's heart: its top over the line's middle (m), its width to its height's (x the classic curve's), how
  *  far its tip stands off the portico's roof (m). */
 const HEART = { top: 2.9, wide: 1.0, lift: 0.15 };
@@ -269,7 +275,10 @@ const HEART = { top: 2.9, wide: 1.0, lift: 0.15 };
  *  blade and the cross), its round ends' radius the rows' half height and `margin`, the seam `seam` past the widest
  *  row's backer, its face `off` behind the line's, `depth` deep; its pink tube `tube` in from its edge. */
 const CAPSULE = { inset: 1.4, margin: 0.36, seam: 0.45, off: 0.06, depth: 0.44, tube: 0.17 };
-const CHAPEL = { gable: 3.2, portico: { w: 4.6, d: 1.6, h: 2.95 }, steeple: { side: 2.3, back: 2.2, tower: 3.6, belfry: 2.2, spire: 3.6 }, lawn: 1.3 };
+/** The chapel (m, in its front's frame): its gable's rise over the wall, the portico (width, depth, height to its
+ *  roof), its step's riser over the sidewalk, the steeple (its tower's side, how far back on the roof, the belfry's
+ *  height, the spire's), the lawn's depth to its picket fence. (Its limo at the kerb: drive/sets/verse3.ts LIMO.) */
+const CHAPEL = { riser: 0.15, gable: 3.2, portico: { w: 4.6, d: 1.6, h: 2.95 }, steeple: { side: 2.3, back: 2.2, tower: 3.6, belfry: 2.2, spire: 3.6 }, lawn: 1.3 };
 
 /** The rooms seen through the fillers' windows: an atlas of 8 x 4 cells, each a room of its own. Shops' ground-floor
  *  rooms (each trade's own: STRIP), the floors' rooms above, and dark ones (the user, 2026-10-15: "it's kind of just
@@ -435,12 +444,14 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   // (lit a little from within: in the street's shade a plain toon gold printed as brown)
   const gold = toon({ color: '#e8bc50', emissive: '#5a4214' });
 
-  /** Every flickering or buzzing neon material: its line's start (it flickers on with it; none: always lit, a slight
+  /** Every warming or buzzing neon material: its line's start (it warms up with it, warmAt; none: always lit, a slight
    *  buzz), its lit brightness, whether it dances (a torch's flame). */
   const flicker: { m: THREE.MeshBasicMaterial; start?: number; peak: number; dance?: boolean; seed: number }[] = [];
-  /** The marquee's and the pawn shop's bulbs, in two phases (they chase); the payphones' coin light (it blinks while
-   *  they're told to call). */
-  const marqueeBulbs: { m: THREE.ShaderMaterial; phase: number; k: number }[] = [];
+  /** The marquee's and the chapel's bulbs, in two phases (they chase; the chapel's warm up with its tube, from its
+   *  line's `start`); the payphones' coin light (it blinks while they're told to call). */
+  const marqueeBulbs: { m: THREE.ShaderMaterial; phase: number; k: number; start?: number }[] = [];
+  /** Glows thrown by a line's neon (the chapel's pink on its wall): their strength, warming up with it. */
+  const warmGlows: { m: THREE.ShaderMaterial; k: number; start: number }[] = [];
   let coin: THREE.Mesh | null = null, coinStart = 0;
   /** Neon lit by a word (the chapel's bells and rings): dark until `at`, then on (eased in over WORD_ON s: no flash). */
   const wordLit: { m: THREE.MeshBasicMaterial; at: number; peak: number }[] = [];
@@ -685,10 +696,10 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
   };
 
   /** A blade down a building's corner, out from its wall (in the lot's frame: at x, from y0 up h, out `out` m). */
-  const blade = (g: THREE.Object3D, x: number, y0: number, h: number, word: string, color: string, out = 1.25, start?: number, peak = SECONDARY) => {
+  const blade = (g: THREE.Object3D, x: number, y0: number, h: number, word: string, color: string, out = 1.25) => {
     const b = new THREE.Group(); b.position.set(x, y0 + h / 2, out / 2 + 0.05); b.rotation.y = Math.PI / 2; g.add(b);
     box(b, out, h, 0.3, 0, 0, 0, dark);
-    for (const sd of [1, -1]) { const p = neon(b, out * 0.82, h * 0.94, 0, 0, sd * 0.16, bladeWord(word, color, true), { start, peak }); if (sd < 0) p.rotation.y = Math.PI; }
+    for (const sd of [1, -1]) { const p = neon(b, out * 0.82, h * 0.94, 0, 0, sd * 0.16, bladeWord(word, color, true)); if (sd < 0) p.rotation.y = Math.PI; }
     for (const y of [-h / 2 + 0.4, h / 2 - 0.4]) box(g, 0.08, 0.08, out + 0.2, x, y0 + h / 2 + y, (out + 0.2) / 2, steel); // its brackets
     return b;
   };
@@ -1146,7 +1157,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     }), { start, peak: 1.3 });
     // chasing bulbs inside the tube
     const bulb = [lampMaterial('#e8b878', 1.7, 0.5), lampMaterial('#e8b878', 1.7, 0.5)];
-    marqueeBulbs.push(...bulb.map((m, i) => ({ m, phase: i, k: 1.7 })));
+    marqueeBulbs.push(...bulb.map((m, i) => ({ m, phase: i, k: 1.7, start })));
     {
       const ring = outline(0.86, 400), len: number[] = [0];
       for (let i = 1; i <= ring.length; i++) len.push(len[i - 1]! + ring[i % ring.length]!.distanceTo(ring[i - 1]!));
@@ -1208,7 +1219,7 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
       c.beginPath(); c.moveTo(258, 72); c.lineTo(242, 40); c.lineTo(258, 18); c.lineTo(274, 40); c.closePath(); c.stroke(); // its stone
     }), wordAt('man'));
     // its pink on the wall round it and down on the lawn
-    wash(fg, rw + 6, hh + 4, 0, hcy, wall + 0.01, PINK, 0.3);
+    warmGlows.push({ m: wash(fg, rw + 6, hh + 4, 0, hcy, wall + 0.01, PINK, 0.3).material as THREE.ShaderMaterial, k: 0.3, start });
   }
 
   /** The wedding chapel, in its lot's frame (its front at z 0, the lyric's neon on it). */
@@ -1254,24 +1265,28 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     };
     for (const x of [-3.9, 3.9, -5.4, 5.4]) archWindow(x, 0.75, 0.9, 2.3);
     archWindow(-Wl / 2 + 1.2, 4.3, 0.9, 2.2);
-    // the portico: columns up to an entablature with the chapel's name, under a low pediment, the doors behind
-    const P = K.portico;
+    // the portico: four columns on a step, a beam round their heads carrying its flat roof (the chapel's name on the
+    // beam's front; the sign's heart sits on the roof), the doors behind. The step stands a riser proud of the sidewalk:
+    // its top was the sidewalk's (both at the kerb's height), and the two fought under the roof; and the beam ran only
+    // across the front, so the back pair's capitals stopped 0.4 m under the roof (the user, 2026-10-19: the pillar
+    // "isn't connected to the actual structure above it. The structure's floating above it").
+    const P = K.portico, step = SIDEWALKS.kerb + K.riser, beam = P.h - 0.41, cx = P.w / 2 - 0.2, zf = P.d - 0.15, bd = 0.5;
     box(g, P.w + 0.4, 0.36, P.d + 0.2, 0, P.h + 0.18, P.d / 2, trim); // its roof slab
-    box(g, P.w + 0.2, 0.42, 0.12, 0, P.h - 0.2, P.d + 0.02, trim); // the frieze
-    plane(g, P.w - 0.3, 0.3, 0, P.h - 0.2, P.d + 0.09, pic(signFace('WEDDING CHAPEL', 1024, 72, '#5a3a5e', null, F.sign(700), 0.72, 0.18), { transparent: true }));
-    // (flat-roofed: its sign's heart sits on it — a pediment stood where the heart's tip comes down)
-    for (const x of [-P.w / 2 + 0.2, P.w / 2 - 0.2]) for (const z of [P.d - 0.15, 0.3]) {
-      cyl(g, 0.15, P.h - 0.5, x, (P.h - 0.5) / 2 + 0.15, z, trim, 16);
-      box(g, 0.42, 0.15, 0.42, x, 0.08, z, trim); box(g, 0.4, 0.12, 0.4, x, P.h - 0.47, z, trim); // its base, its capital
+    box(g, P.w + 0.2, P.h - beam + 0.02, bd, 0, (beam + P.h + 0.02) / 2, P.d + 0.08 - bd / 2, trim); // the beam across the front (its face where the frieze's was)
+    for (const sd of [-1, 1]) box(g, 0.4, P.h - beam + 0.02, P.d + 0.1 - bd, sd * cx, (beam + P.h + 0.02) / 2, (P.d + 0.08 - bd) / 2 - 0.01, trim); // and back along each side to the wall
+    plane(g, P.w - 0.3, 0.3, 0, beam + 0.21, P.d + 0.09, pic(signFace('WEDDING CHAPEL', 1024, 72, '#5a3a5e', null, F.sign(700), 0.72, 0.18), { transparent: true }));
+    for (const x of [-cx, cx]) for (const z of [zf, 0.3]) {
+      cyl(g, 0.15, beam - 0.12 - step - 0.15, x, (step + 0.15 + beam - 0.12) / 2, z, trim, 16);
+      box(g, 0.42, 0.15, 0.42, x, step + 0.075, z, trim); box(g, 0.4, 0.12, 0.4, x, beam - 0.06, z, trim); // its base on the step, its capital under the beam
     }
-    box(g, P.w + 0.2, 0.15, P.d + 0.2, 0, 0.075, P.d / 2, toon({ color: '#5a5266' })); // the step
-    // the doors: a pair under an arched fanlight
-    box(g, 1.5, 2.1, 0.1, 0, 1.05, 0.06, doorM);
-    box(g, 0.04, 2.0, 0.04, 0, 1.05, 0.13, toon({ color: '#2a1820' }));
-    for (const x of [-0.22, 0.22]) box(g, 0.05, 0.3, 0.05, x, 1.1, 0.14, gold);
-    const fan = new THREE.Mesh(new THREE.CircleGeometry(0.72, 24, 0, Math.PI), stained(false)); fan.position.set(0, 2.1, 0.06); g.add(fan);
+    box(g, P.w + 0.2, step, P.d + 0.2, 0, step / 2, P.d / 2, toon({ color: '#5a5266' })); // the step
+    // the doors: a pair on the step under an arched fanlight (clear of the roof)
+    box(g, 1.5, 1.9, 0.1, 0, step + 0.95, 0.06, doorM);
+    box(g, 0.04, 1.8, 0.04, 0, step + 0.95, 0.13, toon({ color: '#2a1820' }));
+    for (const x of [-0.22, 0.22]) box(g, 0.05, 0.3, 0.05, x, step + 1.0, 0.14, gold);
+    const fan = new THREE.Mesh(new THREE.CircleGeometry(0.66, 24, 0, Math.PI), stained(false)); fan.position.set(0, step + 1.9, 0.06); g.add(fan);
     // a lantern either side of the doors, dim and warm
-    for (const x of [-1.2, 1.2]) { box(g, 0.22, 0.34, 0.22, x, 2.0, 0.2, toon({ color: '#2a2430' })); box(g, 0.14, 0.22, 0.14, x, 2.0, 0.2, lampMaterial('#e0a868', 1.4, 0.5)); }
+    for (const x of [-1.2, 1.2]) { box(g, 0.22, 0.34, 0.22, x, step + 1.75, 0.2, toon({ color: '#2a2430' })); box(g, 0.14, 0.22, 0.14, x, step + 1.75, 0.2, lampMaterial('#e0a868', 1.4, 0.5)); }
     // the steeple: a tower on the roof's ridge behind the gable, its belfry open on four posts, the bell in it, the spire
     const S = K.steeple, sz = -S.back - S.side / 2, base = Hl + K.gable - 0.6;
     box(g, S.side, S.tower, S.side, 0, base + S.tower / 2, sz, clap);
@@ -1667,13 +1682,17 @@ export function buildVerse3(drive: Drive): { group: THREE.Group; update(t: numbe
     group: root,
     update(t) {
       for (const f of flicker) {
-        const lit = f.dance ? 0.75 + 0.25 * Math.sin(t * 11 + f.seed * 7) * Math.sin(t * 17 + f.seed) : f.start !== undefined ? flickAt(t, f.start) : 0.94 + 0.06 * Math.sin(t * 60 + f.seed * 3.1);
+        const lit = f.dance ? 0.75 + 0.25 * Math.sin(t * 11 + f.seed * 7) * Math.sin(t * 17 + f.seed) : f.start !== undefined ? warmAt(t, f.start) : 0.94 + 0.06 * Math.sin(t * 60 + f.seed * 3.1);
         f.m.color.setScalar(0.12 + (f.peak - 0.12) * Math.max(0.04, lit));
       }
       // the marquee's and the pawn shop's bulbs chase
       const ph = Math.floor(t * 6) % 2;
-      for (const b of marqueeBulbs) b.m.uniforms.strength!.value = (b.phase + ph) % 2 === 0 ? b.k : b.k * 0.3;
-      for (const w of wordLit) w.m.color.setScalar(0.12 + (w.peak - 0.12) * Math.min(1, Math.max(0, (t - w.at) / WORD_ON)));
+      for (const b of marqueeBulbs) {
+        const on = (b.phase + ph) % 2 === 0 ? b.k : b.k * 0.3;
+        b.m.uniforms.strength!.value = b.start === undefined ? on : 0.12 + (on - 0.12) * warmAt(t, b.start);
+      }
+      for (const w of warmGlows) w.m.uniforms.strength!.value = w.k * warmAt(t, w.start);
+      for (const w of wordLit) w.m.color.setScalar(0.12 + (w.peak - 0.12) * wordOn(t, w.at));
       if (coin) (coin.material as THREE.MeshBasicMaterial).color.setRGB(...((t >= coinStart && (t * 2.2) % 1 < 0.5 ? [1.6, 0.4, 0.3] : [0.3, 0.08, 0.06]) as [number, number, number]));
       // people walking, legs scissoring
       for (const p of people) {
