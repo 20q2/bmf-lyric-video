@@ -1,6 +1,6 @@
 // The night's lights. One uniform, NIGHT (0 by day, 1 once the sun is well down: the scene sets it each frame), turns
 // them on together:
-//   windows   lit windows on the buildings, cell by cell (some lit, some dark), warm and a few cool
+//   windows   lit windows on the buildings' glass (nightGlass), some lit, some dark, warm
 //   beams     the car's headlights, cones of light ahead of it on the road
 //   pools     the streetlights' circles of light on the road
 // All additive or emissive HDR, so they bloom. Browser and bun (shaders are strings).
@@ -13,46 +13,6 @@ export const NIGHT: THREE.IUniform<number> = { value: 0 };
 export const PULSE: THREE.IUniform<number> = { value: 0 };
 /** How bright the lights shine (HDR multiples). */
 export const GLOW = { window: 1.6, lamp: 6, beam: 0.55, pool: 0.5, neon: 2.6, tail: 4, head: 8 };
-
-/** Windows in a toon material's buildings (instanced boxes): a grid on their walls (3 m wide, 3.2 m floors), dark glass
- *  by day; by night some lit, by the cell's hash, from NIGHT. */
-export function withWindows(m: THREE.MeshToonMaterial): THREE.MeshToonMaterial {
-  m.onBeforeCompile = (sh) => {
-    printShadows(sh);
-    sh.uniforms.night = NIGHT;
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWinPos; varying vec3 vWinN;')
-      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-  vec4 wpw = vec4(transformed, 1.0);
-  vec3 wn = objectNormal;
-  #ifdef USE_INSTANCING
-    wpw = instanceMatrix * wpw;
-    wn = mat3(instanceMatrix) * wn;
-  #endif
-  wpw = modelMatrix * wpw;
-  vWinPos = wpw.xyz;
-  vWinN = normalize(mat3(modelMatrix) * wn);`);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>
-uniform float night; varying vec3 vWinPos; varying vec3 vWinN;
-float winHash(vec3 p) { p = fract(p * .1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }`)
-      // the window grid on the walls (3 m wide, 3.2 m floors): dark glass by day, some lit by night
-      .replace('#include <color_fragment>', `#include <color_fragment>
-  float winMask = 0.0, winLit = 0.0; vec3 winWarm = vec3(1.0);
-  if (abs(vWinN.y) < 0.5) {
-    float u = abs(vWinN.x) > abs(vWinN.z) ? vWinPos.z : vWinPos.x;
-    vec2 g = vec2(u / 3.0, (vWinPos.y - 0.6) / 3.2), cell = floor(g), f = fract(g);
-    winMask = step(0.22, f.x) * step(f.x, 0.78) * step(0.25, f.y) * step(f.y, 0.75) * step(0.0, cell.y);
-    winLit = step(0.55, winHash(vec3(cell, floor(vWinPos.x * 0.05) + floor(vWinPos.z * 0.05))));
-    winWarm = mix(vec3(1.0, 0.62, 0.28), vec3(0.55, 0.75, 1.0), step(0.85, winHash(vec3(cell.yx, 7.0))));
-    diffuseColor.rgb *= 1.0 - 0.42 * winMask * (1.0 - winLit * night); // the glass, darker than the stucco
-  }`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-  totalEmissiveRadiance += winWarm * winMask * winLit * night * ${GLOW.window.toFixed(2)};`);
-  };
-  m.customProgramCacheKey = () => 'withWindows';
-  return m;
-}
 
 const VERT = /* glsl */ `varying vec2 vUv; varying vec3 vN; varying vec3 vV;
 void main() {
@@ -101,7 +61,9 @@ void main() {
 }
 
 /** What a pane's `behind` attribute says is behind it (nightGlass). */
-export const BEHIND = { shop: 0, room: 1, dark: 2 } as const;
+export const BEHIND = { shop: 0, room: 1, dark: 2, drapes: 3 } as const;
+/** A pane's `lit` attribute: dark at night (0), lit at night (1), or lit day and night (2: a motel's lobby). */
+export const LIT = { no: 0, night: 1, always: 2 } as const;
 // (A shop pane's `trade` attribute (drive/shops.ts TRADE, its shop's) picks what's behind it: 0 shelves of stock, 1
 // clothes on a rail, 2 a lunch counter under its menu board, 3 bills taped up inside the glass, 4 an office's vertical
 // blinds, 5 a salon's chairs under its mirror, 6 a laundromat's machines.
@@ -112,7 +74,8 @@ export const BEHIND = { shop: 0, room: 1, dark: 2 } as const;
  *  windows are blacked out ... little things going on inside") — by its `behind` attribute (BEHIND), a shop's back wall
  *  and shelves of stock in muted colours (bright reds, yellows and blues read as "library books": the user,
  *  2026-10-15), or upstairs a room: blinds, curtains or a net, a lamp, a picture on the wall — dim by day under the
- *  glass's tint; by night lit where its `lit` attribute is 1, warm. */
+ *  glass's tint; by night lit where its `lit` attribute is 1, warm (LIT: 2 lit by day too, a motel's lobby); or a
+ *  motel room's drapes (look/motel.ts). */
 export function nightGlass(): THREE.MeshToonMaterial {
   const m = toon({ color: '#28323c' });
   m.onBeforeCompile = (sh) => {
@@ -217,13 +180,27 @@ float glassHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3
     } else {
       interior = mix(room, vec3(0.86, 0.84, 0.8), 0.62); cover = 0.6;
     }
-  } else {
+  } else if (vBehind < 2.5) {
     interior = vec3(0.12, 0.11, 0.12); // the dark
+  } else {
+    // a motel room's lined drapes, pinch-pleated, drawn across on their rod but for a gap somewhere along it (or none):
+    // mustard, olive, rust or oatmeal, muted; through the gap the room, its wall and a lamp's shade
+    float h = glassHash(vec2(seed, 91.0));
+    vec3 cloth = h < 0.3 ? vec3(0.66, 0.55, 0.34) : h < 0.55 ? vec3(0.47, 0.49, 0.36) : h < 0.8 ? vec3(0.58, 0.39, 0.32) : vec3(0.74, 0.68, 0.56);
+    float gc = 0.2 + 0.6 * glassHash(vec2(seed, 92.0)), gw = step(0.35, glassHash(vec2(seed, 93.0))) * (0.04 + 0.16 * glassHash(vec2(seed, 94.0)));
+    float open = step(abs(q.x - gc), gw);
+    float folds = 0.74 + 0.26 * pow(abs(sin(q.x * 3.14159 * 11.0)), 0.7);
+    vec3 drape = cloth * folds * mix(0.9, 1.0, smoothstep(0.0, 0.25, q.y));
+    vec3 room = vec3(0.50, 0.44, 0.38) * mix(0.65, 1.0, smoothstep(0.95, 0.4, q.y));
+    room = mix(room, vec3(0.9, 0.82, 0.62), step(abs(q.x - gc), gw * 0.6) * step(0.22, q.y) * step(q.y, 0.36));
+    interior = mix(drape, room, open);
+    interior = mix(interior, vec3(0.30, 0.27, 0.25), step(0.95, q.y)); // (the rod's valance)
+    cover = 1.0 - open;
   }
   // (dim by day under the glass's tint, bright and warm by night where lit; unlit at night, the dark shop)
-  float litNow = vLit * night;
+  float litNow = min(vLit, 1.0) * max(night, step(1.5, vLit) * 0.55); // (2: lit by day too)
   vec3 dayLook = mix(diffuseColor.rgb, interior * mix(0.55, 0.8, cover), 0.75 + 0.1 * cover);
-  diffuseColor.rgb = mix(dayLook, interior * 0.9, litNow) * (1.0 - 0.5 * night * (1.0 - vLit));`)
+  diffuseColor.rgb = mix(dayLook, interior * 0.9, litNow) * (1.0 - 0.5 * night * (1.0 - min(vLit, 1.0)));`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += interior * vec3(1.0, 0.8, 0.55) * litNow * ${(GLOW.window * 0.7).toFixed(2)};`);
   };

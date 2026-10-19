@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { hash } from '../engine/util';
 import { WORLD, toon } from '../look/toon';
 import { F } from '../engine/type';
-import { GLOW, glowMaterial, lampMaterial, withWindows } from '../look/night';
+import { GLOW, glowMaterial, lampMaterial } from '../look/night';
 import { wallMaterial } from '../look/walls';
 import { facadeMeshes, facades, signAtlas, signUv } from '../look/facades';
 import { roofSign, shopIndex } from './shops';
@@ -21,7 +21,7 @@ import { HEADLAND, HEADWALL, TILE_REPEAT, TUNNEL, TUNNEL_CLEAR, type Tunnel, dra
 import type { Stretch } from './stretches';
 import { BACK, BLOCKS, boxAt } from './blocks';
 import { canvasTex, fuse, part, sedan, tball, tbox, tcyl } from '../scenes/sets/kit';
-import { MOTEL_SIGN, motelSign } from './landmarks';
+import { buildMotel, buildMotelSign } from '../look/motel';
 import { CORNER } from './sets/intro';
 import { type Chorus2Plan, laneEdge } from './sets/chorus2';
 import { buildDash } from '../look/dash';
@@ -1013,70 +1013,6 @@ function buildStreetlights(drive: Drive): THREE.Group {
   }
   // where the lit lamps' light comes from: just under each bulb
   g.userData.lamps = at.filter((s) => s >= lit).map((s) => { const f = route.frameAt(s); return f.pos.clone().addScaledVector(f.right, L.reach + 0.3).add(new THREE.Vector3(0, L.h - 0.6, 0)); });
-  return g;
-}
-
-/** The motel on the corner (the intro's, the end's): a two-storey pink wing running back from the road, its rooms'
- *  doors and windows facing its lot (toward the corner), the upper walkway with its railing and posts, the stair at its
- *  far end, a white parapet. Its box: s −17, 20 m right of the road, 30 m deep from the road, 14 m along it, 9 m high. */
-function buildMotel(route: Route): THREE.Group {
-  const M = { s: -17, lateral: 20, w: 30, h: 9, d: 14 }, f = route.frameAt(M.s), g = new THREE.Group();
-  g.matrixAutoUpdate = false;
-  g.matrix.makeBasis(f.right.clone().negate(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(f.fwd.x, 0, f.fwd.z).normalize()).setPosition(f.pos.clone().addScaledVector(f.right, M.lateral));
-  const pink = withWindows(toon({ color: WORLD.motel })), white = toon({ color: '#f8f4ea' }), teal = toon({ color: '#1f6f78' }), glass = toon({ color: '#28323c' });
-  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); };
-  const H = 6.6, front = M.d / 2 - 1.8; // (its rooms' face, the walkway in front of it to the box's edge)
-  box(M.w, H, M.d - 1.8, 0, H / 2, -0.9, pink);
-  box(M.w + 0.3, 0.5, M.d - 1.5, 0, H + 0.25, -0.9, white); // the parapet
-  for (const [y0, fl] of [[0, 0], [3.3, 1]] as const) {
-    for (let k = 0; k < 9; k++) {
-      const x = -M.w / 2 + 2 + k * 3.2;
-      box(1.0, 2.1, 0.06, x, y0 + 1.05, front + 0.03, teal); // its door
-      box(1.3, 1.0, 0.04, x + 1.35, y0 + 1.5, front + 0.02, glass); // its window
-      box(1.5, 0.1, 0.16, x + 1.35, y0 + 0.95, front + 0.08, white); // its sill
-    }
-    if (fl) { // the upper walkway: its slab, its railing, the posts holding it
-      box(M.w, 0.22, 1.8, 0, y0 - 0.11, front + 0.9, white);
-      box(M.w, 0.08, 0.08, 0, y0 + 1.0, M.d / 2 - 0.05, white);
-      for (let x = -M.w / 2; x <= M.w / 2; x += 1.5) box(0.05, 1.0, 0.05, x, y0 + 0.5, M.d / 2 - 0.05, white);
-      for (let x = -M.w / 2 + 0.2; x <= M.w / 2; x += 6) box(0.2, y0, 0.2, x, y0 / 2, M.d / 2 - 0.15, white);
-    }
-  }
-  const stair = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.2, 4.6), white); // the stair up to the walkway, at its far end
-  stair.position.set(M.w / 2 - 1, 1.65, front + 0.5 - 2.2); stair.rotation.x = Math.atan2(3.3, 4.2); g.add(stair);
-  return g;
-}
-
-/** The motel's roadside sign (landmarks.ts), the video's title in the world: SZA over BMF in pink neon, NO VACANCY
- *  lit below. Two faces — with the NO, and without (VACANCY, the end) — the scene picks one and lights it (userData). */
-function signFace(no: boolean): THREE.CanvasTexture {
-  const M = MOTEL_SIGN, c = document.createElement('canvas'); c.width = 512; c.height = Math.round((512 * M.h) / M.w);
-  const x = c.getContext('2d')!, W = c.width, H = c.height;
-  x.fillStyle = '#163a40'; x.fillRect(0, 0, W, H);
-  x.strokeStyle = '#f3e6c4'; x.lineWidth = 14; x.strokeRect(14, 14, W - 28, H - 28);
-  x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillStyle = '#f3e6c4'; x.font = `${H * 0.11}px "${F.archivo(100, 900)}"`; x.fillText('SZA', W / 2, H * 0.17);
-  x.shadowColor = 'rgba(255,79,163,1)'; x.shadowBlur = 28; x.fillStyle = '#ffd0e8';
-  x.font = `${H * 0.27}px "${F.bodoni(700, { italic: true })}"`; x.fillText('BMF', W / 2, H * 0.48, W * 0.8);
-  x.font = `${H * 0.075}px "${F.archivo(100, 700)}"`;
-  const vac = 'VACANCY', gap = x.measureText(' ').width, wNo = x.measureText('NO').width, wVac = x.measureText(vac).width, x0 = W / 2 - (wNo + gap + wVac) / 2;
-  x.textAlign = 'left';
-  x.shadowColor = no ? 'rgba(255,60,40,1)' : 'rgba(0,0,0,0)'; x.fillStyle = no ? '#ff8a70' : '#4a2a2a'; x.fillText('NO', x0, H * 0.82);
-  x.shadowColor = 'rgba(255,60,40,1)'; x.fillStyle = '#ff8a70'; x.fillText(vac, x0 + wNo + gap, H * 0.82);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-  return tex;
-}
-function buildMotelSign(route: Route): THREE.Group {
-  const M = MOTEL_SIGN, at = motelSign(route), faces = { no: signFace(true), vacancy: signFace(false) };
-  const mat = new THREE.MeshBasicMaterial({ map: faces.no, side: THREE.DoubleSide });
-  const g = new THREE.Group();
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(M.w, M.h), mat);
-  panel.position.set(0, M.y, 0); g.add(panel);
-  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.35, M.y - M.h / 2, 0.35), toon({ color: WORLD.post }));
-  pole.position.set(0, (M.y - M.h / 2) / 2, -0.1); g.add(pole);
-  g.matrixAutoUpdate = false;
-  g.matrix.makeBasis(new THREE.Vector3(0, 1, 0).cross(at.normal).normalize(), new THREE.Vector3(0, 1, 0), at.normal).setPosition(at.foot);
-  g.userData = { neon: mat, faces };
   return g;
 }
 

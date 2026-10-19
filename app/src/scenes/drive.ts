@@ -14,6 +14,7 @@ import { type Drive, makeDrive } from '../drive/drive';
 import { CarrierArt, wallColor } from '../drive/carrierart';
 import { type Carrier, FLY, centerAt, riseAt } from '../drive/carriers';
 import { COAST_T, SUN_AZ_DEG, airAt, cloudsAt, daylight, raysAt, skyStateAt } from '../drive/sky';
+import { BULB, bulbsAt } from '../look/motel';
 import { CAR, buildCar, buildCarrier, buildPlane, buildWorld, flutter, spinProp } from '../drive/world';
 import { TUNNEL, insideAt, nearTunnel } from '../drive/tunnel';
 import { SkyDome } from '../look/skydome';
@@ -126,8 +127,8 @@ export default class DriveScene extends Scene {
   private city!: ReturnType<typeof buildCity>;
   /** (debugging: the named parts hidden, ?hide=) */
   private hidden: string[] = [];
-  /** The motel sign's neon (its material and its two faces), and the car's body on its hydraulics. */
-  private sign!: { neon: THREE.MeshBasicMaterial; faces: { no: THREE.Texture; vacancy: THREE.Texture } };
+  /** The motel sign's neon (its material and its two faces, its bulbs), and the car's body on its hydraulics. */
+  private sign!: { neon: THREE.MeshBasicMaterial; faces: { no: THREE.Texture; vacancy: THREE.Texture }; bulbs: THREE.MeshBasicMaterial };
   private stance!: (t: number) => Stance;
   private cast!: (t: number) => Cast;
   /** Where the sun sets (flat, unit). */
@@ -296,6 +297,7 @@ export default class DriveScene extends Scene {
     // the motel's neon: flickering on, and at the end its NO going out
     const neon = neonAt(t, f.beat);
     this.sign.neon.color.setScalar(0.25 + 1.45 * neon.lit);
+    this.sign.bulbs.color.copy(BULB).multiplyScalar(bulbsAt(neon.lit)); // (its bulbs flicker on with it)
     const face = neon.no ? this.sign.faces.no : this.sign.faces.vacancy;
     if (this.sign.neon.map !== face) { this.sign.neon.map = face; this.sign.neon.needsUpdate = true; }
     const carS = d.motion.distanceAt(t);
