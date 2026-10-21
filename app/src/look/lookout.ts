@@ -1,9 +1,10 @@
 // The overlook at the end of the drive, and the hill across the canyon (the finale; the user, 2026-10-15: "this looks
 // like the perfect final scene to like expand on ... make it look just like really nice at the end"). Built, not a
 // placeholder:
-//   the lot     an asphalt turnout where the road ends — patched, cracked, tyre-worn — its bays painted along the wall
-//               either side of a hatched viewing strip, a concrete wheel stop in each, a kerb round its sides; two cars
-//               parked dark in the bays
+//   the lot     an asphalt turnout where the road ends — patched, cracked, tyre-worn — its bays painted along the wall,
+//               the car's own at the arc's middle (it turns into it off its lane: drive.ts BAY), a hatched viewing
+//               strip a bay over on the city's side, a concrete wheel stop in each bay, a kerb round its sides; three
+//               cars parked dark in the bays
 //   the wall    a low wall of laid stone along an arc at the lip, capped, pillars at its ends, a two-pipe rail on posts
 //   at the wall two coin telescopes, a bench, a bin
 //   the lamps   two cobra-heads over the lot and two lanterns at its far side, each with its warm pool (and real light
@@ -22,19 +23,35 @@ import { ROAD_HALF } from '../drive/route';
 import { WORLD, printShadows, toon } from './toon';
 import { glowMaterial, lampMaterial } from './night';
 import { sedan } from '../scenes/sets/kit';
+import { BAY, bayPath } from '../drive/drive';
+import { CAR } from '../drive/cabin';
 
-/** The lot (m, in the parked car's road frame: x right of the road's centre, z forward of where the car stops): it
- *  starts this far short of the car, spans this far either side; the wall's arc (its middle this far ahead of the car,
- *  its radius, its height), the bays along it (wide, deep), and the strip kept clear in front of the car (x from, to:
- *  the view, the telescopes and the bench). */
-export const LOT = { entry: 14, half: 22, wall: { z: 9, R: 40, h: 0.62 }, bay: { w: 2.7, d: 5.2 }, clear: [-6.5, 11] as [number, number] };
+/** The lot, laid round the car's bay (m, in its own frame: x right of the car's bay's centre line, z forward along
+ *  the road from the lot's datum): it starts this far short of the datum, spans this far either side; the wall's arc
+ *  (its middle, over the car's bay, this far ahead of the datum; its radius, its height); the bays along it, radial off
+ *  the arc, one centred on its middle (wide, deep from the wall's line, their wheel stops this far out from it); the
+ *  bays given over to the hatched viewing strip (the telescopes, the bench: a bay over from the car's, toward the city —
+ *  the car stopped right in front of them, the user, 2026-10-20), and those with a car parked in them (counted from
+ *  the car's: + to the right). */
+export const LOT = { entry: 14, half: 22, wall: { z: 9, R: 40, h: 0.62 }, bay: { w: 2.7, d: 5.8, stop: 1.6 }, strip: [2, 4] as [number, number], parked: [[-2, '#232b38'], [-5, '#2e3833'], [6, '#3a2731']] as [number, string][] };
+/** Where the car stops in the lot's frame (z; x is 0, its bay's centre): its front tyres against its bay's wheel stop.
+ *  The lot's datum is this far short of where it parks (world.ts). */
+export const PARKED_Z = LOT.wall.z - LOT.bay.stop - 0.11 - (CAR.wheelZ + CAR.wheelR);
 /** The slope from the wall down to the plain: how far out it runs (m), and how wide. */
-const FALL = { along: 190, across: 150 };
+const FALL = { along: 196, across: 150 };
 const DARK = '#1a2430';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** The wall's line: how far ahead of the car it stands at x. */
 export const wallZ = (x: number) => LOT.wall.z - LOT.wall.R + Math.sqrt(LOT.wall.R ** 2 - x * x);
+/** A point `r` m in from the wall's line along the radial at x (from the arc's point there toward its centre). */
+const inward = (x: number, r: number) => { const a = Math.asin(x / LOT.wall.R); return { x: x - Math.sin(a) * r, z: wallZ(x) - Math.cos(a) * r }; };
+/** The row's bays either side of the car's (k: bays from it, + to the right), as many as fit short of the lot's sides. */
+const ROW = Math.floor((LOT.half - 1.5 - LOT.bay.w / 2) / LOT.bay.w);
+const inStrip = (k: number) => k >= LOT.strip[0] && k <= LOT.strip[1];
+/** The bays' lines (x at the wall): between each bay and the next, the strip's sides, the row's ends; none inside the
+ *  strip. */
+const bayLines = () => Array.from({ length: 2 * ROW + 2 }, (_, i) => i - ROW - 1).filter((j) => !(inStrip(j) && inStrip(j + 1))).map((j) => (j + 0.5) * LOT.bay.w);
 
 function canvas(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void, repeat = false): THREE.CanvasTexture {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
@@ -97,9 +114,9 @@ function pine(h: number, r: number, mat: THREE.Material, trunk: THREE.Material):
 }
 
 /** The lot's face: asphalt, patched and cracked, worn lighter where the cars run in; the bays' lines along the wall,
- *  the viewing strip's hatching between them, oil under where cars stand. Drawn over the lot's extent (x right, z
- *  forward; `zTop` its far edge). */
-function lotTexture(zTop: number, bays: { x: number; z: number; yaw: number }[]): THREE.CanvasTexture {
+ *  each drawn once, the viewing strip's hatching between two of them, oil under where cars stand. Drawn over the lot's
+ *  extent (x right of the car's bay's centre, z forward; `zTop` its far edge; the road's centre at x `road`). */
+function lotTexture(zTop: number, bays: { x: number; z: number; yaw: number }[], road: number): THREE.CanvasTexture {
   const W = 2048, H = 1088, L = LOT;
   const X = (x: number) => ((x + L.half) / (2 * L.half)) * W, Z = (z: number) => (1 - (z + L.entry) / (zTop + L.entry)) * H;
   const pxm = W / (2 * L.half);
@@ -112,9 +129,16 @@ function lotTexture(zTop: number, bays: { x: number; z: number; yaw: number }[])
       c.fillStyle = r() < 0.5 ? '#4e4757' : '#625a69'; c.fillRect(x, y, w, h);
       c.strokeStyle = 'rgba(30,24,36,0.6)'; c.lineWidth = 3; c.strokeRect(x, y, w, h);
     }
-    // the worn tracks in from the road, lighter where the tyres run
-    c.fillStyle = 'rgba(140,128,140,0.22)';
-    for (const dx of [-0.85, 0.85]) c.fillRect(X(1.9 + dx) - 0.35 * pxm, Z(-2), 0.7 * pxm, H - Z(-2));
+    // the worn tracks in from the road, lighter where the tyres run: along the car's path off its lane into its bay
+    c.strokeStyle = 'rgba(140,128,140,0.22)'; c.lineWidth = 0.7 * pxm; c.lineCap = 'butt';
+    for (const dx of [-0.85, 0.85]) {
+      c.beginPath();
+      for (let z = -L.entry; z <= PARKED_Z + 1.6; z += 0.5) {
+        const p = bayPath(PARKED_Z - z), n = Math.hypot(1, p.slope); // (each wheel square off the path)
+        c.lineTo(X(p.lateral - BAY.x + dx / n), Z(z - (dx * p.slope) / n));
+      }
+      c.stroke();
+    }
     // the grain: a speck, light and dark
     for (let i = 0; i < 60000; i++) { c.fillStyle = r() < 0.5 ? 'rgba(20,16,26,0.35)' : 'rgba(170,160,170,0.3)'; c.fillRect(r() * W, r() * H, 2, 2); }
     // cracks
@@ -127,23 +151,25 @@ function lotTexture(zTop: number, bays: { x: number; z: number; yaw: number }[])
     }
     // oil in the bays, under where the engines stand
     for (const b of bays) { c.fillStyle = 'rgba(22,16,26,0.45)'; c.beginPath(); c.ellipse(X(b.x - Math.sin(b.yaw) * 1.6), Z(b.z + Math.cos(b.yaw) * 1.6 - 1.0), 0.6 * pxm, 0.9 * pxm, -b.yaw, 0, Math.PI * 2); c.fill(); }
-    // the bays' lines: radial off the wall, between each bay and the next
+    // the bays' lines: radial off the wall, one between each bay and the next and one at each end of the row (the
+    // viewing strip's sides among them, each drawn once: the strip had its own edge beside a bay's line, the two
+    // crossing at its corner)
     c.strokeStyle = '#ece4cf'; c.lineWidth = 0.13 * pxm; c.lineCap = 'butt';
-    const edge = (x: number) => { const a = Math.asin(x / L.wall.R), zw = wallZ(x) - 0.35; return { x0: x, z0: zw, x1: x - Math.sin(a) * L.bay.d, z1: zw - Math.cos(a) * L.bay.d }; };
-    const line = (x: number) => { const e = edge(x); c.beginPath(); c.moveTo(X(e.x0), Z(e.z0)); c.lineTo(X(e.x1), Z(e.z1)); c.stroke(); };
-    for (const [a, b] of [[-L.half + 1, L.clear[0]], [L.clear[1], L.half - 1]] as const) for (let x = a; x <= b + 0.01; x += L.bay.w) line(x);
-    // the viewing strip in front of the car: hatched, edged, kept clear
-    c.save();
-    c.beginPath();
-    const steps = 24;
-    for (let i = 0; i <= steps; i++) { const x = L.clear[0] + ((L.clear[1] - L.clear[0]) * i) / steps; c.lineTo(X(x), Z(wallZ(x) - 0.35)); }
-    for (let i = steps; i >= 0; i--) { const x = L.clear[0] + ((L.clear[1] - L.clear[0]) * i) / steps; c.lineTo(X(x), Z(wallZ(x) - 3.4)); }
-    c.closePath(); c.stroke(); c.clip();
-    c.lineWidth = 0.11 * pxm; c.strokeStyle = 'rgba(236,228,207,0.85)';
-    for (let x = -W; x < 2 * W; x += 0.9 * pxm) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x + H * 0.8, H); c.stroke(); }
-    c.restore();
+    const r0 = 0.35, r1 = r0 + L.bay.d;
+    for (const x of bayLines()) { const a = inward(x, r0), b = inward(x, r1); c.beginPath(); c.moveTo(X(a.x), Z(a.z)); c.lineTo(X(b.x), Z(b.z)); c.stroke(); }
+    // the viewing strip between two of them: closed across its back, hatched within
+    {
+      const xa = (L.strip[0] - 0.5) * L.bay.w, xb = (L.strip[1] + 0.5) * L.bay.w, ab = inward(xa, r1), bb = inward(xb, r1), steps = 24;
+      c.beginPath(); c.moveTo(X(ab.x), Z(ab.z)); c.lineTo(X(bb.x), Z(bb.z)); c.stroke();
+      c.save(); c.beginPath();
+      for (let i = 0; i <= steps; i++) { const p = inward(xa + ((xb - xa) * i) / steps, r0); c.lineTo(X(p.x), Z(p.z)); }
+      c.lineTo(X(bb.x), Z(bb.z)); c.lineTo(X(ab.x), Z(ab.z)); c.closePath(); c.clip();
+      c.lineWidth = 0.11 * pxm; c.strokeStyle = 'rgba(236,228,207,0.85)';
+      for (let x = -W; x < 2 * W; x += 0.9 * pxm) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x + H * 0.8, H); c.stroke(); }
+      c.restore();
+    }
     // a scuffed stop bar where the road comes in
-    c.fillStyle = 'rgba(236,228,207,0.7)'; c.fillRect(X(-ROAD_HALF + 0.3), Z(-L.entry + 0.6), X(ROAD_HALF - 0.3) - X(-ROAD_HALF + 0.3), 0.35 * pxm);
+    c.fillStyle = 'rgba(236,228,207,0.7)'; c.fillRect(X(road - ROAD_HALF + 0.3), Z(-L.entry + 0.6), X(road + ROAD_HALF - 0.3) - X(road - ROAD_HALF + 0.3), 0.35 * pxm);
   });
 }
 
@@ -176,25 +202,29 @@ function vistaFace(): THREE.CanvasTexture {
   });
 }
 
-/** The overlook, in the parked car's frame: `park` the road's frame where the car stops, `lip` where the road ends;
- *  the verges reach `shoulder` m out. */
-export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; right: THREE.Vector3 }, lipAhead: number, shoulder: number): THREE.Group {
+/** The overlook, in the lot's frame: `datum` the road's frame at the lot's datum (PARKED_Z short of where the car
+ *  stops), `lip` where the road ends; the verges reach `shoulder` m out. */
+export function buildLookout(datum: { pos: THREE.Vector3; fwd: THREE.Vector3; right: THREE.Vector3 }, lipAhead: number, shoulder: number): THREE.Group {
   const L = LOT, root = new THREE.Group();
-  const fwd = V(park.fwd.x, 0, park.fwd.z).normalize(), right = V(park.right.x, 0, park.right.z).normalize(), y0 = park.pos.y;
+  const fwd = V(datum.fwd.x, 0, datum.fwd.z).normalize(), right = V(datum.right.x, 0, datum.right.z).normalize(), y0 = datum.pos.y;
   // (the frame: x to the left, as the car's — a mirrored frame would mirror the sign's words)
   root.matrixAutoUpdate = false;
-  root.matrix.makeBasis(right.clone().negate(), V(0, 1, 0), fwd).setPosition(park.pos.x, y0, park.pos.z);
-  const g = new THREE.Group(); root.add(g);
-  /** A place on the lot: x right of the road's centre, y up off it, z forward of the car's stop. */
+  root.matrix.makeBasis(right.clone().negate(), V(0, 1, 0), fwd).setPosition(datum.pos.x, y0, datum.pos.z);
+  // (the lot laid round the car's bay, BAY.x right of the road's centre)
+  const g = new THREE.Group(); g.position.set(-BAY.x, 0, 0); root.add(g);
+  /** A place on the lot: x right of the car's bay's centre line, y up off the road, z forward of the lot's datum. */
   const P = (x: number, y: number, z: number) => V(-x, y, z);
+  /** The road's centre line, in the lot's x. */
+  const road = -BAY.x;
   const put = (geo: THREE.BufferGeometry, m: THREE.Material, p: THREE.Vector3, yaw = 0, to: THREE.Object3D = g) => { const o = new THREE.Mesh(geo, m); o.position.copy(p); o.rotation.y = yaw; to.add(o); return o; };
   /** Facing out from the wall at x (radians about y, in the frame: 0 is forward). */
   const outAt = (x: number) => -Math.asin(x / L.wall.R);
   const steel = toon({ color: WORLD.post }), concrete = toon({ color: '#b9ae9f' }), dark = toon({ color: DARK }), trunk = toon({ color: '#2a1f22' });
 
-  // the bays along the wall, either side of the clear strip: where their wheel stops stand, where cars park
-  const bays: { x: number; z: number; yaw: number }[] = [];
-  for (const [a, b] of [[-L.half + 1, L.clear[0]], [L.clear[1], L.half - 1]] as const) for (let x = a + L.bay.w / 2; x < b; x += L.bay.w) bays.push({ x, z: wallZ(x), yaw: outAt(x) });
+  // the bays along the wall, the car's at the middle, but for the viewing strip's: where their wheel stops stand,
+  // where cars park (k: from the car's)
+  const bays: { k: number; x: number; z: number; yaw: number }[] = [];
+  for (let k = -ROW; k <= ROW; k++) if (!inStrip(k)) { const x = k * L.bay.w; bays.push({ k, x, z: wallZ(x), yaw: outAt(x) }); }
 
   // the lot: its surface over the road's end, out to the wall (a grid bent to the wall's arc)
   {
@@ -205,13 +235,13 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
     }
     geo.computeVertexNormals();
     // (over the road's own end, drawn over it at any distance)
-    const lot = new THREE.Mesh(geo, toon({ map: lotTexture(zTop, bays), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
+    const lot = new THREE.Mesh(geo, toon({ map: lotTexture(zTop, bays, road), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
     lot.name = 'lot'; g.add(lot);
     // its kerb round the sides and either side of where the road comes in; its gravel shoulder beyond
     const kerb = (x0: number, z0: number, x1: number, z1: number) => { const d = V(x1 - x0, 0, z1 - z0); put(new THREE.BoxGeometry(0.25, 0.15, d.length()), concrete, P((x0 + x1) / 2, 0.075, (z0 + z1) / 2), Math.atan2(-(x1 - x0), z1 - z0)); };
     for (const s of [-1, 1]) {
       kerb(s * L.half, -L.entry, s * L.half, wallZ(L.half) - 0.2);
-      kerb(s * L.half, -L.entry, s * (ROAD_HALF + 0.6), -L.entry);
+      kerb(s * L.half, -L.entry, road + s * (ROAD_HALF + 0.6), -L.entry);
     }
     const gravel = new THREE.Mesh(new THREE.RingGeometry(L.half, L.half + 7, 40, 1, -Math.PI / 2 + 0.6, 2 * Math.PI - 1.2), scrubGround(toon({ color: '#7a6d62' }), '#2a3229', 0.3));
     gravel.rotation.x = -Math.PI / 2; gravel.position.set(0, -0.02, -1.5); gravel.scale.set(1, 0.62, 1); g.add(gravel);
@@ -239,20 +269,21 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
     }
   }
 
-  // the wheel stops, and two cars parked dark in the bays (one either side, noses to the wall)
+  // the wheel stops (the car's front tyres come up against its own), and cars parked dark in the bays, noses to the
+  // wall, their front tyres at their stops
   {
-    for (const b of bays) put(new THREE.BoxGeometry(1.75, 0.13, 0.22), concrete, P(b.x - Math.sin(-b.yaw) * 0.85, 0.065, b.z - Math.cos(b.yaw) * 0.85 - 0.35), b.yaw);
-    const parked: [number, string][] = [[1, '#232b38'], [bays.length - 3, '#3a2731']];
-    for (const [i, colour] of parked) {
-      const b = bays[i]!, car = sedan({ color: colour, length: 4.7 });
-      car.position.copy(P(b.x - Math.sin(-b.yaw) * 3.2, 0, b.z - Math.cos(b.yaw) * 3.2 - 0.35)); car.rotation.y = b.yaw; g.add(car);
+    const at = (b: (typeof bays)[number], r: number) => { const p = inward(b.x, r); return P(p.x, 0, p.z); };
+    for (const b of bays) put(new THREE.BoxGeometry(1.75, 0.13, 0.22), concrete, at(b, L.bay.stop).setY(0.065), b.yaw);
+    for (const [k, colour] of L.parked) {
+      const b = bays.find((q) => q.k === k)!, car = sedan({ color: colour, length: 4.7 });
+      car.position.copy(at(b, L.bay.stop + 0.11 + (4.7 / 2 - 0.85) + 0.3)); car.rotation.y = b.yaw; g.add(car); // (kit.ts sedan: its wheels 0.85 m in from its ends, 0.3 m in radius)
     }
   }
 
   // at the wall: two coin telescopes looking out, a bench facing the view, a bin
   {
     const paint = toon({ color: '#2f5f52' }), lens = toon({ color: '#0e1216' }), chrome = toon({ color: WORLD.chrome });
-    for (const x of [-3.2, 7.6]) {
+    for (const x of [5.0, 11.3]) { // (in the viewing strip, either end of it)
       const v = new THREE.Group(); v.position.copy(P(x, 0, wallZ(x) - 0.95)); v.rotation.y = outAt(x); g.add(v);
       put(new THREE.CylinderGeometry(0.28, 0.32, 0.06, 16), concrete, V(0, 0.03, 0), 0, v); // its footing
       put(new THREE.CylinderGeometry(0.06, 0.085, 1.05, 12), paint, V(0, 0.58, 0), 0, v); // the pedestal
@@ -269,13 +300,13 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
       put(new THREE.BoxGeometry(0.3, 0.05, 0.2), paint, V(0, 0.15, -0.12), 0, head); // its hood over the eyepieces
     }
     // the bench: slats on cast-iron ends, its back to the lot
-    const wood = toon({ color: '#6a4632' }), iron = toon({ color: '#211c24' }), bx = 3.8, bench = new THREE.Group();
+    const wood = toon({ color: '#6a4632' }), iron = toon({ color: '#211c24' }), bx = 7.1, bench = new THREE.Group();
     bench.position.copy(P(bx, 0, wallZ(bx) - 1.25)); bench.rotation.y = outAt(bx); g.add(bench);
     for (const s of [-0.85, 0.85]) { put(new THREE.BoxGeometry(0.07, 0.44, 0.48), iron, V(s, 0.22, 0), 0, bench); put(new THREE.BoxGeometry(0.07, 0.5, 0.06), iron, V(s, 0.68, -0.24), 0, bench).rotation.x = -0.2; }
     for (let k = 0; k < 3; k++) put(new THREE.BoxGeometry(2, 0.04, 0.13), wood, V(0, 0.46, -0.16 + k * 0.15), 0, bench);
     for (let k = 0; k < 2; k++) put(new THREE.BoxGeometry(2, 0.11, 0.035), wood, V(0, 0.62 + k * 0.17, -0.25 - 0.035 * k), 0, bench).rotation.x = -0.2;
     // the bin: a steel can with its domed lid and its mouth
-    const bin = toon({ color: '#33473c' }), bnx = 6.1, bp = P(bnx, 0, wallZ(bnx) - 1.0);
+    const bin = toon({ color: '#33473c' }), bnx = 9.0, bp = P(bnx, 0, wallZ(bnx) - 1.0);
     put(new THREE.CylinderGeometry(0.3, 0.28, 0.9, 16), bin, bp.clone().setY(0.45));
     for (const y of [0.18, 0.72]) put(new THREE.TorusGeometry(0.3, 0.02, 6, 20), bin, bp.clone().setY(y)).rotation.x = Math.PI / 2;
     put(new THREE.SphereGeometry(0.31, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), bin, bp.clone().setY(0.9));
@@ -288,7 +319,7 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
     const head = lampMaterial('#ffcf8a'), pole = toon({ color: '#3b3640' });
     const pool = (x: number, z: number, r: number) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 32), glowMaterial('#ffb35a', 0.62, true)); m.rotation.x = -Math.PI / 2; m.position.copy(P(x, 0.06, z)); g.add(m); };
     const light = (x: number, y: number, z: number, i: number, reach: number) => { const l = new THREE.PointLight('#ffb766', i, reach, 1.5); l.position.copy(P(x, y, z)); g.add(l); };
-    for (const [x, z, toward] of [[16.5, -3, -1], [12.2, wallZ(12.2) - 0.8, -1]] as const) {
+    for (const [x, z, toward] of [[16.5, -3, -1], [10.3, wallZ(10.3) - 0.8, -1]] as const) {
       const h = 7.4, arm = 1.8;
       put(new THREE.CylinderGeometry(0.07, 0.12, h, 10), pole, P(x, h / 2, z));
       put(new THREE.CylinderGeometry(0.2, 0.26, 0.5, 10), pole, P(x, 0.25, z)); // its base
@@ -321,7 +352,7 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
     const scrubM: THREE.Matrix4[] = [], q = new THREE.Quaternion(), up = V(0, 1, 0);
     for (let i = 0; i < 140; i++) { // round the lot's edge, not ahead of the wall nor on the road in
       const a = hash(i, 11) * Math.PI * 2, r = 1 + 11 * hash(i, 12) ** 1.4, x = Math.cos(a) * (L.half + r), z = -1.5 + Math.sin(a) * (L.entry + r) * 0.9;
-      if (z > wallZ(Math.min(Math.abs(x), L.half - 0.01)) - 1 || (Math.abs(x) < ROAD_HALF + 2 && z < 0)) continue;
+      if (z > wallZ(Math.min(Math.abs(x), L.half - 0.01)) - 1 || (Math.abs(x - road) < ROAD_HALF + 2 && z < 0)) continue;
       const sz = 0.45 + 0.9 * hash(i, 13);
       scrubM.push(new THREE.Matrix4().compose(P(x, -0.15 - 0.3 * hash(i, 14), z), q.setFromAxisAngle(up, hash(i, 15) * 6).clone(), V(sz * 1.3, sz * 0.75, sz)));
     }
@@ -337,7 +368,7 @@ export function buildLookout(park: { pos: THREE.Vector3; fwd: THREE.Vector3; rig
 
   // the VISTA POINT sign where the road comes into the lot
   {
-    const x = ROAD_HALF + 1.6, z = -L.entry - 1.5;
+    const x = road + ROAD_HALF + 1.6, z = -L.entry - 1.5;
     put(new THREE.BoxGeometry(0.1, 2.4, 0.1), steel, P(x, 1.2, z));
     const face = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.6), new THREE.MeshBasicMaterial({ map: vistaFace() }));
     face.position.copy(P(x, 2.2, z - 0.06)); face.rotation.y = Math.PI; g.add(face);

@@ -53,6 +53,18 @@ export const SET_FLOOR = 40;
 
 /** How far right of the road's centre the car drives (m): in its lane. */
 export const LANE = 1.9;
+/** Its bay at the overlook (the user, 2026-10-20: "it might also be nice if they pull into a parking spot instead of
+ *  just parking right in front of all the stuff"): where it stops, m right of the road's centre (left of it: the lot
+ *  is laid round this bay, look/lookout.ts); it turns in off its lane over `over` m of road, straight again `settle` m
+ *  before it stops. An S (smootherstep: its curvature, and so the turn of the car, eased in and out — no jerk), the car
+ *  pointed along it. */
+export const BAY = { x: -2.4, over: 26, settle: 1 };
+/** The car's path into its bay, `short` m of road before it stops: m right of the road's centre, and the path's slope
+ *  (m across per m along). */
+export function bayPath(short: number): { lateral: number; slope: number } {
+  const u = Math.min(1, Math.max(0, 1 - (short - BAY.settle) / BAY.over)), d = BAY.x - LANE;
+  return { lateral: LANE + d * u * u * u * (u * (6 * u - 15) + 10), slope: (d * 30 * u * u * (1 - u) * (1 - u)) / BAY.over };
+}
 /** The opening's cuts (s, downbeats: the drop, the two of them, the lot, the pull-out) and how far from the sign
  *  its first shot stands (m). */
 export const SIGN_SHOT = { dist: 7.5, push: 0.5, over: 3 };
@@ -121,8 +133,16 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const stretches = resolveStretches(audio, lyrics);
   const motion = motionFor(stretches, audio, (s) => SETS[s.id]?.speed?.(s, audio) ?? []), route = routeFor(stretches, motion);
   const tunnels = tunnelsOf(stretches, motion, audio.beats);
-  // the car keeps to its lane (the right one), off the centre line
-  const carFrame = (t: number, ahead = 0) => { const f = route.frameAt(motion.distanceAt(t) + ahead); return { ...f, pos: f.pos.clone().addScaledVector(f.right, LANE) }; };
+  // the car keeps to its lane (the right one), off the centre line, until it turns into its bay at the overlook
+  const parkS = motion.distanceAt(stretches[stretches.length - 1]!.end);
+  const carFrame = (t: number, ahead = 0): RouteFrame => {
+    const s = motion.distanceAt(t) + ahead, f = route.frameAt(s), { lateral, slope } = bayPath(parkS - s);
+    if (slope === 0) return { ...f, pos: f.pos.clone().addScaledVector(f.right, lateral) };
+    // (pointed along its path: turned toward the bay by the slope of the S)
+    const yaw = Math.atan(slope), c = Math.cos(yaw), sn = Math.sin(yaw);
+    const fwd = f.fwd.clone().multiplyScalar(c).addScaledVector(f.right, sn).normalize(), right = f.right.clone().multiplyScalar(c).addScaledVector(f.fwd, -sn).normalize();
+    return { pos: f.pos.clone().addScaledVector(f.right, lateral), fwd, right, up: f.up, heading: Math.atan2(fwd.x, fwd.z) };
+  };
   // the lyrics on their carriers: the set-pieces' stretches on their own surfaces (sets/), framed as they say
   const solo = emphasisOf(lyrics.lines), nextStart = (i: number) => lyrics.lines[i + 1]?.words[0]?.start ?? Infinity;
   const setFrames = new Map<string, SetFrame>(), clears: Placed['clear'] = [], setBlocks: Block[] = [], plans: Record<string, unknown> = {}, ofSets: Carrier[] = [], openings: { side: number; a: number; b: number }[] = [];
@@ -251,7 +271,10 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const pull: Target = (t) => {
     const u = Math.min(1, Math.max(0, (t - t0) / (FINALE.endCard - t0))), e = u ** END.pull, a = u * u * (3 - 2 * u), f = carFrame(t);
     const back = back0 * (END.back / back0) ** e; // (by ratio: it falls back at an even rate to the eye)
-    const eye = f.pos.clone().addScaledVector(flat(f.fwd), -back).addScaledVector(flat(f.right), side0 * (1 - e)).add(new THREE.Vector3(0, up0 + (END.up - up0) * e, 0));
+    // (behind the car along the road, not its heading: it follows the car across into its bay without swinging round
+    // as the car turns in)
+    const road = route.frameAt(motion.distanceAt(t));
+    const eye = f.pos.clone().addScaledVector(flat(road.fwd), -back).addScaledVector(flat(road.right), side0 * (1 - e)).add(new THREE.Vector3(0, up0 + (END.up - up0) * e, 0));
     return lookFrom(eye, aim0.clone().lerp(view, a));
   };
   // (the last line's own shot cuts straight onto the take: at its cut the take is that line's framing)

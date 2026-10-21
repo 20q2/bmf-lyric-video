@@ -27,7 +27,7 @@ import { CORNER } from './sets/intro';
 import { type Chorus2Plan, laneEdge } from './sets/chorus2';
 import { buildDash } from '../look/dash';
 import { buildCast } from '../look/cast3d';
-import { LOT, buildClimbHills, buildLookout, dressHill, scrubGround } from '../look/lookout';
+import { LOT, PARKED_Z, buildClimbHills, buildLookout, dressHill, scrubGround } from '../look/lookout';
 import { CAR, WHEEL } from './cabin';
 export { CAR };
 import { candyPaint, chrome as heroChrome } from '../look/hero';
@@ -43,8 +43,8 @@ export const BEACH = 42;
 const BASE = 12000;
 /** Where the road climbs above the plain, its verges slope down to it this much out per metre down (an embankment). */
 export const SLOPE = 1;
-/** The road runs on this far past where the car parks, to the overlook's edge (m). */
-const OVERLOOK_LIP = 9;
+/** The road runs on this far past the overlook lot's datum, to its edge (m: the wall's apex, look/lookout.ts LOT). */
+const OVERLOOK_LIP = LOT.wall.z;
 const STEP = 2;
 export { ROAD_START }; // (route.ts: the road starts this far behind the light)
 
@@ -317,8 +317,9 @@ export function buildWorld(drive: Drive): THREE.Group {
   // ground either side (the sea to the left along the coast), the road, its centre dashes
   const grass = new THREE.Color(WORLD.ground), sand = new THREE.Color(WORLD.sand), sea = new THREE.Color(WORLD.sea), asphalt = new THREE.Color(WORLD.asphalt);
   const seaLeft = (s: number) => !!BLOCKS[stretchAtS(s).id]!.seaLeft;
-  // the road ends at the overlook, a few metres past where the car parks: a cliff, the city below
-  const end = Math.min(route.length, motion.distanceAt(drive.stretches[drive.stretches.length - 1]!.end) + OVERLOOK_LIP);
+  // the road ends at the overlook, a few metres past where the car parks (nose to the wall in its bay: the lot's datum
+  // is PARKED_Z short of it): a cliff, the city below
+  const end = Math.min(route.length, motion.distanceAt(drive.stretches[drive.stretches.length - 1]!.end) - PARKED_Z + OVERLOOK_LIP);
   const named = <T extends THREE.Object3D>(o: T, name: string) => { o.name = name; return o; };
   // each section its own ground: the city's paving, the freeway's concrete, the neighbourhood's lawns, the coast's sand
   const groundOf = (s: number) => { const g0 = GROUND[stretchAtS(s).id]; return g0 ? new THREE.Color(g0) : grass; };
@@ -967,9 +968,11 @@ export const STREETLIGHTS = { from: 92, beats: 2, gap: 18, lateral: 6.2, h: 7.2,
 function buildStreetlights(drive: Drive): THREE.Group {
   const { route, motion } = drive, g = new THREE.Group(), at: number[] = [];
   const signs = drive.carriers.filter((c) => c.kind === 'sign' || c.kind === 'street' || c.kind === 'gantry' || c.kind === 'arch');
+  // (none in the overlook's lot, or on its kerb where the road comes in: it has its own lamps)
+  const lot = motion.distanceAt(drive.stretches[drive.stretches.length - 1]!.end) - PARKED_Z - LOT.entry - 2;
   for (const b of drive.beats.filter((b, i) => b >= STREETLIGHTS.from && i % STREETLIGHTS.beats === 0)) {
     const s = motion.distanceAt(b);
-    if (at.length && s - at[at.length - 1]! < STREETLIGHTS.gap) continue;
+    if (s > lot || (at.length && s - at[at.length - 1]! < STREETLIGHTS.gap)) continue;
     if (nearTunnel(drive.tunnels, s, TUNNEL_CLEAR) || signs.some((c) => Math.abs(c.s - s) < 12)) continue;
     // nor where the camera stands across the road from a face on the left (it would stand beside the lens)
     if (drive.carriers.some((c) => PAIRABLE.has(c.kind) && Math.abs(c.s - s) < c.w / 2 + 28)) continue;
