@@ -183,6 +183,10 @@ export class CarrierArt {
   readonly texture: THREE.CanvasTexture;
   private c: CanvasRenderingContext2D;
   private key = '';
+  /** The time it was last drawn for. */
+  private at = -Infinity;
+  /** Not yet drawn for any time since its phrase started (a seek past its window: its face still blank). */
+  get unseen() { return this.at < this.carrier.phrase.start; }
   private style: Style;
   /** The board's ad art (its product, his portrait: the same at every draw), painted once and laid in after: repainted
    *  at each step of a lyric's reveal, his portrait's thousands of triangles cost ~350 ms of the GPU a frame — through
@@ -217,6 +221,7 @@ export class CarrierArt {
   }
 
   update(t: number) {
+    this.at = t;
     const falling = this.carrier.phrase.words.some((w) => /^dropping/i.test(w.w) && t >= w.start && t < w.start + 0.8);
     const key = `${karaokeKey(this.carrier.phrase.words, t)}:${Math.round(dissolveAt(this.carrier, t) * 20)}:${Math.round(revealAt(this.carrier, t) * FLIP.steps)}:${Math.round(punchAt(this.carrier, t) * 10)}:${falling ? Math.round(t * 30) : 0}:${Math.round(staleAt(this.carrier, t) * 8)}`;
     if (key === this.key) return;

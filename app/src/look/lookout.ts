@@ -285,7 +285,9 @@ export function buildLookout(datum: { pos: THREE.Vector3; fwd: THREE.Vector3; ri
     const paint = toon({ color: '#2f5f52' }), lens = toon({ color: '#0e1216' }), chrome = toon({ color: WORLD.chrome });
     for (const x of [5.0, 11.3]) { // (in the viewing strip, either end of it)
       const v = new THREE.Group(); v.position.copy(P(x, 0, wallZ(x) - 0.95)); v.rotation.y = outAt(x); g.add(v);
-      put(new THREE.CylinderGeometry(0.28, 0.32, 0.06, 16), concrete, V(0, 0.03, 0), 0, v); // its footing
+      // its footing, a plinth standing well up off the lot (3 cm over it, the lot's paint — drawn pulled toward the lens —
+      // came through its top from the end's low eye: the user, 2026-10-20)
+      put(new THREE.CylinderGeometry(0.28, 0.32, 0.16, 16), concrete, V(0, 0.08, 0), 0, v);
       put(new THREE.CylinderGeometry(0.06, 0.085, 1.05, 12), paint, V(0, 0.58, 0), 0, v); // the pedestal
       put(new THREE.BoxGeometry(0.16, 0.2, 0.12), paint, V(0, 0.95, -0.08), 0, v); // the coin box
       put(new THREE.BoxGeometry(0.03, 0.03, 0.01), chrome, V(0, 0.99, -0.145), 0, v); // its slot

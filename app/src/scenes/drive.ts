@@ -391,7 +391,7 @@ export default class DriveScene extends Scene {
     // the hill sign stays floodlit to the end (it's the view they parked for); the beacon on its mast blinks
     for (const m of this.beacons) m.visible = (t % BEACON.every) < BEACON.on;
     // the lyric faces near now
-    this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if (t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) a.update(t); });
+    this.arts.forEach((a, i) => { const p = d.carriers[i]!.phrase; if ((t > p.start - FACE_WINDOW && t < p.end + FACE_WINDOW) || (a.unseen && t > p.start)) a.update(t); }); // (and once after a seek past its window: CRUISE ALL NIGHT was blank sought to the end)
     placeCamera(this.cam, d.camera(t));
     // (the end's lens, behind the two of them, a metre clear of the car, looks out over the city 2 km off: its near plane
     // pulled out, the depth buffer resolves the towers finely enough that their windows stop flickering — at 0.1 m it

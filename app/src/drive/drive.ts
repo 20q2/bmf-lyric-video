@@ -267,14 +267,15 @@ export function makeDrive(audio: AudioData, lyrics: Lyrics): Drive {
   const last = phraseShots[phraseShots.length - 1]!, t0 = resolveAt(last.at), from = last.to(t0), f0 = carFrame(t0);
   const e0 = eyeOf(from).sub(f0.pos), back0 = -e0.dot(flat(f0.fwd)), side0 = e0.dot(flat(f0.right)), up0 = e0.y;
   const aim0 = new THREE.Vector3(from.tx, from.ty, from.tz), park = carFrame(audio.duration), pf = flat(park.fwd), pr = flat(park.right);
+  const road0 = route.frameAt(motion.distanceAt(t0)), lane0 = f0.pos.clone().sub(road0.pos).dot(flat(road0.right)); // (the car's lane, off the road's centre)
   const view = park.pos.clone().addScaledVector(pf, END.look).addScaledVector(pr, END.side).add(new THREE.Vector3(0, -END.under, 0));
   const pull: Target = (t) => {
     const u = Math.min(1, Math.max(0, (t - t0) / (FINALE.endCard - t0))), e = u ** END.pull, a = u * u * (3 - 2 * u), f = carFrame(t);
     const back = back0 * (END.back / back0) ** e; // (by ratio: it falls back at an even rate to the eye)
-    // (behind the car along the road, not its heading: it follows the car across into its bay without swinging round
-    // as the car turns in)
-    const road = route.frameAt(motion.distanceAt(t));
-    const eye = f.pos.clone().addScaledVector(flat(road.fwd), -back).addScaledVector(flat(road.right), side0 * (1 - e)).add(new THREE.Vector3(0, up0 + (END.up - up0) * e, 0));
+    // (behind the car's lane along the road, not the car: it lets them turn off into their bay and keeps falling back
+    // down the road — it slid across with them: the user, 2026-10-20, "the camera shouldn't pan to the left with it")
+    const road = route.frameAt(motion.distanceAt(t)), lane = road.pos.clone().addScaledVector(flat(road.right), lane0).setY(f.pos.y);
+    const eye = lane.addScaledVector(flat(road.fwd), -back).addScaledVector(flat(road.right), side0 * (1 - e)).add(new THREE.Vector3(0, up0 + (END.up - up0) * e, 0));
     return lookFrom(eye, aim0.clone().lerp(view, a));
   };
   // (the last line's own shot cuts straight onto the take: at its cut the take is that line's framing)
