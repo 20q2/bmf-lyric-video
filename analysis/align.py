@@ -89,10 +89,14 @@ FIX = {
     (47, 3): dict(start=176.30, end=176.40, conf=0.4),
     (47, 4): dict(start=176.40, end=176.50, conf=0.4),
     (47, 5): dict(start=176.50, end=176.62, conf=0.4),
-    # L29 bridge "...fast, (oh) it won't last": the lead's "it won't last" is 123.46-124.18 (onset 1.5, 277 -> 316 Hz,
-    # "last" falling to 155 Hz); the 415 Hz note 122.9-123.42 before it is the "oh" ad-lib. "fast" ends at 122.85.
+    # L29 bridge "...fast, it won't last", sung as L31's "we might crash" (set by the user's ear): "it won't" on the
+    # 415 Hz note after "fast" (122.99-123.42; it had been taken for an "oh" ad-lib), "last" the low phrase from 123.44
+    # (277 -> 314 Hz, falling to 156) held over the 415 Hz note to 124.80. (The user, 2026-10-20: "it won't last is a
+    # little bit delayed in its highlighting".)
     (29, 2): dict(end=122.85, conf=0.7),
-    (29, 3): dict(start=123.46, conf=0.75),
+    (29, 3): dict(start=122.99, end=123.22, conf=0.7),
+    (29, 4): dict(start=123.23, end=123.43, conf=0.7),
+    (29, 5): dict(start=123.44, conf=0.7),
     # L30 bridge "Tryna": after the "oh" ad-lib (420 Hz, 124.22-124.84) and a silence, the lead re-enters at 125.29
     # (onset 2.5, 282 Hz). Whisper: "make" 125.62.
     (30, 0): dict(start=125.29, conf=0.75),

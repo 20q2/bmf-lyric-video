@@ -1820,7 +1820,7 @@
       "text": "Blowin' money fast, it won't last",
       "section": "bridge1",
       "start": 120.64,
-      "end": 124.801,
+      "end": 124.796,
       "words": [
         {
           "w": "Blowin'",
@@ -1842,21 +1842,21 @@
         },
         {
           "w": "it",
-          "start": 123.46,
-          "end": 123.7,
-          "conf": 0.75
+          "start": 122.99,
+          "end": 123.22,
+          "conf": 0.7
         },
         {
           "w": "won't",
-          "start": 123.7,
-          "end": 123.913,
-          "conf": 0.44
+          "start": 123.23,
+          "end": 123.43,
+          "conf": 0.7
         },
         {
           "w": "last",
-          "start": 123.913,
-          "end": 124.801,
-          "conf": 0.68
+          "start": 123.44,
+          "end": 124.796,
+          "conf": 0.7
         }
       ]
     },

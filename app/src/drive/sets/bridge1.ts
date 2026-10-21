@@ -151,7 +151,7 @@ export const BRIDGE1: SetPiece = {
       const sA = paint(A, 0, eyeS(A.end) - 18.5), sB = paint(B, 1, sA + 11);
       take([A, B], [
         { t: T0, eye: [eyeS(T0), E.x, E.y], at: [sA - 1.5, W0, aimY] },
-        { t: T1 + 0.5, eye: [eyeS(T1 + 0.5), E.x, E.y], at: [sB + 1.5, W0, aimY] },
+        { t: T1 + 0.5, eye: [eyeS(T1 + 0.5), E.x, E.y], at: [sB + 4.5, W0, aimY] },
       ], true);
     }
 
