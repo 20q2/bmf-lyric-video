@@ -33,6 +33,7 @@ import { poseCast } from '../look/cast3d';
 import { VIEW } from '../explore/view';
 import { buildRig, poseRig } from '../explore/rig';
 import { floorUnder, warmFloor } from '../explore/floor';
+import { CODA_ON, RIG_SIZE, buildCoda } from '../explore/coda';
 import { FINALE } from '../drive/drive';
 import { AUDIBLE } from '../drive/stretches';
 import { carMatrix } from '../drive/carriers';
@@ -170,6 +171,8 @@ export default class DriveScene extends Scene {
   /** The video's camera, shown standing in the world while the site's explorer looks from elsewhere (explore/view.ts),
    *  and where it stands this frame. */
   private rig = buildRig();
+  /** The coda (explore/coda.ts, ?coda=1): its roof paint and its crane over the opening. */
+  private coda: ReturnType<typeof buildCoda> | null = null;
   private shot = new THREE.Object3D();
 
   override async init() {
@@ -218,6 +221,7 @@ export default class DriveScene extends Scene {
     // (the shadows are the cascades' (look/shadows.ts): the sun and the moon cast nothing themselves)
     this.world.add(...this.shade.objects);
     this.world.add(this.rig);
+    if (CODA_ON) { this.coda = buildCoda(this.drive); this.world.add(this.coda.group); }
     VIEW.carAt = (t) => this.drive.carFrame(t);
     VIEW.videoAt = (t) => this.drive.camera(t);
     VIEW.floorAt = (p) => floorUnder(this.world, p);
@@ -410,12 +414,12 @@ export default class DriveScene extends Scene {
     // pulled out, the depth buffer resolves the towers finely enough that their windows stop flickering — at 0.1 m it
     // couldn't tell a window from the face of a tower a metre behind another's, nor the city's plain from the ground)
     // (the site's explorer looks from its own eye, the video's camera standing where it was placed: explore/view.ts)
-    const eye = VIEW.eye;
+    const eye = VIEW.eye ?? this.coda?.eye(t) ?? null;
     this.rig.visible = !!eye;
     if (eye) {
       this.shot.position.copy(this.cam.position); this.shot.quaternion.copy(this.cam.quaternion);
       this.cam.position.copy(eye.pos); this.cam.quaternion.copy(eye.quat); this.cam.updateMatrixWorld();
-      poseRig(this.rig, this.shot, eye.pos, t);
+      poseRig(this.rig, this.shot, eye.pos, t, this.coda && !VIEW.eye ? RIG_SIZE : 1);
     }
     { const near = eye ? LENS.near : d.lastCut !== null && t >= d.lastCut ? END_NEAR : LENS.near, fov = eye ? eye.fov : LENS.fov;
       if (this.cam.near !== near || this.cam.fov !== fov) { this.cam.near = near; this.cam.fov = fov; this.cam.updateProjectionMatrix(); } }
@@ -525,7 +529,7 @@ export default class DriveScene extends Scene {
       haze: 0.06 + 0.32 * NIGHT.value, // (a breath of it round the sun by day; neon in damp air by night)
       grain: 0.072, vignette: 0.22,
       zoom: 1 + (SYNC.punch[0] + SYNC.punch[1] * heft) * f.a.kick * drums,
-      exposure: 1 - gone * gone,
+      exposure: (1 - gone * gone) * (this.coda ? this.coda.fade(t) : 1),
     };
   }
 

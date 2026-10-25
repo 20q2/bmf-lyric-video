@@ -71,6 +71,17 @@ The site doesn't replace the render: `scripts/render.ts` drives the same app in 
 (`out/bmf_m6.mp4`, fb2be77). It needs `audio/song.wav` (or `--noaudio`) and ffmpeg (`source scripts/env.sh`).
 `--scale 2` renders 4K.
 
+### The coda
+
+A short clip after the video's end card pointing at the site (`src/explore/coda.ts`): the opening (song time 6–21 s)
+from a spectator's crane over the corner, the video's camera standing in the world at work, coming to rest over the
+liquor store's roof where EXPLORE THE SET is painted, as the car pulls away on the first kick. `?coda=1` plays it live
+in the player.
+
+    cd app
+    bun run render:coda    # -> ../out/bmf_coda.mp4 (the final's settings; the song's opening under it)
+    bun run append:coda    # -> ../out/bmf_m6_coda.mp4: bmf_m6.mp4 + the coda, the video stream-copied, the coda's audio faded
+
 ## The drive (app/src/drive/)
 
 - `stretches.ts`: the route table (spec §3) — each stretch's section, pace, bend, climb, home chase framing, sign kind.

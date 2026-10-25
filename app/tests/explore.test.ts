@@ -126,3 +126,28 @@ test('Fast lighting: the shadow maps drawn once empty and then left alone; culli
   c.live = true;
   for (const l of c.lights) expect(l.shadow.autoUpdate).toBe(true);
 });
+
+test('the coda: one smooth crane over the opening, above the roofs, coming to rest on the roof paint read left to right', async () => {
+  const { audio, lyrics } = await import('./data');
+  const { makeDrive } = await import('../src/drive/drive');
+  const { CODA, PAINT, cranePath, storeFrame } = await import('../src/explore/coda');
+  const { LIQUOR } = await import('../src/drive/sets/intro');
+  const drive = makeDrive(audio, lyrics), store = storeFrame(drive), path = cranePath(drive, store);
+  let last = path(CODA.from);
+  for (let t = CODA.from + 1 / 60; t <= CODA.to; t += 1 / 60) {
+    const p = path(t);
+    expect(p.eye.distanceTo(last.eye)).toBeLessThan(0.6); // (no cut: under 36 m/s)
+    expect(p.eye.y).toBeGreaterThan(12); // (over the corner's shops: 5-9 m)
+    last = p;
+  }
+  // at rest: the paint's middle near the frame's middle, its text's run across the frame left to right, and the car's
+  // way down the road the same way
+  const cam = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 3000), end = path(CODA.to);
+  cam.position.copy(end.eye); cam.lookAt(end.aim); cam.updateMatrixWorld();
+  const mid = new THREE.Vector3(0, LIQUOR.h, PAINT.z).applyMatrix4(store), right = new THREE.Vector3(-1, 0, 0).transformDirection(store);
+  const a = mid.clone().addScaledVector(right, -PAINT.w / 2).project(cam), b = mid.clone().addScaledVector(right, PAINT.w / 2).project(cam);
+  expect(Math.abs(mid.clone().project(cam).x)).toBeLessThan(0.15);
+  expect(b.x - a.x).toBeGreaterThan(1); // (left to right, and over half the frame wide)
+  const car = drive.carFrame(15.6).pos, on = drive.carFrame(CODA.to).pos;
+  expect(on.clone().project(cam).x).toBeGreaterThan(car.clone().project(cam).x);
+});

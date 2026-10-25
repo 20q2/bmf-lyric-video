@@ -8,6 +8,8 @@
     "preview": "vite preview --port 5994",
     "render:video": "bun scripts/render.ts video --samples auto --max-samples 36 --shutter 0.2 --out ../out/bmf.mp4",
     "render:draft": "bun scripts/render.ts video --preview --out ../out/bmf_draft.mp4",
+    "render:coda": "bun scripts/render.ts video --coda --samples auto --max-samples 36 --shutter 0.2 --out ../out/bmf_coda.mp4",
+    "append:coda": "bun scripts/append-coda.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
   },

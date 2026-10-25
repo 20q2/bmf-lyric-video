@@ -39,10 +39,10 @@ export function buildRig() {
 
 const _m = new THREE.Matrix4(), _s = new THREE.Vector3();
 
-/** Stands the rig where `cam` (the video's camera, placed) is, sized for an eye at `from`; its tally blinking with song
- *  time `t`. */
-export function poseRig(rig: THREE.Object3D, cam: THREE.Object3D, from: THREE.Vector3, t: number) {
-  const k = Math.max(1, cam.position.distanceTo(from) * FRAME.grow);
+/** Stands the rig where `cam` (the video's camera, placed) is, sized for an eye at `from` (at least `least` times its
+ *  own size); its tally blinking with song time `t`. */
+export function poseRig(rig: THREE.Object3D, cam: THREE.Object3D, from: THREE.Vector3, t: number, least = 1) {
+  const k = Math.max(least, cam.position.distanceTo(from) * FRAME.grow);
   rig.matrixAutoUpdate = false;
   rig.matrix.copy(_m.compose(cam.position, cam.quaternion, _s.setScalar(k)));
   rig.matrixWorldNeedsUpdate = true;

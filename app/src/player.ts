@@ -10,6 +10,7 @@ import { placeCamera } from './drive/camera';
 import { FlyCam, OrbitCam, type Move } from './explore/cameras';
 import { VIEW, type Eye } from './explore/view';
 import { jump, partAt, partLoop } from './review';
+import { CODA, CODA_ON } from './explore/coda';
 
 type Mode = 'video' | 'free' | 'orbit';
 const MODES: Mode[] = ['video', 'free', 'orbit'];
@@ -161,7 +162,8 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     marks.appendChild(m);
   }
   let loop: [number, number] | null = null;
-  song.seek(from ?? 0);
+  // (?coda=1 plays the coda: from its start, its crane the video's camera, explore/coda.ts)
+  song.seek(from ?? (CODA_ON ? CODA.from : 0));
   const toggle = () => { if (song.playing) song.pause(); else { intro.classList.add('gone'); song.play(); } };
   playBtn.onclick = toggle;
   // (a clicked button gives the keyboard back: space would press it again as well as play/pause)

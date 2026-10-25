@@ -13,9 +13,13 @@
 //   --scale N (all modes): render at N× the 1920x1080 layout (--scale 2 = true 3840x2160); stills are then saved
 //            full-res from the pixel buffer, videos are encoded at the physical size.
 //   --card NAME (all modes): render a diagnostic scene (testcard) instead of the video
+//   --coda (all modes): the coda (src/explore/coda.ts: the opening from a spectator's crane, EXPLORE THE SET on a roof);
+//            video mode's --from/--to default to its span (song time: the song's opening under it). Join it onto the
+//            video with scripts/append-coda.ts.
 // Starts a private Vite dev server (no live reload) unless --url names one, which must serve this app.
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
+import { CODA } from '../src/explore/coda';
 import path from 'node:path';
 
 const argv = process.argv.slice(2);
@@ -31,7 +35,7 @@ usage: bun scripts/render.ts <mode> [options]   (options: see the comment at the
   play   [--from 0] [--to <duration>] [--fps 30] [--over 150]
   video  [--from 0] [--to <duration>] [--fps 60] [--samples N|auto] [--shutter 0.5] [--preset slow] [--out ../out/lyricvideo.mp4] [--noaudio]
   gpu    (print the WebGL renderer string)
-  all modes: [--scale N] [--url URL] [--hide name,name (the drive's named world parts)]`);
+  all modes: [--scale N] [--url URL] [--hide name,name (the drive's named world parts)] [--coda]`);
   process.exit(1);
 }
 // (the last of a repeated option wins: `bun run render:video --out x.mp4` overrides the script's own --out)
@@ -135,7 +139,7 @@ async function bootApp(browser: Browser, url: string) {
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   const only = opt('only');
   const hide = opt('hide'); // (debugging: hide the world's named parts, e.g. --hide blocks,palms)
-  await page.goto(`${url}/?export=1${only ? `&only=${only}` : ''}${SCALE !== 1 ? `&scale=${SCALE}` : ''}${CARD ? `&card=${encodeURIComponent(CARD)}` : ''}${hide ? `&hide=${encodeURIComponent(hide)}` : ''}${flag('preview') ? '&quality=preview' : ''}`);
+  await page.goto(`${url}/?export=1${only ? `&only=${only}` : ''}${SCALE !== 1 ? `&scale=${SCALE}` : ''}${CARD ? `&card=${encodeURIComponent(CARD)}` : ''}${hide ? `&hide=${encodeURIComponent(hide)}` : ''}${flag('preview') ? '&quality=preview' : ''}${flag('coda') ? '&coda=1' : ''}`);
   // (a module that throws while it loads leaves no __lv at all: say what the page said, not just that it timed out)
   try { await page.waitForFunction(() => (window as any).__lv?.ready || (window as any).__lv?.error, null, { timeout: 120000 }); }
   catch (e) { throw new Error(`the app didn't boot within 120 s; ${logs.length ? `the page logged:\n${logs.join('\n')}` : 'the page logged no errors'}`, { cause: e }); }
@@ -326,7 +330,7 @@ try {
       console.log(`frames ${r.n}  avg ${r.avg.toFixed(1)}ms  p50 ${r.p50.toFixed(1)}  p95 ${r.p95.toFixed(1)}  max ${r.max.toFixed(1)}  sub-frames ${hist(r.used)}`);
     } else if (mode === 'video') {
       const dur: number = await page.evaluate(() => (window as any).__lv.duration);
-      await video(page, +opt('from', '0')!, +opt('to', String(dur))!, +opt('fps', '60')!, path.resolve(opt('out', path.join(ROOT, 'out/lyricvideo.mp4'))!));
+      await video(page, +opt('from', flag('coda') ? String(CODA.from) : '0')!, +opt('to', String(flag('coda') ? CODA.to : dur))!, +opt('fps', '60')!, path.resolve(opt('out', path.join(ROOT, 'out/lyricvideo.mp4'))!));
     }
     if (logs.length) console.error('BROWSER LOG:\n' + logs.slice(0, 40).join('\n'));
   } finally {
