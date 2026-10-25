@@ -34,7 +34,8 @@ usage: bun scripts/render.ts <mode> [options]   (options: see the comment at the
   all modes: [--scale N] [--url URL] [--hide name,name (the drive's named world parts)]`);
   process.exit(1);
 }
-const opt = (k: string, d?: string) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d; };
+// (the last of a repeated option wins: `bun run render:video --out x.mp4` overrides the script's own --out)
+const opt = (k: string, d?: string) => { const i = argv.lastIndexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d; };
 const flag = (k: string) => argv.includes(`--${k}`);
 const APP = path.resolve(import.meta.dir, '..');
 const SCALE = Math.max(1, Math.round(+opt('scale', '1')!));

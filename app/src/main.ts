@@ -1,14 +1,17 @@
-// Entry: preview player (default) or export mode (?export=1, driven by scripts/render.ts from M2).
+// Entry: the player (default: the site and the preview, src/player.ts) or export mode (?export=1, driven by
+// scripts/render.ts: stills, sheets and the video's render).
 import { Engine, type AdaptiveSampling } from './engine/engine';
 import { PW, PH, SCALE } from './engine/gl';
-import { resolveStretches } from './drive/stretches';
-import { jump, partAt, partLoop } from './review';
+import { setupPlayer } from './player';
 import { makeTimeline } from './timeline';
 
 const params = new URLSearchParams(location.search);
 const EXPORT = params.has('export');
 const ONLY = params.get('only'); // comma-separated scene ids to load (faster stills)
 const FROM = params.get('t') ? parseFloat(params.get('t')!) : null;
+
+// (the page's controls hidden from the start: a still taken while it loads must not show them)
+if (EXPORT) document.body.classList.add('export');
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 // physical size: 1920x1080 times ?scale= (the page CSS keeps showing it at 1920x1080)
@@ -23,6 +26,12 @@ declare global {
 
 let TIMELINE: typeof engine.timeline = [];
 
+// (while it loads, the site's intro counts the seconds: building the world takes a while)
+const loading = EXPORT ? 0 : window.setInterval(() => {
+  const st = document.getElementById('status'), s = Math.round(performance.now() / 1000);
+  if (st && s >= 3) st.textContent = `Building the world… ${s} s`;
+}, 1000);
+
 async function boot() {
   const onlySet = ONLY ? new Set(ONLY.split(',')) : null;
   await engine.init(onlySet ? (e) => onlySet.has(e.id) : undefined);
@@ -30,8 +39,9 @@ async function boot() {
   // an id matching no entry would load nothing and render every frame as an unloaded scene
   const unknown = onlySet ? [...onlySet].filter((id) => !TIMELINE.some((e) => e.id === id)) : [];
   if (unknown.length) throw new Error(`?only=${ONLY}: no timeline entry ${unknown.join(', ')} (the timeline has ${TIMELINE.map((e) => e.id).join(', ')})`);
+  clearInterval(loading);
   if (EXPORT) setupExport();
-  else setupPlayer();
+  else setupPlayer(engine, canvas, FROM);
 }
 
 // ------------------------------------------------------------------ export API
@@ -97,93 +107,11 @@ function setupExport() {
   window.__lv.ready = true;
 }
 
-// ------------------------------------------------------------------ preview player
-function setupPlayer() {
-  const audio = new Audio('audio/song.wav');
-  audio.preload = 'auto';
-  const ui = document.getElementById('ui')!;
-  const scrub = document.getElementById('scrub') as HTMLInputElement;
-  const info = document.getElementById('info')!;
-  const marks = document.getElementById('marks')!;
-  const errs = document.getElementById('errs')!;
-  scrub.max = String(engine.duration);
-  scrub.step = '0.001';
-  // the volume, remembered in this browser (storage can be missing or blocked: then it starts at full each time); it
-  // hands the keyboard back once set, so the arrows seek again rather than nudging it
-  const volume = document.getElementById('volume') as HTMLInputElement;
-  try { const v = parseFloat(localStorage.getItem('lv.volume') ?? ''); if (v >= 0 && v <= 1) volume.value = String(v); } catch { /* no storage */ }
-  audio.volume = parseFloat(volume.value);
-  volume.oninput = () => {
-    audio.volume = parseFloat(volume.value);
-    try { localStorage.setItem('lv.volume', volume.value); } catch { /* no storage */ }
-  };
-  volume.onchange = () => volume.blur();
-  if (engine.errors.length) { errs.textContent = engine.errors.join('\n\n'); errs.style.display = 'block'; }
-
-  // the marks strip and the jump keys follow the drive's stretches (drive/stretches.ts)
-  const parts = resolveStretches(engine.audio, engine.lyrics).map((s) => ({ id: s.id, start: s.start, end: s.end }));
-  const starts = parts.map((p) => p.start);
-  for (const p of parts) {
-    const m = document.createElement('div');
-    m.className = 'mark';
-    m.style.left = `${(p.start / engine.duration) * 100}%`;
-    m.style.width = `${((p.end - p.start) / engine.duration) * 100}%`;
-    m.title = `${p.id} ${p.start.toFixed(2)}–${p.end.toFixed(2)}`;
-    m.textContent = p.id;
-    m.onclick = () => seek(p.start);
-    marks.appendChild(m);
-  }
-
-  let t = FROM ?? 0;
-  let playing = false;
-  let loop: [number, number] | null = null;
-  let lastAudioT = 0, lastPerf = 0;
-  const seek = (x: number) => { t = Math.max(0, Math.min(engine.duration - 0.001, x)); audio.currentTime = t; };
-  seek(t);
-
-  const toggle = () => { playing = !playing; if (playing) { audio.currentTime = t; audio.play(); } else audio.pause(); };
-  canvas.onclick = toggle;
-  scrub.oninput = () => seek(parseFloat(scrub.value));
-  window.addEventListener('keydown', (ev) => {
-    if (ev.key === ' ') { ev.preventDefault(); toggle(); }
-    if (ev.key === 'PageDown' || ev.key === 'PageUp') {
-      ev.preventDefault();
-      const to = jump(starts, t, ev.key === 'PageDown' ? 1 : -1);
-      if (to !== undefined) seek(to);
-    }
-    if (ev.key === 'ArrowRight') seek(t + (ev.shiftKey ? 5 : 1));
-    if (ev.key === 'ArrowLeft') seek(t - (ev.shiftKey ? 5 : 1));
-    if (ev.key === '.') seek(t + 1 / 60);
-    if (ev.key === ',') seek(t - 1 / 60);
-    if (ev.key === 'l' && starts.length) loop = loop ? null : partLoop(starts, t, engine.duration);
-    if (ev.key === 'h') ui.classList.toggle('hidden');
-  });
-
-  let frames = 0, fpsT = performance.now(), fps = 0;
-  const tick = () => {
-    if (playing) {
-      // smooth the coarse audio clock with performance.now()
-      const now = performance.now();
-      if (audio.currentTime !== lastAudioT) { lastAudioT = audio.currentTime; lastPerf = now; }
-      t = lastAudioT + (audio.paused ? 0 : (now - lastPerf) / 1000);
-      // the last part's loop runs to the song's end, which the wav reaches first: wrap there too, and play on
-      if (loop && (t >= loop[1] || audio.ended)) { seek(loop[0]); if (audio.paused) audio.play(); }
-      if (audio.ended) playing = false;
-    }
-    engine.render(t, 1 / 60);
-    scrub.value = String(t);
-    frames++;
-    const now = performance.now();
-    if (now - fpsT > 500) { fps = (frames * 1000) / (now - fpsT); frames = 0; fpsT = now; }
-    const l = engine.lyrics.lineAt(t), up = parts.length ? ` ▸${parts[partAt(starts, t)]!.id}` : '';
-    info.textContent = `${t.toFixed(2)}s  beat ${engine.audio.beatAt(t).toFixed(2)}  bar ${engine.audio.barAt(t).toFixed(2)}${up}  ${fps.toFixed(0)}fps   ${l ? '“' + l.text + '”' : ''}${loop ? '  LOOP' : ''}`;
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
-
 boot().catch((e) => {
   console.error(e);
+  clearInterval(loading);
+  const st = document.getElementById('status');
+  if (st) { st.className = 'warn'; st.textContent = `It couldn't start in this browser (it needs WebGL 2): ${String(e?.message ?? e)}`; }
   document.body.insertAdjacentHTML('beforeend', `<pre style="color:#f55;position:fixed;top:0;left:0">${String(e?.stack ?? e)}</pre>`);
   window.__lv = { error: String(e?.stack ?? e) };
 });

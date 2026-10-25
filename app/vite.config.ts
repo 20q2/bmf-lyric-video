@@ -47,5 +47,7 @@ export default defineConfig({
   // 5491: this project's default (5391 is the I Like Ur Look project's); if busy, vite takes the next free port
   server: { port: 5491, strictPort: false, hmr: process.env.LV_NO_HMR ? false : undefined, fs: { allow: [repoRoot] } },
   resolve: { alias: { '@root': repoRoot } },
+  // relative asset paths: the build is served from a subpath (GitHub Pages: /<repo>/), and from anywhere for a look
+  base: './',
   build: { target: 'esnext', assetsInlineLimit: 0 },
 });

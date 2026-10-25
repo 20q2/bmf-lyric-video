@@ -4,35 +4,119 @@
 <meta charset="utf-8" />
 <title>BMF</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="A lyric video for SZA's “BMF”, rendered live in your browser: watch it through the video's camera, or fly around the drive while it plays." />
 <link rel="icon" href="data:," />
 <style>
-  :root { color-scheme: dark; }
-  html, body { margin: 0; height: 100%; background: #050505; color: #eee9df; font: 12px/1.4 ui-monospace, Menlo, monospace; overflow: hidden; }
-  #wrap { position: absolute; inset: 0 0 64px 0; display: flex; align-items: center; justify-content: center; }
-  #c { max-width: 100%; max-height: 100%; aspect-ratio: 16/9; background: #000; cursor: pointer; }
-  #ui { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; padding: 6px 12px; box-sizing: border-box; background: #0b0b0c; }
+  :root { color-scheme: dark; --bg: #050505; --bar: #0b0b0c; --fg: #eee9df; --dim: #9c978f; --line: #24221f; --accent: #ff5a36; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; overflow: hidden; }
+  button { font: inherit; color: var(--fg); background: #17161a; border: 1px solid var(--line); border-radius: 4px; padding: 4px 9px; cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: #4a463f; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #140a06; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  #wrap { position: absolute; inset: 0 0 72px 0; display: flex; align-items: center; justify-content: center; }
+  #c { max-width: 100%; max-height: 100%; aspect-ratio: 16/9; background: #000; cursor: pointer; touch-action: none; }
+  body.flying #c { cursor: grab; } body.flying.dragging #c { cursor: grabbing; }
+  #pip { position: absolute; top: 12px; right: 12px; width: min(28vw, 384px); aspect-ratio: 16/9; background: #000; border: 1px solid var(--accent); border-radius: 3px; display: none; cursor: pointer; }
+  body.pip.flying #pip { display: block; }
+  #ui { position: absolute; left: 0; right: 0; bottom: 0; height: 72px; padding: 4px 12px 6px; box-sizing: border-box; background: var(--bar); }
   #ui.hidden { display: none; } #ui.hidden ~ #wrap { bottom: 0; }
-  #scrub { width: 100%; margin: 0; accent-color: #ff5a36; }
-  #marks { position: relative; height: 16px; }
-  .mark { position: absolute; top: 0; height: 14px; border-left: 1px solid #ff5a36; color: #9c978f; font-size: 9px; overflow: hidden; white-space: nowrap; padding-left: 2px; cursor: pointer; box-sizing: border-box; }
-  .mark:hover { color: #eee9df; background: #ff5a3622; }
-  #info { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #9c978f; margin-right: 170px; }
-  #vol { position: absolute; right: 12px; bottom: 6px; display: flex; align-items: center; gap: 6px; color: #9c978f; }
-  #vol input { width: 120px; margin: 0; accent-color: #ff5a36; }
+  #scrub { width: 100%; margin: 0; accent-color: var(--accent); }
+  #marks { position: relative; height: 15px; }
+  .mark { position: absolute; top: 0; height: 13px; border-left: 1px solid var(--accent); color: var(--dim); font-size: 9px; overflow: hidden; white-space: nowrap; padding-left: 2px; cursor: pointer; box-sizing: border-box; }
+  .mark:hover { color: var(--fg); background: #ff5a3622; }
+  #row { display: flex; align-items: center; gap: 8px; margin-top: 2px; min-width: 0; }
+  #row .group { display: flex; gap: 4px; align-items: center; }
+  #time { color: var(--dim); min-width: 92px; font-variant-numeric: tabular-nums; }
+  #info { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dim); }
+  #vol { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+  #vol input { width: 90px; margin: 0; accent-color: var(--accent); }
   #errs { display: none; position: fixed; top: 8px; left: 8px; right: 8px; max-height: 40vh; overflow: auto; background: #300; color: #fbb; padding: 8px; white-space: pre-wrap; z-index: 9; }
-  body.export #ui, body.export #errs { display: none !important; }
+  #toast { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: #000c; border: 1px solid var(--line); padding: 5px 12px; border-radius: 4px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+  #toast.show { opacity: 1; }
+  .panel { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #050505d0; z-index: 5; padding: 16px; box-sizing: border-box; }
+  .panel > div { max-width: 560px; width: 100%; max-height: 100%; overflow: auto; background: #0d0c0e; border: 1px solid var(--line); border-radius: 6px; padding: 22px 24px; box-sizing: border-box; }
+  .panel h1 { font: 900 44px/1 system-ui, sans-serif; letter-spacing: 0.02em; margin: 0 0 4px; }
+  .panel h2 { font-size: 12px; font-weight: normal; color: var(--dim); margin: 0 0 18px; }
+  .panel p { color: var(--dim); margin: 10px 0; }
+  .panel .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 6px; }
+  .panel .actions button { padding: 8px 14px; }
+  .panel .actions button.primary { background: var(--accent); border-color: var(--accent); color: #140a06; font-weight: bold; }
+  #status { color: var(--fg); min-height: 1.4em; }
+  #status.warn { color: #ffb36b; }
+  #help, #intro.gone { display: none; }
+  #help.open { display: flex; }
+  kbd { border: 1px solid #3a3731; border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; color: var(--fg); font: inherit; }
+  table.keys { border-collapse: collapse; width: 100%; color: var(--dim); }
+  table.keys td { padding: 3px 6px 3px 0; vertical-align: top; }
+  table.keys td:first-child { white-space: nowrap; width: 1%; padding-right: 14px; }
+  table.keys th { text-align: left; color: var(--fg); font-weight: normal; padding: 10px 0 3px; }
+  .dropping .panel > div, body.dropping #wrap { outline: 2px dashed var(--accent); outline-offset: -8px; }
+  @media (max-width: 760px) { #info, #vol, #time { display: none; } #row { gap: 4px; } button { padding: 4px 6px; } }
+  body.export #ui, body.export #errs, body.export .panel, body.export #pip, body.export #toast { display: none !important; }
   body.export #wrap { inset: 0; }
   body.export #c { width: 1920px; height: 1080px; max-width: none; max-height: none; }
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="c"></canvas></div>
+<div id="wrap"><canvas id="c"></canvas><canvas id="pip" width="480" height="270" title="the video, as its camera sees it (click: ride the video camera)"></canvas><div id="toast"></div></div>
 <div id="ui">
   <div id="marks"></div>
-  <input id="scrub" type="range" min="0" value="0" />
-  <div id="info"></div>
-  <label id="vol" title="volume">vol <input id="volume" type="range" min="0" max="1" step="0.01" value="1" /></label>
+  <input id="scrub" type="range" min="0" value="0" aria-label="song time" />
+  <div id="row">
+    <button id="play" title="play / pause (space)" aria-label="play">▶</button>
+    <span id="time">0:00 / 0:00</span>
+    <span class="group" role="group" aria-label="camera">
+      <button data-mode="video" class="on" title="ride the video's camera (1)">Video camera</button>
+      <button data-mode="free" title="fly anywhere: drag to look, WASD to move (2)">Fly</button>
+      <button data-mode="orbit" title="circle the car: drag round it, wheel to zoom (3)">Orbit car</button>
+    </span>
+    <button id="follow" class="on" title="while flying, keep pace with the car (F)">Follow car</button>
+    <button id="pipbtn" title="while flying, show the video in a corner (P)">Video inset</button>
+    <span id="info"></span>
+    <button id="song" title="play along with your copy of the song">♪ Song…</button>
+    <label id="vol" title="volume">vol <input id="volume" type="range" min="0" max="1" step="0.01" value="1" /></label>
+    <button id="full" title="full screen">⛶</button>
+    <button id="helpbtn" title="controls (?)">?</button>
+  </div>
 </div>
+<div id="intro" class="panel"><div>
+  <h1>BMF</h1>
+  <h2>SZA · a lyric video, rendered live in your browser</h2>
+  <p>Sit in the video's camera and watch it as it was cut, or fly out of it and look round the drive while it plays — the song's world runs in real time around you.</p>
+  <p>The song isn't hosted here. Choose your own copy (an mp3 of “BMF”, about 3:01) or drop it on the page, and the video plays in sync with it.</p>
+  <div class="actions">
+    <button id="pick" class="primary" disabled>Choose the song…</button>
+    <button id="mute" disabled>Watch without sound</button>
+  </div>
+  <div id="status">Building the world…</div>
+  <p>Drag to look round, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to fly, <kbd>1</kbd> to get back in the video's camera, <kbd>?</kbd> for every control. Best on a desktop browser with a decent GPU.</p>
+</div></div>
+<div id="help" class="panel"><div>
+  <h1 style="font-size:26px">Controls</h1>
+  <table class="keys">
+    <tr><th colspan="2">Playback</th></tr>
+    <tr><td><kbd>Space</kbd> or click</td><td>play / pause</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>back / on a second (with <kbd>Shift</kbd>: five)</td></tr>
+    <tr><td><kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>previous / next stretch of the drive</td></tr>
+    <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>a frame back / on</td></tr>
+    <tr><td><kbd>L</kbd></td><td>loop the stretch playing</td></tr>
+    <tr><th colspan="2">Camera</th></tr>
+    <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> or <kbd>C</kbd></td><td>the video's camera / fly / orbit the car</td></tr>
+    <tr><td>drag (mouse or touch)</td><td>look round (orbit: circle the car); from the video's camera it takes you flying</td></tr>
+    <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>fly forward, left, back, right</td></tr>
+    <tr><td><kbd>E</kbd> / <kbd>Q</kbd></td><td>up / down</td></tr>
+    <tr><td><kbd>Shift</kbd> / <kbd>Alt</kbd></td><td>fast / slow</td></tr>
+    <tr><td>wheel or pinch</td><td>flying: speed (pinch: forward / back) · orbit: closer / further</td></tr>
+    <tr><td><kbd>F</kbd></td><td>flying: keep pace with the car, or stay put in the world</td></tr>
+    <tr><td><kbd>V</kbd></td><td>flying: jump to where the video's camera is</td></tr>
+    <tr><td><kbd>P</kbd></td><td>the video in a corner while you fly</td></tr>
+    <tr><th colspan="2">Screen</th></tr>
+    <tr><td><kbd>H</kbd></td><td>hide the bar</td></tr>
+    <tr><td><kbd>?</kbd> / <kbd>Esc</kbd></td><td>this help / close it</td></tr>
+  </table>
+  <p>The video's camera stands in the world as an orange film camera, its frame drawn out ahead of it. The world was built for that camera: fly far from it and you'll find where the set ends.</p>
+  <div class="actions"><button id="helpclose" class="primary">Close</button></div>
+</div></div>
 <pre id="errs"></pre>
 <script type="module" src="/src/main.ts"></script>
 </body>

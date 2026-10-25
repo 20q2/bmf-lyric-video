@@ -1,0 +1,50 @@
+# The site: app/ built (vite build -> app/dist: the page, its code, fonts and data/; never the song) and published to
+# GitHub Pages on every push to main, or by hand from the Actions tab. One-time setup: the repo's Settings -> Pages ->
+# Source: "GitHub Actions".
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run build
+      # (belt and braces: the song must never be published)
+      - run: "! find dist -iname '*.wav' -o -iname '*.mp3' -o -iname '*.m4a' -o -iname '*.flac' | grep ."
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

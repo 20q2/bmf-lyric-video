@@ -30,6 +30,8 @@ import { type Stance, hydraulics } from '../drive/hydraulics';
 import { neonAt } from '../drive/landmarks';
 import { type Cast, castOf } from '../drive/cast';
 import { poseCast } from '../look/cast3d';
+import { VIEW } from '../explore/view';
+import { buildRig, poseRig } from '../explore/rig';
 import { FINALE } from '../drive/drive';
 import { AUDIBLE } from '../drive/stretches';
 import { carMatrix } from '../drive/carriers';
@@ -164,6 +166,10 @@ export default class DriveScene extends Scene {
   private endMoon = new THREE.Vector3();
   /** The world's still parts, hidden while off screen. */
   private zones!: Zones;
+  /** The video's camera, shown standing in the world while the site's explorer looks from elsewhere (explore/view.ts),
+   *  and where it stands this frame. */
+  private rig = buildRig();
+  private shot = new THREE.Object3D();
 
   override async init() {
     const { audio, lyrics, renderer } = this.ctx;
@@ -210,6 +216,9 @@ export default class DriveScene extends Scene {
     });
     // (the shadows are the cascades' (look/shadows.ts): the sun and the moon cast nothing themselves)
     this.world.add(...this.shade.objects);
+    this.world.add(this.rig);
+    VIEW.carAt = (t) => this.drive.carFrame(t);
+    VIEW.videoAt = (t) => this.drive.camera(t);
     // (nothing up in the sky casts: the skywriter, the banners' tow planes — their shadows fell on the facades out of
     // nowhere)
     for (const o of [this.writer, ...this.flying.map(([, f]) => f)]) o.traverse((m) => { if (m instanceof THREE.Mesh) m.castShadow = false; });
@@ -396,7 +405,16 @@ export default class DriveScene extends Scene {
     // (the end's lens, behind the two of them, a metre clear of the car, looks out over the city 2 km off: its near plane
     // pulled out, the depth buffer resolves the towers finely enough that their windows stop flickering — at 0.1 m it
     // couldn't tell a window from the face of a tower a metre behind another's, nor the city's plain from the ground)
-    { const near = d.lastCut !== null && t >= d.lastCut ? END_NEAR : LENS.near; if (this.cam.near !== near) { this.cam.near = near; this.cam.updateProjectionMatrix(); } }
+    // (the site's explorer looks from its own eye, the video's camera standing where it was placed: explore/view.ts)
+    const eye = VIEW.eye;
+    this.rig.visible = !!eye;
+    if (eye) {
+      this.shot.position.copy(this.cam.position); this.shot.quaternion.copy(this.cam.quaternion);
+      this.cam.position.copy(eye.pos); this.cam.quaternion.copy(eye.quat); this.cam.updateMatrixWorld();
+      poseRig(this.rig, this.shot, eye.pos, t);
+    }
+    { const near = eye ? LENS.near : d.lastCut !== null && t >= d.lastCut ? END_NEAR : LENS.near, fov = eye ? eye.fov : LENS.fov;
+      if (this.cam.near !== near || this.cam.fov !== fov) { this.cam.near = near; this.cam.fov = fov; this.cam.updateProjectionMatrix(); } }
 
     // the sky, the sun or the moon, the fog
     const { sky, sunDir, sunColor } = this.skyAt(t), day = daylight(t), e = sky.sunElev;

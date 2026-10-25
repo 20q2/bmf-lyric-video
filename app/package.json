@@ -3,6 +3,11 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "dev": "vite --port 5990 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5994",
+    "render:video": "bun scripts/render.ts video --samples auto --max-samples 36 --shutter 0.2 --out ../out/bmf.mp4",
+    "render:draft": "bun scripts/render.ts video --preview --out ../out/bmf_draft.mp4",
     "test": "bun test",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
   },

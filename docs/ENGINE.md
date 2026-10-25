@@ -38,6 +38,38 @@ ear wins. Close GPU-heavy games first if you can: the GPU has 8 GB and the model
 Without `--url` the renderer starts its own private server. Look at stills and sheets (Read tool) before handing work
 to the user. Only the final export renders video (M5).
 
+## The site (GitHub Pages)
+
+The page is the site: the same player serves the preview and GitHub Pages (`src/player.ts`). It plays the video live
+and lets the viewer leave the video's camera — `1` the video's camera, `2` fly (drag to look, WASD, E/Q up/down, wheel
+for speed, `F` keep pace with the car), `3` orbit the car; `P` keeps the video in a corner inset, `V` jumps to where
+the video's camera is, `?` lists every key. While the view is elsewhere the video's camera stands in the world as an
+orange film camera with its frame drawn ahead of it (`explore/rig.ts`). The scene reads the view from
+`explore/view.ts` (`VIEW.eye`); the export never sets it, so renders are the video's camera, unchanged.
+
+The song is never bundled: the preview plays `audio/song.wav` from the repo (no intro); the site asks visitors for
+their own copy (a file picker, or drop it on the page) or plays without sound on the wall clock.
+
+    cd app
+    bun run build      # -> app/dist (relative paths: serves from any subpath)
+    bun run preview    # http://localhost:5994/ — the built site, as Pages will serve it
+
+`.github/workflows/pages.yml` typechecks, tests, builds and publishes `app/dist` on every push to `main` (or by hand
+from the Actions tab). One-time setup on GitHub: Settings → Pages → Source: GitHub Actions.
+
+## Re-rendering the video
+
+The site doesn't replace the render: `scripts/render.ts` drives the same app in headless Edge (`?export=1`).
+
+    cd app
+    bun run render:video   # the final settings -> ../out/bmf.mp4 (1080p60, adaptive motion blur; ~3 h on this machine)
+    bun run render:draft   # player quality, one sample a frame -> ../out/bmf_draft.mp4 (minutes: to check a change)
+    bun run render:video --from 60 --to 70 --out ../out/clip.mp4   # a stretch; later options override the script's
+
+`render:video` is `render.ts video --samples auto --max-samples 36 --shutter 0.2`, the m6 final's settings
+(`out/bmf_m6.mp4`, fb2be77). It needs `audio/song.wav` (or `--noaudio`) and ffmpeg (`source scripts/env.sh`).
+`--scale 2` renders 4K.
+
 ## The drive (app/src/drive/)
 
 - `stretches.ts`: the route table (spec §3) — each stretch's section, pace, bend, climb, home chase framing, sign kind.
