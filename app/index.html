@@ -42,16 +42,17 @@
   .panel .actions button { padding: 8px 14px; }
   .panel .actions button.primary { background: var(--accent); border-color: var(--accent); color: #140a06; font-weight: bold; }
   .panel p.small { font-size: 11px; margin-top: 14px; }
-  /* the loading spinner behind the controls: a wire wheel turning, till the world's built */
+  /* the loading spinner behind the controls: a wire wheel turning slowly till the world's built (the user, 2026-10-25:
+     a turn every 2.2 s strobed its spokes — "makin me dizzy") */
   #loader { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at center, #1a0f0b 0%, var(--bg) 70%); transition: opacity 0.8s; }
   body.ready #loader { opacity: 0; pointer-events: none; }
-  #loader .wheel { width: min(84vmin, 820px); height: min(84vmin, 820px); opacity: 0.55; border-radius: 50%; animation: spin 2.2s linear infinite;
+  #loader .wheel { width: min(84vmin, 820px); height: min(84vmin, 820px); opacity: 0.35; border-radius: 50%; animation: spin 16s linear infinite;
     background: radial-gradient(circle closest-side, #ffd9a8 0 9%, transparent 10% 74%, #2a2620 75% 86%, var(--accent) 87% 92%, transparent 93%),
       repeating-conic-gradient(from 0deg, #c9c2b6 0 1.2deg, transparent 1.2deg 15deg);
     -webkit-mask: radial-gradient(circle closest-side, #000 0 92%, transparent 93%); mask: radial-gradient(circle closest-side, #000 0 92%, transparent 93%);
     box-shadow: 0 0 120px #ff5a3630; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { #loader .wheel { animation-duration: 6s; } }
+  @media (prefers-reduced-motion: reduce) { #loader .wheel { animation: none; } }
   #status { color: var(--dim); align-self: center; }
   body.ready #status { display: none; }
   #intro > div { background: #0d0c0ee6; backdrop-filter: blur(3px); }
