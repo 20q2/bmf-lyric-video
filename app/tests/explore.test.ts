@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { FlyCam, OrbitCam, ORBIT } from '../src/explore/cameras';
+import { FLY, FlyCam, OrbitCam, ORBIT } from '../src/explore/cameras';
+import { floorUnder } from '../src/explore/floor';
 import type { RouteFrame } from '../src/drive/route';
 import type { Eye } from '../src/explore/view';
 
@@ -62,4 +63,50 @@ test('a fresh orbit sits behind the car, above it; zoom keeps to its range', () 
   expect(o.dist).toBe(ORBIT.min);
   o.zoom(1000);
   expect(o.dist).toBe(ORBIT.max);
+});
+
+test('a floor stops a fall onto it, and leaves a camera above it alone', () => {
+  const fly = new FlyCam();
+  fly.from(eyeAt(new THREE.Vector3(0, 3, 0), new THREE.Vector3(10, 3, 0)));
+  for (let i = 0; i < 60; i++) { fly.step(1 / 60, { x: 0, y: -1, z: 0 }); fly.floor(0); }
+  expect(fly.pos.y).toBeCloseTo(FLY.clear, 9);
+  fly.pos.y = 20;
+  fly.floor(0);
+  expect(fly.pos.y).toBe(20);
+});
+
+test('the floor under a point is the highest solid surface below it; hidden and unlit things are not floors', () => {
+  const lit = () => new THREE.MeshToonMaterial();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100).rotateX(-Math.PI / 2), lit());
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 4), lit()); roof.position.set(0, 5.5, 0);
+  const hidden = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 4), lit()); hidden.position.set(20, 8, 0); hidden.visible = false;
+  const words = new THREE.Mesh(new THREE.PlaneGeometry(4, 4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial()); words.position.set(-20, 3, 0);
+  const world = new THREE.Group();
+  for (const m of [ground, roof, hidden]) { m.castShadow = true; world.add(m); }
+  world.add(words);
+  world.updateMatrixWorld(true);
+  expect(floorUnder(world, new THREE.Vector3(0, 30, 0))).toBeCloseTo(6, 6); // the roof
+  expect(floorUnder(world, new THREE.Vector3(0, 3, 0))).toBeCloseTo(0, 6); // under the roof: the street
+  expect(floorUnder(world, new THREE.Vector3(20, 30, 0))).toBeCloseTo(0, 6); // a hidden box isn't there
+  expect(floorUnder(world, new THREE.Vector3(-20, 30, 0))).toBeCloseTo(0, 6); // lettering isn't solid
+  expect(floorUnder(world, new THREE.Vector3(0, -5, 0))).toBeNull();
+});
+
+test('a big mesh (gridded) gives the same floor as three\'s raycast', () => {
+  const g = new THREE.PlaneGeometry(120, 120, 120, 120).rotateX(-Math.PI / 2); // 28 800 triangles: gridded
+  const p = g.attributes.position!;
+  for (let i = 0; i < p.count; i++) p.setY(i, Math.sin(p.getX(i) * 0.1) * 3 + Math.cos(p.getZ(i) * 0.07) * 2);
+  const hill = new THREE.Mesh(g, new THREE.MeshToonMaterial());
+  hill.castShadow = true;
+  hill.position.set(10, 4, -5);
+  const world = new THREE.Group().add(hill);
+  world.updateMatrixWorld(true);
+  const ray = new THREE.Raycaster();
+  for (const [x, z] of [[0, 0], [33.3, -17.1], [-41, 50.5], [69, 0]]) {
+    const at = new THREE.Vector3(x, 50, z);
+    ray.set(at, new THREE.Vector3(0, -1, 0));
+    const want = ray.intersectObject(hill)[0]?.point.y ?? null;
+    const got = floorUnder(world, at);
+    if (want === null) expect(got).toBeNull(); else expect(got!).toBeCloseTo(want, 4);
+  }
 });

@@ -172,7 +172,9 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   // ------------------------------------------------------------ the cameras
   let mode: Mode = 'video';
   const fly = new FlyCam(), orbit = new OrbitCam();
-  fly.follow = store.get('lv.follow') !== '0';
+  // (free of the car unless asked: the user, 2026-10-25, "let me fly free of the car"; a new key, so a remembered
+  // follow from before doesn't stick)
+  fly.follow = store.get('lv.followCar') === '1';
   let pipOn = store.get('lv.pip') === '1';
   const scratch = new THREE.PerspectiveCamera();
   /** Where the view is at song time t in the current mode. */
@@ -199,7 +201,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     toast(m === 'video' ? 'the video’s camera' : m === 'free' ? `flying${fly.follow ? ', keeping pace with the car' : ''}` : 'circling the car');
   };
   for (const b of modeBtns) b.onclick = () => { setMode(b.dataset.mode as Mode); b.blur(); };
-  followBtn.onclick = () => { fly.follow = !fly.follow; store.set('lv.follow', fly.follow ? '1' : '0'); syncButtons(); followBtn.blur(); toast(fly.follow ? 'keeping pace with the car' : 'staying put in the world'); };
+  followBtn.onclick = () => { fly.follow = !fly.follow; store.set('lv.followCar', fly.follow ? '1' : '0'); syncButtons(); followBtn.blur(); toast(fly.follow ? 'keeping pace with the car' : 'staying put in the world'); };
   pipBtn.onclick = () => { pipOn = !pipOn; store.set('lv.pip', pipOn ? '1' : '0'); syncButtons(); pipBtn.blur(); };
   pip.onclick = () => setMode('video');
   syncButtons();
@@ -251,20 +253,28 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   // ------------------------------------------------------------ keys
   const held = new Set<string>();
   const FLY_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'];
+  /** Flying, Space rises and Ctrl sinks (the user's ask, 2026-10-25; play/pause is then K or a click). */
+  const CTRL = ['ControlLeft', 'ControlRight'];
   const openHelp = (on: boolean) => help.classList.toggle('open', on);
   $('helpbtn').onclick = () => openHelp(true);
   $('helpclose').onclick = () => openHelp(false);
   help.onclick = (e) => { if (e.target === help) openHelp(false); };
   $('full').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); };
   window.addEventListener('keydown', (ev) => {
-    if (ev.ctrlKey || ev.metaKey) return;
     if ((ev.target as HTMLElement)?.tagName === 'INPUT' && (ev.target as HTMLInputElement).type !== 'range') return;
-    if (ev.key === '?' || (ev.key === 'Escape' && help.classList.contains('open'))) { openHelp(!help.classList.contains('open')); return; }
-    if (FLY_KEYS.includes(ev.code)) {
+    // (Ctrl held down to sink, the fly keys still steer: Ctrl+W, +S, +A, +D are flying here, not the browser's — what
+    // a page can't stop, Ctrl+W closing the tab, asks first: beforeunload, below)
+    if (CTRL.includes(ev.code)) { if (mode === 'free') held.add(ev.code); return; }
+    if (FLY_KEYS.includes(ev.code) && !ev.metaKey && !ev.altKey) {
+      ev.preventDefault();
       held.add(ev.code);
       if (mode === 'video') setMode('free');
       return;
     }
+    if (ev.ctrlKey || ev.metaKey) return;
+    if (ev.key === '?' || (ev.key === 'Escape' && help.classList.contains('open'))) { openHelp(!help.classList.contains('open')); return; }
+    if (ev.code === 'Space' && mode === 'free') { ev.preventDefault(); held.add('Space'); (document.activeElement as HTMLElement | null)?.blur?.(); return; }
+    if (ev.key === 'k') toggle();
     if (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight' || ev.code === 'AltLeft' || ev.code === 'AltRight') { held.add(ev.code); if (ev.key === 'Alt') ev.preventDefault(); }
     if (ev.key === ' ') { ev.preventDefault(); toggle(); (document.activeElement as HTMLElement | null)?.blur?.(); }
     if (ev.key === 'PageDown' || ev.key === 'PageUp') {
@@ -285,6 +295,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     if (ev.key === 'v' && mode !== 'video') { fly.from(videoEye(song.t)); if (mode === 'orbit') { mode = 'free'; syncButtons(); } toast('at the video’s camera'); }
   });
   window.addEventListener('keyup', (ev) => held.delete(ev.code));
+  window.addEventListener('beforeunload', (e) => { if (CTRL.some((c) => held.has(c))) e.preventDefault(); });
   window.addEventListener('blur', () => held.clear());
 
   // ------------------------------------------------------------ the frame
@@ -298,9 +309,17 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     const t = song.t;
     if (mode === 'free') {
       const k = (a: string, b: string) => (held.has(a) ? 1 : 0) - (held.has(b) ? 1 : 0);
-      const move: Move = { x: k('KeyD', 'KeyA'), y: k('KeyE', 'KeyQ'), z: k('KeyW', 'KeyS'), boost: held.has('ShiftLeft') || held.has('ShiftRight'), creep: held.has('AltLeft') || held.has('AltRight') };
+      const move: Move = { x: k('KeyD', 'KeyA'), y: (held.has('KeyE') || held.has('Space') ? 1 : 0) - (held.has('KeyQ') || CTRL.some((c) => held.has(c)) ? 1 : 0), z: k('KeyW', 'KeyS'), boost: held.has('ShiftLeft') || held.has('ShiftRight'), creep: held.has('AltLeft') || held.has('AltRight') };
       const carried = VIEW.carAt!(t).pos.clone().sub(VIEW.carAt!(lastT).pos);
+      // (onto whatever's under it, never through: looked for down from where it was or is, whichever's higher, so a roof
+      // or a sign over the street isn't under it)
+      // (and only once it's moved: a still camera, paused, costs nothing)
+      const was = fly.pos.clone();
       fly.step(realDt, move, carried);
+      if (fly.pos.distanceToSquared(was) > 1e-6) {
+        const floor = VIEW.floorAt?.(new THREE.Vector3(fly.pos.x, Math.max(was.y, fly.pos.y) + 0.05, fly.pos.z));
+        if (floor != null) fly.floor(floor);
+      }
     }
     lastT = t;
     // the inset: the video as its camera sees it, every other frame (each costs a whole second render)

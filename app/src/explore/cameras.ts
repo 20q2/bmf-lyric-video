@@ -6,8 +6,9 @@ import type { RouteFrame } from '../drive/route';
 import type { Eye } from './view';
 
 /** Flying: base speed (m/s) and its range (the wheel), the boost and creep factors, look (radians per px of drag), how
- *  fast the speed eases to what's asked (1/s), the field of view (degrees: wider than the video's 40°, to look round). */
-export const FLY = { speed: 14, min: 1, max: 800, fast: 4, slow: 0.25, look: 0.0035, ease: 8, fov: 55 };
+ *  fast the speed eases to what's asked (1/s), the field of view (degrees: wider than the video's 40°, to look round),
+ *  how high it stays over what's under it (m). */
+export const FLY = { speed: 14, min: 1, max: 800, fast: 4, slow: 0.25, look: 0.0035, ease: 8, fov: 55, clear: 0.8 };
 /** Circling the car: distance (m) and its range, pitch range (radians), the height on the car aimed at (m), look. */
 export const ORBIT = { dist: 10, min: 2.5, max: 400, pitch: [-0.08, 1.5] as const, height: 1.1, look: 0.006, fov: 50 };
 
@@ -26,8 +27,9 @@ export class FlyCam {
   yaw = 0;
   pitch = 0;
   speed = FLY.speed;
-  /** Carried along with the car (the player hands each step the car's move), so the drive doesn't leave it behind. */
-  follow = true;
+  /** Carried along with the car (the player hands each step the car's move), so the drive doesn't leave it behind; off
+   *  (the default), it flies free of the car. */
+  follow = false;
   private vel = new THREE.Vector3();
 
   /** Starts where `eye` stands, looking where it looks (its roll dropped), at rest. */
@@ -57,6 +59,13 @@ export class FlyCam {
     this.vel.lerp(want, 1 - Math.exp(-FLY.ease * dt));
     this.pos.addScaledVector(this.vel, dt);
     if (this.follow && carried) this.pos.add(carried);
+  }
+
+  /** Kept `FLY.clear` above a floor at height `y` (a fall onto it stops there). */
+  floor(y: number) {
+    if (this.pos.y >= y + FLY.clear) return;
+    this.pos.y = y + FLY.clear;
+    if (this.vel.y < 0) this.vel.y = 0;
   }
 
   eye(): Eye {

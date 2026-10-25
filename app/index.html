@@ -79,14 +79,14 @@
   <div id="marks"></div>
   <input id="scrub" type="range" min="0" value="0" aria-label="song time" />
   <div id="row">
-    <button id="play" title="play / pause (space)" aria-label="play">▶</button>
+    <button id="play" title="play / pause (K, or space when not flying)" aria-label="play">▶</button>
     <span id="time">0:00 / 0:00</span>
     <span class="group" role="group" aria-label="camera">
       <button data-mode="video" class="on" title="ride the video's camera (1)">Video camera</button>
       <button data-mode="free" title="fly anywhere: drag to look, WASD to move (2)">Fly</button>
       <button data-mode="orbit" title="circle the car: drag round it, wheel to zoom (3)">Orbit car</button>
     </span>
-    <button id="follow" class="on" title="while flying, keep pace with the car (F)">Follow car</button>
+    <button id="follow" title="while flying, keep pace with the car (F); off, you fly free of it">Follow car</button>
     <button id="pipbtn" title="while flying, show the video in a corner (P)">Video inset</button>
     <span id="info"></span>
     <button id="song" title="play along with your copy of the song">♪ Song…</button>
@@ -100,9 +100,10 @@
   <h1>BMF</h1>
   <h2>SZA · a lyric video, rendered live in your browser</h2>
   <table class="keys">
-    <tr><td><kbd>Space</kbd> or click</td><td>play / pause</td></tr>
+    <tr><td><kbd>K</kbd> or click</td><td>play / pause</td></tr>
     <tr><td>drag</td><td>look round — it takes you out of the video's camera</td></tr>
-    <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>E</kbd><kbd>Q</kbd></td><td>fly about the drive (<kbd>Shift</kbd> fast, wheel for speed)</td></tr>
+    <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>fly about the drive (<kbd>Shift</kbd> fast, wheel for speed)</td></tr>
+    <tr><td><kbd>Space</kbd> / <kbd>Ctrl</kbd></td><td>while flying: rise / sink</td></tr>
     <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>the video's camera / fly / orbit the car</td></tr>
     <tr><td><kbd>P</kbd></td><td>the video in a corner while you fly</td></tr>
     <tr><td><kbd>?</kbd></td><td>every control</td></tr>
@@ -114,7 +115,7 @@
   <h1 style="font-size:26px">Controls</h1>
   <table class="keys">
     <tr><th colspan="2">Playback</th></tr>
-    <tr><td><kbd>Space</kbd> or click</td><td>play / pause</td></tr>
+    <tr><td><kbd>K</kbd> or click</td><td>play / pause (<kbd>Space</kbd> too, except while flying)</td></tr>
     <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>back / on a second (with <kbd>Shift</kbd>: five)</td></tr>
     <tr><td><kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>previous / next stretch of the drive</td></tr>
     <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>a frame back / on</td></tr>
@@ -123,7 +124,7 @@
     <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> or <kbd>C</kbd></td><td>the video's camera / fly / orbit the car</td></tr>
     <tr><td>drag (mouse or touch)</td><td>look round (orbit: circle the car); from the video's camera it takes you flying</td></tr>
     <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>fly forward, left, back, right</td></tr>
-    <tr><td><kbd>E</kbd> / <kbd>Q</kbd></td><td>up / down</td></tr>
+    <tr><td><kbd>Space</kbd> / <kbd>Ctrl</kbd></td><td>up / down (or <kbd>E</kbd> / <kbd>Q</kbd>)</td></tr>
     <tr><td><kbd>Shift</kbd> / <kbd>Alt</kbd></td><td>fast / slow</td></tr>
     <tr><td>wheel or pinch</td><td>flying: speed (pinch: forward / back) · orbit: closer / further</td></tr>
     <tr><td><kbd>F</kbd></td><td>flying: keep pace with the car, or stay put in the world</td></tr>

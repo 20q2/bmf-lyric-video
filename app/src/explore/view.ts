@@ -14,4 +14,6 @@ export const VIEW = {
   /** Filled in by the drive scene once it's loaded: the car's frame and the video camera's pose at song time t (pure). */
   carAt: null as ((t: number) => RouteFrame) | null,
   videoAt: null as ((t: number) => Pose) | null,
+  /** The height of the solid surface under a point (explore/floor.ts), as the world stands at the last frame. */
+  floorAt: null as ((p: THREE.Vector3) => number | null) | null,
 };

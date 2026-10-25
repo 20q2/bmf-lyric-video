@@ -32,6 +32,7 @@ import { type Cast, castOf } from '../drive/cast';
 import { poseCast } from '../look/cast3d';
 import { VIEW } from '../explore/view';
 import { buildRig, poseRig } from '../explore/rig';
+import { floorUnder, warmFloor } from '../explore/floor';
 import { FINALE } from '../drive/drive';
 import { AUDIBLE } from '../drive/stretches';
 import { carMatrix } from '../drive/carriers';
@@ -219,6 +220,7 @@ export default class DriveScene extends Scene {
     this.world.add(this.rig);
     VIEW.carAt = (t) => this.drive.carFrame(t);
     VIEW.videoAt = (t) => this.drive.camera(t);
+    VIEW.floorAt = (p) => floorUnder(this.world, p);
     // (nothing up in the sky casts: the skywriter, the banners' tow planes — their shadows fell on the facades out of
     // nowhere)
     for (const o of [this.writer, ...this.flying.map(([, f]) => f)]) o.traverse((m) => { if (m instanceof THREE.Mesh) m.castShadow = false; });
@@ -233,6 +235,8 @@ export default class DriveScene extends Scene {
       this.car.updateMatrixWorld(true);
       for (const set of this.sets) set.update(t, this.car);
     }, Array.from({ length: Math.ceil(dur / ZONE_STEP) + 1 }, (_, i) => Math.min(i * ZONE_STEP, dur)));
+    // (the explorer's floor: the big merged meshes gridded now, not on the first flight — explore/floor.ts)
+    warmFloor(world);
     const coast = this.drive.route.frameAt(this.drive.motion.distanceAt(COAST_T));
     this.sunAz.set(coast.fwd.x, 0, coast.fwd.z).normalize().multiplyScalar(Math.cos(SUN_AZ))
       .addScaledVector(new THREE.Vector3(coast.right.x, 0, coast.right.z).normalize(), -Math.sin(SUN_AZ)).normalize();
