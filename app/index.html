@@ -41,8 +41,23 @@
   .panel .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 6px; }
   .panel .actions button { padding: 8px 14px; }
   .panel .actions button.primary { background: var(--accent); border-color: var(--accent); color: #140a06; font-weight: bold; }
-  #status { color: var(--fg); min-height: 1.4em; }
-  #status.warn { color: #ffb36b; }
+  .panel p.small { font-size: 11px; margin-top: 14px; }
+  /* the loading spinner behind the controls: a wire wheel turning, till the world's built */
+  #loader { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at center, #1a0f0b 0%, var(--bg) 70%); transition: opacity 0.8s; }
+  body.ready #loader { opacity: 0; pointer-events: none; }
+  #loader .wheel { width: min(84vmin, 820px); height: min(84vmin, 820px); opacity: 0.55; border-radius: 50%; animation: spin 2.2s linear infinite;
+    background: radial-gradient(circle closest-side, #ffd9a8 0 9%, transparent 10% 74%, #2a2620 75% 86%, var(--accent) 87% 92%, transparent 93%),
+      repeating-conic-gradient(from 0deg, #c9c2b6 0 1.2deg, transparent 1.2deg 15deg);
+    -webkit-mask: radial-gradient(circle closest-side, #000 0 92%, transparent 93%); mask: radial-gradient(circle closest-side, #000 0 92%, transparent 93%);
+    box-shadow: 0 0 120px #ff5a3630; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #loader .wheel { animation-duration: 6s; } }
+  #status { color: var(--dim); align-self: center; }
+  body.ready #status { display: none; }
+  #intro > div { background: #0d0c0ee6; backdrop-filter: blur(3px); }
+  body.failed #loader .wheel { animation: none; opacity: 0.3; }
+  body.failed #status { color: #ffb36b; }
+  #intro { background: transparent; }
   #help, #intro.gone { display: none; }
   #help.open { display: flex; }
   kbd { border: 1px solid #3a3731; border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; color: var(--fg); font: inherit; }
@@ -52,7 +67,7 @@
   table.keys th { text-align: left; color: var(--fg); font-weight: normal; padding: 10px 0 3px; }
   .dropping .panel > div, body.dropping #wrap { outline: 2px dashed var(--accent); outline-offset: -8px; }
   @media (max-width: 760px) { #info, #vol, #time { display: none; } #row { gap: 4px; } button { padding: 4px 6px; } }
-  body.export #ui, body.export #errs, body.export .panel, body.export #pip, body.export #toast { display: none !important; }
+  body.export #ui, body.export #errs, body.export .panel, body.export #loader, body.export #pip, body.export #toast { display: none !important; }
   body.export #wrap { inset: 0; }
   body.export #c { width: 1920px; height: 1080px; max-width: none; max-height: none; }
 </style>
@@ -79,17 +94,20 @@
     <button id="helpbtn" title="controls (?)">?</button>
   </div>
 </div>
+<div id="loader"><div class="wheel"></div></div>
 <div id="intro" class="panel"><div>
   <h1>BMF</h1>
   <h2>SZA · a lyric video, rendered live in your browser</h2>
-  <p>Sit in the video's camera and watch it as it was cut, or fly out of it and look round the drive while it plays — the song's world runs in real time around you.</p>
-  <p>The song isn't hosted here. Choose your own copy (an mp3 of “BMF”, about 3:01) or drop it on the page, and the video plays in sync with it.</p>
-  <div class="actions">
-    <button id="pick" class="primary" disabled>Choose the song…</button>
-    <button id="mute" disabled>Watch without sound</button>
-  </div>
-  <div id="status">Building the world…</div>
-  <p>Drag to look round, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to fly, <kbd>1</kbd> to get back in the video's camera, <kbd>?</kbd> for every control. Best on a desktop browser with a decent GPU.</p>
+  <table class="keys">
+    <tr><td><kbd>Space</kbd> or click</td><td>play / pause</td></tr>
+    <tr><td>drag</td><td>look round — it takes you out of the video's camera</td></tr>
+    <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>E</kbd><kbd>Q</kbd></td><td>fly about the drive (<kbd>Shift</kbd> fast, wheel for speed)</td></tr>
+    <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>the video's camera / fly / orbit the car</td></tr>
+    <tr><td><kbd>P</kbd></td><td>the video in a corner while you fly</td></tr>
+    <tr><td><kbd>?</kbd></td><td>every control</td></tr>
+  </table>
+  <div class="actions"><button id="go" class="primary" disabled>Loading…</button><span id="status">Building the world…</span></div>
+  <p class="small">The song isn't hosted here: it plays without sound unless you give it your own copy — ♪ in the bar, or drop the file on the page.</p>
 </div></div>
 <div id="help" class="panel"><div>
   <h1 style="font-size:26px">Controls</h1>

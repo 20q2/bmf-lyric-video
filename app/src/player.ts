@@ -79,7 +79,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   const D = engine.duration;
   const song = new SongClock(D);
   const ui = $('ui'), scrub = $<HTMLInputElement>('scrub'), info = $('info'), marks = $('marks'), errs = $('errs');
-  const playBtn = $('play'), timeEl = $('time'), intro = $('intro'), status = $('status'), help = $('help'), toastEl = $('toast');
+  const playBtn = $('play'), timeEl = $('time'), intro = $('intro'), help = $('help'), toastEl = $('toast');
   const pip = $<HTMLCanvasElement>('pip'), pipCtx = pip.getContext('2d')!;
   scrub.max = String(D);
   scrub.step = '0.001';
@@ -113,24 +113,16 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(f);
     const a = useAudio(objectUrl);
-    status.className = '';
-    status.textContent = `Loading ${f.name}…`;
     a.addEventListener('loadedmetadata', () => {
       const off = a.duration - D;
-      if (Math.abs(off) > LENGTH_SLACK) {
-        status.className = 'warn';
-        status.textContent = `${f.name} is ${clock(a.duration)} long; the video's song is ${clock(D)}. It may be another cut of it and drift out of sync.`;
-        toast(`that file is ${off > 0 ? 'longer' : 'shorter'} than the video's song: it may drift`);
-      } else status.textContent = `${f.name} ✓`;
+      toast(Math.abs(off) > LENGTH_SLACK ? `${f.name} is ${clock(a.duration)}, the video's song ${clock(D)}: it may drift out of sync` : `playing along with ${f.name}`);
     }, { once: true });
-    a.addEventListener('error', () => { status.className = 'warn'; status.textContent = `Couldn't play ${f.name} in this browser.`; song.audio = null; }, { once: true });
+    a.addEventListener('error', () => { toast(`couldn't play ${f.name} in this browser`); song.audio = null; }, { once: true });
     $('song').title = `playing along with ${f.name} (click to choose another)`;
     start();
   };
   picker.onchange = () => { const f = picker.files?.[0]; if (f) useFile(f); picker.value = ''; };
-  $('pick').onclick = () => picker.click();
   $('song').onclick = () => picker.click();
-  $('mute').onclick = () => start();
   // a song dropped anywhere on the page
   window.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('dropping'); });
   window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
@@ -139,10 +131,14 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     const f = [...(e.dataTransfer?.files ?? [])].find((x) => x.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|opus|flac)$/i.test(x.name));
     if (f) useFile(f); else toast('drop an audio file (the song)');
   });
-  // the intro: away once a choice is made (or at once in the preview, where the repo's copy of the song plays)
+  // the intro (the controls, over the loading spinner): Play once the world's built; away at once in the preview, where
+  // the repo's copy of the song plays
   const start = () => { intro.classList.add('gone'); song.play(); };
-  for (const id of ['pick', 'mute']) ($(id) as HTMLButtonElement).disabled = false;
-  status.textContent = 'Ready.';
+  const go = $<HTMLButtonElement>('go');
+  go.onclick = start;
+  go.disabled = false;
+  go.textContent = 'Play ▶';
+  document.body.classList.add('ready');
   fetch(LOCAL_SONG, { method: 'HEAD' }).then((r) => {
     if (!r.ok || !(r.headers.get('content-type') ?? '').startsWith('audio')) return;
     useAudio(LOCAL_SONG);

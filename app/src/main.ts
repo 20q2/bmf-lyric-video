@@ -111,7 +111,8 @@ boot().catch((e) => {
   console.error(e);
   clearInterval(loading);
   const st = document.getElementById('status');
-  if (st) { st.className = 'warn'; st.textContent = `It couldn't start in this browser (it needs WebGL 2): ${String(e?.message ?? e)}`; }
+  document.body.classList.add('failed');
+  if (st) st.textContent = `It couldn't start in this browser (it needs WebGL 2): ${String(e?.message ?? e)}`;
   document.body.insertAdjacentHTML('beforeend', `<pre style="color:#f55;position:fixed;top:0;left:0">${String(e?.stack ?? e)}</pre>`);
   window.__lv = { error: String(e?.stack ?? e) };
 });
