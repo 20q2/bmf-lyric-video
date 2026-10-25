@@ -236,11 +236,11 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     if (!dragged && Math.hypot(dx, dy) < DRAG) return;
     if (!dragged) { dragged = true; document.body.classList.add('dragging'); if (mode === 'video') setMode('free'); }
     p.x = e.clientX; p.y = e.clientY;
-    // (across, the world is dragged round with the hand; up and down, the view tilts with it — drag up, look up — in
-    // both modes: flying tilted the other way, "reversed vertically", the user, 2026-10-25. Scaled by the canvas's
-    // on-screen size)
+    // (the view turns the way the hand goes — drag right, look right; drag up, look up — in both modes: flying dragged
+    // the world instead, "reversed vertically" and then "horizontally too", the user, 2026-10-25. Scaled by the
+    // canvas's on-screen size)
     const k = 1920 / canvas.getBoundingClientRect().width;
-    if (mode === 'orbit') orbit.look(dx * k, dy * k); else fly.look(-dx * k, dy * k);
+    if (mode === 'orbit') orbit.look(dx * k, dy * k); else fly.look(dx * k, dy * k);
   });
   const up = (e: PointerEvent) => {
     if (!down.delete(e.pointerId)) return;
