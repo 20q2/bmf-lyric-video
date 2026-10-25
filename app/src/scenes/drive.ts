@@ -507,6 +507,7 @@ export default class DriveScene extends Scene {
 
     this.city.update(t, this.cam.position, this.rt.width / W);
     // (the maps aren't drawn while nothing shows them: deep in a tunnel; nor is what can't be seen: scenes/zones.ts)
+    this.shade.disabled = VIEW.fast;
     this.shade.live = PRINT_SHADE.value > 0 || this.sun.intensity > 0 || this.moon.intensity > 0;
     this.zones.hide((s) => this.shade.sees(s));
     renderer.setRenderTarget(this.rt);

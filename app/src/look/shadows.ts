@@ -221,6 +221,10 @@ export class Cascades {
   /** Every caster drawn into every map, uncull'd (the load's warm-up: each kind of caster's depth shader compiled then,
    *  not on first sight). */
   everything = false;
+  /** No cast shadows (the site's Fast lighting): the maps drawn once with nothing in them — lit everywhere — and then
+   *  left alone; what's culled is only what's out of view. (Not the lights' castShadow off: every shader would be
+   *  rebuilt, a freeze.) */
+  private off = false;
   constructor(private size: number) {
     const sphere = new THREE.Sphere();
     this.lights.forEach((l, i) => {
@@ -228,6 +232,7 @@ export class Cascades {
       const box = l.shadow.getFrustum(), least = CASCADES[i]!.least;
       box.intersectsObject = (o: THREE.Object3D) => {
         if (this.everything) return true;
+        if (this.off) return false;
         const inst = o as THREE.InstancedMesh;
         if (inst.isInstancedMesh) { if (!inst.boundingSphere) inst.computeBoundingSphere(); sphere.copy(inst.boundingSphere!); }
         else { const g = (o as THREE.Mesh).geometry; if (!g.boundingSphere) g.computeBoundingSphere(); sphere.copy(g.boundingSphere!); }
@@ -258,6 +263,7 @@ export class Cascades {
    *  away from the light as far as a shadow still prints (FADE) touches the view. (A little wider: the blocker search
    *  and the soft edge read the map round a pixel.) */
   sees(s: THREE.Sphere): boolean {
+    if (this.off) { for (const p of this.view.planes) if (p.distanceToPoint(s.center) < -s.radius) return false; return true; }
     const r = s.radius + SOFT.search;
     this.far.copy(s.center).addScaledVector(this.toLight, -FADE[1]);
     for (const p of this.view.planes) if (p.distanceToPoint(s.center) < -r && p.distanceToPoint(this.far) < -r) return false;
@@ -265,7 +271,14 @@ export class Cascades {
   }
 
   /** Whether the maps are drawn this frame (not while nothing would show them: deep in a tunnel). */
-  set live(on: boolean) { for (const l of this.lights) l.shadow.autoUpdate = on; }
+  set live(on: boolean) { for (const l of this.lights) l.shadow.autoUpdate = on && !this.off; }
+
+  /** Cast shadows off (or back on: the maps are drawn again from the next frame). */
+  set disabled(off: boolean) {
+    if (off === this.off) return;
+    this.off = off;
+    for (const l of this.lights) { l.shadow.autoUpdate = !off; l.shadow.needsUpdate = true; }
+  }
 
   /** Round the lens's view of the ground (at height `ground`), from `toLight` (unit). */
   update(cam: THREE.PerspectiveCamera, toLight: THREE.Vector3, ground: number) {

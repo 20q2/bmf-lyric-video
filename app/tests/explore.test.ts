@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { FLY, FlyCam, OrbitCam, ORBIT } from '../src/explore/cameras';
 import { floorUnder } from '../src/explore/floor';
+import { Cascades } from '../src/look/shadows';
 import type { RouteFrame } from '../src/drive/route';
 import type { Eye } from '../src/explore/view';
 
@@ -109,4 +110,19 @@ test('a big mesh (gridded) gives the same floor as three\'s raycast', () => {
     const got = floorUnder(world, at);
     if (want === null) expect(got).toBeNull(); else expect(got!).toBeCloseTo(want, 4);
   }
+});
+
+test('Fast lighting: the shadow maps drawn once empty and then left alone; culling by the view alone', () => {
+  const c = new Cascades(256), cam = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 3000);
+  cam.position.set(0, 2, 0); cam.lookAt(0, 2, -10); cam.updateMatrixWorld();
+  c.update(cam, new THREE.Vector3(0.3, 0.8, 0.2).normalize(), 0);
+  c.disabled = true;
+  for (const l of c.lights) { expect(l.shadow.autoUpdate).toBe(false); expect(l.shadow.needsUpdate).toBe(true); }
+  c.live = true; // (the scene sets it every frame: it mustn't turn the maps back on)
+  for (const l of c.lights) expect(l.shadow.autoUpdate).toBe(false);
+  expect(c.sees(new THREE.Sphere(new THREE.Vector3(0, 2, -30), 1))).toBe(true); // ahead
+  expect(c.sees(new THREE.Sphere(new THREE.Vector3(0, 2, 30), 1))).toBe(false); // behind
+  c.disabled = false;
+  c.live = true;
+  for (const l of c.lights) expect(l.shadow.autoUpdate).toBe(true);
 });

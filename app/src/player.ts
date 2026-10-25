@@ -87,9 +87,9 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   if (!DEBUG) info.style.display = 'none';
 
   let toastTimer = 0;
-  const toast = (msg: string) => {
+  const toast = (msg: string, ms = 1600) => {
     toastEl.textContent = msg; toastEl.classList.add('show');
-    clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toastEl.classList.remove('show'), 1600);
+    clearTimeout(toastTimer); toastTimer = window.setTimeout(() => toastEl.classList.remove('show'), ms);
   };
 
   // ------------------------------------------------------------ the song
@@ -181,12 +181,16 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   const videoEye = (t: number): Eye => { placeCamera(scratch, VIEW.videoAt!(t)); return { pos: scratch.position.clone(), quat: scratch.quaternion.clone(), fov: scratch.fov }; };
   const eyeNow = (t: number): Eye => mode === 'free' ? fly.eye() : mode === 'orbit' ? orbit.eye(VIEW.carAt!(t)) : videoEye(t);
   const modeBtns = [...document.querySelectorAll<HTMLButtonElement>('[data-mode]')];
-  const followBtn = $('follow'), pipBtn = $('pipbtn');
+  const followBtn = $('follow'), pipBtn = $('pipbtn'), lightBtn = $('light');
+  // the lighting: Full (the video's: printed cast shadows) or Fast (none: each shadow map was another walk of the whole
+  // world a frame — the user, 2026-10-25, "it's pretty laggy"); remembered in this browser
+  VIEW.fast = store.get('lv.fast') === '1';
   const syncButtons = () => {
     for (const b of modeBtns) b.classList.toggle('on', b.dataset.mode === mode);
     followBtn.classList.toggle('on', fly.follow);
     followBtn.style.display = mode === 'free' ? '' : 'none';
     pipBtn.classList.toggle('on', pipOn);
+    lightBtn.textContent = `Lighting: ${VIEW.fast ? 'Fast' : 'Full'}`;
     pipBtn.style.display = mode === 'video' ? 'none' : '';
     document.body.classList.toggle('flying', mode !== 'video');
     document.body.classList.toggle('pip', pipOn);
@@ -204,6 +208,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   followBtn.onclick = () => { fly.follow = !fly.follow; store.set('lv.followCar', fly.follow ? '1' : '0'); syncButtons(); followBtn.blur(); toast(fly.follow ? 'keeping pace with the car' : 'staying put in the world'); };
   pipBtn.onclick = () => { pipOn = !pipOn; store.set('lv.pip', pipOn ? '1' : '0'); syncButtons(); pipBtn.blur(); };
   pip.onclick = () => setMode('video');
+  lightBtn.onclick = () => { VIEW.fast = !VIEW.fast; store.set('lv.fast', VIEW.fast ? '1' : '0'); syncButtons(); toast(VIEW.fast ? 'Fast lighting: no shadows' : 'Full lighting: the video’s shadows'); };
   syncButtons();
 
   // dragging looks round (from the video's camera it takes you flying); a press that doesn't move is play/pause;
@@ -292,6 +297,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     if (ev.key === 'c') setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]!);
     if (ev.key === 'f') followBtn.click();
     if (ev.key === 'p') pipBtn.click();
+    if (ev.key === 'g') lightBtn.click();
     if (ev.key === 'v' && mode !== 'video') { fly.from(videoEye(song.t)); if (mode === 'orbit') { mode = 'free'; syncButtons(); } toast('at the video’s camera'); }
   });
   window.addEventListener('keyup', (ev) => held.delete(ev.code));
@@ -299,6 +305,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   window.addEventListener('blur', () => held.clear());
 
   // ------------------------------------------------------------ the frame
+  let slow = 0, hinted = false;
   let frames = 0, fpsT = performance.now(), fps = 0, lastReal = performance.now(), lastT = song.t, n = 0;
   const tick = () => {
     const now = performance.now(), realDt = Math.min(0.1, (now - lastReal) / 1000);
@@ -334,7 +341,12 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     playBtn.textContent = song.playing ? '❚❚' : '▶';
     timeEl.textContent = `${clock(t)} / ${clock(D)}`;
     frames++;
-    if (now - fpsT > 500) { fps = (frames * 1000) / (now - fpsT); frames = 0; fpsT = now; }
+    if (now - fpsT > 500) {
+      fps = (frames * 1000) / (now - fpsT); frames = 0; fpsT = now;
+      // (struggling with the full lighting, playing a while: say once that there's a lighter one)
+      slow = song.playing && !VIEW.fast && fps < 28 ? slow + 1 : 0;
+      if (slow >= 12 && !hinted) { hinted = true; toast('Laggy? Lighting: Fast (G) drops the shadows', 6000); }
+    }
     if (DEBUG) {
       const l = engine.lyrics.lineAt(t), at = parts.length ? ` ▸${parts[partAt(starts, t)]!.id}` : '';
       info.textContent = `${t.toFixed(2)}s  beat ${engine.audio.beatAt(t).toFixed(2)}  bar ${engine.audio.barAt(t).toFixed(2)}${at}  ${fps.toFixed(0)}fps   ${l ? '“' + l.text + '”' : ''}${loop ? '  LOOP' : ''}`;

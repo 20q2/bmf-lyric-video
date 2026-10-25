@@ -43,7 +43,8 @@ to the user. Only the final export renders video (M5).
 The page is the site: the same player serves the preview and GitHub Pages (`src/player.ts`). It plays the video live
 and lets the viewer leave the video's camera — `1` the video's camera, `2` fly (drag to look, WASD, Space/Ctrl or E/Q up/down,
 wheel for speed; K plays/pauses, `F` keep pace with the car), `3` orbit the car; `P` keeps the video in a corner inset, `V` jumps to where
-the video's camera is, `?` lists every key. While the view is elsewhere the video's camera stands in the world as an
+the video's camera is, `G` switches the lighting to Fast (no cast shadows: `VIEW.fast`, look/shadows.ts
+`Cascades.disabled` — the maps drawn once empty, then skipped; never set by the export), `?` lists every key. While the view is elsewhere the video's camera stands in the world as an
 orange film camera with its frame drawn ahead of it (`explore/rig.ts`). The scene reads the view from
 `explore/view.ts` (`VIEW.eye`); the export never sets it, so renders are the video's camera, unchanged.
 
