@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { FLY, FlyCam, OrbitCam, ORBIT } from '../src/explore/cameras';
-import { floorUnder } from '../src/explore/floor';
+import { floorUnder, warmFloor } from '../src/explore/floor';
 import { Cascades } from '../src/look/shadows';
 import type { RouteFrame } from '../src/drive/route';
 import type { Eye } from '../src/explore/view';
@@ -101,15 +101,22 @@ test('a big mesh (gridded) gives the same floor as three\'s raycast', () => {
   hill.castShadow = true;
   hill.position.set(10, 4, -5);
   const world = new THREE.Group().add(hill);
-  world.updateMatrixWorld(true);
+  warmFloor(world);
   const ray = new THREE.Raycaster();
-  for (const [x, z] of [[0, 0], [33.3, -17.1], [-41, 50.5], [69, 0]]) {
-    const at = new THREE.Vector3(x, 50, z);
-    ray.set(at, new THREE.Vector3(0, -1, 0));
-    const want = ray.intersectObject(hill)[0]?.point.y ?? null;
-    const got = floorUnder(world, at);
-    if (want === null) expect(got).toBeNull(); else expect(got!).toBeCloseTo(want, 4);
-  }
+  const check = () => {
+    world.updateMatrixWorld(true);
+    for (const [x, z] of [[0, 0], [33.3, -17.1], [-41, 50.5], [69, 0]]) {
+      const at = new THREE.Vector3(x, 50, z);
+      ray.set(at, new THREE.Vector3(0, -1, 0));
+      const want = ray.intersectObject(hill)[0]?.point.y ?? null;
+      const got = floorUnder(world, at);
+      if (want === null) expect(got).toBeNull(); else expect(got!).toBeCloseTo(want, 4);
+    }
+  };
+  check();
+  // moved after it was gridded (a car on the road): still right, through three's raycast
+  hill.position.set(-7, 9, 12);
+  check();
 });
 
 test('Fast lighting: the shadow maps drawn once empty and then left alone; culling by the view alone', () => {

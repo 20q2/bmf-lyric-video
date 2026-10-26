@@ -26,8 +26,6 @@ interface Grid {
 const grids = new WeakMap<THREE.Mesh, Grid>();
 
 function gridOf(m: THREE.Mesh): Grid {
-  const old = grids.get(m);
-  if (old && old.at.equals(m.matrixWorld)) return old;
   const g = m.geometry, p = g.attributes.position!, n = p.count;
   const pos = new Float32Array(n * 3), v = new THREE.Vector3();
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -87,7 +85,11 @@ export function floorUnder(root: THREE.Object3D, p: THREE.Vector3, reach = 600):
     if (!o.visible) return;
     const m = o as THREE.Mesh;
     if (m.isMesh && o.castShadow && !(m as THREE.InstancedMesh).isInstancedMesh) {
-      if (isBig(m)) top = gridFloor(gridOf(m), p.x, p.y, p.z, p.y - reach, top);
+      // (a grid only while its mesh stands where it was gridded: what moves — the traffic, every car a few thousand
+      // triangles — goes through three's raycast, its bounds first. Gridded again as it moved, each look-up rebuilt
+      // every moving car's grid: 48 ms, the user's readout, 2026-10-25)
+      const g = isBig(m) ? grids.get(m) : undefined;
+      if (g && g.at.equals(m.matrixWorld)) top = gridFloor(g, p.x, p.y, p.z, p.y - reach, top);
       else o.raycast(ray, hits);
     }
     for (const c of o.children) walk(c);
@@ -97,7 +99,7 @@ export function floorUnder(root: THREE.Object3D, p: THREE.Vector3, reach = 600):
   return top;
 }
 
-/** Grids every big solid mesh under `root` now (at load: the first flight would otherwise freeze while it's done). */
+/** Grids every big solid mesh under `root` now, as it stands (at load: what's gridded is what never moves after). */
 export function warmFloor(root: THREE.Object3D) {
   root.updateMatrixWorld(true);
   root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && o.castShadow && isBig(m)) gridOf(m); });
