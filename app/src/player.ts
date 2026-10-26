@@ -183,7 +183,11 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   const videoEye = (t: number): Eye => { placeCamera(scratch, VIEW.videoAt!(t)); return { pos: scratch.position.clone(), quat: scratch.quaternion.clone(), fov: scratch.fov }; };
   const eyeNow = (t: number): Eye => mode === 'free' ? fly.eye() : mode === 'orbit' ? orbit.eye(VIEW.carAt!(t)) : videoEye(t);
   const modeBtns = [...document.querySelectorAll<HTMLButtonElement>('[data-mode]')];
-  const followBtn = $('follow'), pipBtn = $('pipbtn'), lightBtn = $('light');
+  const followBtn = $('follow'), pipBtn = $('pipbtn'), lightBtn = $('light'), reachBtn = $('reach');
+  // the draw distance while flying or circling (the user, 2026-10-25: a frame's CPU is the walk of the whole world; past
+  // it, still parts are left out); remembered
+  const REACHES = [Infinity, 600, 250];
+  { const r = Number(store.get('lv.reach')); if (REACHES.includes(r)) VIEW.reach = r; }
   // the lighting: Full (the video's: printed cast shadows) or Fast (none: each shadow map was another walk of the whole
   // world a frame — the user, 2026-10-25, "it's pretty laggy"); remembered in this browser
   VIEW.fast = store.get('lv.fast') === '1';
@@ -193,6 +197,8 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     followBtn.style.display = mode === 'free' ? '' : 'none';
     pipBtn.classList.toggle('on', pipOn);
     lightBtn.textContent = `Lighting: ${VIEW.fast ? 'Fast' : 'Full'}`;
+    reachBtn.textContent = `Draw: ${VIEW.reach === Infinity ? 'Full' : `${VIEW.reach} m`}`;
+    reachBtn.style.display = mode === 'video' ? 'none' : '';
     pipBtn.style.display = mode === 'video' ? 'none' : '';
     document.body.classList.toggle('flying', mode !== 'video');
     document.body.classList.toggle('pip', pipOn);
@@ -210,6 +216,12 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   followBtn.onclick = () => { fly.follow = !fly.follow; store.set('lv.followCar', fly.follow ? '1' : '0'); syncButtons(); followBtn.blur(); toast(fly.follow ? 'keeping pace with the car' : 'staying put in the world'); };
   pipBtn.onclick = () => { pipOn = !pipOn; store.set('lv.pip', pipOn ? '1' : '0'); syncButtons(); pipBtn.blur(); };
   pip.onclick = () => setMode('video');
+  reachBtn.onclick = () => {
+    VIEW.reach = REACHES[(REACHES.indexOf(VIEW.reach) + 1) % REACHES.length]!;
+    store.set('lv.reach', String(VIEW.reach));
+    syncButtons();
+    toast(VIEW.reach === Infinity ? 'drawing all of it' : `drawing ${VIEW.reach} m out`);
+  };
   lightBtn.onclick = () => { VIEW.fast = !VIEW.fast; store.set('lv.fast', VIEW.fast ? '1' : '0'); syncButtons(); toast(VIEW.fast ? 'Fast lighting: no shadows' : 'Full lighting: the video’s shadows'); };
   syncButtons();
 
@@ -300,6 +312,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     if (ev.key === 'f') followBtn.click();
     if (ev.key === 'p') pipBtn.click();
     if (ev.key === 'g') lightBtn.click();
+    if (ev.key === 'r') reachBtn.click();
     if (ev.key === 'v' && mode !== 'video') { fly.from(videoEye(song.t)); if (mode === 'orbit') { mode = 'free'; syncButtons(); } toast('at the video’s camera'); }
   });
   window.addEventListener('keyup', (ev) => held.delete(ev.code));

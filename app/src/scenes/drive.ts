@@ -508,12 +508,16 @@ export default class DriveScene extends Scene {
     const far = air.far - 500 * NIGHT.value;
     fog.near = air.near - (air.near - 10) * inside;
     fog.far = far - (far - 140) * inside;
+    // (the explorer's draw distance: the haze closes in to it, so what's left out past it fades rather than pops)
+    const reach = VIEW.eye ? VIEW.reach : Infinity;
+    if (reach < fog.far) { fog.far = reach; fog.near = Math.min(fog.near, reach * 0.45); }
 
     this.city.update(t, this.cam.position, this.rt.width / W);
     // (the maps aren't drawn while nothing shows them: deep in a tunnel; nor is what can't be seen: scenes/zones.ts)
     this.shade.disabled = VIEW.fast;
     this.shade.live = PRINT_SHADE.value > 0 || this.sun.intensity > 0 || this.moon.intensity > 0;
-    this.zones.hide((s) => this.shade.sees(s));
+    const camAt = this.cam.position;
+    this.zones.hide(reach === Infinity ? (s) => this.shade.sees(s) : (s) => s.center.distanceTo(camAt) - s.radius < reach && this.shade.sees(s));
     renderer.setRenderTarget(this.rt);
     renderer.clear(true, true, true); // the engine leaves autoClear off; the dome draws the sky, so nothing else clears
     renderer.render(this.world, this.cam);

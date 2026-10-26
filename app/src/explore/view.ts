@@ -16,6 +16,9 @@ export const VIEW = {
   videoAt: null as ((t: number) => Pose) | null,
   /** The site's Fast lighting: no cast shadows (look/shadows.ts Cascades.disabled), for slower machines. */
   fast: false,
+  /** The explorer's draw distance (m; Infinity: all of it): the world's still parts past it left out, the fog pulled in to
+   *  it. Only while the explorer's own eye is used: the video's camera always sees what it was framed to. */
+  reach: Infinity,
   /** The height of the solid surface under a point (explore/floor.ts), as the world stands at the last frame. */
   floorAt: null as ((p: THREE.Vector3) => number | null) | null,
 };
