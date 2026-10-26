@@ -308,6 +308,11 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
 
   // ------------------------------------------------------------ the frame
   let slow = 0, hinted = false;
+  /** The floor under the flying camera, and where it was looked up from. */
+  let under: { at: THREE.Vector3; floor: number | null } | null = null;
+  // (?debug, and the preview: what a frame costs — the render's own time on the CPU, what it drew, the floor look-up)
+  let floorMs = 0, renderMs = 0;
+  if (DEBUG) engine.renderer.info.autoReset = false;
   let frames = 0, fpsT = performance.now(), fps = 0, lastReal = performance.now(), lastT = song.t, n = 0;
   const tick = () => {
     const now = performance.now(), realDt = Math.min(0.1, (now - lastReal) / 1000);
@@ -322,13 +327,17 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
       const carried = VIEW.carAt!(t).pos.clone().sub(VIEW.carAt!(lastT).pos);
       // (onto whatever's under it, never through: looked for down from where it was or is, whichever's higher, so a roof
       // or a sign over the street isn't under it)
-      // (and only once it's moved: a still camera, paused, costs nothing)
+      // (looked up again only once it's moved a metre or two, or up or down past what it was looked up from: a look-up
+      // walks the whole world, ~2 ms; between them the last one holds)
       const was = fly.pos.clone();
       fly.step(realDt, move, carried);
-      if (fly.pos.distanceToSquared(was) > 1e-6) {
-        const floor = VIEW.floorAt?.(new THREE.Vector3(fly.pos.x, Math.max(was.y, fly.pos.y) + 0.05, fly.pos.z));
-        if (floor != null) fly.floor(floor);
+      const from = new THREE.Vector3(fly.pos.x, Math.max(was.y, fly.pos.y) + 0.05, fly.pos.z);
+      if (!under || Math.hypot(from.x - under.at.x, from.z - under.at.z) > 1.5 || Math.abs(from.y - under.at.y) > 3) {
+        const f0 = performance.now();
+        under = { at: from, floor: VIEW.floorAt?.(from) ?? null };
+        floorMs = performance.now() - f0;
       }
+      if (under.floor != null) fly.floor(under.floor);
     }
     lastT = t;
     // the inset: the video as its camera sees it, every other frame (each costs a whole second render)
@@ -338,7 +347,9 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
       pipCtx.drawImage(canvas, 0, 0, pip.width, pip.height);
     }
     VIEW.eye = mode === 'video' ? null : eyeNow(t);
+    const r0 = performance.now();
     engine.render(t, 1 / 60);
+    renderMs = performance.now() - r0;
     scrub.value = String(t);
     playBtn.textContent = song.playing ? '❚❚' : '▶';
     timeEl.textContent = `${clock(t)} / ${clock(D)}`;
@@ -351,7 +362,9 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
     }
     if (DEBUG) {
       const l = engine.lyrics.lineAt(t), at = parts.length ? ` ▸${parts[partAt(starts, t)]!.id}` : '';
-      info.textContent = `${t.toFixed(2)}s  beat ${engine.audio.beatAt(t).toFixed(2)}  bar ${engine.audio.barAt(t).toFixed(2)}${at}  ${fps.toFixed(0)}fps   ${l ? '“' + l.text + '”' : ''}${loop ? '  LOOP' : ''}`;
+      const ri = engine.renderer.info.render;
+      info.textContent = `${t.toFixed(2)}s  ${fps.toFixed(0)}fps  cpu ${renderMs.toFixed(1)}ms  ${(ri.calls / 1000).toFixed(1)}k draws  ${(ri.triangles / 1e6).toFixed(1)}M tris  floor ${floorMs.toFixed(1)}ms${VIEW.fast ? '  FAST' : ''}${at}   beat ${engine.audio.beatAt(t).toFixed(2)}  bar ${engine.audio.barAt(t).toFixed(2)}  ${l ? '“' + l.text + '”' : ''}${loop ? '  LOOP' : ''}`;
+      engine.renderer.info.reset();
     }
     requestAnimationFrame(tick);
   };
