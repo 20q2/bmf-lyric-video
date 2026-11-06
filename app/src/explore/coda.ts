@@ -1,8 +1,7 @@
 // The coda (the user, 2026-10-25): a short clip after the video's end card, pointing at the site. The opening plays
 // again from outside the video: a spectator's crane over the corner while the car waits at the red light, the video's
 // camera standing in the world at work (explore/rig.ts), coming to rest behind the liquor store over its flat roof,
-// where EXPLORE THE SET is painted, as the light goes green on the first kick and the car pulls away left to right
-// across the top of the frame. Rendered on its own (render.ts video --coda: song time CODA.from..to, the song's opening
+// where EXPLORE THE SET is painted, as the light goes green on the first kick. Rendered on its own (render.ts video --coda: song time CODA.from..to, the song's opening
 // under it) and joined onto the video (scripts/append-coda.ts); ?coda=1 in the player plays it live.
 // Browser (the paint's canvas) and bun (the rest).
 import * as THREE from 'three';
@@ -41,10 +40,12 @@ export function cranePath(drive: Drive, store: THREE.Matrix4) {
   const c = drive.carFrame(0), fwd = c.fwd.clone().setY(0).normalize(), left = c.right.clone().setY(0).normalize().negate(), h = LIQUOR.h;
   const at = (a: number, l: number, y: number) => c.pos.clone().addScaledVector(fwd, a).addScaledVector(left, l).addScaledVector(UP, y);
   const local = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(store);
-  // behind the car and up off its left, the corner ahead; risen over the left side of the intersection, looking across
-  // at the store; behind the store, over its roof, looking down across the paint to the road
-  const eyes = [at(-26, 9, 16), at(8, 7, 24), local(0, h + 13, -20)];
-  const aims = [at(6, 0, 1), at(22, -9, 3), local(0, h, -5.6)];
+  // behind the car and up off its left, the corner ahead; across the road and up over the cross street on its right,
+  // looking back down at the car at the light; behind the store, over its roof, looking down across the paint to the
+  // road. (Round the store's far side, never over its roof: crossing it low, the words filled the frame sideways and
+  // upside down before the crane came to them — stills, 2026-11-06)
+  const eyes = [at(-26, 9, 16), at(10, -22, 26), local(0, h + 13, -20)];
+  const aims = [at(6, 0, 1), at(8, -2, 1), local(0, h, -5.6)];
   const keys = [CODA.from, 10.5, 15.2];
   const rest = { eye: local(0, h + 11.2, -17.6), aim: local(0, h, -5.2) };
   const eyeCurve = new THREE.CatmullRomCurve3(eyes, false, 'centripetal'), aimCurve = new THREE.CatmullRomCurve3(aims, false, 'centripetal');
