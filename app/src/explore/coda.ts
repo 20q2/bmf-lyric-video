@@ -11,9 +11,19 @@ import { F, font } from '../engine/type';
 import { toon } from '../look/toon';
 import type { Eye } from './view';
 
-/** The song time it plays (s: the guitar intro's second half, the green on the first kick at 15.6, the car away), and
- *  its fades from and to black (s). */
-export const CODA = { from: 6, to: 21, fadeIn: 0.8, fadeOut: 1.4 };
+/** The song time it plays (s: the guitar intro's second half, the green on the first kick at 15.6, the car away), slowed
+ *  to `rate` — the picture and the song together, so the light still goes green on the kick (the user, 2026-11-06: "a
+ *  subtle and slowed down version of the intro"); its fades from and to black (s of the clip). */
+export const CODA = { from: 6, to: 21, rate: 0.8, fadeIn: 1, fadeOut: 2.6 };
+/** The clip's length (s). */
+export const CODA_LENGTH = (CODA.to - CODA.from) / CODA.rate;
+/** The song under it, slowed (pitch and all, as a record played slow), muffled and roomy, and quiet: under the picture,
+ *  not over it. An ffmpeg filter for the song cut at CODA.from..to, sample rate `sr`. */
+export function codaAudioFilter(sr: number) {
+  const out = CODA_LENGTH - CODA.fadeOut;
+  return [`asetrate=${Math.round(sr * CODA.rate)}`, `aresample=${sr}`, 'lowpass=f=3200', 'aecho=0.85:0.8:120|260|410:0.3|0.2|0.12',
+    'volume=0.4', `afade=t=in:d=${CODA.fadeIn}`, `afade=t=out:st=${out.toFixed(3)}:d=${CODA.fadeOut}`].join(',');
+}
 export const CODA_ON = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coda');
 /** The paint's words: the call, then what's there, then where. */
 export const CODA_WORDS = ['EXPLORE THE SET', 'fly around it live in your browser', 'source on GitHub · link in the description'] as const;
@@ -34,8 +44,12 @@ export function storeFrame(drive: Drive) {
   return new THREE.Matrix4().makeBasis(fwd.clone().negate(), UP, right.clone().negate()).setPosition(f.pos.clone().addScaledVector(f.right, L.back));
 }
 
-/** The spectator's crane through song time: keys (s; the eye and where it looks, world), joined by one smooth curve
- *  up to the roof, then a slow push in while the words are read. */
+/** The spectator's crane through song time: one glide along one curve through its keys (the eye, world), at an even
+ *  pace along it eased by one profile (`GLIDE`): moving already as it fades in, fastest a third of the way, then slowing
+ *  all the way down into its rest over the roof — no stops and starts (the user, 2026-11-06: "smoother camera movement":
+ *  it had eased to a stop at the roof and started again at once, and sped up and slowed down at each key, the curve's
+ *  keys taking equal time however far apart). Where it looks: on the car, then panning down onto the paint as the eye
+ *  comes round behind the store. */
 export function cranePath(drive: Drive, store: THREE.Matrix4) {
   const c = drive.carFrame(0), fwd = c.fwd.clone().setY(0).normalize(), left = c.right.clone().setY(0).normalize().negate(), h = LIQUOR.h;
   const at = (a: number, l: number, y: number) => c.pos.clone().addScaledVector(fwd, a).addScaledVector(left, l).addScaledVector(UP, y);
@@ -44,19 +58,34 @@ export function cranePath(drive: Drive, store: THREE.Matrix4) {
   // looking back down at the car at the light; behind the store, over its roof, looking down across the paint to the
   // road. (Round the store's far side, never over its roof: crossing it low, the words filled the frame sideways and
   // upside down before the crane came to them — stills, 2026-11-06)
-  const eyes = [at(-26, 9, 16), at(10, -22, 26), local(0, h + 13, -20)];
-  const aims = [at(6, 0, 1), at(8, -2, 1), local(0, h, -5.6)];
-  const keys = [CODA.from, 10.5, 15.2];
-  const rest = { eye: local(0, h + 11.2, -17.6), aim: local(0, h, -5.2) };
-  const eyeCurve = new THREE.CatmullRomCurve3(eyes, false, 'centripetal'), aimCurve = new THREE.CatmullRomCurve3(aims, false, 'centripetal');
+  const eyes = [at(-26, 9, 16), at(10, -22, 26), local(0, h + 13, -20), local(0, h + 11.2, -17.6)];
+  const aims = [at(6, 0, 1), at(8, -2, 1), local(0, h, -5.6), local(0, h, -5.2)];
+  const curve = new THREE.CatmullRomCurve3(eyes, false, 'centripetal');
+  // (its length measured finely: the even pace is read off it, and a coarse table steps the speed)
+  curve.arcLengthDivisions = 3000;
+  const lengths = curve.getLengths(), whole = lengths[lengths.length - 1]!;
+  const share = (k: number) => lengths[(k * 3000) / (eyes.length - 1)]! / whole; // (how far along key k is)
+  const f1 = share(1), f2 = share(2);
   return (t: number) => {
-    if (t <= keys[2]!) {
-      const u = smooth((t - keys[0]!) / (keys[2]! - keys[0]!));
-      return { eye: eyeCurve.getPoint(u), aim: aimCurve.getPoint(u) };
-    }
-    const u = Math.min(1, (t - keys[2]!) / (CODA.to - keys[2]!)), e = 1 - (1 - u) * (1 - u);
-    return { eye: eyes[2]!.clone().lerp(rest.eye, e), aim: aims[2]!.clone().lerp(rest.aim, e) };
+    const p = glide((t - CODA.from) / (CODA.to - CODA.from));
+    const eye = curve.getPointAt(p);
+    const onCar = aims[0]!.clone().lerp(aims[1]!, smooth(p / f1)), onPaint = aims[2]!.clone().lerp(aims[3]!, smooth((p - f2) / (1 - f2)));
+    return { eye, aim: onCar.lerp(onPaint, smooth((p - f1) / (f2 - f1))) };
   };
+}
+
+/** The glide's pace: its speed (x + a)(1 - x)^k over the clip (x 0..1): moving as it fades in, fastest at (1 - ka)/(1 + k),
+ *  slowing to nothing at its end; most of the way (0.92) there by the green. Integrated once into a table. */
+const GLIDE = { a: 0.1, k: 2.5, steps: 4000 };
+const glideTable = (() => {
+  const { a, k, steps } = GLIDE, cum = new Float64Array(steps + 1);
+  for (let i = 1; i <= steps; i++) { const x = (i - 0.5) / steps; cum[i] = cum[i - 1]! + (x + a) * (1 - x) ** k; }
+  for (let i = 1; i <= steps; i++) cum[i]! /= cum[steps]!;
+  return cum;
+})();
+function glide(x: number) {
+  const f = Math.min(1, Math.max(0, x)) * GLIDE.steps, i = Math.min(GLIDE.steps - 1, Math.floor(f));
+  return glideTable[i]! + (glideTable[i + 1]! - glideTable[i]!) * (f - i);
 }
 
 /** The roof's paint: white road paint, worn, inside a yellow border; the link line in yellow. */
@@ -113,6 +142,9 @@ export function buildCoda(drive: Drive) {
       return { pos: eye, quat: new THREE.Quaternion().setFromRotationMatrix(m.lookAt(eye, aim, UP)), fov: LENS_FOV };
     },
     /** From and to black at its ends (an exposure factor). */
-    fade(t: number) { return smooth((t - CODA.from) / CODA.fadeIn) * (1 - smooth((t - (CODA.to - CODA.fadeOut)) / CODA.fadeOut)); },
+    fade(t: number) {
+      const c = (t - CODA.from) / CODA.rate; // (the clip's own time: its fades are of the slowed clip)
+      return smooth(c / CODA.fadeIn) * (1 - smooth((c - (CODA_LENGTH - CODA.fadeOut)) / CODA.fadeOut));
+    },
   };
 }

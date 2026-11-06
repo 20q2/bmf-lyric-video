@@ -134,19 +134,28 @@ test('Fast lighting: the shadow maps drawn once empty and then left alone; culli
   for (const l of c.lights) expect(l.shadow.autoUpdate).toBe(true);
 });
 
-test('the coda: one smooth crane over the opening, above the roofs, coming to rest on the roof paint read left to right', async () => {
+test('the coda: one smooth glide over the opening, above the roofs, coming to rest on the roof paint read left to right', async () => {
   const { audio, lyrics } = await import('./data');
   const { makeDrive } = await import('../src/drive/drive');
-  const { CODA, PAINT, cranePath, storeFrame } = await import('../src/explore/coda');
+  const { CODA, CODA_LENGTH, PAINT, cranePath, storeFrame } = await import('../src/explore/coda');
   const { LIQUOR } = await import('../src/drive/sets/intro');
   const drive = makeDrive(audio, lyrics), store = storeFrame(drive), path = cranePath(drive, store);
-  let last = path(CODA.from);
-  for (let t = CODA.from + 1 / 60; t <= CODA.to; t += 1 / 60) {
-    const p = path(t);
-    expect(p.eye.distanceTo(last.eye)).toBeLessThan(0.6); // (no cut: under 36 m/s)
+  // frame by frame as it's rendered (60 fps of the slowed clip): no jolt in its move or its turn (the user, 2026-11-06,
+  // "smoother camera movement": it had stopped and started again at the roof, 270 m/s² in one frame)
+  const eyes: THREE.Vector3[] = [], looks: THREE.Vector3[] = [];
+  for (let c = 0; c <= CODA_LENGTH; c += 1 / 60) {
+    const p = path(CODA.from + c * CODA.rate);
     expect(p.eye.y).toBeGreaterThan(12); // (over the corner's shops: 5-9 m)
-    last = p;
+    eyes.push(p.eye); looks.push(p.aim.clone().sub(p.eye).normalize());
   }
+  const v = eyes.slice(1).map((e, i) => e.clone().sub(eyes[i]!).multiplyScalar(60));
+  const accel = v.slice(1).map((x, i) => x.clone().sub(v[i]!).multiplyScalar(60).length());
+  const turn = looks.slice(1).map((d, i) => (d.angleTo(looks[i]!) * 60 * 180) / Math.PI);
+  const turnAccel = turn.slice(1).map((x, i) => Math.abs(x - turn[i]!) * 60);
+  expect(Math.max(...v.map((x) => x.length()))).toBeLessThan(9); // m/s
+  expect(Math.max(...accel)).toBeLessThan(4); // m/s²
+  expect(Math.max(...turn)).toBeLessThan(20); // °/s
+  expect(Math.max(...turnAccel)).toBeLessThan(30); // °/s²
   // at rest: the paint's middle near the frame's middle, its text's run across the frame left to right, and the car's
   // way down the road the same way
   const cam = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 3000), end = path(CODA.to);

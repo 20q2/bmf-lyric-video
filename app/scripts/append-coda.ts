@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
-// Joins the coda (render.ts video --coda) onto the end of the video, after its end card, without re-encoding the
-// video: the coda's audio (the song's opening, cut out of it) faded in and out to match its picture's fades from and to
-// black, then the two concatenated stream for stream. Both must come from render.ts's own encoder (same size, rate,
-// codecs): it checks.
+// Joins the coda (render.ts video --coda: its picture and its slowed song already faded in and out) onto the end of the
+// video, after its end card, without re-encoding either: the two concatenated stream for stream. Both must come from
+// render.ts's own encoder (same size, rate, codecs, the same song's sample rate): it checks.
 //   bun scripts/append-coda.ts [--video ../out/bmf_m6.mp4] [--coda ../out/bmf_coda.mp4] [--out ../out/bmf_m6_coda.mp4]
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { CODA } from '../src/explore/coda';
 
 const argv = process.argv.slice(2);
 const opt = (k: string, d: string) => { const i = argv.lastIndexOf(`--${k}`); return i >= 0 ? argv[i + 1]! : d; };
@@ -32,14 +30,11 @@ async function probe(f: string) {
 const [main, clip] = [await probe(VIDEO), await probe(CLIP)];
 if (main.video !== clip.video) throw new Error(`the coda's video (${clip.video}) doesn't match the video's (${main.video}): render it with the same render.ts settings`);
 if (!clip.audio) throw new Error('the coda has no audio (rendered with --noaudio?)');
+if (main.audio !== clip.audio) throw new Error(`the coda's audio (${clip.audio}) doesn't match the video's (${main.audio})`);
 const tmp = mkdtempSync(path.join(tmpdir(), 'coda-'));
 try {
-  const faded = path.join(tmp, 'coda.mp4');
-  const d = clip.duration, out = Math.max(0, d - CODA.fadeOut);
-  // the audio re-encoded with the video's own settings (render.ts: aac 320k, the song's rate), the picture copied
-  await run(['ffmpeg', '-y', '-loglevel', 'error', '-i', CLIP, '-c:v', 'copy', '-af', `afade=t=in:d=${CODA.fadeIn},afade=t=out:st=${out.toFixed(3)}:d=${CODA.fadeOut}`, '-c:a', 'aac', '-b:a', '320k', ...(main.audio ? ['-ar', main.audio.split(' ')[1]!] : []), '-movflags', '+faststart', faded]);
-  const list = path.join(tmp, 'list.txt');
-  writeFileSync(list, [VIDEO, faded].map((f) => `file '${f.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
+  const d = clip.duration, list = path.join(tmp, 'list.txt');
+  writeFileSync(list, [VIDEO, CLIP].map((f) => `file '${f.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
   await run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', OUT]);
   const done = await probe(OUT);
   console.log(`wrote ${OUT}: ${main.duration.toFixed(2)} s + ${d.toFixed(2)} s coda = ${done.duration.toFixed(2)} s`);

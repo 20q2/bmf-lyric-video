@@ -28,11 +28,13 @@ const store = {
   set(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* no storage */ } },
 };
 
-/** Song time: the audio's clock while there's a song (its coarse steps smoothed with performance.now), else the wall's. */
+/** Song time: the audio's clock while there's a song (its coarse steps smoothed with performance.now), else the wall's;
+ *  at `rate` (the coda's slow motion: the song slowed with it, its pitch dropping as a record's would). */
 class SongClock {
   t = 0;
   playing = false;
   audio: HTMLAudioElement | null = null;
+  rate = 1;
   private lastAudioT = -1;
   private lastPerf = 0;
   private wall = 0;
@@ -41,6 +43,8 @@ class SongClock {
   use(a: HTMLAudioElement) {
     this.audio?.pause();
     this.audio = a;
+    a.playbackRate = this.rate;
+    a.preservesPitch = false;
     a.currentTime = this.t;
     this.lastAudioT = -1;
     if (this.playing) a.play().catch(() => this.pause());
@@ -58,16 +62,16 @@ class SongClock {
     if (this.audio) { this.audio.currentTime = this.t; this.lastAudioT = -1; this.audio.play().catch(() => this.pause()); }
   }
   pause() { this.playing = false; this.audio?.pause(); }
-  /** The song time now; false once the song has ended. */
+  /** Moves song time on to now (it stops at the song's end). */
   tick() {
     if (!this.playing) return;
     const now = performance.now(), a = this.audio;
     if (a) {
       if (a.currentTime !== this.lastAudioT) { this.lastAudioT = a.currentTime; this.lastPerf = now; }
-      this.t = Math.min(this.duration - 0.001, this.lastAudioT + (a.paused ? 0 : (now - this.lastPerf) / 1000));
+      this.t = Math.min(this.duration - 0.001, this.lastAudioT + (a.paused ? 0 : ((now - this.lastPerf) / 1000) * this.rate));
       if (a.ended) this.playing = false;
     } else {
-      this.t += (now - this.wall) / 1000;
+      this.t += ((now - this.wall) / 1000) * this.rate;
       this.wall = now;
       if (this.t >= this.duration - 0.001) { this.t = this.duration - 0.001; this.playing = false; }
     }
@@ -79,6 +83,7 @@ export function setupPlayer(engine: Engine, canvas: HTMLCanvasElement, from: num
   const DEBUG = import.meta.env.DEV || params.has('debug');
   const D = engine.duration;
   const song = new SongClock(D);
+  if (CODA_ON) song.rate = CODA.rate; // (?coda=1: slowed, as it's rendered)
   const ui = $('ui'), scrub = $<HTMLInputElement>('scrub'), info = $('info'), marks = $('marks'), errs = $('errs');
   const playBtn = $('play'), timeEl = $('time'), intro = $('intro'), help = $('help'), toastEl = $('toast');
   const pip = $<HTMLCanvasElement>('pip'), pipCtx = pip.getContext('2d')!;

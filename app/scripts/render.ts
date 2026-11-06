@@ -14,12 +14,12 @@
 //            full-res from the pixel buffer, videos are encoded at the physical size.
 //   --card NAME (all modes): render a diagnostic scene (testcard) instead of the video
 //   --coda (all modes): the coda (src/explore/coda.ts: the opening from a spectator's crane, EXPLORE THE SET on a roof);
-//            video mode's --from/--to default to its span (song time: the song's opening under it). Join it onto the
-//            video with scripts/append-coda.ts.
+//            video mode's --from/--to default to its span (song time), played slowed (CODA.rate: the picture and the
+//            song under it, slowed, muffled and faded: codaAudioFilter). Join it onto the video with scripts/append-coda.ts.
 // Starts a private Vite dev server (no live reload) unless --url names one, which must serve this app.
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
-import { CODA } from '../src/explore/coda';
+import { CODA, codaAudioFilter } from '../src/explore/coda';
 import path from 'node:path';
 
 const argv = process.argv.slice(2);
@@ -195,6 +195,13 @@ async function video(page: Page, from: number, to: number, fps: number, out: str
   const audio = path.join(ROOT, 'audio/song.wav');
   const args = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${OW}x${OH}`, '-r', String(fps), '-i', 'pipe:0'];
   if (!flag('noaudio')) args.push('-ss', String(from), '-t', String(to - from), '-i', audio);
+  // (the coda: slow motion, the song under it slowed to match and treated: src/explore/coda.ts)
+  const rate = flag('coda') ? CODA.rate : 1;
+  if (!flag('noaudio') && flag('coda')) {
+    const sr = +new TextDecoder().decode(Bun.spawnSync(['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', audio]).stdout).trim();
+    if (!(sr > 0)) throw new Error(`couldn't read ${audio}'s sample rate`);
+    args.push('-af', codaAudioFilter(sr));
+  }
   // Frames are sRGB (toSRGB in the final pass): convert with the BT.709 matrix and tag the stream,
   // otherwise ffmpeg converts with BT.601 while players and YouTube decode untagged HD as BT.709.
   // scale tags the matrix and range; primaries and transfer need setparams (the -color_* output flags don't reach the stream).
@@ -203,7 +210,7 @@ async function video(page: Page, from: number, to: number, fps: number, out: str
   args.push('-movflags', '+faststart', out);
   const ff = Bun.spawn(args, { stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' });
   let frames = 0;
-  const total = Math.round(to * fps) - Math.round(from * fps);
+  const total = rate === 1 ? Math.round(to * fps) - Math.round(from * fps) : Math.round(((to - from) / rate) * fps);
   const t0 = performance.now();
   // ffmpeg exiting before we close its input means the video is broken: fail, rather than wait for acks forever
   let closing = false, exited = false;
@@ -233,7 +240,7 @@ async function video(page: Page, from: number, to: number, fps: number, out: str
   });
   try {
     const used: Record<string, number> = await Promise.race([
-      page.evaluate((o) => (window as any).__lv.stream(o), { from, to, fps, ws: `ws://localhost:${server.port}`, samples: SAMPLES, shutter: +opt('shutter', '0.5')!, inflight: 4 }),
+      page.evaluate((o) => (window as any).__lv.stream(o), { from, to, fps, ws: `ws://localhost:${server.port}`, samples: SAMPLES, shutter: +opt('shutter', '0.5')!, inflight: 4, rate }),
       died,
     ]);
     // wait for all frames to arrive

@@ -76,22 +76,26 @@ function setupExport() {
      * has handed on (a text message with its running count) and at most `inflight` frames are unacknowledged:
      * backpressure from the encoder, so a slow encode (4K) cannot pile frames up in the receiver's memory.
      */
-    async stream(opts: { from: number; to: number; fps: number; ws: string; samples?: number | AdaptiveSampling; shutter?: number; inflight?: number }) {
+    async stream(opts: { from: number; to: number; fps: number; ws: string; samples?: number | AdaptiveSampling; shutter?: number; inflight?: number; rate?: number }) {
       const ws = new WebSocket(opts.ws);
       ws.binaryType = 'arraybuffer';
       let acked = 0;
       ws.onmessage = (e) => { if (typeof e.data === 'string') acked = Math.max(acked, +e.data || 0); };
       await new Promise<void>((res, rej) => { ws.onopen = () => res(); ws.onerror = (e) => rej(e); });
       const dt = 1 / opts.fps;
-      const n0 = Math.round(opts.from * opts.fps), n1 = Math.round(opts.to * opts.fps);
+      // (`rate` < 1: slow motion — each frame steps song time by rate/fps, the coda's slowed opening; at 1 the frames
+      // fall on the song's own grid, n/fps, as they always did)
+      const r = opts.rate ?? 1, step = dt * r;
+      const n0 = Math.round(opts.from * opts.fps), n1 = r === 1 ? Math.round(opts.to * opts.fps) : n0 + Math.round(((opts.to - opts.from) / r) * opts.fps);
+      const at = (n: number) => (r === 1 ? n * dt : n0 * dt + (n - n0) * step);
       const buf = new Uint8Array(PW * PH * 4);
       // warm-up: render one frame before the range so the first frame is sequential for stateful scenes
       const S = opts.samples ?? 1, SH = opts.shutter ?? 0.5;
       // (adaptive sampling only runs stateless scenes: one sample is enough for the warm-up)
-      if (n0 > 0) engine.render((n0 - 1) * dt, dt, false, typeof S === 'number' ? S : 1, SH);
+      if (n0 > 0) engine.render(at(n0 - 1), step, false, typeof S === 'number' ? S : 1, SH);
       const used: Record<number, number> = {}; // sub-frames per frame -> frames
       for (let n = n0; n < n1; n++) {
-        const k = engine.render(n * dt, dt, false, S, SH);
+        const k = engine.render(at(n), step, false, S, SH);
         used[k] = (used[k] ?? 0) + 1;
         await engine.readPixelsAsync(buf);
         if (opts.inflight) while (n - n0 - acked >= opts.inflight) await new Promise((r) => setTimeout(r, 2));
