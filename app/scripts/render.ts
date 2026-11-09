@@ -19,7 +19,7 @@
 // Starts a private Vite dev server (no live reload) unless --url names one, which must serve this app.
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
-import { CODA, codaAudioFilter } from '../src/explore/coda';
+import { CODA, codaAudio } from '../src/explore/coda';
 import path from 'node:path';
 
 const argv = process.argv.slice(2);
@@ -194,14 +194,13 @@ async function video(page: Page, from: number, to: number, fps: number, out: str
   const crf = opt('crf', '16')!;
   const audio = path.join(ROOT, 'audio/song.wav');
   const args = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${OW}x${OH}`, '-r', String(fps), '-i', 'pipe:0'];
-  if (!flag('noaudio')) args.push('-ss', String(from), '-t', String(to - from), '-i', audio);
+  const sr = flag('coda') ? +new TextDecoder().decode(Bun.spawnSync(['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', audio]).stdout).trim() : 0;
+  if (flag('coda') && !(sr > 0) && !flag('noaudio')) throw new Error(`couldn't read ${audio}'s sample rate`);
+  const song = flag('coda') && sr > 0 ? codaAudio(sr) : null;
+  if (!flag('noaudio')) args.push('-ss', String(song ? song.ss : from), '-t', String(song ? song.t : to - from), '-i', audio);
   // (the coda: slow motion, the song under it slowed to match and treated: src/explore/coda.ts)
   const rate = flag('coda') ? CODA.rate : 1;
-  if (!flag('noaudio') && flag('coda')) {
-    const sr = +new TextDecoder().decode(Bun.spawnSync(['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', audio]).stdout).trim();
-    if (!(sr > 0)) throw new Error(`couldn't read ${audio}'s sample rate`);
-    args.push('-af', codaAudioFilter(sr));
-  }
+  if (!flag('noaudio') && song) args.push('-af', song.af);
   // Frames are sRGB (toSRGB in the final pass): convert with the BT.709 matrix and tag the stream,
   // otherwise ffmpeg converts with BT.601 while players and YouTube decode untagged HD as BT.709.
   // scale tags the matrix and range; primaries and transfer need setparams (the -color_* output flags don't reach the stream).

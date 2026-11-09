@@ -1,11 +1,14 @@
 #!/usr/bin/env bun
-// Joins the coda (render.ts video --coda: its picture and its slowed song already faded in and out) onto the end of the
-// video, after its end card, without re-encoding either: the two concatenated stream for stream. Both must come from
-// render.ts's own encoder (same size, rate, codecs, the same song's sample rate): it checks.
+// Joins the coda (render.ts video --coda) onto the end of the video, after its end card: CODA.hold seconds of silent
+// black, then the clip, its picture copied as rendered and its sound made again from the song (src/explore/coda.ts
+// codaAudio: so the sound can be changed without rendering the picture again). The video itself is copied, not
+// re-encoded. Both must come from render.ts's own encoder (same size, rate, codecs): it checks. Also leaves the clip as
+// it's joined (its new sound, no hold) as bmf_coda_final.mp4.
 //   bun scripts/append-coda.ts [--video ../out/bmf_m6.mp4] [--coda ../out/bmf_coda.mp4] [--out ../out/bmf_m6_coda.mp4]
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { CODA, codaAudio } from '../src/explore/coda';
 
 const argv = process.argv.slice(2);
 const opt = (k: string, d: string) => { const i = argv.lastIndexOf(`--${k}`); return i >= 0 ? argv[i + 1]! : d; };
@@ -13,6 +16,8 @@ const ROOT = path.resolve(import.meta.dir, '../..');
 const VIDEO = path.resolve(opt('video', path.join(ROOT, 'out/bmf_m6.mp4')));
 const CLIP = path.resolve(opt('coda', path.join(ROOT, 'out/bmf_coda.mp4')));
 const OUT = path.resolve(opt('out', path.join(ROOT, 'out/bmf_m6_coda.mp4')));
+const FINAL = path.join(path.dirname(CLIP), 'bmf_coda_final.mp4');
+const SONG = path.join(ROOT, 'audio/song.wav');
 
 async function run(cmd: string[]) {
   const p = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe' });
@@ -33,11 +38,20 @@ if (!clip.audio) throw new Error('the coda has no audio (rendered with --noaudio
 if (main.audio !== clip.audio) throw new Error(`the coda's audio (${clip.audio}) doesn't match the video's (${main.audio})`);
 const tmp = mkdtempSync(path.join(tmpdir(), 'coda-'));
 try {
-  const d = clip.duration, list = path.join(tmp, 'list.txt');
-  writeFileSync(list, [VIDEO, CLIP].map((f) => `file '${f.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
+  const d = clip.duration, list = path.join(tmp, 'list.txt'), sr = +clip.audio.split(' ')[1]!, a = codaAudio(sr);
+  // the clip's picture with its sound made again (cut from the song where the picture's at, treated, delayed)
+  const treated = path.join(tmp, 'coda.mp4');
+  await run(['ffmpeg', '-y', '-loglevel', 'error', '-i', CLIP, '-ss', String(a.ss), '-t', String(a.t), '-i', SONG, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-af', a.af, '-c:a', 'aac', '-b:a', '320k', '-ar', String(sr), '-shortest', '-movflags', '+faststart', treated]);
+  copyFileSync(treated, FINAL);
+  // the hold: silent black, as the video's own encoding (the same size, rate and pixel format) so it joins without a re-encode
+  const [vw, vh, , vfps] = [...(main.video ?? '').split(' ').slice(2)];
+  const black = path.join(tmp, 'black.mp4');
+  await run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', `color=c=black:s=${vw}x${vh}:r=${vfps}:d=${CODA.hold}`, '-f', 'lavfi', '-i', `anullsrc=r=${sr}:cl=stereo`, '-t', String(CODA.hold),
+    '-vf', 'scale=out_color_matrix=bt709,setparams=color_primaries=bt709:color_trc=bt709', '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-tune', 'grain', '-x264-params', 'aq-mode=3', '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', black]);
+  writeFileSync(list, [VIDEO, black, treated].map((f) => `file '${f.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
   await run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', OUT]);
   const done = await probe(OUT);
-  console.log(`wrote ${OUT}: ${main.duration.toFixed(2)} s + ${d.toFixed(2)} s coda = ${done.duration.toFixed(2)} s`);
+  console.log(`wrote ${OUT}: ${main.duration.toFixed(2)} s + ${CODA.hold} s black + ${d.toFixed(2)} s coda = ${done.duration.toFixed(2)} s`);
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

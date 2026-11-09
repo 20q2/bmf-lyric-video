@@ -167,3 +167,14 @@ test('the coda: one smooth glide over the opening, above the roofs, coming to re
   const car = drive.carFrame(15.6).pos, on = drive.carFrame(CODA.to).pos;
   expect(on.clone().project(cam).x).toBeGreaterThan(car.clone().project(cam).x);
 });
+
+
+test('the coda sound is cut where the picture is when it comes in, and is as long as the clip, quieter than it was', async () => {
+  const { CODA, CODA_LENGTH, CODA_MUSIC, codaAudio } = await import('../src/explore/coda');
+  const a = codaAudio(44100);
+  expect(a.ss).toBeCloseTo(CODA.from + CODA_MUSIC.at * CODA.rate, 9); // (the song at the clip's time CODA_MUSIC.at)
+  expect(a.ss + a.t).toBeCloseTo(CODA.to, 9);
+  expect(CODA_MUSIC.at + a.t / CODA.rate).toBeCloseTo(CODA_LENGTH, 9); // (delayed, slowed: as long as the clip)
+  expect(a.af).toContain(`adelay=${CODA_MUSIC.at * 1000}|${CODA_MUSIC.at * 1000}`);
+  expect(CODA_MUSIC.volume).toBeLessThanOrEqual(0.2);
+});

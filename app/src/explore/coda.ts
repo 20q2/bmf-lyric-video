@@ -14,15 +14,24 @@ import type { Eye } from './view';
 /** The song time it plays (s: the guitar intro's second half, the green on the first kick at 15.6, the car away), slowed
  *  to `rate` — the picture and the song together, so the light still goes green on the kick (the user, 2026-11-06: "a
  *  subtle and slowed down version of the intro"); its fades from and to black (s of the clip). */
-export const CODA = { from: 6, to: 21, rate: 0.8, fadeIn: 1, fadeOut: 2.6 };
+export const CODA = { from: 6, to: 21, rate: 0.8, fadeIn: 1, fadeOut: 2.6, hold: 2 };
+/** The song under it (the user, 2026-11-09: "hang out as black" at the video's end, music not until "about 4 seconds", "50%
+ *  softer"): enters this far into the clip (s of the clip: cut from the song at the matching place, so it stays in step
+ *  with the picture), fading in this long, at this much of its former level (0.2: half the amplitude, -6 dB). `hold`
+ *  above: seconds of silent black between the video's end and the clip, added when they're joined. */
+export const CODA_MUSIC = { at: 4, fadeIn: 2, volume: 0.2 };
 /** The clip's length (s). */
 export const CODA_LENGTH = (CODA.to - CODA.from) / CODA.rate;
 /** The song under it, slowed (pitch and all, as a record played slow), muffled and roomy, and quiet: under the picture,
- *  not over it. An ffmpeg filter for the song cut at CODA.from..to, sample rate `sr`. */
-export function codaAudioFilter(sr: number) {
-  const out = CODA_LENGTH - CODA.fadeOut;
-  return [`asetrate=${Math.round(sr * CODA.rate)}`, `aresample=${sr}`, 'lowpass=f=3200', 'aecho=0.85:0.8:120|260|410:0.3|0.2|0.12',
-    'volume=0.4', `afade=t=in:d=${CODA.fadeIn}`, `afade=t=out:st=${out.toFixed(3)}:d=${CODA.fadeOut}`].join(',');
+ *  not over it, coming in late. What to cut from the song (`ss`, `t`: seconds of it, from where the clip's picture is
+ *  at CODA_MUSIC.at, to its end) and the ffmpeg filter to treat it with at sample rate `sr`; the filtered sound is as
+ *  long as the clip. */
+export function codaAudio(sr: number) {
+  const at = CODA_MUSIC.at, ms = Math.round(at * 1000), out = CODA_LENGTH - CODA.fadeOut;
+  const af = [`asetrate=${Math.round(sr * CODA.rate)}`, `aresample=${sr}`, 'lowpass=f=3200', 'aecho=0.85:0.8:120|260|410:0.3|0.2|0.12',
+    `volume=${CODA_MUSIC.volume}`, `adelay=${ms}|${ms}`, `afade=t=in:st=${at}:d=${CODA_MUSIC.fadeIn}`, `afade=t=out:st=${out.toFixed(3)}:d=${CODA.fadeOut}`].join(',');
+  const ss = CODA.from + at * CODA.rate;
+  return { ss, t: CODA.to - ss, af };
 }
 export const CODA_ON = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coda');
 /** The paint's words: the call, then what's there, then where. */
